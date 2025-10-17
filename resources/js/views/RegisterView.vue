@@ -1,0 +1,88 @@
+<template>
+  <div class="auth-wrapper">
+    <div class="container">
+      <div class="row justify-content-center align-items-center min-vh-100">
+        <div class="col-12 col-md-10 col-lg-7 d-flex justify-content-center">
+          <div class="auth-card card w-100" style="max-width: 560px;">
+            <div class="card-body">
+              <div class="text-center mb-3">
+                <div class="fw-bold" style="color: var(--brand-primary); font-size: 20px;">TECH</div>
+              </div>
+              <div class="auth-header text-center mb-4">
+                <h4 class="mb-1">Register New Account</h4>
+              </div>
+              <form @submit.prevent="submit">
+                <div class="row g-3">
+                  <div class="col-12 col-md-6">
+                    <label class="form-label">First Name</label>
+                    <input v-model="form.firstName" type="text" class="form-control" placeholder="First Name" required />
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <label class="form-label">Last Name</label>
+                    <input v-model="form.lastName" type="text" class="form-control" placeholder="Last Name" required />
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <label class="form-label">Email Address</label>
+                    <input v-model="form.email" type="email" class="form-control" placeholder="Email Address" required />
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <label class="form-label">Phone Number</label>
+                    <input v-model="form.phone" type="tel" class="form-control" placeholder="Phone Number" />
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Password</label>
+                    <input v-model="form.password" type="password" class="form-control" placeholder="Password" required />
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Confirm Password</label>
+                    <input v-model="form.password_confirmation" type="password" class="form-control" placeholder="Confirm Password" required />
+                  </div>
+                </div>
+                <div class="form-check mt-3 mb-3">
+                  <input class="form-check-input" type="checkbox" id="agree" required />
+                  <label class="form-check-label text-muted" for="agree">By clicking, you agree with Terms &amp; Conditions.</label>
+                </div>
+                <div class="d-grid gap-2">
+                  <button type="submit" class="btn btn-primary">Register</button>
+                </div>
+              </form>
+              <div class="mt-3 text-center auth-footer">
+                <span class="text-muted small">Already Have an Account?</span>
+                <RouterLink to="/login" class="small ms-1">Login Now</RouterLink>
+              </div>
+              <p v-if="error" class="text-danger mt-3 mb-0">{{ error }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { reactive, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import axios from 'axios';
+import { setAuthenticatedUser } from '../auth';
+
+const router = useRouter();
+const appName = document.title || 'Omayer Fleet System';
+const error = ref('');
+const form = reactive({ firstName: '', lastName: '', email: '', phone: '', password: '', password_confirmation: '' });
+
+async function submit() {
+  error.value = '';
+  const payload = { name: `${form.firstName} ${form.lastName}`.trim(), email: form.email, password: form.password, password_confirmation: form.password_confirmation };
+  try {
+    const { data } = await axios.post('/web/auth/register', payload);
+    setAuthenticatedUser(data?.user);
+    router.push('/');
+  } catch (e) {
+    error.value = e?.response?.data?.message || 'Registration failed';
+  }
+}
+</script>
+
+<style scoped>
+.auth-card { max-width: 560px; }
+</style>
