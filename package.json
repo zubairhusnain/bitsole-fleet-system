@@ -16,5 +16,11 @@
         "vite": "^5.4.20",
         "vue": "^3.5.22",
         "vue-router": "^4.6.2"
+    },
+    "dependencies": {
+        "laravel-echo": "^2.2.4",
+        "leaflet": "^1.9.4",
+        "pusher-js": "^8.4.0",
+        "sweetalert2": "^11.26.2"
     }
 }

@@ -1,3 +1,4 @@
+@import './plugins/adminlte.min.css';
 @import 'tailwindcss';
 /* Fonts loaded via welcome.blade: Instrument Sans */
 
@@ -241,6 +242,33 @@ p  { font-size: 16px; line-height: 1.6; }
 }
 .btn-app-dark:hover { background-color: #11154A;color:#FFFFFF; border-color: #11154A; }
 .input-w-360 { width: 360px; }
+
+/* Status badge utilities: ignition/speed states */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  line-height: 1;
+}
+.status-badge .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.95;
+}
+/* Variants */
+.status-badge.is-on { color: #0a7a39; background: rgba(10, 122, 57, 0.12); }
+.status-badge.is-off { color: #6b7280; background: rgba(107, 114, 128, 0.16); }
+.status-badge.is-low { color: #0b5ed7; background: rgba(11, 94, 215, 0.12); }
+.status-badge.is-medium { color: #108b4a; background: rgba(16, 139, 74, 0.12); }
+.status-badge.is-high { color: #c77d0a; background: rgba(199, 125, 10, 0.12); }
+.status-badge.is-critical { color: #b02a37; background: rgba(176, 42, 55, 0.12); }
+.status-badge.is-unknown { color: #6b7280; background: rgba(107, 114, 128, 0.12); }
 
 /* Table header: dark slate bar */
 .thead-app-dark, .thead-app-dark th { background-color: #0b0f28; }

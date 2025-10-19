@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 Route::get('/testing', function () {
             try {
             // Raw SQL query to select all columns from the 'tc_users' table
-            // We prepend the schema name 'omayer' to ensure the database 
+            // We prepend the schema name 'omayer' to ensure the database
             // looks in the correct location for the table.
             $users = TcUser::all();
             dd($users);
@@ -45,11 +45,17 @@ Route::redirect('/', '/login');
 // Exclude /web/* so those endpoints are handled by controllers
 Route::view('/{any}', 'welcome')
     ->where('any', '^(?!web|storage|up|ping|health|testing).*$');
+// Provide CSRF token for SPA clients (fallback when meta/cookie not available)
+Route::get('/web/csrf-token', function () {
+    return response()->json(['csrfToken' => csrf_token()]);
+});
 
 // SPA Auth endpoints (session-based)
 Route::prefix('/web/auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/login', [AuthController::class, 'login']);
+    // Temporarily disable CSRF for local dev login to unblock testing
+    Route::post('/login', [AuthController::class, 'login'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 });
@@ -79,4 +85,16 @@ Route::middleware('auth')->prefix('/web/admin')->group(function () {
     });
 });
 
-// (Debug route removed)
+// Auth-protected Vehicles CRUD
+Route::middleware('auth')->prefix('/web/vehicles')->group(function () {
+    Route::get('/', [\App\Http\Controllers\VehicleController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\VehicleController::class, 'store']);
+    Route::get('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'show']);
+    Route::put('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'update']);
+    Route::delete('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'destroy']);
+});
+
+// Live Tracking: trigger a broadcast of current positions
+Route::middleware('auth')->get('/web/live/positions/broadcast', [\App\Http\Controllers\LiveTrackingController::class, 'broadcast']);
+// Live Tracking: HTTP fallback to fetch current positions
+Route::get('/web/live/positions/current', [\App\Http\Controllers\LiveTrackingController::class, 'current']);

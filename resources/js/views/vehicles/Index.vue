@@ -3,23 +3,24 @@
     <!-- Breadcrumb -->
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
-        <li class="breadcrumb-item"><RouterLink to="/">Dashboard</RouterLink></li>
-        <li class="breadcrumb-item active" aria-current="page">Vehicle Management</li>
+         <li class="breadcrumb-item"><RouterLink to="/dashboard">Dashboard</RouterLink></li>
+         <li class="breadcrumb-item active" aria-current="page">Vehicle Management</li>
       </ol>
     </div>
-
+<UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="dismissError" />
     <!-- Page Title and Actions -->
     <div class="d-flex align-items-center justify-content-between mb-3">
       <div>
         <h4 class="mb-0 fw-semibold">Vehicles Management</h4>
-        <small class="text-muted">Inventory and status</small>
+        <div v-if="loading" class="text-muted small">Loading vehicles…</div>
+
       </div>
       <div class="d-flex align-items-center gap-1">
         <div class="input-group">
           <span class="input-group-text"><i class="bi bi-search"></i></span>
-          <input v-model="query" type="text" class="form-control input-w-360" placeholder="Search vehicle/ID" />
+          <input v-model="query" type="text" class="form-control input-w-360" placeholder="Search vehicleID" />
         </div>
-        <button class="btn btn-outline-secondary btn-icon-44" title="Filters"><i class="bi bi-sliders2"></i></button>
+        <button class="btn btn-outline-secondary btn-icon-44" title="Filters" disabled><i class="bi bi-sliders2"></i></button>
         <RouterLink to="/vehicles/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> List New Vehicle</RouterLink>
       </div>
     </div>
@@ -39,27 +40,47 @@
                 <th class="fw-semibold py-2">Ignition</th>
                 <th class="fw-semibold py-2">Speed (Km/h)</th>
                 <th class="fw-semibold py-2">Location</th>
+                <th class="fw-semibold py-2 text-end">Actions</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in pagedRows" :key="row.id" class="border-bottom">
-                <td class="text-muted text-nowrap">{{ row.code }}</td>
-                <td class="text-nowrap">{{ row.name }}</td>
-                <td class="text-muted text-nowrap">{{ row.vin }}</td>
-                <td class="text-muted text-nowrap">{{ row.plate }}</td>
-                <td class="text-muted text-nowrap">{{ row.odometer }}</td>
-                <td>
-                  <span :class="['badge rounded-pill badge-app', row.ignition === 'On' ? 'text-bg-success' : 'text-bg-secondary']">{{ row.ignition }}</span>
+              <tr v-for="row in pagedRows" :key="row.device_id" class="border-bottom">
+                <td class="text-muted text-nowrap">{{ row.uniqueid ?? '—' }}</td>
+                <td class="text-muted text-nowrap">{{ row.name ?? '—' }}</td>
+                <td class="text-muted text-nowrap">{{ row.vin ?? '—' }}</td>
+                <td class="text-muted text-nowrap">{{ row.plate ?? '—' }}</td>
+                <td class="text-muted text-nowrap">{{ row.odometer ?? '—' }}</td>
+                <td class="text-nowrap">
+                  <span :class="['status-badge', ignitionClass(row.ignition)]">
+                    <span class="dot"></span>
+                    {{ row.ignition ?? '—' }}
+                  </span>
                 </td>
-                <td class="text-muted text-nowrap">{{ row.speed }}</td>
-                <td class="text-nowrap">{{ row.location }}</td>
+                <td class="text-nowrap">
+                  <span :class="['status-badge', speedClass(row.speed)]">
+                    <span class="dot"></span>
+                    {{ row.speed ?? '—' }}
+                  </span>
+                </td>
+                <td class="text-muted text-nowrap">{{ row.location ?? '—' }}</td>
+                <td class="text-end">
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-outline-danger" title="Delete" @click="remove(row)" :disabled="deleting[row.device_id] === true">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="pagedRows.length === 0 && !loading">
+                <td colspan="9" class="text-center text-muted py-3">No vehicles found.</td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
       <div class="card-footer d-flex align-items-center py-2">
-        <div class="text-muted small me-auto">Showing {{ startIndex + 1 }} to {{ Math.min(startIndex + pageSize, rows.length) }} of {{ rows.length }} results</div>
+        <div class="text-muted small me-auto">Showing {{ startIndex + 1 }} to {{ Math.min(startIndex + pageSize, totalCount) }} of {{ totalCount }} results</div>
         <nav aria-label="Pagination" class="ms-auto">
           <ul class="pagination pagination-sm mb-0 pagination-app">
             <li class="page-item" :class="{ disabled: page === 1 }"><button class="page-link" @click="prevPage">‹</button></li>
@@ -73,52 +94,214 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import axios from 'axios';
+import { useRouter, useRoute } from 'vue-router';
+import Swal from 'sweetalert2';
+import UiAlert from '../../components/UiAlert.vue';
 
+const router = useRouter();
+const route = useRoute();
 const query = ref('');
 const page = ref(1);
-const pageSize = 16;
+const pageSize = ref(25);
+const loading = ref(false);
+const error = ref('');
+const rows = ref([]);
+const deleting = ref({});
+const meta = ref({ total: 0, current_page: 1, per_page: 25 });
 
-// Sample vehicle rows to match the structure in the screenshot
-const rows = ref([
-  { id: 1, code: 'VHCL-1001', name: 'Phantom Racer 9 Pro', vin: '1FTRX18W43NA12345', plate: 'D248-1982-6794', odometer: '212,300 KM', ignition: 'Off', speed: '0 km/h', location: '1234 Elm St, Springfield' },
-  { id: 2, code: 'VHCL-1002', name: 'Racer X 2020', vin: '1G1TZX628X4F123456', plate: 'F732-6118-2945', odometer: '212,958 KM', ignition: 'On', speed: '95 km/h', location: '789 Pine St, Seattle, WA' },
-  { id: 3, code: 'VHCL-1003', name: 'TurboMax Z', vin: '2C3CAC3G5AH123456', plate: 'G384-9917-8842', odometer: '213,612 KM', ignition: 'Off', speed: '0 km/h', location: '456 Oak Rd, Austin, TX' },
-  { id: 4, code: 'VHCL-1004', name: 'Speedster 3000', vin: '1NAL3JAP4EC123456', plate: 'K185-4273-6021', odometer: '214,275 KM', ignition: 'On', speed: '110 km/h', location: '321 Maple Dr, Denver, CO' },
-  { id: 5, code: 'VHCL-1005', name: 'Velocity Racer', vin: 'WAU3LJ5BE69A123456', plate: 'M569-8431-1186', odometer: '214,935 KM', ignition: 'Off', speed: '0 km/h', location: '987 Cedar Ln, Orlando, FL' },
-  { id: 6, code: 'VHCL-1006', name: 'Extreme Speedster', vin: 'JHMZN2H5BSB123456', plate: 'R912-7032-5714', odometer: '215,600 KM', ignition: 'On', speed: '55 km/h', location: '654 Birch Blvd, Portland, OR' },
-  { id: 7, code: 'VHCL-1007', name: 'Nitro Falcon', vin: '1ZVHT85H3757123456', plate: 'S334-6689-0078', odometer: '216,267 KM', ignition: 'Off', speed: '0 km/h', location: '147 Walnut St, Nashville, TN' },
-  { id: 8, code: 'VHCL-1008', name: 'Thunderbolt X', vin: 'YV1RS5924X4234567', plate: 'T498-2205-7340', odometer: '216,932 KM', ignition: 'On', speed: '88 km/h', location: '258 Spruce Ct, Philadelphia, PA' },
-  { id: 9, code: 'VHCL-1009', name: 'Lightning Racer', vin: '3N1AB7AP4FY123456', plate: 'W125-9873-1402', odometer: '217,600 KM', ignition: 'Off', speed: '0 km/h', location: '369 Ash Ave, San Diego, CA' },
-  { id: 10, code: 'VHCL-1010', name: 'Flash 6000', vin: '5N1A2ZMHF9FN123456', plate: 'Y863-4451-3909', odometer: '218,275 KM', ignition: 'On', speed: '105 km/h', location: '159 Cherry Way, Miami, FL' },
-  { id: 11, code: 'VHCL-1011', name: 'Rapid Racer V2', vin: '2G1FB1E31F9123456', plate: 'D248-1982-6794', odometer: '218,942 KM', ignition: 'Off', speed: '0 km/h', location: '753 Palm St, Charlotte, NC' },
-  { id: 12, code: 'VHCL-1012', name: 'Supernova R', vin: '1FBAXX8BSK8B123456', plate: 'F732-6118-2945', odometer: '219,610 KM', ignition: 'On', speed: '72 km/h', location: '852 Fir Pl, Phoenix, AZ' },
-  { id: 13, code: 'VHCL-1013', name: 'Gravity Racer', vin: '1J8HS582XBC123456', plate: 'G384-9917-8842', odometer: '220,278 KM', ignition: 'On', speed: '0 km/h', location: '951 Dogwood Dr, Indianapolis, IN' },
-  { id: 14, code: 'VHCL-1014', name: 'Stellar Racer X1', vin: '2G8WP52S5X4123456', plate: 'K185-4273-6021', odometer: '220,950 KM', ignition: 'On', speed: '98 km/h', location: '258 Sycamore Ln, Dallas, TX' },
-  { id: 15, code: 'VHCL-1015', name: 'Racer X 2020', vin: '1GKRRDE9A1P123456', plate: 'M569-8431-1186', odometer: '221,625 KM', ignition: 'On', speed: '65 km/h', location: '369 Cypress Blvd, New Orleans, LA' },
-  { id: 16, code: 'VHCL-1016', name: 'Velocity Racer', vin: '1C4RJF8G1AC123456', plate: 'R912-7032-5714', odometer: '222,300 KM', ignition: 'Off', speed: '0 km/h', location: '789 Magnolia St, San Francisco, CA' },
-]);
+async function fetchPage(n = 1) {
+  loading.value = true;
+  try {
+    const { data } = await axios.get('/web/vehicles', { params: { page: n } });
+    const list = Array.isArray(data) ? data : (data.data ?? []);
+    rows.value = list;
+    meta.value = {
+      total: data.total ?? (data.meta?.total ?? list.length),
+      current_page: data.current_page ?? (data.meta?.current_page ?? n),
+      per_page: data.per_page ?? (data.meta?.per_page ?? 25)
+    };
+    page.value = meta.value.current_page;
+    pageSize.value = meta.value.per_page;
+  } catch (e) {
+    error.value = e?.response?.data?.message || 'Failed to load vehicles.';
+    rows.value = [];
+    meta.value = { total: 0, current_page: 1, per_page: 25 };
+  } finally {
+    loading.value = false;
+  }
+}
 
-const filtered = computed(() => {
-  if (!query.value) return rows.value;
-  const q = query.value.toLowerCase();
-  return rows.value.filter(r =>
-    r.code.toLowerCase().includes(q) ||
-    r.name.toLowerCase().includes(q) ||
-    r.vin.toLowerCase().includes(q)
-  );
+function refresh() { fetchPage(page.value); }
+
+function dismissError() { error.value = ''; }
+
+onMounted(() => {
+  const errParam = route.query?.error;
+  if (errParam) {
+    error.value = Array.isArray(errParam) ? String(errParam[0]) : String(errParam);
+    // Clear query to prevent persistent banner on later navigations
+    router.replace('/vehicles');
+  }
+  fetchPage(1);
 });
 
-const totalPages = computed(() => Math.ceil(filtered.value.length / pageSize));
-const startIndex = computed(() => (page.value - 1) * pageSize);
-const pagedRows = computed(() => filtered.value.slice(startIndex.value, startIndex.value + pageSize));
+// Hydrate rows with tc_device attributes to match table headers
+function parseAttrs(attrs) {
+  try { return typeof attrs === 'string' ? JSON.parse(attrs) : (attrs || {}); } catch { return {}; }
+}
+function pickAttr(attrs, keys) {
+  for (const k of keys) {
+    const val = attrs?.[k];
+    if (val !== undefined && val !== null && val !== '') return val;
+  }
+  return null;
+}
+function deriveRow(r) {
+   const tc = r?.tc_device ?? r?.tcDevice ?? {};
+   const attrs = parseAttrs(tc.attributes);
+   const pos = tc.position || {};
+   const posAttrs = parseAttrs(pos.attributes);
+   const uniqueid = r.uniqueid ?? r.uniqueId ?? tc.uniqueid ?? tc.uniqueId ?? pickAttr(attrs, ['uniqueId', 'uniqueid']);
+   const name = r.name ?? tc.name ?? pickAttr(attrs, ['name']);
+   const vin = r.vin ?? pickAttr(attrs, ['vin', 'VIN']);
+   const plate = r.plate ?? pickAttr(attrs, ['plate', 'licensePlate', 'registration', 'regNumber']);
+   const odometer = r.odometer ?? pickAttr(attrs, ['odometer', 'mileage', 'odometerKm', 'odometer_km']);
 
-function goPage(n) { page.value = n; }
-function prevPage() { if (page.value > 1) page.value--; }
-function nextPage() { if (page.value < totalPages.value) page.value++; }
+   // ignition: prefer tc.position.attributes.ignition, fallback to tc_device.attributes
+   const ignRaw = posAttrs.ignition ?? (r.ignition ?? pickAttr(attrs, ['ignition', 'Ignition']));
+   const ignition = ignRaw === true || ignRaw === 1 || String(ignRaw).toLowerCase() === 'on'
+     ? 'on'
+     : (ignRaw === false || ignRaw === 0 || String(ignRaw).toLowerCase() === 'off' ? 'off' : null);
+
+   // speed: prefer tc.position.speed (knots -> km/h), fallback to attributes
+   const speedAttr = pickAttr(attrs, ['speedKmh', 'speed_kmh', 'speedKmH', 'speed', 'speedKMH']);
+   const speedVal = (typeof pos.speed === 'number' ? Math.round(pos.speed * 1.852) : pos.speed) ?? r.speed ?? speedAttr;
+   let speed = null;
+   if (speedVal != null) {
+     if (typeof speedVal === 'string' && /km\/h/i.test(speedVal)) {
+       speed = speedVal;
+     } else {
+       const n = Number(speedVal);
+       speed = Number.isFinite(n) ? `${Math.round(n)} km/h` : String(speedVal);
+     }
+   }
+
+   // location: prefer tc.position.address; fallback to attributes; then coords if available
+   let coords = null;
+   if (typeof pos.latitude === 'number' && typeof pos.longitude === 'number') {
+     coords = `${pos.latitude.toFixed(5)}, ${pos.longitude.toFixed(5)}`;
+   } else if (typeof pos.lat === 'number' && typeof pos.lon === 'number') {
+     coords = `${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}`;
+   }
+   const location = pos.address ?? (r.location ?? pickAttr(attrs, ['address', 'location'])) ?? coords;
+
+   return { ...r, uniqueid, name, vin, plate, odometer, ignition, speed, location };
+ }
+
+const rowsHydrated = computed(() => rows.value.map(r => deriveRow(r)));
+
+const filtered = computed(() => {
+  const base = rowsHydrated.value;
+  if (!query.value) return base;
+  const q = String(query.value).toLowerCase();
+  return base.filter(r => String(r.device_id).toLowerCase().includes(q)
+    || String(r.uniqueid || '').toLowerCase().includes(q)
+    || String(r.name || '').toLowerCase().includes(q)
+    || String(r.vin || '').toLowerCase().includes(q)
+    || String(r.plate || '').toLowerCase().includes(q));
+});
+
+const totalCount = computed(() => meta.value.total || filtered.value.length);
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / meta.value.per_page)));
+const startIndex = computed(() => (page.value - 1) * meta.value.per_page);
+const pagedRows = computed(() => filtered.value.slice(startIndex.value, startIndex.value + meta.value.per_page));
+
+function ignitionClass(val) {
+  const v = String(val || '').toLowerCase();
+  if (v === 'on') return 'is-on';
+  if (v === 'off') return 'is-off';
+  return 'is-unknown';
+}
+
+function speedClass(val) {
+  const match = String(val || '').match(/(\d+)/);
+  const s = match ? parseInt(match[1], 10) : NaN;
+  if (!Number.isFinite(s)) return 'is-unknown';
+  if (s === 0) return 'is-off';
+  if (s > 100) return 'is-critical';
+  if (s >= 80) return 'is-high';
+  if (s >= 40) return 'is-medium';
+  return 'is-low';
+}
+
+// Format tc_device.attributes (string or object) into key: value pairs
+function formatTcAttributes(attrs) {
+  if (attrs == null) return '—';
+  try {
+    const obj = typeof attrs === 'string' ? JSON.parse(attrs) : attrs;
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+      const entries = Object.entries(obj);
+      if (entries.length === 0) return '—';
+      return entries.map(([k, v]) => `${k}: ${stringifyAttr(v)}`).join(', ');
+    }
+    return String(attrs);
+  } catch {
+    return String(attrs);
+  }
+}
+
+function stringifyAttr(v) {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'object') return JSON.stringify(v);
+  if (typeof v === 'boolean') return v ? 'true' : 'false';
+  return String(v);
+}
+
+function goPage(n) { if (n >= 1 && n <= totalPages.value) { page.value = n; fetchPage(n); } }
+function prevPage() { goPage(page.value - 1); }
+function nextPage() { goPage(page.value + 1); }
+
+async function remove(row) {
+  if (!row?.device_id) return;
+  const result = await Swal.fire({
+    title: `Delete vehicle ${row.device_id}?`,
+    text: 'This will permanently remove this vehicle from the system.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Delete',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#6c757d',
+  });
+  if (!result.isConfirmed) return;
+  deleting.value[row.device_id] = true;
+  try {
+    await axios.delete(`/web/vehicles/${row.device_id}`);
+    await Swal.fire({
+      title: 'Deleted',
+      text: 'Vehicle deleted successfully.',
+      icon: 'success',
+      timer: 1500,
+      showConfirmButton: false,
+    });
+    await fetchPage(page.value);
+  } catch (e) {
+    const serverMessage = e?.response?.data?.message || '';
+    const safeMessage = /traccar/i.test(serverMessage) ? 'Failed to delete vehicle.' : (serverMessage || 'Failed to delete vehicle.');
+    await Swal.fire({
+      title: 'Delete failed',
+      text: safeMessage,
+      icon: 'error',
+    });
+  } finally {
+    deleting.value[row.device_id] = false;
+  }
+}
+
+function toEdit(row) {
+  if (!row?.device_id) return;
+  router.push(`/vehicles/${row.device_id}/edit`);
+}
 </script>
-
-<style scoped>
-.input-w-360 { width: 360px; }
-.btn-app-dark { background-color: #0b0f28; color: #fff; border-radius: 12px; padding: .5rem .75rem; }
-</style>

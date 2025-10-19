@@ -47,6 +47,8 @@ const routes = [
   { path: '/vehicles/overview', name: 'vehicles-overview', component: VehiclesOverview, meta: { requiresAuth: true, title: 'Vehicle Overview' } },
   // Add Vehicle route
   { path: '/vehicles/new', name: 'vehicles-new', component: () => import('../views/vehicles/AddVehicle.vue'), meta: { requiresAuth: true, title: 'Add New Vehicle' } },
+  // Edit Vehicle route
+  { path: '/vehicles/:deviceId/edit', name: 'vehicles-edit', component: () => import('../views/vehicles/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Vehicle' } },
   { path: '/reports', name: 'reports', component: Reports, meta: { requiresAuth: true, title: 'Reports & Analytics' } },
   { path: '/alerts', name: 'alerts', component: Alerts, meta: { requiresAuth: true, title: 'Alerts & Notifications' } },
   { path: '/fuel', name: 'fuel', component: Fuel, meta: { requiresAuth: true, title: 'Fuel Management' } },

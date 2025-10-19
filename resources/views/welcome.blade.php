@@ -19,7 +19,6 @@
     <!-- Vite-bundled styles and SPA entry -->
     @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
       @vite([
-        'resources/css/plugins/adminlte.min.css',
         'resources/css/app.css',
         'resources/js/app.js',
       ])

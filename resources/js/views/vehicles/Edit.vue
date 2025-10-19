@@ -1,34 +1,41 @@
 <template>
-  <div class="add-vehicle-view">
+  <div class="edit-vehicle-view">
     <!-- Breadcrumb -->
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
         <li class="breadcrumb-item"><RouterLink to="/">Dashboard</RouterLink></li>
         <li class="breadcrumb-item"><RouterLink to="/vehicles">Vehicle Management</RouterLink></li>
-        <li class="breadcrumb-item active" aria-current="page">Add New Vehicle</li>
+        <li class="breadcrumb-item active" aria-current="page">Edit Vehicle</li>
       </ol>
     </div>
 
-    <h4 class="mb-3 fw-semibold">List New Vehicle</h4>
+    <h4 class="mb-3 fw-semibold">Edit Vehicle</h4>
 
     <!-- Status Messages -->
     <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="dismissError" />
     <UiAlert :show="!!message" :message="message" variant="success" dismissible @dismiss="dismissMessage" />
 
     <form @submit.prevent="submit">
+      <div v-if="loading" class="d-flex align-items-center mb-2">
+        <div class="spinner-border spinner-border-sm me-2" role="status"><span class="visually-hidden">Loading…</span></div>
+        <span class="text-muted small">Loading vehicle…</span>
+      </div>
+
       <!-- Vehicle Information -->
-      <div class="card mb-3">
+      <div v-if="!loading" class="card mb-3">
         <div class="card-header"><h6 class="mb-0">Vehicle Information</h6></div>
         <div class="card-body">
           <div class="row g-3 align-items-start">
-            <div class="col-12 col-md-4">
-              <label class="form-label small">Vehicle ID</label>
-              <input v-model="form.uniqueId" type="text" class="form-control" placeholder="VHCL-1016" />
-            </div>
+            <input :value="deviceId" type="hidden" />
             <div class="col-12 col-md-4">
               <label class="form-label small">Vehicle Name</label>
               <input v-model="form.name" type="text" class="form-control" placeholder="Vehicle Name" />
             </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Vehicle ID (uniqueId)</label>
+              <input v-model="form.uniqueId" type="text" class="form-control" placeholder="uniqueId" disabled />
+            </div>
+
             <div class="col-12 col-md-4">
               <label class="form-label small">Vehicle Type</label>
               <select v-model="form.attributes.type" class="form-select">
@@ -88,17 +95,14 @@
       </div>
 
       <!-- Vehicle Photos -->
-      <div class="card mb-3">
+      <div v-if="!loading" class="card mb-3">
         <div class="card-header"><h6 class="mb-0">Vehicle Photos</h6></div>
         <div class="card-body">
           <div class="row g-3">
             <div v-for="(preview, i) in previews" :key="i" class="col-12 col-md-4">
               <label class="upload-box w-100" :class="{ 'has-image': !!preview }">
-                <input type="file" accept="image/png,image/jpeg" class="d-none" @change="onFile(i, $event)" :ref="el => fileRefs[i] = el" />
+                <input type="file" accept="image/png,image/jpeg" class="d-none" @change="onFile(i, $event)" />
                 <img v-if="preview" :src="preview" alt="Vehicle photo" class="upload-img" />
-                <button v-if="preview" type="button" class="btn-remove" title="Remove image" @click.stop.prevent="removeFile(i)">
-                  <i class="bi bi-x-lg"></i>
-                </button>
                 <div v-else class="upload-empty">
                   <i class="bi bi-cloud-arrow-up fs-3"></i>
                   <div class="small mt-1">Upload Vehicle Images</div>
@@ -111,11 +115,11 @@
       </div>
 
       <!-- Actions -->
-      <div class="d-flex gap-2 justify-content-end">
+      <div v-if="!loading" class="d-flex gap-2 justify-content-end">
         <RouterLink to="/vehicles" class="btn btn-outline-secondary">Cancel</RouterLink>
         <button type="submit" class="btn btn-app-dark" :disabled="submitting">
-          <span v-if="!submitting">Add Vehicle</span>
-          <span v-else>Submitting…</span>
+          <span v-if="!submitting">Save Changes</span>
+          <span v-else>Saving…</span>
         </button>
       </div>
     </form>
@@ -123,16 +127,18 @@
 </template>
 
 <script setup>
-import { reactive, ref, onBeforeUnmount } from 'vue';
-import { useRouter } from 'vue-router';
+import { reactive, ref, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
 
+const route = useRoute();
 const router = useRouter();
+const deviceId = route.params.deviceId;
 
 const form = reactive({
-  uniqueId: 'VHCL-1016', /** vehicleId **/
   name: '',
+  uniqueId: '',
   model: '',
   attributes: {
     type: '',
@@ -144,19 +150,75 @@ const form = reactive({
     odometer: '',
     fuelAverage: '',
     maxSpeed: ''
-  },
-
+  }
 });
 
 const previews = ref([null, null, null]);
 const blobs = ref([null, null, null]);
-const fileRefs = ref([null, null, null]);
+
 const message = ref('');
 const error = ref('');
 const submitting = ref(false);
+const loading = ref(true);
 
 function dismissError() { error.value = ''; }
 function dismissMessage() { message.value = ''; }
+
+onMounted(async () => {
+  try {
+    const { data } = await axios.get(`/web/vehicles/${deviceId}`);
+    const tc = data?.tc_device;
+    if (tc) {
+      hydrateFormFromTc(tc);
+      loading.value = false;
+    } else {
+      loading.value = false;
+      router.replace({ path: '/vehicles', query: { error: 'Vehicle data not available for this device id.' } });
+    }
+  } catch (e) {
+    const status = e?.response?.status;
+    let msg = '';
+    if (status === 404) {
+      msg = 'Vehicle not found for the given device id.';
+    } else if (status === 403) {
+      msg = 'You do not have permission to edit this vehicle.';
+    } else {
+      msg = e?.response?.data?.message || 'Failed to load vehicle.';
+    }
+    loading.value = false;
+    router.replace({ path: '/vehicles', query: { error: msg } });
+  }
+});
+
+function parseAttrsMaybe(attr) {
+  if (!attr) return {};
+  if (typeof attr === 'string') {
+    try { return JSON.parse(attr); } catch { return {}; }
+  }
+  return { ...attr };
+}
+
+function hydrateFormFromTc(tc) {
+  const attrs = parseAttrsMaybe(tc.attributes);
+  form.name = tc.name || '';
+  form.uniqueId = tc.uniqueId || tc.uniqueid || '';
+  form.model = tc.model || '';
+  form.attributes.type = attrs.type || '';
+  form.attributes.manufacturer = attrs.manufacturer || '';
+  form.attributes.color = attrs.color || '';
+  form.attributes.registration = attrs.registration || '';
+  form.attributes.plate = attrs.plate || attrs.licensePlate || attrs.plateNumber || '';
+  form.attributes.vin = attrs.vin || '';
+  form.attributes.odometer = attrs.odometer || attrs.totalDistance || '';
+  form.attributes.fuelAverage = attrs.fuelAverage || '';
+  form.attributes.maxSpeed = attrs.maxSpeed || attrs.speedLimit || '';
+
+  // Hydrate previews from existing attributes.photos if present
+  const photosArr = Array.isArray(attrs.photos)
+    ? attrs.photos
+    : (typeof attrs.photos === 'string' ? [attrs.photos] : []);
+  previews.value = [photosArr[0] || null, photosArr[1] || null, photosArr[2] || null];
+}
 
 function onFile(i, e) {
   const file = e.target.files?.[0];
@@ -168,46 +230,26 @@ function onFile(i, e) {
   blobs.value[i] = file;
 }
 
-function removeFile(i) {
-  try {
-    if (previews.value[i]) URL.revokeObjectURL(previews.value[i]);
-  } catch {}
-  previews.value[i] = null;
-  blobs.value[i] = null;
-  const input = fileRefs.value[i];
-  if (input) input.value = '';
-}
-
-onBeforeUnmount(() => {
-  previews.value.forEach((url) => url && URL.revokeObjectURL(url));
-});
-
 async function submit() {
   message.value = '';
   error.value = '';
 
-  // Basic client-side validation aligned with backend
-  if (!form.name || !form.uniqueId) {
-    error.value = 'Please provide both Vehicle Name and Vehicle ID.';
-    return;
-  }
-
   submitting.value = true;
   try {
     const fd = new FormData();
-    fd.append('name', form.name.trim());
-    fd.append('uniqueId', form.uniqueId.trim());
-    if (form.model) fd.append('model', form.model.trim());
+    fd.append('name', form.name?.trim() || '');
+    fd.append('uniqueId', form.uniqueId?.trim() || '');
+    if (form.model) fd.append('model', form.model?.trim());
     fd.append('attributes', JSON.stringify({ ...form.attributes }));
     blobs.value.forEach((file, i) => { if (file) fd.append(`images[${i}]`, file); });
+    // Use POST with method override to ensure Laravel parses multipart fields/files
+    fd.append('_method', 'PUT');
 
-    const { data } = await axios.post('/web/vehicles', fd);
-    message.value = 'Vehicle created successfully.';
-
-    // Small delay to show success message, then navigate
+    const { data } = await axios.post(`/web/vehicles/${deviceId}`, fd);
+    message.value = 'Vehicle updated successfully.';
     setTimeout(() => router.push('/vehicles'), 600);
   } catch (e) {
-    error.value = e?.response?.data?.message || 'Failed to create vehicle.';
+    error.value = e?.response?.data?.message || 'Failed to update vehicle.';
   } finally {
     submitting.value = false;
   }
@@ -217,10 +259,9 @@ async function submit() {
 <style scoped>
 .card-header h6 { font-weight: 600; }
 .btn-app-dark { background-color: #0b0f28; color: #fff; }
-.upload-box { border: 2px dashed #cfd6e4; border-radius: .75rem; height: 220px; display:flex; align-items:center; justify-content:center; background:#f8fafc; cursor:pointer; position: relative; }
+.upload-box { border: 2px dashed #cfd6e4; border-radius: .75rem; height: 220px; display:flex; align-items:center; justify-content:center; background:#f8fafc; cursor:pointer; }
 .upload-box.has-image { border-style: solid; background:#fff; }
 .upload-empty { text-align:center; color:#2b2f4a; }
 .upload-img { width: 100%; height: 100%; object-fit: cover; border-radius: .75rem; }
-.btn-remove { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; border: 1px solid #dee2e6; background: #fff; color: #212529; display:flex; align-items:center; justify-content:center; line-height: 1; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
 .xsmall { font-size: .75rem; }
 </style>

@@ -67,13 +67,13 @@
             </li>
 
             <li class="nav-item">
-              <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/vehicles') }">
+              <RouterLink to="/vehicles" class="nav-link" :class="{ active: route.path.startsWith('/vehicles') }">
                 <i class="nav-icon bi bi-car-front"></i>
                 <p>
                   Vehicle Management
                   <i class="bi bi-chevron-right right"></i>
                 </p>
-              </a>
+              </RouterLink>
               <ul class="nav nav-treeview">
                 <li class="nav-item">
                   <RouterLink to="/vehicles" class="nav-link" :class="{ active: route.path === '/vehicles' }">

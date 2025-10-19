@@ -25,7 +25,12 @@ Trait Curl
             $header[] = "Cookie: " . $cookie;
         }
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, Config::get('constants.Constants.host').$task);
+        // Ensure single-slash join between host and task to avoid paths like //api/devices
+        $base = Config::get('constants.Constants.host');
+        $base = is_string($base) ? rtrim($base, '/') : '';
+        $path = '/' . ltrim((string) $task, '/');
+        $url = $base . $path;
+        curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_TIMEOUT, 20);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
         // Enable gzip/deflate for faster transfers when supported
@@ -53,7 +58,7 @@ Trait Curl
             $res->response = '';
         }
 
-        if (preg_match('/^Set-Cookie:\s*([^;]*)/mi', substr($data, 0, $size), $c) == 1){
+        if (preg_match('/^Set-Cookie:\\s*([^;]*)/mi', substr($data, 0, $size), $c) == 1){
             session(['cookie'=>$c[1]]);
         }
 
@@ -67,6 +72,7 @@ Trait Curl
         curl_close($ch);
         return $res;
     }
+
 
 
 
