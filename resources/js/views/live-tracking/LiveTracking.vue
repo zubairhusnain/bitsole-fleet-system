@@ -24,8 +24,14 @@
                                 <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
                             </div>
                             <div class="vehicle-info">
-                                <span class="badge status-badge" :class="statusClass(v)">{{ statusLabel(v) }}</span>
-                                <div class="vehicle-name">{{ deviceName(v) }}</div>
+                                <div class="vehicle-name-row">
+                                    <div class="vehicle-name">{{ deviceName(v) }}</div>
+                                    <div class="vehicle-status" :class="statusClass(v)">
+                                        <span v-if="statusIs(v, 'online')" class="icon-buffering"></span>
+                                        <span v-else class="icon-dot"></span>
+                                        <span class="status-text">{{ statusLabel(v) }}</span>
+                                    </div>
+                                </div>
                                 <div class="vehicle-meta">Vehicle ID {{ uniqueId(v) || '—' }}</div>
                             </div>
                         </div>
@@ -110,9 +116,21 @@ function applyRealtimePositions(list) {
         if (p.lastUpdate) {
             existing.tcDevice.lastUpdate = p.lastUpdate;
         }
-        // Update device status from backend payload
-        if (p.status) {
-            existing.tcDevice.status = p.status;
+        // Only set status when payload explicitly provides tc_devices-style status
+        if (p.status && ['online','offline','unknown'].includes(String(p.status).toLowerCase())) {
+            existing.tcDevice.status = String(p.status).toLowerCase();
+        }
+        // Fallback: derive status from p.online or serverTime when p.status missing
+        if (!existing.tcDevice.status) {
+            if (typeof p.online === 'boolean') {
+                existing.tcDevice.status = p.online ? 'online' : 'offline';
+            } else if (p.serverTime) {
+                const t = Date.parse(p.serverTime);
+                if (!Number.isNaN(t)) {
+                    const isRecent = (Date.now() - t) <= (60 * 60 * 1000);
+                    existing.tcDevice.status = isRecent ? 'online' : 'offline';
+                }
+            }
         }
         // Preserve device-level attributes for UI (image, meta)
         if (p.attributes && !existing.tcDevice.attributes) {
@@ -125,6 +143,7 @@ function applyRealtimePositions(list) {
 
 function getPosition(v) {
     const dev = v.tcDevice || v.tc_device || {};
+    console.log('tcdevice ',dev);
     const pos = dev.position || dev.tcPosition || dev.tc_position || v.position || v.tcPosition || v.tc_position || v.positionData || {};
     const latRaw = pos.latitude ?? pos.lat ?? pos.y ?? null;
     const lonRaw = pos.longitude ?? pos.lon ?? pos.x ?? null;
@@ -194,26 +213,29 @@ function statusText(v) {
 }
 
 function statusClass(v) {
-    const { ignition, speed, raw } = getPosition(v);
-    const online = raw?.attributes?.online;
-    if (online === false) return 'status-off';
-    if (ignition === true && speed > 0) return 'status-on';
-    if (ignition === true && (!speed || speed === 0)) return 'status-off';
-    if (ignition === false) return 'status-off';
-    if (ignition === null) return 'status-unknown';
-    if (typeof speed === 'number' && speed > 100) return 'status-critical';
+    const s = statusValue(v);
+    if (s === 'online') return 'status-on';
+    if (s === 'offline') return 'status-off';
     return 'status-unknown';
 }
 
-function statusLabel(v) {
-    const { ignition, speed, raw } = getPosition(v);
+function statusValue(v) {
+    const tc = v.tcDevice || v.tc_device || {};
+    const rawStatus = typeof tc.status === 'string' ? tc.status.trim().toLowerCase() : '';
+    if (['online','offline','unknown'].includes(rawStatus)) return rawStatus;
+    const { raw } = getPosition(v);
     const online = raw?.attributes?.online;
-    if (online === false) return 'Inactive';
-    if (ignition === true && speed > 0) return 'Moving';
-    if (ignition === true && (!speed || speed === 0)) return 'Idle';
-    if (ignition === false) return 'Stopped';
-    if (typeof speed === 'number' && speed > 100) return 'Critical';
-    return 'Unknown';
+    if (typeof online === 'boolean') return online ? 'online' : 'offline';
+    return 'unknown';
+}
+
+function statusLabel(v) {
+    const s = statusValue(v);
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : 'offline';
+}
+
+function statusIs(v, value) {
+    return statusValue(v) === String(value).toLowerCase();
 }
 
 function formatTime(val) {
@@ -267,12 +289,19 @@ function popupHtml(v) {
     const locText = address || 'Coordinates available';
     const uniq = uniqueId(v) || '—';
     const lu = formatTime(lastUpdate(v));
-    const stat = statusText(v);
+    const sClass = statusClass(v);
+    const sLabel = statusLabel(v);
+    const isOnline = statusIs(v, 'online');
     return `
     <div class="popup-card">
-      <div class="popup-title">${name}</div>
+      <div class="popup-title-row">
+        <div class="popup-title">${name}</div>
+        <div class="popup-status ${sClass}">
+          ${isOnline ? '<span class="icon-buffering"></span>' : '<span class="icon-dot"></span>'}
+          <span class="status-text">${sLabel}</span>
+        </div>
+      </div>
       <div class="popup-row"><span>Unique ID:</span> <strong>${uniq}</strong></div>
-      <div class="popup-row"><span>Status:</span> <strong>${stat}</strong></div>
       <div class="popup-row"><span>Last Update:</span> <strong>${lu}</strong></div>
       <div class="popup-row"><span>Ignition:</span> <strong>${ign}</strong></div>
       <div class="popup-row"><span>Speed:</span> <strong>${sp ?? '-'} km/h</strong></div>
@@ -282,23 +311,37 @@ function popupHtml(v) {
 }
 
 function placeMarkers(list) {
-    if (!deviceLayer.value) return;
-    deviceLayer.value.clearLayers();
-    markersById.clear();
-    const latLngs = [];
-    list.forEach(v => {
-        const { lat, lon } = getPosition(v);
-        if (typeof lat === 'number' && typeof lon === 'number') {
-            const m = L.marker([lat, lon], { icon: carIcon });
-            m.bindPopup(popupHtml(v), { autoClose: false, closeOnClick: true });
-            m.addTo(deviceLayer.value);
-            markersById.set(deviceKey(v), m);
-            latLngs.push([lat, lon]);
+    if (!deviceLayer.value || !map.value) return;
+    try {
+        deviceLayer.value.clearLayers();
+        markersById.clear();
+        const latLngs = [];
+        list.forEach(v => {
+            const { lat, lon } = getPosition(v);
+            if (typeof lat === 'number' && typeof lon === 'number') {
+                try {
+                    const m = L.marker([lat, lon], { icon: carIcon });
+                    m.bindPopup(popupHtml(v), { autoClose: false, closeOnClick: true });
+                    m.addTo(deviceLayer.value);
+                    markersById.set(deviceKey(v), m);
+                    latLngs.push([lat, lon]);
+                } catch (e) {
+                    console.warn('Marker add failed for device', deviceKey(v), e);
+                }
+            }
+        });
+        if (latLngs.length) {
+            // Compute bounds from raw lat/lon pairs to avoid marker state issues
+            const bounds = L.latLngBounds(latLngs);
+            try {
+                map.value.fitBounds(bounds.pad(0.2));
+            } catch (e) {
+                // Fallback: just fit without pad
+                try { map.value.fitBounds(bounds); } catch {}
+            }
         }
-    });
-    if (latLngs.length) {
-        const group = L.featureGroup(latLngs.map(ll => L.marker(ll)));
-        map.value.fitBounds(group.getBounds().pad(0.2));
+    } catch (e) {
+        console.error('placeMarkers error', e);
     }
 }
 
@@ -468,11 +511,15 @@ onBeforeUnmount(() => {
 }
 
 .status-on {
-    color: #2e7d32;
+    color: #2e7d32; /* green */
 }
 
 .status-off {
-    color: #616161;
+    color: #616161; /* gray */
+}
+
+.status-unknown {
+    color: #757575; /* gray-500 */
 }
 
 .status-critical {
@@ -534,5 +581,40 @@ onBeforeUnmount(() => {
     width: 100%;
     height: 100%;
     object-fit: cover;
+}
+
+.vehicle-name-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.vehicle-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.icon-buffering {
+    width: 10px;
+    height: 10px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+.icon-dot {
+    width: 8px;
+    height: 8px;
+    background: currentColor;
+    border-radius: 50%;
+}
+.status-text {
+    line-height: 1;
 }
 </style>

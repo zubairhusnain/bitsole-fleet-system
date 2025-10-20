@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use App\Events\PositionsUpdated;
-use App\Models\TcDevice;
 use Carbon\Carbon;
 
 class LiveTrackingController extends Controller
@@ -34,7 +33,7 @@ class LiveTrackingController extends Controller
             } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
                 $distId = $user->distributor_id ?? $user->id;
                 $query->where('distributor_id', $distId)
-                ->where('user_id', $user->id);
+                      ->where('user_id', $user->id);
             }
             // Admin sees all
         }
@@ -78,6 +77,10 @@ class LiveTrackingController extends Controller
                 }
             }
 
+            // Normalize tc_devices.status to online/offline/unknown to match Traccar
+            $statusRaw = strtolower(trim((string) ($tc->status ?? '')));
+            $deviceStatus = in_array($statusRaw, ['online','offline','unknown']) ? $statusRaw : 'unknown';
+
             return [
                 'id' => $tc->id,
                 'name' => $tc->name ?? ('Device #' . $tc->id),
@@ -86,7 +89,8 @@ class LiveTrackingController extends Controller
                 'speed' => $pos->speed ?? null,
                 'address' => $pos->address ?? null,
                 'ignition' => $ignition,
-                'status' => $activity,
+                'status' => $deviceStatus,
+                'activity' => $activity,
                 'motion' => $motion,
                 'online' => $online,
                 'positionId' => $tc->positionid ?? null,
