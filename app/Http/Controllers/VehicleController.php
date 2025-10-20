@@ -246,4 +246,29 @@ class VehicleController extends Controller
             'device' => $device,
         ], 200);
     }
+
+    public function destroy(Request $request, int $deviceId)
+    {
+        // Local-only soft delete; do not remove from tracking server
+        $device = Devices::withTrashed()->where('device_id', $deviceId)->first();
+        if (!$device) {
+            return response()->json(['message' => 'Vehicle not found'], 404);
+        }
+
+        if (method_exists($device, 'trashed') && $device->trashed()) {
+            return response()->json(['message' => 'Vehicle already soft-deleted'], 200);
+        }
+
+        try {
+            $device->delete();
+        } catch (\Throwable $e) {
+            Log::warning('Local device soft delete failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+            return response()->json([
+                'message' => 'Failed to soft-delete vehicle locally',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json(['message' => 'Vehicle soft-deleted'], 200);
+    }
 }
