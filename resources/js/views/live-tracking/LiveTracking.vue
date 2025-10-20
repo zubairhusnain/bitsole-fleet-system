@@ -95,7 +95,7 @@ function applyRealtimePositions(list) {
             longitude: p.longitude,
             speed: p.speed,
             address: p.address,
-            attributes: { ignition: p.ignition, motion: p.status },
+            attributes: { ignition: p.ignition, motion: p.motion ?? null, online: p.online ?? null },
         };
         existing.name = existing.name || p.name;
         // Attach lightweight tcDevice stub for display fields when missing
@@ -106,9 +106,13 @@ function applyRealtimePositions(list) {
         if (p.uniqueId && !existing.tcDevice.uniqueId) {
             existing.tcDevice.uniqueId = p.uniqueId;
         }
-        // Preserve lastUpdate from backend payload (tcDevice fallback)
-        if (p.lastUpdate && !existing.tcDevice.lastUpdate) {
+        // Update lastUpdate from backend payload (tcDevice)
+        if (p.lastUpdate) {
             existing.tcDevice.lastUpdate = p.lastUpdate;
+        }
+        // Update device status from backend payload
+        if (p.status) {
+            existing.tcDevice.status = p.status;
         }
         // Preserve device-level attributes for UI (image, meta)
         if (p.attributes && !existing.tcDevice.attributes) {
@@ -182,12 +186,17 @@ function getImage(v) {
 function statusText(v) {
     const tc = v.tcDevice || v.tc_device || {};
     const pos = getPosition(v);
-    const status = tc.status || v.status || (pos.ignition === true ? 'moving' : (pos.ignition === false ? 'stopped' : null));
+    const online = pos.raw?.attributes?.online;
+    if (typeof tc.status === 'string' && tc.status) return tc.status;
+    if (online === false) return 'Inactive';
+    const status = v.status || (pos.ignition === true ? (pos.speed > 0 ? 'moving' : 'idle') : (pos.ignition === false ? 'stopped' : null));
     return status || 'Unknown';
 }
 
 function statusClass(v) {
-    const { ignition, speed } = getPosition(v);
+    const { ignition, speed, raw } = getPosition(v);
+    const online = raw?.attributes?.online;
+    if (online === false) return 'status-off';
     if (ignition === true && speed > 0) return 'status-on';
     if (ignition === true && (!speed || speed === 0)) return 'status-off';
     if (ignition === false) return 'status-off';
@@ -197,10 +206,12 @@ function statusClass(v) {
 }
 
 function statusLabel(v) {
-    const { ignition, speed } = getPosition(v);
-    if (ignition === true && speed > 0) return 'Active';
+    const { ignition, speed, raw } = getPosition(v);
+    const online = raw?.attributes?.online;
+    if (online === false) return 'Inactive';
+    if (ignition === true && speed > 0) return 'Moving';
     if (ignition === true && (!speed || speed === 0)) return 'Idle';
-    if (ignition === false) return 'Inactive';
+    if (ignition === false) return 'Stopped';
     if (typeof speed === 'number' && speed > 100) return 'Critical';
     return 'Unknown';
 }

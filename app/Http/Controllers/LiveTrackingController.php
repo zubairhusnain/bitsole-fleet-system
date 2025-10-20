@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use App\Events\PositionsUpdated;
 use App\Models\TcDevice;
+use Carbon\Carbon;
 
 class LiveTrackingController extends Controller
 {
@@ -51,6 +52,32 @@ class LiveTrackingController extends Controller
                     ? $pos->attributes
                     : (json_decode($pos->attributes, true) ?? []);
             }
+
+            $serverTimeRaw = $pos->serverTime ?? null;
+            $serverTime = $serverTimeRaw ? Carbon::parse($serverTimeRaw) : null;
+            $now = Carbon::now();
+            $online = $serverTime ? $serverTime->gte($now->copy()->subHour()) : false;
+
+            $motion = isset($posAttributes['motion']) ? (int) $posAttributes['motion'] : null;
+            $ignition = $posAttributes['ignition'] ?? null;
+
+            $activity = 'noData';
+            if ($serverTime) {
+                if ($serverTime->lt($now->copy()->subHour())) {
+                    $activity = 'inActive';
+                } else {
+                    if ($motion === 1) {
+                        $activity = 'moving';
+                    } elseif ($ignition === 1 && $motion === 0) {
+                        $activity = 'idle';
+                    } elseif ($motion === 0 && $ignition === 0) {
+                        $activity = 'stopped';
+                    } else {
+                        $activity = 'noData';
+                    }
+                }
+            }
+
             return [
                 'id' => $tc->id,
                 'name' => $tc->name ?? ('Device #' . $tc->id),
@@ -58,15 +85,15 @@ class LiveTrackingController extends Controller
                 'longitude' => $pos->longitude ?? null,
                 'speed' => $pos->speed ?? null,
                 'address' => $pos->address ?? null,
-                'ignition' => $posAttributes['ignition'] ?? null,
-                // Historically, we exposed position motion under the "status" key
-                'status' => $posAttributes['motion'] ?? null,
+                'ignition' => $ignition,
+                'status' => $activity,
+                'motion' => $motion,
+                'online' => $online,
                 'positionId' => $tc->positionid ?? null,
-                // Additional fields for UI rendering
                 'lastUpdate' => $tc->lastUpdate ?? null,
                 'uniqueId' => ($tc->uniqueId ?? $tc->uniqueid ?? null),
-                // Device-level attributes (JSON string or object) for UI rendering
                 'attributes' => $tc->attributes ?? null,
+                'serverTime' => $serverTimeRaw,
             ];
         })->filter(function ($i) {
             return $i && $i['latitude'] !== null && $i['longitude'] !== null;
