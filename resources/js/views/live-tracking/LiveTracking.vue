@@ -234,6 +234,7 @@ function statusLabel(v) {
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : 'offline';
 }
 
+
 function statusIs(v, value) {
     return statusValue(v) === String(value).toLowerCase();
 }
