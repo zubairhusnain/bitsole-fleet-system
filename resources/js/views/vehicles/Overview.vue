@@ -10,14 +10,11 @@
         </ol>
       </nav>
     </div>
-    <div class="card">
-      <div class="card-body">
-        <p>This is a placeholder for Vehicle Overview.</p>
-      </div>
-    </div>
+    <ComingSoon />
   </div>
 </template>
 
 <script setup>
+import ComingSoon from '../../components/ComingSoon.vue';
 // Placeholder view for Vehicle Overview
 </script>

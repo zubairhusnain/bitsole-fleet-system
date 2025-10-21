@@ -75,7 +75,7 @@ router.beforeEach(async (to, from, next) => {
 
   // Block guest-only pages when authenticated
   if (to.meta?.guestOnly && isAuthed) {
-    return next({ name: 'dashboard' });
+    return next({ name: 'live-tracking' });
   }
 
   return next();

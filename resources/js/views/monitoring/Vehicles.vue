@@ -7,6 +7,8 @@
       </div>
     </div>
 
+    <ComingSoon class="mb-3" />
+
     <div class="row g-4">
       <div class="col-12 col-lg-6">
         <div class="card">
@@ -63,6 +65,7 @@
 </template>
 
 <script setup>
+import ComingSoon from '../../components/ComingSoon.vue';
 // Static skeleton; data wiring to follow
 </script>
 

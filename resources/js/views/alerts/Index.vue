@@ -9,14 +9,11 @@
         </ol>
       </nav>
     </div>
-    <div class="card">
-      <div class="card-body">
-        <p>This is a placeholder for Alerts & Notifications.</p>
-      </div>
-    </div>
+    <ComingSoon />
   </div>
 </template>
 
 <script setup>
+import ComingSoon from '../../components/ComingSoon.vue';
 // Placeholder view for Alerts & Notifications
 </script>

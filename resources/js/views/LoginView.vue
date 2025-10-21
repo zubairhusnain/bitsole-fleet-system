@@ -61,9 +61,9 @@ async function submit() {
     const { data } = await axios.post('/web/auth/login', form);
     // Update auth state so guards and UI reflect logged-in status
     setAuthenticatedUser(data?.user);
-    // Redirect to intended route or dashboard
+    // Redirect to intended route or Live Tracking by default
     const redirect = router.currentRoute.value.query?.redirect;
-    router.push(redirect || '/dashboard');
+    router.push(redirect || '/live-tracking');
   } catch (e) {
     error.value = e?.response?.data?.message || 'Login failed';
   }

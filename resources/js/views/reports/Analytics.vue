@@ -10,6 +10,8 @@
       </div>
     </div>
 
+    <ComingSoon class="mb-3" />
+
     <div class="row g-4">
       <div class="col-12 col-lg-4" v-for="i in 3" :key="i">
         <div class="card">
@@ -27,6 +29,7 @@
 </template>
 
 <script setup>
+import ComingSoon from '../../components/ComingSoon.vue';
 // Chart placeholders; integrate ApexCharts or similar later
 </script>
 

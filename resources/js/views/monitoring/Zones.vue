@@ -7,6 +7,8 @@
       </div>
     </div>
 
+    <ComingSoon class="mb-3" />
+
     <div class="row g-3">
       <div class="col-12 col-xl-8">
         <div class="card">
@@ -31,6 +33,7 @@
 </template>
 
 <script setup>
+import ComingSoon from '../../components/ComingSoon.vue';
 // Static skeleton; map integration will be added later
 </script>
 

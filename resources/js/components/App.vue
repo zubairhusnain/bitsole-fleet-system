@@ -52,7 +52,7 @@
               </RouterLink>
             </li>
 
-            <li class="nav-item">
+            <li class="nav-item d-none">
               <RouterLink to="/dashboard" class="nav-link" :class="{ active: route.name === 'dashboard' }">
                 <i class="nav-icon bi bi-speedometer"></i>
                 <p>Dashboard</p>
@@ -96,14 +96,14 @@
               </ul>
             </li>
 
-            <li class="nav-item">
+            <li class="nav-item  d-none">
               <RouterLink to="/fuel" class="nav-link" :class="{ active: route.name === 'fuel' }">
                 <i class="nav-icon bi bi-fuel-pump"></i>
                 <p>Fuel Management</p>
               </RouterLink>
             </li>
 
-            <li class="nav-item">
+            <li class="nav-item  d-none">
               <a href="#" class="nav-link">
                 <i class="nav-icon bi bi-graph-up"></i>
                 <p>
@@ -127,28 +127,28 @@
               </ul>
             </li>
 
-            <li class="nav-item">
+            <li class="nav-item  d-none">
               <RouterLink to="/zones" class="nav-link" :class="{ active: route.name === 'zones' }">
                 <i class="nav-icon bi bi-grid-3x3"></i>
                 <p>Zone Management</p>
               </RouterLink>
             </li>
 
-            <li class="nav-item">
+            <li class="nav-item  d-none">
               <RouterLink to="/reports" class="nav-link" :class="{ active: route.name === 'reports' }">
                 <i class="nav-icon bi bi-bar-chart"></i>
                 <p>Reports & Analytics</p>
               </RouterLink>
             </li>
 
-            <li class="nav-item">
+            <li class="nav-item  d-none">
               <RouterLink to="/alerts" class="nav-link" :class="{ active: route.name === 'alerts' }">
                 <i class="nav-icon bi bi-bell"></i>
                 <p>Alerts & Notifications</p>
               </RouterLink>
             </li>
 
-            <li class="nav-item">
+            <li class="nav-item  d-none">
               <RouterLink to="/settings" class="nav-link" :class="{ active: route.name === 'settings' }">
                 <i class="nav-icon bi bi-gear"></i>
                 <p>Settings</p>
