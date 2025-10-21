@@ -12,12 +12,12 @@
         <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="dismissError" />
         <!-- Page Title and Actions -->
         <div class="row mb-3">
-            <div class="col-sm-12 col-md-8 col-lg-8">
+            <div class="col-sm-12 col-md-5 col-lg-8">
                 <h4 class="mb-0 fw-semibold">Drivers Directory</h4>
             </div>
-            <div class="col-sm-12 col-md-4 col-lg-4">
+            <div class="col-sm-12 col-md-7 col-lg-4">
                 <div class="row">
-                    <div class="col-sm-12 col-md-7 col-lg-7 ml-auto">
+                    <div class="col-sm-12 col-md-6 col-lg-7 ml-auto">
                         <div class="input-group">
                             <span class="input-group-text"><i class="bi bi-search"></i></span>
                             <input v-model="query" type="text" class="form-control input-w-360"
@@ -25,7 +25,7 @@
                             <span class="input-group-text"><i class="bi bi-sliders2"></i></span>
                         </div>
                     </div>
-                    <div class="col-sm-12 col-md-5 col-lg-5 ml-auto">
+                    <div class="col-sm-12 col-md-6 col-lg-5 ml-auto">
                         <RouterLink to="/vehicles/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> List New Vehicle</RouterLink>
                     </div>
                 </div>
