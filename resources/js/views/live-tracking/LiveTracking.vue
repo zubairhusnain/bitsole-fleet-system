@@ -270,16 +270,24 @@ function speedKmh(speed) {
 const carIcon = L.icon({
     iconUrl:
         'data:image/svg+xml;utf8,' +
-        encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="48" height="24" viewBox="0 0 48 24">
-      <rect x="4" y="6" width="40" height="12" rx="6" fill="#e53935"/>
-      <rect x="12" y="4" width="16" height="6" rx="3" fill="#c62828"/>
-      <circle cx="12" cy="18" r="3.5" fill="#263238"/>
-      <circle cx="36" cy="18" r="3.5" fill="#263238"/>
-      <rect x="18" y="8" width="14" height="4" fill="#000" opacity="0.15"/>
-    </svg>`),
-    iconSize: [48, 24],
-    iconAnchor: [24, 12],
-    popupAnchor: [0, -10],
+        encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48">
+  <defs>
+    <linearGradient id="pinGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7C4DFF"/>
+      <stop offset="1" stop-color="#00E5FF"/>
+    </linearGradient>
+  </defs>
+  <!-- Map pin shape -->
+  <path d="M18 47c-7-9-15-16-15-26C3 9 9 3 18 3s15 6 15 18c0 10-8 17-15 26z" fill="url(#pinGrad)"/>
+  <!-- Device/wave glyph -->
+  <circle cx="18" cy="21" r="8" fill="#ffffff"/>
+  <path d="M14 21a4 4 0 118 0" stroke="#1A237E" stroke-width="2" fill="none"/>
+  <path d="M12 21a6 6 0 1112 0" stroke="#1A237E" stroke-width="1.5" fill="none" opacity="0.6"/>
+  <path d="M10 21a8 8 0 1116 0" stroke="#1A237E" stroke-width="1.2" fill="none" opacity="0.3"/>
+</svg>`),
+    iconSize: [36, 48],
+    iconAnchor: [18, 44],
+    popupAnchor: [0, -38],
 });
 
 function popupHtml(v) {
