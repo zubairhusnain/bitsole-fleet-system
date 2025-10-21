@@ -1,15 +1,8 @@
 <template>
     <div class="live-tracking-view">
-        <div class="app-content-header mb-2">
-            <ol class="breadcrumb mb-0 small text-muted">
-                <li class="breadcrumb-item">
-                    <RouterLink to="/dashboard">Dashboard</RouterLink>
-                </li>
-                <li class="breadcrumb-item active" aria-current="page">Live Tracking</li>
-            </ol>
-        </div>
+        <!-- Breadcrumbs removed per request -->
 
-        <div class="map-wrap card">
+        <div class="map-wrap">
             <div class="panel-floating">
                 <div class="panel-header">
                     <h3 class="panel-title">Search Vehicle</h3>
@@ -268,23 +261,7 @@ function speedKmh(speed) {
 }
 
 const carIcon = L.icon({
-    iconUrl:
-        'data:image/svg+xml;utf8,' +
-        encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48">
-  <defs>
-    <linearGradient id="pinGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#7C4DFF"/>
-      <stop offset="1" stop-color="#00E5FF"/>
-    </linearGradient>
-  </defs>
-  <!-- Map pin shape -->
-  <path d="M18 47c-7-9-15-16-15-26C3 9 9 3 18 3s15 6 15 18c0 10-8 17-15 26z" fill="url(#pinGrad)"/>
-  <!-- Device/wave glyph -->
-  <circle cx="18" cy="21" r="8" fill="#ffffff"/>
-  <path d="M14 21a4 4 0 118 0" stroke="#1A237E" stroke-width="2" fill="none"/>
-  <path d="M12 21a6 6 0 1112 0" stroke="#1A237E" stroke-width="1.5" fill="none" opacity="0.6"/>
-  <path d="M10 21a8 8 0 1116 0" stroke="#1A237E" stroke-width="1.2" fill="none" opacity="0.3"/>
-</svg>`),
+    iconUrl: '/images/markers/device-pin.svg',
     iconSize: [36, 48],
     iconAnchor: [18, 44],
     popupAnchor: [0, -38],
@@ -427,13 +404,15 @@ onBeforeUnmount(() => {
 <style scoped>
 .live-tracking-view {
     position: relative;
+    margin-left: calc(-1 * var(--bs-gutter-x, .75rem));
+    margin-right: calc(-1 * var(--bs-gutter-x, .75rem));
 }
 
 .map-wrap {
     position: relative;
-    height: calc(100vh - 180px);
-    min-height: 480px;
-    border-radius: 12px;
+    height: calc(100vh - 120px);
+    min-height: 520px;
+    border-radius: 0;
     overflow: hidden;
 }
 

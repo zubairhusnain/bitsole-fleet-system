@@ -230,6 +230,9 @@ p  { font-size: 16px; line-height: 1.6; }
   align-items: center;
   justify-content: center;
 }
+.sidebar-brand{
+    border-bottom: unset !important;
+}
 .btn-app-dark {
   height: 44px;
   display: inline-flex;

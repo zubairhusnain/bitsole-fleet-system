@@ -6,7 +6,7 @@
           <div class="auth-card card">
             <div class="card-body">
               <div class="text-center mb-3">
-                <div class="fw-bold" style="color: var(--brand-primary); font-size: 20px;">TECH</div>
+                <img :src="logoSrc" alt="Logo" style="height:32px" />
               </div>
               <div class="auth-header text-center mb-4">
                 <h4 class="mb-1">Login to your account</h4>
@@ -49,6 +49,10 @@ import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { setAuthenticatedUser } from '../auth';
+
+// Resolve assets from Laravel backend in dev; use current origin in prod
+const assetBase = import.meta.env.DEV ? (import.meta.env.VITE_BACKEND_PROXY_TARGET || 'http://127.0.0.1:8001') : window.location.origin;
+const logoSrc = assetBase + '/images/logo.png';
 
 const router = useRouter();
 const appName = document.title || 'Omayer Fleet System';

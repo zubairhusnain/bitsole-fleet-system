@@ -35,8 +35,8 @@
     <aside class="app-sidebar bg-white ">
       <!--begin::Sidebar Brand-->
       <div class="sidebar-brand">
-        <RouterLink to="/" class="brand-link">
-          <span class="brand-text fw-light">{{ appName }}</span>
+        <RouterLink to="/" class="brand-link d-flex align-items-center">
+          <img :src="logoSrc" alt="App Logo" style="height:24px" />
         </RouterLink>
       </div>
       <!--end::Sidebar Brand-->
@@ -193,6 +193,10 @@ import { computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
 import { authState, clearAuthCache } from '../auth';
+
+// Resolve assets from Laravel backend in dev; use current origin in prod
+const assetBase = import.meta.env.DEV ? (import.meta.env.VITE_BACKEND_PROXY_TARGET || 'http://127.0.0.1:8001') : window.location.origin;
+const logoSrc = assetBase + '/images/logo.png';
 
 const router = useRouter();
 const route = useRoute();

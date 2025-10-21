@@ -5,7 +5,10 @@
         <div class="col-12 d-flex justify-content-center">
           <div class="auth-card card">
             <div class="card-body">
-              <div class="auth-header text-center mb-4">
+              <div class="text-center mb-3">
+                <img :src="logoSrc" alt="Logo" style="height:32px" />
+              </div>
+               <div class="auth-header text-center mb-4">
                 <h4 class="mb-1">Reset Password</h4>
                 <p class="text-muted">Choose a new password for your account</p>
               </div>
@@ -43,6 +46,10 @@
 <script setup>
 import { reactive, ref } from 'vue';
 import axios from 'axios';
+
+// Resolve assets from Laravel backend in dev; use current origin in prod
+const assetBase = import.meta.env.DEV ? (import.meta.env.VITE_BACKEND_PROXY_TARGET || 'http://127.0.0.1:8001') : window.location.origin;
+const logoSrc = assetBase + '/images/logo.png';
 
 const form = reactive({ email: '', password: '', password_confirmation: '' });
 const message = ref('');

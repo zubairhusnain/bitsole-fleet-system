@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48">
+  <defs>
+    <linearGradient id="pinGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7C4DFF"/>
+      <stop offset="1" stop-color="#00E5FF"/>
+    </linearGradient>
+  </defs>
+  <!-- Map pin shape -->
+  <path d="M18 47c-7-9-15-16-15-26C3 9 9 3 18 3s15 6 15 18c0 10-8 17-15 26z" fill="url(#pinGrad)"/>
+  <!-- Device/wave glyph -->
+  <circle cx="18" cy="21" r="8" fill="#ffffff"/>
+  <path d="M14 21a4 4 0 118 0" stroke="#1A237E" stroke-width="2" fill="none"/>
+  <path d="M12 21a6 6 0 1112 0" stroke="#1A237E" stroke-width="1.5" fill="none" opacity="0.6"/>
+  <path d="M10 21a8 8 0 1116 0" stroke="#1A237E" stroke-width="1.2" fill="none" opacity="0.3"/>
+</svg>
