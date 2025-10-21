@@ -1,29 +1,34 @@
 <template>
-  <div class="add-driver-view">
+  <div class="edit-driver-view">
     <!-- Breadcrumb -->
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
         <li class="breadcrumb-item"><RouterLink to="/">Dashboard</RouterLink></li>
         <li class="breadcrumb-item"><RouterLink to="/drivers">Driver Management</RouterLink></li>
-        <li class="breadcrumb-item active" aria-current="page">Add New Driver</li>
+        <li class="breadcrumb-item active" aria-current="page">Edit Driver</li>
       </ol>
     </div>
 
-    <h4 class="mb-3 fw-semibold">Add New Driver</h4>
+    <h4 class="mb-3 fw-semibold">Edit Driver</h4>
 
     <!-- Status Messages -->
     <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="error = ''" />
     <UiAlert :show="!!message" :message="message" variant="success" dismissible @dismiss="message = ''" />
 
     <form @submit.prevent="submit">
+      <div v-if="loading" class="d-flex align-items-center mb-2">
+        <div class="spinner-border spinner-border-sm me-2" role="status"><span class="visually-hidden">Loading…</span></div>
+        <span class="text-muted small">Loading driver…</span>
+      </div>
+
       <!-- Personal Information -->
-      <div class="card mb-3">
+      <div class="card mb-3" v-if="!loading">
         <div class="card-header"><h6 class="mb-0">Personal Information</h6></div>
         <div class="card-body">
           <div class="row g-3 align-items-start">
             <div class="col-12 col-md-3">
               <label class="form-label small">Driver ID</label>
-              <input v-model="form.driverId" type="text" class="form-control" placeholder="DRV-1016" />
+              <input v-model="form.driverId" type="text" class="form-control" placeholder="DRV-1016" disabled />
             </div>
             <div class="col-12 col-md-3">
               <label class="form-label small">Full Name</label>
@@ -65,7 +70,7 @@
       </div>
 
       <!-- Contact Information -->
-      <div class="card mb-3">
+      <div class="card mb-3" v-if="!loading">
         <div class="card-header"><h6 class="mb-0">Contact Information</h6></div>
         <div class="card-body">
           <div class="row g-3">
@@ -90,21 +95,29 @@
       </div>
 
       <!-- Driving License Information -->
-      <div class="card mb-3">
+      <div class="card mb-3" v-if="!loading">
         <div class="card-header"><h6 class="mb-0">Driving License Information</h6></div>
         <div class="card-body">
           <div class="row g-3">
             <div class="col-12">
               <label class="form-label small">Avatar Image</label>
+              <div class="d-flex align-items-center gap-3 mb-2">
+                <img v-if="existingAvatarUrl" :src="existingAvatarUrl" alt="Avatar" class="rounded-circle" style="width:64px;height:64px;object-fit:cover;" />
+                <span v-else class="text-muted small">No avatar uploaded</span>
+              </div>
               <div class="input-group">
-                <input class="form-control" type="file" @change="onAvatarFile" />
+                <input class="form-control" type="file" accept="image/*" @change="onAvatarFile" />
                 <span class="input-group-text">Browse Files</span>
               </div>
             </div>
             <div class="col-12">
               <label class="form-label small">Licence Image</label>
+              <div class="d-flex align-items-center gap-3 mb-2">
+                <img v-if="existingLicenseUrl" :src="existingLicenseUrl" alt="Licence" class="rounded" style="width:96px;height:64px;object-fit:cover;" />
+                <span v-else class="text-muted small">No licence image uploaded</span>
+              </div>
               <div class="input-group">
-                <input class="form-control" type="file" @change="onFile" />
+                <input class="form-control" type="file" accept="image/*" @change="onFile" />
                 <span class="input-group-text">Browse Files</span>
               </div>
             </div>
@@ -121,7 +134,7 @@
       </div>
 
       <!-- Assigned Vehicle -->
-      <div class="card mb-3">
+      <div class="card mb-3" v-if="!loading">
         <div class="card-header"><h6 class="mb-0">Assigned Vehicle</h6></div>
         <div class="card-body">
           <div class="row g-3">
@@ -143,7 +156,7 @@
       <!-- Actions -->
       <div class="d-flex align-items-center justify-content-end gap-2">
         <RouterLink to="/drivers" class="btn btn-outline-secondary">Cancel</RouterLink>
-        <button type="submit" class="btn btn-app-dark" :disabled="submitting">{{ submitting ? 'Adding…' : 'Add Driver' }}</button>
+        <button type="submit" class="btn btn-app-dark" :disabled="submitting">{{ submitting ? 'Saving…' : 'Save Changes' }}</button>
       </div>
     </form>
   </div>
@@ -151,14 +164,16 @@
 
 <script setup>
 import { reactive, ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
 
+const route = useRoute();
 const router = useRouter();
+const driverId = Number(route.params.driverId);
 
 const form = reactive({
-  driverId: 'DRV-1016',
+  driverId: '',
   fullName: '',
   gender: '',
   dob: '',
@@ -178,11 +193,23 @@ const form = reactive({
 
 const message = ref('');
 const error = ref('');
+const loading = ref(false);
 const submitting = ref(false);
 
 const vehiclesOptions = ref([]);
 const loadingVehicles = ref(false);
 const vehiclesError = ref('');
+
+const existingAvatarUrl = ref('');
+const existingLicenseUrl = ref('');
+
+function parseAttrsMaybe(attr) {
+  if (!attr) return {};
+  if (typeof attr === 'string') {
+    try { return JSON.parse(attr); } catch { return {}; }
+  }
+  return { ...attr };
+}
 
 async function fetchVehicleOptions() {
   loadingVehicles.value = true;
@@ -198,15 +225,50 @@ async function fetchVehicleOptions() {
   }
 }
 
-onMounted(fetchVehicleOptions);
-
-function onAvatarFile(event) {
-  form.avatar = event.target.files?.[0] || null;
+async function fetchDriver() {
+  loading.value = true;
+  error.value = '';
+  try {
+    const { data } = await axios.get(`/web/drivers/${driverId}`);
+    const attrs = parseAttrsMaybe(data?.attributes);
+    form.fullName = data?.name || '';
+    form.driverId = data?.uniqueId || '';
+    form.email = attrs?.email || '';
+    form.phone = attrs?.phone || '';
+    form.gender = attrs?.gender || '';
+    form.dob = attrs?.dob || '';
+    form.idCard = attrs?.idCard || '';
+    form.passport = attrs?.passport || '';
+    form.healthOk = Boolean(attrs?.healthOk);
+    form.address = attrs?.address || '';
+    form.telephone = attrs?.telephone || '';
+    form.licence = attrs?.licence || attrs?.license || '';
+    form.expiry = attrs?.licenseExpiry || '';
+    // Prefer local device mapping; fallback to stored attribute
+    form.vehicle = data?.deviceId || attrs?.assignedVehicle || '';
+    existingAvatarUrl.value = data?.avatarImageUrl || (attrs?.avatarImage ? `/storage/${attrs.avatarImage}` : '');
+    existingLicenseUrl.value = data?.licenseImageUrl || (attrs?.licenseImage ? `/storage/${attrs.licenseImage}` : '');
+  } catch (e) {
+    const msg = e?.response?.data?.message || 'Failed to load driver';
+    error.value = msg;
+    // Redirect back to list on failure to load
+    setTimeout(() => router.replace({ path: '/drivers', query: { error: msg } }), 300);
+  } finally {
+    loading.value = false;
+  }
 }
 
 function onFile(event) {
   form.licenceImage = event.target.files?.[0] || null;
 }
+
+function onAvatarFile(event) {
+  form.avatar = event.target.files?.[0] || null;
+}
+
+onMounted(async () => {
+  await Promise.all([fetchDriver(), fetchVehicleOptions()]);
+});
 
 async function submit() {
   message.value = '';
@@ -230,18 +292,19 @@ async function submit() {
     };
 
     const fd = new FormData();
+    fd.append('_method', 'PUT');
     fd.append('name', form.fullName);
     fd.append('uniqueId', (form.driverId || '').toString().trim());
     fd.append('attributes', JSON.stringify(attrs));
     if (form.licenceImage) fd.append('licenceImage', form.licenceImage);
     if (form.avatar) fd.append('avatar', form.avatar);
 
-    const { data } = await axios.post('/web/drivers', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    const { data } = await axios.post(`/web/drivers/${driverId}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
 
-    message.value = data?.message || 'Driver created';
-    setTimeout(() => router.push('/drivers'), 300);
+    message.value = data?.message || 'Driver updated';
+    setTimeout(() => router.push('/drivers'), 400);
   } catch (e) {
-    error.value = e?.response?.data?.message || 'Failed to add driver';
+    error.value = e?.response?.data?.message || 'Failed to save changes';
   } finally {
     submitting.value = false;
   }

@@ -56,4 +56,11 @@ class PermissionService
                 return $devices->response;
             }
         }
+
+        public function unassignDriver($request,$device_id,$driver_id){
+            $sessionId = $request->user()->traccarSession ?? session('cookie');
+            $data='{"deviceId":"'.$device_id.'","driverId":"'.$driver_id.'"}';
+            $devices = static::curl('/api/permissions', 'DELETE',$sessionId,$data,array('Content-Type: application/json', 'Accept: application/json'));
+            return $devices->response;
+        }
 }

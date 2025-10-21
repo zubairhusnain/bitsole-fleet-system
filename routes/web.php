@@ -88,10 +88,21 @@ Route::middleware('auth')->prefix('/web/admin')->group(function () {
 // Auth-protected Vehicles CRUD
 Route::middleware('auth')->prefix('/web/vehicles')->group(function () {
     Route::get('/', [\App\Http\Controllers\VehicleController::class, 'index']);
+    Route::get('/options', [\App\Http\Controllers\VehicleController::class, 'options']);
     Route::post('/', [\App\Http\Controllers\VehicleController::class, 'store']);
     Route::get('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'show']);
     Route::put('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'update']);
     Route::delete('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'destroy']);
+});
+
+// NEW: Auth-protected Drivers CRUD & assignment
+Route::middleware('auth')->prefix('/web/drivers')->group(function () {
+    Route::get('/', [\App\Http\Controllers\DriverController::class, 'index']);
+    Route::get('/{driverId}', [\App\Http\Controllers\DriverController::class, 'show']);
+    Route::post('/', [\App\Http\Controllers\DriverController::class, 'store']);
+    Route::put('/{driverId}', [\App\Http\Controllers\DriverController::class, 'update']);
+    Route::delete('/{driverId}', [\App\Http\Controllers\DriverController::class, 'destroy']);
+
 });
 
 // Live Tracking: trigger a broadcast of current positions

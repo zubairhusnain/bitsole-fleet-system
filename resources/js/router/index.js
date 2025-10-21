@@ -42,6 +42,8 @@ const routes = [
   { path: '/drivers', name: 'drivers', component: Drivers, meta: { requiresAuth: true, title: 'Driver Management' } },
   // Add Driver route
   { path: '/drivers/new', name: 'drivers-new', component: () => import('../views/drivers/AddDriver.vue'), meta: { requiresAuth: true, title: 'Add New Driver' } },
+  // Edit Driver route
+  { path: '/drivers/:driverId/edit', name: 'drivers-edit', component: () => import('../views/drivers/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Driver' } },
   { path: '/vehicles', name: 'vehicles', component: Vehicles, meta: { requiresAuth: true, title: 'Vehicle Management' } },
   { path: '/vehicles/maintenance', name: 'vehicles-maintenance', component: VehiclesMaintenance, meta: { requiresAuth: true, title: 'Vehicle Maintenance' } },
   { path: '/vehicles/overview', name: 'vehicles-overview', component: VehiclesOverview, meta: { requiresAuth: true, title: 'Vehicle Overview' } },

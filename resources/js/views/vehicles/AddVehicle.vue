@@ -154,6 +154,7 @@ const fileRefs = ref([null, null, null]);
 const message = ref('');
 const error = ref('');
 const submitting = ref(false);
+const MAX_IMAGE_SIZE_MB = 16;
 
 function dismissError() { error.value = ''; }
 function dismissMessage() { message.value = ''; }
@@ -162,7 +163,12 @@ function onFile(i, e) {
   const file = e.target.files?.[0];
   if (!file) return;
   const ok = /image\/(png|jpeg)/.test(file.type);
-  if (!ok) { alert('Only PNG/JPEG images allowed'); return; }
+  if (!ok) { error.value = 'Only PNG/JPEG images allowed'; e.target.value=''; return; }
+  if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
+    error.value = `File too large (max ${MAX_IMAGE_SIZE_MB}MB)`;
+    e.target.value = '';
+    return;
+  }
   if (previews.value[i]) URL.revokeObjectURL(previews.value[i]);
   previews.value[i] = URL.createObjectURL(file);
   blobs.value[i] = file;

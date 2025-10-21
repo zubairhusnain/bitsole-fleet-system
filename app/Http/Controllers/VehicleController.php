@@ -43,6 +43,54 @@ class VehicleController extends Controller
     }
 
     /**
+     * Provide simple options for Assigned Vehicle dropdown.
+     * Filters to devices that have a current position (positionid > 0).
+     */
+    public function options(Request $request)
+    {
+        $user = $request->user();
+        $role = (int) ($user->role ?? User::ROLE_ADMIN);
+
+        $query = \App\Models\Devices::query()->with(['tcDevice']);
+
+        if ($request->boolean('mine')) {
+            $query->where('user_id', $user->id);
+        } else {
+            if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
+                $query->where('user_id', $user->id)
+                      ->where('distributor_id', $user->id);
+            } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
+                $distId = $user->distributor_id ?? $user->id;
+                $query->where('distributor_id', $distId)
+                      ->where('user_id', $user->id);
+            }
+        }
+
+        $list = $query->get();
+
+        $filtered = $list->filter(function ($d) {
+            $tc = $d->tcDevice;
+            return $tc && (int)($tc->positionid ?? 0) > 0;
+        });
+
+        $options = $filtered->map(function ($d) {
+            $tc = $d->tcDevice;
+            $unique = data_get($tc, 'uniqueId', data_get($tc, 'uniqueid', ''));
+            $name = data_get($tc, 'name', '');
+            $label = trim(($unique ? ($unique . ' - ') : '') . $name);
+            if ($label === '') { $label = $name ?: (string) data_get($tc, 'id'); }
+            return [
+                'id' => (int) data_get($tc, 'id'),
+                'name' => $name,
+                'uniqueId' => $unique,
+                'label' => $label,
+            ];
+        })->values();
+
+        return response()->json(['options' => $options]);
+    }
+
+    /**
      * Create a device on the tracking server, then persist locally.
      */
     public function store(Request $request)
@@ -53,7 +101,7 @@ class VehicleController extends Controller
             'uniqueId' => ['required', 'string'],
             'model' => ['nullable', 'string', 'max:255'],
             'images' => ['nullable', 'array'],
-            'images.*' => ['nullable', 'file', 'image', 'mimes:jpeg,png', 'max:4096'],
+            'images.*' => ['nullable', 'file', 'image', 'mimes:jpeg,png', 'max:16384'],
         ]);
 
         // Normalize attributes payload and attach optional photo paths
@@ -171,7 +219,7 @@ class VehicleController extends Controller
             'uniqueId' => ['required', 'string'],
             'model' => ['nullable', 'string', 'max:255'],
             'images' => ['nullable', 'array'],
-            'images.*' => ['nullable', 'file', 'image', 'mimes:jpeg,png', 'max:4096'],
+            'images.*' => ['nullable', 'file', 'image', 'mimes:jpeg,png', 'max:16384'],
         ]);
 
         // Normalize attributes payload

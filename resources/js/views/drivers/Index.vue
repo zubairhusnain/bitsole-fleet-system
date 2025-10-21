@@ -21,6 +21,10 @@
       </div>
     </div>
 
+    <!-- Status Messages -->
+    <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="error = ''" />
+    <div v-if="loading" class="text-muted small mb-2">Loading drivers…</div>
+
     <!-- Table -->
     <div class="card border rounded-3 shadow-0">
       <div class="card-body p-0">
@@ -36,12 +40,19 @@
                 <th class="fw-semibold py-2">License Expiry</th>
                 <th class="fw-semibold py-2">Assigned Vehicles</th>
                 <th class="fw-semibold py-2">Last Ride</th>
+                <th class="fw-semibold py-2 text-end">Actions</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="row in pagedRows" :key="row.id" class="border-bottom">
                 <td class="text-muted text-nowrap">{{ row.code }}</td>
-                <td class="text-nowrap">{{ row.name }}</td>
+                <td class="text-nowrap">
+                  <div class="d-flex align-items-center gap-2">
+                    <img v-if="row.avatarUrl" :src="row.avatarUrl" alt="Avatar" class="rounded-circle" style="width:32px;height:32px;object-fit:cover;" />
+                    <i v-else class="bi bi-person-circle fs-5 text-muted"></i>
+                    <span>{{ row.name }}</span>
+                  </div>
+                </td>
                 <td class="text-muted text-nowrap">{{ row.email }}</td>
                 <td class="text-muted text-nowrap">{{ row.phone }}</td>
                 <td class="text-muted text-nowrap">{{ row.licence }}</td>
@@ -51,13 +62,24 @@
                   <span class="badge bg-success rounded-pill badge-app">{{ row.status }}</span>
                 </td>
                 <td class="text-muted text-nowrap">{{ row.lastRide }}</td>
+                <td class="text-end">
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-outline-danger" title="Delete" @click="deleteDriver(row.id, row.name)" :disabled="deleting[row.id] === true">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="pagedRows.length === 0 && !loading">
+                <td colspan="9" class="text-center text-muted py-3">No drivers found.</td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
       <div class="card-footer d-flex align-items-center py-2">
-        <div class="text-muted small me-auto">Showing {{ startIndex + 1 }} to {{ Math.min(startIndex + pageSize, rows.length) }} of {{ rows.length }} results</div>
+        <div class="text-muted small me-auto">Showing {{ startIndex + 1 }} to {{ Math.min(startIndex + pageSize, totalCount) }} of {{ totalCount }} results</div>
         <nav aria-label="Pagination" class="ms-auto">
           <ul class="pagination pagination-sm mb-0 pagination-app">
             <li class="page-item" :class="{ disabled: page === 1 }"><button class="page-link" @click="prevPage">‹</button></li>
@@ -72,47 +94,110 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import axios from 'axios';
+import UiAlert from '../../components/UiAlert.vue';
+import Swal from 'sweetalert2';
+import { useRouter } from 'vue-router';
 
+const router = useRouter();
 const query = ref('');
 const page = ref(1);
 const pageSize = 16;
+const loading = ref(false);
+const error = ref('');
+const rows = ref([]);
+const deleting = ref({});
 
-// Sample rows to match the screenshot structure (can be wired to API later)
-const rows = ref([
-  { id: 1, code: 'DRV-1001', name: 'Oliver Thompson', email: 'oliverthompson@gmail.com', phone: '(727) 540-0492', licence: 'D248-1982-6794', expiry: 'July 15, 2035', vehicle: 'Phantom Racer 9 Pro', status: 'Active', statusClass: 'text-bg-success', lastRide: 'July 15, 2025' },
-  { id: 2, code: 'DRV-1002', name: 'Emma Johnson', email: 'emmajohnson@email.com', phone: '(415) 287-3849', licence: 'F732-6118-2945', expiry: 'Aug 22, 2029', vehicle: 'Racer X 2020', status: 'Active', statusClass: 'text-bg-success', lastRide: 'Aug 22, 2025' },
-  { id: 3, code: 'DRV-1003', name: 'Liam Smith', email: 'liamsmith@yahoo.com', phone: '(510) 200-5678', licence: 'G384-9917-8842', expiry: 'Sep 10, 2031', vehicle: 'TurboMax Z', status: 'Active', statusClass: 'text-bg-success', lastRide: 'Sep 10, 2025' },
-  { id: 4, code: 'DRV-1004', name: 'Sophia Brown', email: 'sophiabrown@gmail.com', phone: '(212) 777-9101', licence: 'K185-4273-6021', expiry: 'Oct 5, 2032', vehicle: 'Speedster 3000', status: 'Active', statusClass: 'text-bg-success', lastRide: 'Oct 5, 2025' },
-  { id: 5, code: 'DRV-1005', name: 'Mason Davis', email: 'masondavis@email.com', phone: '(303) 555-1234', licence: 'M569-8431-1186', expiry: 'Nov 30, 2034', vehicle: 'Velocity Racer', status: 'Active', statusClass: 'text-bg-success', lastRide: 'Nov 30, 2025' },
-  { id: 6, code: 'DRV-1006', name: 'Isabella Wilson', email: 'isabellawilson@gmail.com', phone: '(602) 112-3456', licence: 'R912-7032-5714', expiry: 'Dec 15, 2035', vehicle: 'Extreme Speedster', status: 'Active', statusClass: 'text-bg-success', lastRide: 'Dec 15, 2025' },
-  { id: 7, code: 'DRV-1007', name: 'Elijah Martinez', email: 'elijahmartinez@yahoo.com', phone: '(503) 888-9999', licence: 'S334-6689-0078', expiry: 'Jan 22, 2028', vehicle: 'Nitro Falcon', status: 'Active', statusClass: 'text-bg-success', lastRide: 'Jan 22, 2026' },
-  { id: 8, code: 'DRV-1008', name: 'Ava Garcia', email: 'avagarcia@gmail.com', phone: '(404) 222-3333', licence: 'T498-2205-7340', expiry: 'Feb 16, 2026', vehicle: 'Thunderbolt X', status: 'Active', statusClass: 'text-bg-success', lastRide: 'Feb 16, 2026' },
-  { id: 9, code: 'DRV-1009', name: 'James Rodriguez', email: 'jamesrodriguez@email.com', phone: '(312) 654-9876', licence: 'W125-9873-1402', expiry: 'Mar 19, 2026', vehicle: 'Lightning Racer', status: 'Active', statusClass: 'text-bg-success', lastRide: 'Mar 19, 2026' },
-  { id: 10, code: 'DRV-1010', name: 'Mia Hernandez', email: 'miahernandez@yahoo.com', phone: '(416) 987-6543', licence: 'Y863-4451-3909', expiry: 'Apr 12, 2026', vehicle: 'Flash 6000', status: 'Active', statusClass: 'text-bg-success', lastRide: 'Apr 12, 2026' },
-  { id: 11, code: 'DRV-1011', name: 'Benjamin Lee', email: 'benjaminlee@gmail.com', phone: '(702) 333-4444', licence: 'D248-1982-6794', expiry: 'May 25, 2032', vehicle: 'Rapid Racer V2', status: 'Active', statusClass: 'text-bg-success', lastRide: 'May 25, 2026' },
-  { id: 12, code: 'DRV-1012', name: 'Charlotte Young', email: 'charlotteyoung@email.com', phone: '(818) 555-1111', licence: 'F732-6118-2945', expiry: 'Jun 27, 2030', vehicle: 'Supernova R', status: 'Active', statusClass: 'text-bg-success', lastRide: 'Jun 27, 2026' },
-  { id: 13, code: 'DRV-1013', name: 'Logan King', email: 'loganking@yahoo.com', phone: '(305) 444-2222', licence: 'G384-9917-8842', expiry: 'Jul 3, 2030', vehicle: 'Gravity Racer', status: 'Active', statusClass: 'text-bg-success', lastRide: 'Jul 3, 2026' },
-  { id: 14, code: 'DRV-1014', name: 'Avery Scott', email: 'averyscott@gmail.com', phone: '(407) 777-5555', licence: 'K185-4273-6021', expiry: 'Aug 18, 2028', vehicle: 'Stellar Racer X1', status: 'Active', statusClass: 'text-bg-success', lastRide: 'Aug 18, 2026' },
-  { id: 15, code: 'DRV-1015', name: 'Emma Johnson', email: 'emmajohnson@email.com', phone: '(415) 287-3849', licence: 'M569-8431-1186', expiry: 'Aug 22, 2029', vehicle: 'Racer X 2020', status: 'Active', statusClass: 'text-bg-success', lastRide: 'Aug 22, 2026' },
-  { id: 16, code: 'DRV-1016', name: 'Mason Davis', email: 'masondavis@email.com', phone: '(303) 555-1234', licence: 'R912-7032-5714', expiry: 'Nov 30, 2025', vehicle: 'Velocity Racer', status: 'Active', statusClass: 'text-bg-success', lastRide: 'Nov 30, 2025' },
-]);
+function formatDriver(d) {
+  const attrs = d?.attributes || {};
+  return {
+    id: d?.id ?? Math.random(),
+    code: d?.uniqueId || (d?.id ? `DRV-${d.id}` : '-'),
+    name: d?.name || '-',
+    email: attrs?.email || '-',
+    phone: attrs?.phone || '-',
+    licence: attrs?.licence || attrs?.license || '-',
+    expiry: attrs?.licenseExpiry || '-',
+    vehicle: attrs?.assignedVehicle || '-',
+    status: (d?.status || attrs?.status || 'Active'),
+    lastRide: attrs?.lastRide || '-',
+    avatarUrl: d?.avatarImageUrl || (attrs?.avatarImage ? `/storage/${attrs.avatarImage}` : ''),
+  };
+}
+
+async function fetchDrivers() {
+  loading.value = true;
+  error.value = '';
+  try {
+    const { data } = await axios.get('/web/drivers');
+    const list = Array.isArray(data?.drivers) ? data.drivers : (Array.isArray(data) ? data : []);
+    rows.value = list.map(formatDriver);
+  } catch (e) {
+    error.value = e?.response?.data?.message || 'Failed to load drivers';
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function deleteDriver(id, name) {
+  const result = await Swal.fire({
+    title: `Delete driver ${name || id}?`,
+    text: 'This action cannot be undone.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Delete',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#d33',
+  });
+  if (!result.isConfirmed) return;
+  deleting.value[id] = true;
+  error.value = '';
+  try {
+    await axios.delete(`/web/drivers/${id}`);
+    rows.value = rows.value.filter(r => r.id !== id);
+    await Swal.fire({
+      title: 'Deleted',
+      text: 'Driver has been deleted.',
+      icon: 'success',
+      timer: 1400,
+      showConfirmButton: false,
+    });
+  } catch (e) {
+    error.value = e?.response?.data?.message || 'Failed to delete driver';
+    await Swal.fire({
+      title: 'Delete failed',
+      text: error.value,
+      icon: 'error',
+    });
+  } finally {
+    deleting.value[id] = false;
+  }
+}
+
+onMounted(fetchDrivers);
 
 const filtered = computed(() => {
   if (!query.value) return rows.value;
   const q = query.value.toLowerCase();
   return rows.value.filter(r =>
-    r.code.toLowerCase().includes(q) ||
-    r.name.toLowerCase().includes(q) ||
-    r.email.toLowerCase().includes(q)
+    (r.code || '').toLowerCase().includes(q) ||
+    (r.name || '').toLowerCase().includes(q) ||
+    (r.email || '').toLowerCase().includes(q)
   );
 });
 
-const totalPages = computed(() => Math.ceil(filtered.value.length / pageSize));
+const totalCount = computed(() => filtered.value.length);
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize)));
 const startIndex = computed(() => (page.value - 1) * pageSize);
 const pagedRows = computed(() => filtered.value.slice(startIndex.value, startIndex.value + pageSize));
 
 function goPage(n) { page.value = n; }
 function prevPage() { if (page.value > 1) page.value--; }
 function nextPage() { if (page.value < totalPages.value) page.value++; }
+
+function toEdit(row) {
+  if (!row?.id) return;
+  router.push(`/drivers/${row.id}/edit`);
+}
 </script>
