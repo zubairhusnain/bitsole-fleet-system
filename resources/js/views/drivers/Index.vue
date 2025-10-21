@@ -9,15 +9,21 @@
     </div>
 
     <!-- Page Title and Actions -->
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <h4 class="mb-0 fw-semibold">Drivers Directory</h4>
-      <div class="d-flex align-items-center gap-1">
-        <div class="input-group">
-          <span class="input-group-text"><i class="bi bi-search"></i></span>
-          <input v-model="query" type="text" class="form-control input-w-360" placeholder="Search driver/ID" />
+    <div class="row mb-3">
+      <div class="col-sm-12 col-md-8 col-lg-8"><h4 class="mb-0 fw-semibold">Drivers Directory</h4></div>
+      <div class="col-sm-12 col-md-4 col-lg-4">
+        <div class="row">
+            <div class="col-sm-12 col-md-7 col-lg-7 ml-auto">
+                <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input v-model="query" type="text" class="form-control input-w-360" placeholder="Search driver/ID" />
+                <span class="input-group-text"><i class="bi bi-sliders2"></i></span>
+                </div>
+            </div>
+            <div class="col-sm-12 col-md-5 col-lg-5 ml-auto">
+                    <RouterLink to="/drivers/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> New Driver</RouterLink>
+            </div>
         </div>
-        <button class="btn btn-outline-secondary btn-icon-44" title="Filters"><i class="bi bi-sliders2"></i></button>
-        <RouterLink to="/drivers/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> New Driver</RouterLink>
       </div>
     </div>
 
