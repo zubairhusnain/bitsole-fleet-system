@@ -30,3 +30,18 @@ export function setAuthenticatedUser(user) {
   authState.user = user ?? null;
   authState.fetched = true;
 }
+
+// Refresh CSRF cookie and header after auth changes to prevent first POST mismatch
+export async function refreshCsrf() {
+  try {
+    // Seed XSRF-TOKEN cookie (if Sanctum is available)
+    await axios.get('/sanctum/csrf-cookie');
+  } catch (_) {}
+  try {
+    // Set X-CSRF-TOKEN header from backend helper
+    const { data } = await axios.get('/web/csrf-token');
+    if (data?.csrfToken) {
+      axios.defaults.headers.common['X-CSRF-TOKEN'] = data.csrfToken;
+    }
+  } catch (_) {}
+}

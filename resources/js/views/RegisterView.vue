@@ -63,7 +63,7 @@
 import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
-import { setAuthenticatedUser } from '../auth';
+import { setAuthenticatedUser, refreshCsrf } from '../auth';
 
 // Resolve assets from Laravel backend in dev; use current origin in prod
 const assetBase = import.meta.env.DEV ? (import.meta.env.VITE_BACKEND_PROXY_TARGET || 'http://127.0.0.1:8001') : window.location.origin;
@@ -80,6 +80,8 @@ async function submit() {
   try {
     const { data } = await axios.post('/web/auth/register', payload);
     setAuthenticatedUser(data?.user);
+    // Immediately refresh CSRF to avoid first POST mismatch after session regeneration
+    await refreshCsrf();
     router.push('/');
   } catch (e) {
     error.value = e?.response?.data?.message || 'Registration failed';
