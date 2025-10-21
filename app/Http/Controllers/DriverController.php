@@ -58,6 +58,7 @@ class DriverController extends Controller
                 'deviceId' => $row->device_id ?? null,
                 'deviceName' => $deviceName,
                 'deviceUniqueId' => $deviceUniqueId,
+            'deviceStatus' => $device->status ?? null,
                 'licenseImage' => $licenseImagePath,
                 'avatarImage' => $avatarImagePath,
                 'licenseImageUrl' => $licenseImageUrl,

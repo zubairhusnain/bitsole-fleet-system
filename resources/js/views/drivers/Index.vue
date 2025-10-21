@@ -59,7 +59,7 @@
                 <td class="text-muted text-nowrap">{{ row.expiry }}</td>
                 <td class="text-nowrap">
                   <span class="me-2">{{ row.vehicle }}</span>
-                  <span class="badge bg-success rounded-pill badge-app">{{ row.status }}</span>
+                  <span class="badge rounded-pill badge-app" :class="row.status === 'online' ? 'bg-success' : 'bg-secondary'">{{ row.status || '-' }}</span>
                 </td>
                 <td class="text-muted text-nowrap">{{ row.lastRide }}</td>
                 <td class="text-end">
@@ -120,7 +120,7 @@ function formatDriver(d) {
     licence: attrs?.licence || attrs?.license || '-',
     expiry: attrs?.licenseExpiry || '-',
     vehicle: d?.deviceName || d?.deviceUniqueId || attrs?.assignedVehicle || '-',
-    status: (d?.status || attrs?.status || 'Active'),
+    status: (d?.deviceStatus || d?.status || attrs?.status || '-'),
     lastRide: attrs?.lastRide || '-',
     avatarUrl: d?.avatarImageUrl || (attrs?.avatarImage ? `/storage/${attrs.avatarImage}` : ''),
   };
