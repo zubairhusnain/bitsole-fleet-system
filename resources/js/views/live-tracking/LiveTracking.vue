@@ -618,4 +618,62 @@ onBeforeUnmount(() => {
 .status-text {
     line-height: 1;
 }
+
+/* Mobile-friendly adjustments for panel and map */
+@media (max-width: 576px) {
+    .map-wrap {
+        height: calc(100vh - 140px);
+    }
+    /* Full-bleed map: stretch to viewport width inside padded container */
+    .live-tracking-view .map-wrap {
+        width: 100vw;
+        margin-left: calc(-50vw + 50%);
+        border-radius: 0;
+    }
+    .panel-floating {
+        left: 12px;
+        right: 12px;
+        width: auto;
+    }
+    .panel-floating .panel-body {
+        max-height: 50vh;
+        padding: 10px;
+    }
+    .vehicle-avatar {
+        width: 48px;
+        height: 48px;
+    }
+    .vehicle-card {
+        gap: 10px;
+        padding: 8px 10px;
+    }
+    .vehicle-name { font-size: 14px; }
+    .vehicle-status { font-size: 11px; }
+}
+
+/* Popup layout improvements */
+.popup-card {
+    max-width: min(320px, 85vw);
+    box-sizing: border-box;
+    font-size: 13px;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.popup-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Leaflet popup tweaks (scoped deep selectors) */
+#liveMap :deep(.leaflet-popup-content) {
+    width: auto;
+    margin: 10px 12px;
+}
+#liveMap :deep(.leaflet-popup-content-wrapper) {
+    border-radius: 10px;
+}
 </style>
