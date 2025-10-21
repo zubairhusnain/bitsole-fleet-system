@@ -45,6 +45,9 @@ class DriverController extends Controller
             $avatarImagePath = $attrs['avatarImage'] ?? null;
             $licenseImageUrl = $licenseImagePath ? Storage::url($licenseImagePath) : null;
             $avatarImageUrl = $avatarImagePath ? Storage::url($avatarImagePath) : null;
+            $device = $row->tcDevice;
+            $deviceName = $device->name ?? null;
+            $deviceUniqueId = $device->uniqueId ?? ($device->uniqueid ?? null);
             return [
                 'id' => $tc->id ?? null,
                 'uniqueId' => $tc->uniqueId ?? ($tc->uniqueid ?? null),
@@ -53,6 +56,8 @@ class DriverController extends Controller
                 'phone' => $tc->phone ?? null,
                 'attributes' => $attrs,
                 'deviceId' => $row->device_id ?? null,
+                'deviceName' => $deviceName,
+                'deviceUniqueId' => $deviceUniqueId,
                 'licenseImage' => $licenseImagePath,
                 'avatarImage' => $avatarImagePath,
                 'licenseImageUrl' => $licenseImageUrl,

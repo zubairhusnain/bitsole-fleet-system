@@ -119,7 +119,7 @@ function formatDriver(d) {
     phone: attrs?.phone || '-',
     licence: attrs?.licence || attrs?.license || '-',
     expiry: attrs?.licenseExpiry || '-',
-    vehicle: attrs?.assignedVehicle || '-',
+    vehicle: d?.deviceName || d?.deviceUniqueId || attrs?.assignedVehicle || '-',
     status: (d?.status || attrs?.status || 'Active'),
     lastRide: attrs?.lastRide || '-',
     avatarUrl: d?.avatarImageUrl || (attrs?.avatarImage ? `/storage/${attrs.avatarImage}` : ''),
