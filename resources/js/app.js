@@ -10,11 +10,12 @@ app.mount('#app');
 // Helper to apply AdminLTE body classes based on route
 function setBodyClasses(to) {
   const body = document.body;
+  const isMobile = window.matchMedia('(max-width: 991.98px)').matches;
   if (to.meta?.guestOnly) {
     const guestClass = to.name === 'register' ? 'register-page' : 'login-page';
     body.className = `${guestClass} bg-body-secondary`;
   } else {
-    body.className = 'layout-fixed sidebar-expand-lg sidebar-open bg-body-tertiary';
+    body.className = `layout-fixed sidebar-expand-lg ${isMobile ? 'sidebar-collapse' : 'sidebar-open'} bg-body-tertiary`;
   }
 }
 

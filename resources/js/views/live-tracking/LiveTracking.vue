@@ -3,62 +3,111 @@
         <!-- Breadcrumbs removed per request -->
 
         <div class="map-wrap">
-            <button class="panel-toggle btn btn-light btn-sm" @click="panelVisible = !panelVisible" :aria-expanded="panelVisible.toString()" aria-controls="device-panel">
-                 <i class="bi me-1" :class="panelVisible ? 'bi-x-lg' : 'bi-list'"></i>
-                 <span class="toggle-title">Vehicle List</span>
-             </button>
-            <div class="panel-floating" :class="{ 'is-visible': panelVisible }">
-                <div class="panel-header">
-                    <h3 class="panel-title">Search Vehicle</h3>
+            <!-- Device list moved into map control -->
+            <l-map v-if="showMap" id="liveMap" :zoom="zoom" :center="center" :options="mapOptions" @ready="onMapReady">
+            <l-tile-layer :url="tileUrl" :attribution="tileAttribution" />
+            <l-control position="topright">
+              <div class="device-control leaflet-bar">
+                <button class="control-toggle btn btn-light btn-sm" @click="panelVisible = !panelVisible" :aria-expanded="panelVisible.toString()" aria-controls="device-panel">
+                  <i class="bi me-1" :class="panelVisible ? 'bi-x-lg' : 'bi-list'"></i>
+                  <span class="toggle-title">Vehicle List</span>
+                </button>
+                <div v-show="panelVisible" id="device-panel" class="control-body">
+                  <div class="panel-header">
                     <label class="form-label small">Vehicle Name</label>
                     <input v-model="query" type="text" class="form-control panel-input" placeholder="eg. Transit Van" />
-                </div>
-                <div class="panel-body">
+                  </div>
+                  <div class="panel-body">
                     <div v-if="loading" class="text-muted small">Loading…</div>
                     <div v-else>
-                        <div v-for="v in filtered" :key="deviceKey(v)" class="vehicle-card" @click="focusVehicle(v)">
-                            <div class="vehicle-avatar">
-                                <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
-                            </div>
-                            <div class="vehicle-info">
-                                <div class="vehicle-name-row">
-                                    <div class="vehicle-name">{{ deviceName(v) }}</div>
-                                    <div class="vehicle-status" :class="statusClass(v)">
-                                        <span v-if="statusIs(v, 'online')" class="icon-buffering"></span>
-                                        <span v-else class="icon-dot"></span>
-                                        <span class="status-text">{{ statusLabel(v) }}</span>
-                                    </div>
-                                </div>
-                                <div class="vehicle-meta">Vehicle ID {{ uniqueId(v) || '—' }}</div>
-                            </div>
+                      <div v-for="v in filtered" :key="deviceKey(v)" class="vehicle-card" @click="focusVehicle(v)">
+                        <div class="vehicle-avatar">
+                          <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
                         </div>
-                        <div v-if="!filtered.length" class="text-muted small">No vehicles found.</div>
+                        <div class="vehicle-info">
+                          <div class="vehicle-name-row">
+                            <div class="vehicle-name">{{ deviceName(v) }}</div>
+                            <div class="vehicle-status" :class="statusClass(v)">
+                              <span v-if="statusIs(v, 'online')" class="icon-buffering"></span>
+                              <span v-else class="icon-dot"></span>
+                              <span class="status-text">{{ statusLabel(v) }}</span>
+                            </div>
+                          </div>
+                          <div class="vehicle-meta">Vehicle ID {{ uniqueId(v) || '—' }}</div>
+                        </div>
+                      </div>
+                      <div v-if="!filtered.length" class="text-muted small">No vehicles found.</div>
                     </div>
+                  </div>
                 </div>
-            </div>
-            <div id="liveMap" ref="mapEl"></div>
+              </div>
+            </l-control>
+            <l-marker v-for="m in markerItems" :key="m.id" :lat-lng="[m.lat, m.lon]" :icon="carIcon" :ref="el => setMarkerRef(m.id, el)">
+            <l-popup>
+            <div class="popup-card" v-html="m.popup"></div>
+            </l-popup>
+            </l-marker>
+            </l-map>
         </div>
     </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import axios from 'axios';
 import { getCurrentUser } from '../../auth';
+import { LMap, LTileLayer, LMarker, LPopup, LControl } from '@vue-leaflet/vue-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-const mapEl = ref(null);
 const map = ref(null);
-const deviceLayer = ref(null);
-const markersById = new Map();
+const markerRefs = new Map();
 
+function onMapReady(mapObj) {
+    map.value = mapObj;
+    try { map.value.zoomControl.setPosition('topright'); } catch {}
+}
+
+function setMarkerRef(id, el) {
+    try {
+        const mk = el?.leafletObject ?? el;
+        if (mk) markerRefs.set(id, mk);
+        else markerRefs.delete(id);
+    } catch {}
+}
+
+
+const showMap = ref(true);
+const zoom = ref(4);
+const center = ref([39.8283, -98.5795]);
+const mapOptions = { zoomControl: true, preferCanvas: true };
+const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const tileAttribution = '&copy; OpenStreetMap contributors';
+const fitDone = ref(false);
 const loading = ref(false);
 const error = ref('');
 const vehicles = ref([]);
 const query = ref('');
 const brokenImages = reactive({});
 let broadcastPing = null;
+// Batch incoming position updates to reduce UI thrash
+let pendingPositions = [];
+let flushTimer = null;
+const FLUSH_MS = 250;
+function schedulePositionsMerge(list) {
+    if (Array.isArray(list) && list.length) {
+        pendingPositions.push(...list);
+        if (!flushTimer) {
+            flushTimer = setTimeout(() => {
+                const batch = pendingPositions;
+                pendingPositions = [];
+                flushTimer = null;
+                applyRealtimePositions(batch);
+            }, FLUSH_MS);
+        }
+    }
+}
+
 const panelVisible = ref(true);
 function updatePanelVisibilityForViewport() {
     if (window?.innerWidth > 576) {
@@ -146,7 +195,6 @@ function applyRealtimePositions(list) {
 
 function getPosition(v) {
     const dev = v.tcDevice || v.tc_device || {};
-    console.log('tcdevice ',dev);
     const pos = dev.position || dev.tcPosition || dev.tc_position || v.position || v.tcPosition || v.tc_position || v.positionData || {};
     const latRaw = pos.latitude ?? pos.lat ?? pos.y ?? null;
     const lonRaw = pos.longitude ?? pos.lon ?? pos.x ?? null;
@@ -186,6 +234,28 @@ const filtered = computed(() => {
         return name.includes(q) || String(uniqueId(v) || '').toLowerCase().includes(q);
     });
 });
+
+const markerItems = computed(() => {
+    return filtered.value
+        .map(v => {
+            const { lat, lon } = getPosition(v);
+            return { id: deviceKey(v), lat, lon, popup: popupHtml(v) };
+        })
+        .filter(m => typeof m.lat === 'number' && typeof m.lon === 'number')
+        .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+});
+
+watch(
+    markerItems,
+    (list) => {
+        if (map.value && !fitDone.value && list.length) {
+            const bounds = L.latLngBounds(list.map(m => [m.lat, m.lon]));
+            try { map.value.fitBounds(bounds.pad(0.2)); } catch { map.value.fitBounds(bounds); }
+            fitDone.value = true;
+        }
+    },
+    { flush: 'post' }
+);
 
 function getImage(v) {
     const tc = v.tcDevice || v.tc_device || {};
@@ -306,39 +376,8 @@ function popupHtml(v) {
   `;
 }
 
-function placeMarkers(list) {
-    if (!deviceLayer.value || !map.value) return;
-    try {
-        deviceLayer.value.clearLayers();
-        markersById.clear();
-        const latLngs = [];
-        list.forEach(v => {
-            const { lat, lon } = getPosition(v);
-            if (typeof lat === 'number' && typeof lon === 'number') {
-                try {
-                    const m = L.marker([lat, lon], { icon: carIcon });
-                    m.bindPopup(popupHtml(v), { autoClose: false, closeOnClick: true });
-                    m.addTo(deviceLayer.value);
-                    markersById.set(deviceKey(v), m);
-                    latLngs.push([lat, lon]);
-                } catch (e) {
-                    console.warn('Marker add failed for device', deviceKey(v), e);
-                }
-            }
-        });
-        if (latLngs.length) {
-            // Compute bounds from raw lat/lon pairs to avoid marker state issues
-            const bounds = L.latLngBounds(latLngs);
-            try {
-                map.value.fitBounds(bounds.pad(0.2));
-            } catch (e) {
-                // Fallback: just fit without pad
-                try { map.value.fitBounds(bounds); } catch {}
-            }
-        }
-    } catch (e) {
-        console.error('placeMarkers error', e);
-    }
+function placeMarkers() {
+    // Obsolete with vue-leaflet: markers render reactively via <l-marker>.
 }
 
 async function fetchVehicles() {
@@ -362,29 +401,29 @@ async function fetchVehicles() {
         vehicles.value = [];
     } finally {
         loading.value = false;
-        placeMarkers(filtered.value);
+        // Trigger initial fit once markers are ready
+        fitDone.value = false;
     }
 }
 
 function focusVehicle(v) {
-    const key = deviceKey(v);
-    const m = markersById.get(key);
-    if (m && map.value) {
-        map.value.setView(m.getLatLng(), Math.max(map.value.getZoom(), 8), { animate: true });
-        m.openPopup();
+    const { lat, lon } = getPosition(v);
+    if (map.value && typeof lat === 'number' && typeof lon === 'number') {
+        const z = typeof map.value.getZoom === 'function' ? Math.max(map.value.getZoom(), 8) : 8;
+        try {
+            if (typeof map.value.flyTo === 'function') {
+                map.value.flyTo([lat, lon], z, { duration: 0.6 });
+            } else {
+                map.value.setView([lat, lon], z, { animate: true });
+            }
+        } catch {}
+        const mk = markerRefs.get(deviceKey(v));
+        try { mk?.openPopup?.(); } catch {}
     }
 }
 
 onMounted(() => {
-    if (!mapEl.value) return;
-    map.value = L.map(mapEl.value, { zoomControl: true, preferCanvas: true }).setView([39.8283, -98.5795], 4);
-    // Move zoom control to top right
-    try { map.value.zoomControl.setPosition('topright'); } catch { }
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-        maxZoom: 18,
-    }).addTo(map.value);
-    deviceLayer.value = L.layerGroup().addTo(map.value);
+    // Map is created declaratively via <l-map/>; load data and listeners
     fetchVehicles();
 
     // Initialize panel visibility to visible by default; keep resize to force show on desktop
@@ -396,22 +435,25 @@ onMounted(() => {
         if (user?.id && window.echo) {
             window.echo.private(`positions.${user.id}`).listen('.positions.updated', (e) => {
                 if (Array.isArray(e?.positions)) {
-                    applyRealtimePositions(e.positions);
-                    placeMarkers(filtered.value);
+                    schedulePositionsMerge(e.positions);
+                    // keep user viewport stable; no auto-fit on every update
                 }
             });
         }
     }).catch(() => {});
 
-    // Periodically trigger a broadcast to demo live updates
-    broadcastPing = setInterval(() => {
-        axios.get('/web/live/positions/broadcast').catch(() => { });
-    }, 5000);
+    // Periodically trigger a broadcast to demo live updates (dev only)
+    if (import.meta.env.DEV) {
+        broadcastPing = setInterval(() => {
+            axios.get('/web/live/positions/broadcast').catch(() => { });
+        }, 5000);
+    }
 });
 
 onBeforeUnmount(() => {
     if (map.value) map.value.remove();
     if (broadcastPing) clearInterval(broadcastPing);
+    if (flushTimer) clearTimeout(flushTimer);
     try { window.removeEventListener('resize', updatePanelVisibilityForViewport); } catch {}
 });
 </script>
@@ -705,5 +747,26 @@ onBeforeUnmount(() => {
 }
 #liveMap :deep(.leaflet-popup-content-wrapper) {
     border-radius: 10px;
+}
+
+#liveMap :deep(.device-control) {
+  min-width: 280px;
+  max-width: min(340px, 90vw);
+}
+#liveMap :deep(.device-control .control-toggle) {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  box-sizing: border-box;
+}
+#liveMap :deep(.device-control .panel-header) {
+  padding: 8px 8px 0;
+}
+#liveMap :deep(.device-control .control-body) {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: 0 8px 8px;
 }
 </style>
