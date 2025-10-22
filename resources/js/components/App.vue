@@ -40,7 +40,7 @@
         </RouterLink>
       </div>
       <!-- Mobile close button -->
-      <button class="btn-close sidebar-close d-lg-none" type="button" aria-label="Close sidebar" data-lte-toggle="sidebar"></button>
+      <button class="btn-close sidebar-close d-lg-none" type="button" aria-label="Close sidebar" @click.prevent="closeSidebar" data-lte-toggle="sidebar"></button>
       <!--end::Sidebar Brand-->
       <!--begin::Sidebar Wrapper-->
       <div class="sidebar-wrapper">
@@ -216,6 +216,14 @@ async function logout() {
   }
   clearAuthCache();
   router.push('/login');
+}
+
+function closeSidebar() {
+  const body = document.body;
+  if (body.classList.contains('sidebar-open')) {
+    body.classList.remove('sidebar-open');
+    body.classList.add('sidebar-collapse');
+  }
 }
 </script>
 
