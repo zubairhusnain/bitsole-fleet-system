@@ -106,6 +106,31 @@ function schedulePositionsMerge(list) {
     }
 }
 
+// Live polling fallback to keep data changing without page refresh
+let pollTimer = null;
+let visibilityHandler = null;
+const POLL_MS = 5000;
+async function pollPositionsOnce() {
+    try {
+        const posRes = await axios.get('/web/live/positions/current').catch(() => ({ data: {} }));
+        const positions = Array.isArray(posRes?.data?.positions) ? posRes.data.positions : [];
+        if (positions.length) {
+            schedulePositionsMerge(positions);
+        }
+    } catch {}
+}
+function startPositionsPolling() {
+    stopPositionsPolling();
+    pollTimer = setInterval(() => {
+        pollPositionsOnce();
+    }, POLL_MS);
+}
+function stopPositionsPolling() {
+    if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+    }
+}
 const panelVisible = ref(true);
 function updatePanelVisibilityForViewport() {
     if (window?.innerWidth > 576) {
@@ -428,6 +453,19 @@ onMounted(() => {
     panelVisible.value = true;
     try { window.addEventListener('resize', updatePanelVisibilityForViewport); } catch {}
 
+    // Start polling as a fallback to sockets to keep data fresh
+    startPositionsPolling();
+    try {
+        visibilityHandler = () => {
+            if (document.hidden) {
+                stopPositionsPolling();
+            } else {
+                startPositionsPolling();
+            }
+        };
+        document.addEventListener('visibilitychange', visibilityHandler);
+    } catch {}
+
     // Subscribe to WebSocket channel for live positions (per-user private channel)
     getCurrentUser().then((user) => {
         if (user?.id && window.echo) {
@@ -452,7 +490,14 @@ onBeforeUnmount(() => {
     if (map.value) map.value.remove();
     if (broadcastPing) clearInterval(broadcastPing);
     if (flushTimer) clearTimeout(flushTimer);
-    try { window.removeEventListener('resize', updatePanelVisibilityForViewport); } catch {}
+    if (pollTimer) clearInterval(pollTimer);
+    try {
+        if (visibilityHandler) {
+            document.removeEventListener('visibilitychange', visibilityHandler);
+            visibilityHandler = null;
+        }
+        window.removeEventListener('resize', updatePanelVisibilityForViewport);
+    } catch {}
 });
 </script>
 
