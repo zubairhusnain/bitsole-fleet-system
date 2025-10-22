@@ -12,10 +12,10 @@
         <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="dismissError" />
         <!-- Page Title and Actions -->
         <div class="row mb-3">
-            <div class="col-sm-12 col-md-5 col-lg-8">
+            <div class="col-sm-12 col-md-12 col-xl-8">
                 <h4 class="mb-0 fw-semibold">Vehicles Management</h4>
             </div>
-            <div class="col-sm-12 col-md-7 col-lg-4">
+            <div class="col-sm-12 col-md-12 col-xl-4">
                 <div class="row">
                     <div class="col-sm-12 col-md-6 col-lg-7 ml-auto">
                         <div class="input-group">
