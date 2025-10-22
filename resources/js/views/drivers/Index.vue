@@ -70,6 +70,7 @@
                 <td class="text-muted text-nowrap">{{ row.lastRide }}</td>
                 <td class="text-end">
                   <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" title="View" @click="openDetails(row)"><i class="bi bi-person-lines-fill"></i></button>
                     <button class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i class="bi bi-pencil"></i></button>
                     <button class="btn btn-outline-danger" title="Delete" @click="deleteDriver(row.id, row.name)" :disabled="deleting[row.id] === true">
                       <i class="bi bi-trash"></i>
@@ -95,6 +96,7 @@
         </nav>
       </div>
     </div>
+    <DriverDetailModal :show="detailVisible" :driverId="detailId" @close="detailVisible = false" />
   </div>
 
 </template>
@@ -103,6 +105,7 @@
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
+import DriverDetailModal from '../../components/DriverDetailModal.vue';
 import Swal from 'sweetalert2';
 import { useRouter } from 'vue-router';
 
@@ -114,6 +117,13 @@ const loading = ref(false);
 const error = ref('');
 const rows = ref([]);
 const deleting = ref({});
+const detailVisible = ref(false);
+const detailId = ref(null);
+function openDetails(row) {
+  if (!row?.id) return;
+  detailId.value = row.id;
+  detailVisible.value = true;
+}
 
 function formatDriver(d) {
   const attrs = d?.attributes || {};

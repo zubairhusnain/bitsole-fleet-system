@@ -39,6 +39,8 @@
           <img :src="logoSrc" alt="App Logo" style="height:24px" />
         </RouterLink>
       </div>
+      <!-- Mobile close button -->
+      <button class="btn-close sidebar-close d-lg-none" type="button" aria-label="Close sidebar" data-lte-toggle="sidebar"></button>
       <!--end::Sidebar Brand-->
       <!--begin::Sidebar Wrapper-->
       <div class="sidebar-wrapper">
@@ -234,5 +236,18 @@ nav a.router-link-exact-active { font-weight: 600; }
 .app-sidebar .nav-link.router-link-active p,
 .app-sidebar .nav-link.router-link-exact-active p {
   color: #fff !important;
+}
+
+/* Mobile-only close button (visible when sidebar is open) */
+.app-sidebar { position: relative; }
+.sidebar-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1051;
+  display: none;
+}
+@media (max-width: 992px) {
+  body.sidebar-open .app-sidebar .sidebar-close { display: inline-block; }
 }
 </style>
