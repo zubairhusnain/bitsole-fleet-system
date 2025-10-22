@@ -387,8 +387,8 @@ onMounted(() => {
     deviceLayer.value = L.layerGroup().addTo(map.value);
     fetchVehicles();
 
-    // Initialize panel visibility for viewport and bind resize
-    panelVisible.value = (window?.innerWidth || 1024) > 576;
+    // Initialize panel visibility to visible by default; keep resize to force show on desktop
+    panelVisible.value = true;
     try { window.addEventListener('resize', updatePanelVisibilityForViewport); } catch {}
 
     // Subscribe to WebSocket channel for live positions (per-user private channel)
