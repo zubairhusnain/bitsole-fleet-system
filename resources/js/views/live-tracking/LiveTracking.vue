@@ -3,7 +3,11 @@
         <!-- Breadcrumbs removed per request -->
 
         <div class="map-wrap">
-            <div class="panel-floating">
+            <button class="panel-toggle btn btn-light btn-sm" @click="panelVisible = !panelVisible" :aria-expanded="panelVisible.toString()" aria-controls="device-panel">
+                 <i class="bi me-1" :class="panelVisible ? 'bi-x-lg' : 'bi-list'"></i>
+                 <span class="toggle-title">Vehicle List</span>
+             </button>
+            <div class="panel-floating" :class="{ 'is-visible': panelVisible }">
                 <div class="panel-header">
                     <h3 class="panel-title">Search Vehicle</h3>
                     <label class="form-label small">Vehicle Name</label>
@@ -55,6 +59,12 @@ const vehicles = ref([]);
 const query = ref('');
 const brokenImages = reactive({});
 let broadcastPing = null;
+const panelVisible = ref(true);
+function updatePanelVisibilityForViewport() {
+    if (window?.innerWidth > 576) {
+        panelVisible.value = true;
+    }
+}
 
 function parseAttrs(val) {
     try { return typeof val === 'string' ? JSON.parse(val) : (val || {}); } catch { return {}; }
@@ -377,6 +387,10 @@ onMounted(() => {
     deviceLayer.value = L.layerGroup().addTo(map.value);
     fetchVehicles();
 
+    // Initialize panel visibility for viewport and bind resize
+    panelVisible.value = (window?.innerWidth || 1024) > 576;
+    try { window.addEventListener('resize', updatePanelVisibilityForViewport); } catch {}
+
     // Subscribe to WebSocket channel for live positions (per-user private channel)
     getCurrentUser().then((user) => {
         if (user?.id && window.echo) {
@@ -398,6 +412,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
     if (map.value) map.value.remove();
     if (broadcastPing) clearInterval(broadcastPing);
+    try { window.removeEventListener('resize', updatePanelVisibilityForViewport); } catch {}
 });
 </script>
 
@@ -421,6 +436,24 @@ onBeforeUnmount(() => {
     width: 100%;
 }
 
+.panel-toggle {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1100;
+    display: none;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0 0 12px 12px; /* remove top corners */
+    box-shadow: 0 6px 16px rgba(0,0,0,.10);
+    color: #111;
+    font-weight: 600;
+    padding: 6px 12px;
+}
+.panel-toggle .bi { vertical-align: middle; }
+.toggle-title { vertical-align: middle; }
+
 .panel-floating {
     position: absolute;
     top: 16px;
@@ -430,6 +463,15 @@ onBeforeUnmount(() => {
     background: #fff;
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+    transform: translateX(-110%);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform .25s ease, opacity .25s ease;
+}
+.panel-floating.is-visible {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .panel-floating .panel-header {
@@ -617,6 +659,7 @@ onBeforeUnmount(() => {
         margin-left: calc(-50vw + 50%);
         border-radius: 0;
     }
+    .panel-toggle { display: inline-block; }
     .panel-floating {
         left: 12px;
         right: 12px;
