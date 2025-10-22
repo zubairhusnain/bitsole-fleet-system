@@ -248,6 +248,8 @@ nav a.router-link-exact-active { font-weight: 600; }
   display: none;
 }
 @media (max-width: 992px) {
+  /* Ensure sidebar sits above the overlay so the close button is tappable */
+  .app-sidebar { z-index: 1040; }
   body.sidebar-open .app-sidebar .sidebar-close { display: inline-block; }
 }
 </style>
