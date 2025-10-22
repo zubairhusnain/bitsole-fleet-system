@@ -234,7 +234,22 @@ class VehicleController extends Controller
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
-        // Save uploaded photos and add paths to attributes.photos
+        // Load existing photos from tracking server attributes
+        $existingPhotos = [];
+        try {
+            $row = Devices::with('tcDevice')->where('device_id', $deviceId)->first();
+            $tc = $row ? $row->tcDevice : null;
+            if ($tc && isset($tc->attributes)) {
+                $existingAttrs = is_array($tc->attributes)
+                    ? $tc->attributes
+                    : (json_decode($tc->attributes, true) ?? []);
+                $existingPhotos = array_values(array_filter(is_array($existingAttrs['photos'] ?? []) ? $existingAttrs['photos'] : []));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to load existing vehicle photos for update', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+        }
+
+        // Save uploaded photos
         $savedImagePaths = [];
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $file) {
@@ -246,9 +261,25 @@ class VehicleController extends Controller
                 }
             }
         }
-        if (!empty($savedImagePaths)) {
-            $attributes['photos'] = $savedImagePaths;
+
+        // Determine final photos list (preserve, add new, or clear)
+        $incomingPhotos = array_key_exists('photos', $attributes)
+            ? (is_array($attributes['photos']) ? $attributes['photos'] : [])
+            : null;
+
+        if ($incomingPhotos !== null) {
+            $finalPhotos = !empty($savedImagePaths)
+                ? array_values(array_unique(array_merge($incomingPhotos, $savedImagePaths)))
+                : $incomingPhotos;
+        } else {
+            $finalPhotos = !empty($savedImagePaths)
+                ? array_values(array_unique(array_merge($existingPhotos, $savedImagePaths)))
+                : $existingPhotos;
         }
+        $attributes['photos'] = $finalPhotos;
+
+        // Track removals to clean up storage later
+        $removedPaths = array_diff($existingPhotos, $finalPhotos);
 
         // Merge back into request
         $request->merge([
@@ -286,6 +317,15 @@ class VehicleController extends Controller
                 'user_id' => $userIdLocal,
                 'distributor_id' => $distributorIdLocal,
             ]);
+        }
+
+        // Delete removed images from storage
+        if (!empty($removedPaths)) {
+            foreach ($removedPaths as $p) {
+                try { Storage::disk('public')->delete($p); } catch (\Throwable $e) {
+                    Log::warning('Failed to delete removed vehicle image', ['path' => $p, 'device_id' => $deviceId, 'error' => $e->getMessage()]);
+                }
+            }
         }
 
         return response()->json([

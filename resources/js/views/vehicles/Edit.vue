@@ -100,15 +100,18 @@
         <div class="card-body">
           <div class="row g-3">
             <div v-for="(preview, i) in previews" :key="i" class="col-12 col-md-4">
-              <label class="upload-box w-100" :class="{ 'has-image': !!preview }">
-                <input type="file" accept="image/png,image/jpeg" class="d-none" @change="onFile(i, $event)" />
-                <img v-if="preview" :src="preview" alt="Vehicle photo" class="upload-img" />
-                <div v-else class="upload-empty">
-                  <i class="bi bi-cloud-arrow-up fs-3"></i>
-                  <div class="small mt-1">Upload Vehicle Images</div>
-                  <div class="text-muted xsmall">jpeg & png only</div>
-                </div>
-              </label>
+              <div class="upload-wrapper position-relative">
+                <label class="upload-box w-100" :class="{ 'has-image': !!preview }">
+                  <input type="file" accept="image/png,image/jpeg" class="d-none" @change="onFile(i, $event)" />
+                  <img v-if="preview" :src="preview" alt="Vehicle photo" class="upload-img" />
+                  <div v-else class="upload-empty">
+                    <i class="bi bi-cloud-arrow-up fs-3"></i>
+                    <div class="small mt-1">Upload Vehicle Images</div>
+                    <div class="text-muted xsmall">jpeg & png only</div>
+                  </div>
+                </label>
+                <button v-if="preview" type="button" class="btn btn-sm btn-outline-danger remove-btn" @click="removePhoto(i)">Remove</button>
+              </div>
             </div>
           </div>
         </div>
@@ -153,8 +156,18 @@ const form = reactive({
   }
 });
 
+// Resolve assets from Laravel backend in dev; use current origin in prod
+const assetBase = import.meta.env.DEV ? (import.meta.env.VITE_BACKEND_PROXY_TARGET || 'http://127.0.0.1:8001') : window.location.origin;
+function toPhotoUrl(path) {
+  if (!path) return null;
+  if (/^https?:\/\//.test(path)) return path;
+  const normalized = path.startsWith('/storage/') ? path : `/storage/${path}`;
+  return assetBase + normalized;
+}
+
 const previews = ref([null, null, null]);
 const blobs = ref([null, null, null]);
+const existingPhotos = ref([null, null, null]);
 
 const message = ref('');
 const error = ref('');
@@ -217,7 +230,8 @@ function hydrateFormFromTc(tc) {
   const photosArr = Array.isArray(attrs.photos)
     ? attrs.photos
     : (typeof attrs.photos === 'string' ? [attrs.photos] : []);
-  previews.value = [photosArr[0] || null, photosArr[1] || null, photosArr[2] || null];
+  existingPhotos.value = [photosArr[0] || null, photosArr[1] || null, photosArr[2] || null];
+  previews.value = existingPhotos.value.map(p => p ? toPhotoUrl(p) : null);
 }
 
 function onFile(i, e) {
@@ -225,9 +239,20 @@ function onFile(i, e) {
   if (!file) return;
   const ok = /image\/(png|jpeg)/.test(file.type);
   if (!ok) { alert('Only PNG/JPEG images allowed'); return; }
-  if (previews.value[i]) URL.revokeObjectURL(previews.value[i]);
+  if (previews.value[i] && previews.value[i].startsWith('blob:')) URL.revokeObjectURL(previews.value[i]);
   previews.value[i] = URL.createObjectURL(file);
   blobs.value[i] = file;
+  // New upload replaces any existing photo in this slot
+  existingPhotos.value[i] = null;
+}
+
+function removePhoto(i) {
+  if (previews.value[i] && previews.value[i].startsWith('blob:')) {
+    URL.revokeObjectURL(previews.value[i]);
+  }
+  previews.value[i] = null;
+  blobs.value[i] = null;
+  existingPhotos.value[i] = null;
 }
 
 async function submit() {
@@ -240,7 +265,10 @@ async function submit() {
     fd.append('name', form.name?.trim() || '');
     fd.append('uniqueId', form.uniqueId?.trim() || '');
     if (form.model) fd.append('model', form.model?.trim());
-    fd.append('attributes', JSON.stringify({ ...form.attributes }));
+    const attrsOut = { ...form.attributes };
+    const keptPhotos = existingPhotos.value.filter(Boolean);
+    attrsOut.photos = keptPhotos;
+    fd.append('attributes', JSON.stringify(attrsOut));
     blobs.value.forEach((file, i) => { if (file) fd.append(`images[${i}]`, file); });
     // Use POST with method override to ensure Laravel parses multipart fields/files
     fd.append('_method', 'PUT');
@@ -259,9 +287,11 @@ async function submit() {
 <style scoped>
 .card-header h6 { font-weight: 600; }
 .btn-app-dark { background-color: #0b0f28; color: #fff; }
+.upload-wrapper { position: relative; }
 .upload-box { border: 2px dashed #cfd6e4; border-radius: .75rem; height: 220px; display:flex; align-items:center; justify-content:center; background:#f8fafc; cursor:pointer; }
 .upload-box.has-image { border-style: solid; background:#fff; }
 .upload-empty { text-align:center; color:#2b2f4a; }
 .upload-img { width: 100%; height: 100%; object-fit: cover; border-radius: .75rem; }
-.xsmall { font-size: .75rem; }
+.remove-btn { position: absolute; top: .5rem; right: .5rem; z-index: 2; }
+xsmall { font-size: .75rem; }
 </style>

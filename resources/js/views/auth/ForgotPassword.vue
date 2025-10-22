@@ -6,7 +6,7 @@
           <div class="auth-card card">
             <div class="card-body">
               <div class="text-center mb-3">
-                <img :src="logoSrc" alt="Logo" style="height:32px" />
+                <img :src="logoSrc" alt="Logo" class="auth-logo" />
               </div>
                <div class="auth-header text-center mb-4">
                 <h4 class="mb-1">Forgot Password</h4>
@@ -64,4 +64,5 @@ async function submit() {
 
 <style scoped>
 .auth-card { max-width: 480px; width: 100%; border-radius: var(--radius-card); box-shadow: var(--shadow-card); }
+.auth-logo { display: block; margin: 0 auto; height: 32px; }
 </style>

@@ -6,7 +6,7 @@
           <div class="auth-card card w-100" style="max-width: 560px;">
             <div class="card-body">
               <div class="text-center mb-3">
-                <img :src="logoSrc" alt="Logo" style="height:32px" />
+                <img :src="logoSrc" alt="Logo" class="auth-logo" />
               </div>
               <div class="auth-header text-center mb-4">
                 <h4 class="mb-1">Register New Account</h4>
@@ -91,4 +91,5 @@ async function submit() {
 
 <style scoped>
 .auth-card { max-width: 560px; }
+.auth-logo { display: block; margin: 0 auto; height: 32px; }
 </style>
