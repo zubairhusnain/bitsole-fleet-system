@@ -40,7 +40,7 @@
         </RouterLink>
       </div>
       <!-- Mobile close button -->
-      <button class="btn-close sidebar-close d-lg-none" type="button" aria-label="Close sidebar" @click.prevent="closeSidebar" data-lte-toggle="sidebar"></button>
+      <button class="btn-close sidebar-close d-lg-none" type="button" aria-label="Close sidebar" @click.prevent="closeSidebar" @touchend.stop.prevent="closeSidebar" data-lte-toggle="sidebar"></button>
       <!--end::Sidebar Brand-->
       <!--begin::Sidebar Wrapper-->
       <div class="sidebar-wrapper">
