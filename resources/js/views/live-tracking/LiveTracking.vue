@@ -3,50 +3,48 @@
         <!-- Breadcrumbs removed per request -->
 
         <div class="map-wrap">
-            <!-- Device list moved into map control -->
+            <button class="panel-toggle btn btn-light btn-sm" @click="panelVisible = !panelVisible" :aria-expanded="panelVisible.toString()" aria-controls="device-panel">
+                 <i class="bi me-1" :class="panelVisible ? 'bi-x-lg' : 'bi-list'"></i>
+                 <span class="toggle-title">Vehicle List</span>
+             </button>
+            <!-- moved panel inside l-map -->
             <l-map v-if="showMap" id="liveMap" :zoom="zoom" :center="center" :options="mapOptions" @ready="onMapReady">
             <l-tile-layer :url="tileUrl" :attribution="tileAttribution" />
-            <l-control position="topright">
-              <div class="device-control leaflet-bar">
-                <button class="control-toggle btn btn-light btn-sm" @click="panelVisible = !panelVisible" :aria-expanded="panelVisible.toString()" aria-controls="device-panel">
-                  <i class="bi me-1" :class="panelVisible ? 'bi-x-lg' : 'bi-list'"></i>
-                  <span class="toggle-title">Vehicle List</span>
-                </button>
-                <div v-show="panelVisible" id="device-panel" class="control-body">
-                  <div class="panel-header">
-                    <label class="form-label small">Vehicle Name</label>
-                    <input v-model="query" type="text" class="form-control panel-input" placeholder="eg. Transit Van" />
-                  </div>
-                  <div class="panel-body">
-                    <div v-if="loading" class="text-muted small">Loading…</div>
-                    <div v-else>
-                      <div v-for="v in filtered" :key="deviceKey(v)" class="vehicle-card" @click="focusVehicle(v)">
-                        <div class="vehicle-avatar">
-                          <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
-                        </div>
-                        <div class="vehicle-info">
-                          <div class="vehicle-name-row">
-                            <div class="vehicle-name">{{ deviceName(v) }}</div>
-                            <div class="vehicle-status" :class="statusClass(v)">
-                              <span v-if="statusIs(v, 'online')" class="icon-buffering"></span>
-                              <span v-else class="icon-dot"></span>
-                              <span class="status-text">{{ statusLabel(v) }}</span>
-                            </div>
-                          </div>
-                          <div class="vehicle-meta">Vehicle ID {{ uniqueId(v) || '—' }}</div>
-                        </div>
-                      </div>
-                      <div v-if="!filtered.length" class="text-muted small">No vehicles found.</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </l-control>
             <l-marker v-for="m in markerItems" :key="m.id" :lat-lng="[m.lat, m.lon]" :icon="carIcon" :ref="el => setMarkerRef(m.id, el)">
             <l-popup>
             <div class="popup-card" v-html="m.popup"></div>
             </l-popup>
             </l-marker>
+            <!-- Panel rendered inside the map container (plain layer) -->
+            <div class="panel-floating" :class="{ 'is-visible': panelVisible }">
+              <div class="panel-header">
+                <h3 class="panel-title">Search Vehicle</h3>
+                <label class="form-label small">Vehicle Name</label>
+                <input v-model="query" type="text" class="form-control panel-input" placeholder="eg. Transit Van" />
+              </div>
+              <div class="panel-body">
+                <div v-if="loading" class="text-muted small">Loading…</div>
+                <div v-else>
+                  <div v-for="v in filtered" :key="deviceKey(v)" class="vehicle-card" @click="focusVehicle(v)">
+                    <div class="vehicle-avatar">
+                      <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
+                    </div>
+                    <div class="vehicle-info">
+                      <div class="vehicle-name-row">
+                        <div class="vehicle-name">{{ deviceName(v) }}</div>
+                        <div class="vehicle-status" :class="statusClass(v)">
+                          <span v-if="statusIs(v, 'online')" class="icon-buffering"></span>
+                          <span v-else class="icon-dot"></span>
+                          <span class="status-text">{{ statusLabel(v) }}</span>
+                        </div>
+                      </div>
+                      <div class="vehicle-meta">Vehicle ID {{ uniqueId(v) || '—' }}</div>
+                    </div>
+                  </div>
+                  <div v-if="!filtered.length" class="text-muted small">No vehicles found.</div>
+                </div>
+              </div>
+            </div>
             </l-map>
         </div>
     </div>
@@ -56,7 +54,7 @@
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import axios from 'axios';
 import { getCurrentUser } from '../../auth';
-import { LMap, LTileLayer, LMarker, LPopup, LControl } from '@vue-leaflet/vue-leaflet';
+import { LMap, LTileLayer, LMarker, LIcon, LPopup } from '@vue-leaflet/vue-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -749,24 +747,4 @@ onBeforeUnmount(() => {
     border-radius: 10px;
 }
 
-#liveMap :deep(.device-control) {
-  min-width: 280px;
-  max-width: min(340px, 90vw);
-}
-#liveMap :deep(.device-control .control-toggle) {
-  width: 100%;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  box-sizing: border-box;
-}
-#liveMap :deep(.device-control .panel-header) {
-  padding: 8px 8px 0;
-}
-#liveMap :deep(.device-control .control-body) {
-  max-height: 50vh;
-  overflow-y: auto;
-  padding: 0 8px 8px;
-}
 </style>
