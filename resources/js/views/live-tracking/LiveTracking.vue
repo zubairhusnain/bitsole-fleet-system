@@ -94,7 +94,7 @@ import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { getCurrentUser, clearAuthCache } from '../../auth';
-import { LMap, LTileLayer, LMarker, LIcon, LPopup } from '@vue-leaflet/vue-leaflet';
+import { LMap, LTileLayer, LMarker, LPopup } from '@vue-leaflet/vue-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -170,6 +170,8 @@ function schedulePositionsMerge(list) {
 let pollTimer = null;
 let visibilityHandler = null;
 const POLL_MS = 5000;
+let socketsSeen = false;
+let fallbackStartTimer = null;
 async function pollPositionsOnce() {
     try {
         const posRes = await axios.get('/web/live/positions/current').catch(() => ({ data: {} }));
@@ -190,6 +192,12 @@ function stopPositionsPolling() {
         clearInterval(pollTimer);
         pollTimer = null;
     }
+}
+function armPollingFallback() {
+    if (fallbackStartTimer) clearTimeout(fallbackStartTimer);
+    fallbackStartTimer = setTimeout(() => {
+        if (!socketsSeen) startPositionsPolling();
+    }, 8000);
 }
 const panelVisible = ref(false);
 const showMobileTopbar = ref(true);
@@ -518,14 +526,18 @@ onMounted(() => {
     updatePanelVisibilityForViewport();
     try { window.addEventListener('resize', updatePanelVisibilityForViewport); } catch {}
 
-    // Start polling as a fallback to sockets to keep data fresh
-    startPositionsPolling();
+    // Start polling only if sockets don’t deliver updates shortly
+    armPollingFallback();
     try {
         visibilityHandler = () => {
             if (document.hidden) {
                 stopPositionsPolling();
             } else {
-                startPositionsPolling();
+                if (!socketsSeen) {
+                    startPositionsPolling();
+                } else {
+                    stopPositionsPolling();
+                }
             }
         };
         document.addEventListener('visibilitychange', visibilityHandler);
@@ -537,7 +549,9 @@ onMounted(() => {
             window.echo.private(`positions.${user.id}`).listen('.positions.updated', (e) => {
                 if (Array.isArray(e?.positions)) {
                     schedulePositionsMerge(e.positions);
-                    // keep user viewport stable; no auto-fit on every update
+                    socketsSeen = true;
+                    stopPositionsPolling();
+                    if (fallbackStartTimer) { clearTimeout(fallbackStartTimer); fallbackStartTimer = null; }
                 }
             });
         }
@@ -556,6 +570,7 @@ onBeforeUnmount(() => {
     if (broadcastPing) clearInterval(broadcastPing);
     if (flushTimer) clearTimeout(flushTimer);
     if (pollTimer) clearInterval(pollTimer);
+    if (fallbackStartTimer) clearTimeout(fallbackStartTimer);
     try {
         if (visibilityHandler) {
             document.removeEventListener('visibilitychange', visibilityHandler);
