@@ -916,8 +916,8 @@ onBeforeUnmount(() => {
     }
 
     :global(.app-sidebar[data-v-27b1954b]) {
-         z-index: 100000 !important;
-     }
+          z-index: 10000000 !important;
+      }
 }
 
 /* Popup layout improvements */
