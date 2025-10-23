@@ -2,6 +2,7 @@
 
 use App\Models\TcUser;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -109,3 +110,13 @@ Route::middleware('auth')->prefix('/web/drivers')->group(function () {
 Route::middleware('auth')->get('/web/live/positions/broadcast', [\App\Http\Controllers\LiveTrackingController::class, 'broadcast']);
 // Live Tracking: HTTP fallback to fetch current positions
 Route::get('/web/live/positions/current', [\App\Http\Controllers\LiveTrackingController::class, 'current']);
+
+// NEW: Auth-protected Users CRUD
+Route::middleware('auth')->prefix('/web/users')->group(function () {
+    Route::get('/', [UserController::class, 'index']);
+    Route::get('/options', [UserController::class, 'options']);
+    Route::get('/{userId}', [UserController::class, 'show']);
+    Route::post('/', [UserController::class, 'store']);
+    Route::put('/{userId}', [UserController::class, 'update']);
+    Route::delete('/{userId}', [UserController::class, 'destroy']);
+});

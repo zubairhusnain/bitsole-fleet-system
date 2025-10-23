@@ -12,11 +12,13 @@ import DashboardView from '../views/DashboardView.vue';
 import TasksView from '../views/TasksView.vue';
 import SettingsView from '../views/SettingsView.vue';
 import { ensureAuthenticated } from '../auth';
+import { authState } from '../auth';
 // Feature screens
 const MonitoringVehicles = () => import('../views/monitoring/Vehicles.vue');
 const MonitoringZones = () => import('../views/monitoring/Zones.vue');
 const LiveTracking = () => import('../views/live-tracking/LiveTracking.vue');
 const Drivers = () => import('../views/drivers/Index.vue');
+const Users = () => import('../views/users/Index.vue');
 const Vehicles = () => import('../views/vehicles/Index.vue');
 const VehiclesMaintenance = () => import('../views/vehicles/Maintenance.vue');
 const VehiclesOverview = () => import('../views/vehicles/Overview.vue');
@@ -38,12 +40,16 @@ const routes = [
   // Feature screens
   { path: '/monitoring/vehicles', name: 'monitoring-vehicles', component: MonitoringVehicles, meta: { requiresAuth: true, title: 'Vehicles Monitoring' } },
   { path: '/monitoring/zones', name: 'monitoring-zones', component: MonitoringZones, meta: { requiresAuth: true, title: 'Zone Monitoring' } },
-  { path: '/live-tracking', name: 'live-tracking', component: LiveTracking, meta: { requiresAuth: true, title: 'Live Tracking' } },
+  { path: '/live-tracking', name: 'live-tracking', component: LiveTracking, meta: { requiresAuth: true, title: 'Live Tracking', roles: [1, 2, 3] } },
   { path: '/drivers', name: 'drivers', component: Drivers, meta: { requiresAuth: true, title: 'Driver Management' } },
   // Add Driver route
   { path: '/drivers/new', name: 'drivers-new', component: () => import('../views/drivers/AddDriver.vue'), meta: { requiresAuth: true, title: 'Add New Driver' } },
   // Edit Driver route
   { path: '/drivers/:driverId/edit', name: 'drivers-edit', component: () => import('../views/drivers/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Driver' } },
+  // Users routes
+  { path: '/users', name: 'users', component: Users, meta: { requiresAuth: true, title: 'User Management' } },
+  { path: '/users/new', name: 'users-new', component: () => import('../views/users/AddUser.vue'), meta: { requiresAuth: true, title: 'Add New User' } },
+  { path: '/users/:userId/edit', name: 'users-edit', component: () => import('../views/users/Edit.vue'), meta: { requiresAuth: true, title: 'Edit User' } },
   { path: '/vehicles', name: 'vehicles', component: Vehicles, meta: { requiresAuth: true, title: 'Vehicle Management' } },
   { path: '/vehicles/maintenance', name: 'vehicles-maintenance', component: VehiclesMaintenance, meta: { requiresAuth: true, title: 'Vehicle Maintenance' } },
   { path: '/vehicles/overview', name: 'vehicles-overview', component: VehiclesOverview, meta: { requiresAuth: true, title: 'Vehicle Overview' } },
@@ -75,7 +81,14 @@ router.beforeEach(async (to, from, next) => {
 
   // Block guest-only pages when authenticated
   if (to.meta?.guestOnly && isAuthed) {
-    return next({ name: 'live-tracking' });
+    return next({ name: 'dashboard' });
+  }
+
+  // Role-based gating if route defines allowed roles
+  const role = authState?.user?.role ?? 3;
+  const allowed = Array.isArray(to.meta?.roles) ? to.meta.roles : null;
+  if (allowed && !allowed.includes(Number(role))) {
+    return next({ name: 'dashboard' });
   }
 
   return next();
