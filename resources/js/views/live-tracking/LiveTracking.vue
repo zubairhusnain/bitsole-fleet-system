@@ -11,7 +11,7 @@
                 <i class="bi bi-box-arrow-right"></i>
               </button>
             </div>
-            <button class="panel-toggle btn btn-light btn-sm" @click="panelVisible = !panelVisible" :aria-expanded="panelVisible.toString()" aria-controls="device-panel">
+            <button v-if="isMobile || !panelVisible" class="panel-toggle btn btn-light btn-sm" @click="panelVisible = !panelVisible" :aria-expanded="panelVisible.toString()" aria-controls="device-panel">
                  <i class="bi me-1" :class="panelVisible ? 'bi-x-lg' : 'bi-list'"></i>
                  <span class="toggle-title">Vehicle List</span>
              </button>
@@ -916,8 +916,8 @@ onBeforeUnmount(() => {
     }
 
     :global(.app-sidebar[data-v-27b1954b]) {
-        z-index: 10000 !important;
-    }
+         z-index: 100000 !important;
+     }
 }
 
 /* Popup layout improvements */
