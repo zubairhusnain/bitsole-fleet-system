@@ -116,6 +116,38 @@ class VehicleController extends Controller
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
+        // Validate numeric attributes
+        if (array_key_exists('odometer', $attributes) && $attributes['odometer'] !== null && $attributes['odometer'] !== '') {
+            $odoStr = (string) $attributes['odometer'];
+            if (!preg_match('/^\d+$/', $odoStr)) {
+                return response()->json(['message' => 'Odometer Reading must be numeric and >= 0'], 422);
+            }
+        }
+        if (array_key_exists('maxSpeed', $attributes) && $attributes['maxSpeed'] !== null && $attributes['maxSpeed'] !== '') {
+            $msStr = (string) $attributes['maxSpeed'];
+            if (!preg_match('/^\d+$/', $msStr)) {
+                return response()->json(['message' => 'Max Speed must be numeric and >= 0'], 422);
+            }
+        }
+        if (array_key_exists('speedLimit', $attributes) && $attributes['speedLimit'] !== null && $attributes['speedLimit'] !== '') {
+            $slStr = (string) $attributes['speedLimit'];
+            if (!preg_match('/^\d+$/', $slStr)) {
+                return response()->json(['message' => 'Speed Limit must be numeric and >= 0'], 422);
+            }
+        }
+        if (array_key_exists('registration', $attributes) && $attributes['registration'] !== null && $attributes['registration'] !== '') {
+            $regStr = (string) $attributes['registration'];
+            if (!preg_match('/^\d+$/', $regStr)) {
+                return response()->json(['message' => 'Registration Number must be numeric and >= 0'], 422);
+            }
+        }
+        if (array_key_exists('vin', $attributes) && $attributes['vin'] !== null && $attributes['vin'] !== '') {
+            $vinStr = (string) $attributes['vin'];
+            if (!preg_match('/^\d+$/', $vinStr)) {
+                return response()->json(['message' => 'VIN Number must be numeric and >= 0'], 422);
+            }
+        }
+
         // Save uploaded photos and add paths to attributes.photos
         $savedImagePaths = [];
         if ($request->hasFile('images')) {
@@ -233,6 +265,38 @@ class VehicleController extends Controller
             'type','manufacturer','color','registration','plate','vin','odometer','fuelAverage','maxSpeed','speedLimit','photos'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
+
+        // Validate numeric attributes
+        if (array_key_exists('odometer', $attributes) && $attributes['odometer'] !== null && $attributes['odometer'] !== '') {
+            $odoStr = (string) $attributes['odometer'];
+            if (!preg_match('/^\d+$/', $odoStr)) {
+                return response()->json(['message' => 'Odometer Reading must be numeric and >= 0'], 422);
+            }
+        }
+        if (array_key_exists('maxSpeed', $attributes) && $attributes['maxSpeed'] !== null && $attributes['maxSpeed'] !== '') {
+            $msStr = (string) $attributes['maxSpeed'];
+            if (!preg_match('/^\d+$/', $msStr)) {
+                return response()->json(['message' => 'Max Speed must be numeric and >= 0'], 422);
+            }
+        }
+        if (array_key_exists('speedLimit', $attributes) && $attributes['speedLimit'] !== null && $attributes['speedLimit'] !== '') {
+            $slStr = (string) $attributes['speedLimit'];
+            if (!preg_match('/^\d+$/', $slStr)) {
+                return response()->json(['message' => 'Speed Limit must be numeric and >= 0'], 422);
+            }
+        }
+        if (array_key_exists('registration', $attributes) && $attributes['registration'] !== null && $attributes['registration'] !== '') {
+            $regStr = (string) $attributes['registration'];
+            if (!preg_match('/^\d+$/', $regStr)) {
+                return response()->json(['message' => 'Registration Number must be numeric and >= 0'], 422);
+            }
+        }
+        if (array_key_exists('vin', $attributes) && $attributes['vin'] !== null && $attributes['vin'] !== '') {
+            $vinStr = (string) $attributes['vin'];
+            if (!preg_match('/^\d+$/', $vinStr)) {
+                return response()->json(['message' => 'VIN Number must be numeric and >= 0'], 422);
+            }
+        }
 
         // Load existing photos from tracking server attributes
         $existingPhotos = [];

@@ -62,7 +62,7 @@
 
             <div class="col-12 col-md-4">
               <label class="form-label small">Registration Number</label>
-              <input v-model="form.attributes.registration" type="text" class="form-control" placeholder="Registration Number" />
+              <input v-model="form.attributes.registration" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="Registration Number" />
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Plate Number</label>
@@ -70,12 +70,12 @@
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">VIN Number</label>
-              <input v-model="form.attributes.vin" type="text" class="form-control" placeholder="VIN Number" />
+              <input v-model="form.attributes.vin" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="VIN Number" />
             </div>
 
             <div class="col-12 col-md-4">
               <label class="form-label small">Odometer Reading</label>
-              <input v-model="form.attributes.odometer" type="text" class="form-control" placeholder="Odometer Reading" />
+              <input v-model="form.attributes.odometer" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="Odometer Reading" />
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Fuel Average</label>
@@ -88,7 +88,7 @@
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Max Speed</label>
-              <input v-model="form.attributes.maxSpeed" type="text" class="form-control" placeholder="Max Speed" />
+              <input v-model="form.attributes.maxSpeed" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="Max Speed" />
             </div>
           </div>
         </div>
@@ -258,6 +258,38 @@ function removePhoto(i) {
 async function submit() {
   message.value = '';
   error.value = '';
+
+  // Validate numeric fields: odometer and maxSpeed
+  if (form.attributes.odometer !== '' && form.attributes.odometer !== null) {
+    const odStr = String(form.attributes.odometer);
+    if (!/^\d+$/.test(odStr)) {
+      error.value = 'Odometer Reading must be numeric and >= 0';
+      return;
+    }
+  }
+  if (form.attributes.maxSpeed !== '' && form.attributes.maxSpeed !== null) {
+    const msStr = String(form.attributes.maxSpeed);
+    if (!/^\d+$/.test(msStr)) {
+      error.value = 'Max Speed must be numeric and >= 0';
+      return;
+    }
+  }
+
+  // Validate numeric fields: registration and vin
+  if (form.attributes.registration !== '' && form.attributes.registration !== null) {
+    const regStr = String(form.attributes.registration);
+    if (!/^\d+$/.test(regStr)) {
+      error.value = 'Registration Number must be numeric and >= 0';
+      return;
+    }
+  }
+  if (form.attributes.vin !== '' && form.attributes.vin !== null) {
+    const vinStr = String(form.attributes.vin);
+    if (!/^\d+$/.test(vinStr)) {
+      error.value = 'VIN Number must be numeric and >= 0';
+      return;
+    }
+  }
 
   submitting.value = true;
   try {
