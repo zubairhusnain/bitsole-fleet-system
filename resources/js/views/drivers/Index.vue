@@ -70,7 +70,7 @@
                 <td class="text-muted text-nowrap">{{ row.lastRide }}</td>
                 <td class="text-end">
                   <div class="btn-group btn-group-sm">
-                    <button class="btn btn-outline-primary" title="View" @click="openDetails(row)"><i class="bi bi-person-lines-fill"></i></button>
+                    <button v-if="!isProd" class="btn btn-outline-primary" title="View" @click="openDetails(row)"><i class="bi bi-person-lines-fill"></i></button>
                     <button class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i class="bi bi-pencil"></i></button>
                     <button class="btn btn-outline-danger" title="Delete" @click="deleteDriver(row.id, row.name)" :disabled="deleting[row.id] === true">
                       <i class="bi bi-trash"></i>
@@ -110,6 +110,7 @@ import Swal from 'sweetalert2';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
+const isProd = import.meta.env.PROD;
 const query = ref('');
 const page = ref(1);
 const pageSize = 16;
