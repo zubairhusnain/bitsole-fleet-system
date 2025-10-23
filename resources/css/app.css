@@ -288,6 +288,43 @@ p  { font-size: 16px; line-height: 1.6; }
 /* Table nowrap utility for compact cells */
 .table-nowrap td, .table-nowrap th { white-space: nowrap; }
 
+/* Mobile tables: keep headers intact, wrap body content cleanly */
+@media (max-width: 576px) {
+  .table-responsive .table { table-layout: auto; }
+
+  /* Preserve readable headers on mobile */
+  .table-responsive thead th { white-space: nowrap !important; }
+
+  /* Generic wrapping for ALL table body cells on mobile */
+  .table-responsive tbody td {
+    white-space: normal !important;        /* allow multi-line */
+    word-break: break-word;                /* break long words gracefully */
+    overflow-wrap: break-word;             /* avoid single-letter columns */
+    hyphens: auto;                         /* optional hyphenation */
+  }
+
+  /* Neutralize text-nowrap in table body for mobile */
+  .table-responsive .text-nowrap { white-space: normal !important; }
+  .table-responsive .table.table-nowrap tbody td { white-space: normal !important; }
+
+  /* Utility: truncation for long inline values (still available when desired) */
+  .table-responsive .cell-ellipsis {
+    display: inline-block;
+    max-width: clamp(120px, 36vw, 240px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  /* Optional: allow explicit wrapping when opted-in */
+  .table-responsive .cell-wrap {
+    white-space: normal !important;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+}
+
 /* Badge refinement */
 .badge-app { font-weight: 600; font-size: 12px; padding: 0.25rem 0.5rem; border-radius: 999px; }
 
