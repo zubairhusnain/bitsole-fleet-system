@@ -3,11 +3,48 @@
         <!-- Breadcrumbs removed per request -->
 
         <div class="map-wrap">
+            <div v-if="isMobile && showMobileTopbar" class="mobile-topbar">
+              <button class="mobile-btn btn btn-dark btn-sm" @click="toggleSidebar" aria-label="Toggle sidebar">
+                <i class="bi bi-list"></i>
+              </button>
+              <button class="mobile-btn btn btn-dark btn-sm logout" @click="logout" aria-label="Logout">
+                <i class="bi bi-box-arrow-right"></i>
+              </button>
+            </div>
             <button class="panel-toggle btn btn-light btn-sm" @click="panelVisible = !panelVisible" :aria-expanded="panelVisible.toString()" aria-controls="device-panel">
                  <i class="bi me-1" :class="panelVisible ? 'bi-x-lg' : 'bi-list'"></i>
                  <span class="toggle-title">Vehicle List</span>
              </button>
-            <!-- moved panel inside l-map -->
+            <!-- Panel outside l-map for desktop -->
+             <div v-if="!isMobile && panelVisible" class="panel-floating is-visible">
+               <div class="panel-header">
+                 <h3 class="panel-title">Search Vehicle</h3>
+                 <label class="form-label small">Vehicle Name</label>
+                 <input v-model="query" type="text" class="form-control panel-input" placeholder="eg. Transit Van" />
+               </div>
+               <div class="panel-body" @wheel.stop>
+                 <div v-if="loading" class="text-muted small">Loading…</div>
+                 <div v-else>
+                   <div v-for="v in filtered" :key="deviceKey(v)" class="vehicle-card" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
+                     <div class="vehicle-avatar">
+                       <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
+                     </div>
+                     <div class="vehicle-info">
+                       <div class="vehicle-name-row">
+                         <div class="vehicle-name">{{ deviceName(v) }}</div>
+                         <div class="vehicle-status" :class="statusClass(v)">
+                           <span v-if="statusIs(v, 'online')" class="icon-buffering"></span>
+                           <span v-else class="icon-dot"></span>
+                           <span class="status-text">{{ statusLabel(v) }}</span>
+                         </div>
+                       </div>
+                       <div class="vehicle-meta">Vehicle ID {{ uniqueId(v) || '—' }}</div>
+                     </div>
+                   </div>
+                   <div v-if="!filtered.length" class="text-muted small">No vehicles found.</div>
+                 </div>
+               </div>
+             </div>
             <l-map v-if="showMap" id="liveMap" :zoom="zoom" :center="center" :options="mapOptions" @ready="onMapReady">
             <l-tile-layer :url="tileUrl" :attribution="tileAttribution" />
             <l-marker v-for="m in markerItems" :key="m.id" :lat-lng="[m.lat, m.lon]" :icon="carIcon" :ref="el => setMarkerRef(m.id, el)">
@@ -16,16 +53,17 @@
             </l-popup>
             </l-marker>
             <!-- Panel rendered inside the map container (plain layer) -->
-            <div class="panel-floating" :class="{ 'is-visible': panelVisible }">
+             <transition name="mobile-panel">
+             <div v-if="isMobile && panelVisible" class="panel-floating">
               <div class="panel-header">
                 <h3 class="panel-title">Search Vehicle</h3>
                 <label class="form-label small">Vehicle Name</label>
                 <input v-model="query" type="text" class="form-control panel-input" placeholder="eg. Transit Van" />
               </div>
-              <div class="panel-body">
+              <div class="panel-body" @wheel.stop>
                 <div v-if="loading" class="text-muted small">Loading…</div>
                 <div v-else>
-                  <div v-for="v in filtered" :key="deviceKey(v)" class="vehicle-card" @click="focusVehicle(v)">
+                  <div v-for="v in filtered" :key="deviceKey(v)" class="vehicle-card" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
                     <div class="vehicle-avatar">
                       <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
                     </div>
@@ -45,6 +83,7 @@
                 </div>
               </div>
             </div>
+            </transition>
             </l-map>
         </div>
     </div>
@@ -52,8 +91,9 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { useRouter } from 'vue-router';
 import axios from 'axios';
-import { getCurrentUser } from '../../auth';
+import { getCurrentUser, clearAuthCache } from '../../auth';
 import { LMap, LTileLayer, LMarker, LIcon, LPopup } from '@vue-leaflet/vue-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -61,9 +101,29 @@ import 'leaflet/dist/leaflet.css';
 const map = ref(null);
 const markerRefs = new Map();
 
+const router = useRouter();
+
+async function logout() {
+    try { await axios.post('/web/auth/logout'); } catch {}
+    clearAuthCache();
+    router.push('/login');
+}
+
+function toggleSidebar() {
+    const body = document.body;
+    const isOpen = body.classList.contains('sidebar-open');
+    if (isOpen) {
+        body.classList.remove('sidebar-open');
+        body.classList.add('sidebar-collapse');
+    } else {
+        body.classList.add('sidebar-open');
+        body.classList.remove('sidebar-collapse');
+    }
+}
+
 function onMapReady(mapObj) {
     map.value = mapObj;
-    try { map.value.zoomControl.setPosition('topright'); } catch {}
+    try { map.value.zoomControl.setPosition('bottomright'); } catch {}
 }
 
 function setMarkerRef(id, el) {
@@ -131,9 +191,14 @@ function stopPositionsPolling() {
         pollTimer = null;
     }
 }
-const panelVisible = ref(true);
+const panelVisible = ref(false);
+const showMobileTopbar = ref(true);
+const MOBILE_MAX = 576;
+const isMobile = ref(false);
 function updatePanelVisibilityForViewport() {
-    if (window?.innerWidth > 576) {
+    const w = window?.innerWidth ?? 1024;
+    isMobile.value = w <= MOBILE_MAX;
+    if (w > MOBILE_MAX) {
         panelVisible.value = true;
     }
 }
@@ -449,8 +514,8 @@ onMounted(() => {
     // Map is created declaratively via <l-map/>; load data and listeners
     fetchVehicles();
 
-    // Initialize panel visibility to visible by default; keep resize to force show on desktop
-    panelVisible.value = true;
+    // Initialize by viewport: show on desktop, keep hidden on mobile
+    updatePanelVisibilityForViewport();
     try { window.addEventListener('resize', updatePanelVisibilityForViewport); } catch {}
 
     // Start polling as a fallback to sockets to keep data fresh
@@ -514,6 +579,8 @@ onBeforeUnmount(() => {
     min-height: 520px;
     border-radius: 0;
     overflow: hidden;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
 }
 
 #liveMap {
@@ -521,20 +588,26 @@ onBeforeUnmount(() => {
     width: 100%;
 }
 
+/* LiveTracking-only: remove top margin and padding on main app container */
+:global(.live-tracking-route .app-main) {
+    margin-top: 0 !important;
+    padding: 0 !important;
+}
+
 .panel-toggle {
-    position: absolute;
-    top: 0;
+    position: fixed;
+    top: 10px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 1100;
-    display: none;
+    z-index: 3000;
+    display: inline-block;
     background: #fff;
     border: 1px solid #e5e7eb;
-    border-radius: 0 0 12px 12px; /* remove top corners */
-    box-shadow: 0 6px 16px rgba(0,0,0,.10);
+    border-radius: 12px;
+    box-shadow: 0 6px 16px rgba(0,0,0,.15);
     color: #111;
     font-weight: 600;
-    padding: 6px 12px;
+    padding: 8px 14px;
 }
 .panel-toggle .bi { vertical-align: middle; }
 .toggle-title { vertical-align: middle; }
@@ -544,7 +617,7 @@ onBeforeUnmount(() => {
     top: 16px;
     left: 16px;
     width: 360px;
-    z-index: 1000;
+    z-index: 4000;
     background: #fff;
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
@@ -587,6 +660,8 @@ onBeforeUnmount(() => {
     padding: 10px 12px;
     border-radius: 10px;
     cursor: pointer;
+    position: relative; /* create stacking context for z-index */
+    z-index: 4001; /* ensure whole card overlays within the panel */
 }
 
 .vehicle-card:hover {
@@ -736,7 +811,9 @@ onBeforeUnmount(() => {
 /* Mobile-friendly adjustments for panel and map */
 @media (max-width: 576px) {
     .map-wrap {
-        height: calc(100vh - 140px);
+        height: 100vh;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
     }
     /* Full-bleed map: stretch to viewport width inside padded container */
     .live-tracking-view .map-wrap {
@@ -744,12 +821,36 @@ onBeforeUnmount(() => {
         margin-left: calc(-50vw + 50%);
         border-radius: 0;
     }
-    .panel-toggle { display: inline-block; }
-    .panel-floating {
-        left: 12px;
-        right: 12px;
-        width: auto;
+    /* Keep toggle at top-center on mobile as well */
+    .panel-toggle {
+        position: fixed;
+        top: 10px;
+        bottom: auto;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 3000;
+        display: inline-block;
+        border-radius: 12px;
+        padding: 8px 14px;
+        box-shadow: 0 6px 16px rgba(0,0,0,.15);
     }
+
+    /* Top overlay on mobile: slide down from top, centered horizontally */
+    .panel-floating {
+        position: absolute; /* keep overlay inside map container */
+        top: 120px;
+        bottom: auto;
+        left: 50%;
+        right: auto;
+        width: min(360px, 92vw);
+        transform: translate(-50%, 0); /* final position; transition animates from below */
+        border-radius: 12px; /* rounded corners */
+        box-shadow: 0 8px 24px rgba(0,0,0,.12);
+        opacity: 1; /* ensure visible after transition completes */
+        pointer-events: auto; /* clickable after transition */
+        z-index: 4000; /* keep above map controls */
+    }
+
     .panel-floating .panel-body {
         max-height: 50vh;
         padding: 10px;
@@ -764,6 +865,59 @@ onBeforeUnmount(() => {
     }
     .vehicle-name { font-size: 14px; }
     .vehicle-status { font-size: 11px; }
+
+    :global(.live-tracking-route .app-header) { display: none !important; }
+    :global(.live-tracking-route .app-footer) { display: none !important; }
+    :global(.live-tracking-route .app-main .app-content .container-fluid) {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Mobile overlay controls */
+    .mobile-topbar {
+        position: fixed;
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        z-index: 1200;
+        display: flex;
+        justify-content: space-between;
+        pointer-events: none;
+    }
+    .mobile-topbar .mobile-btn {
+        pointer-events: auto;
+        background: #111;
+        color: #fff;
+        border-radius: 12px;
+        padding: 8px 10px;
+        box-shadow: 0 6px 16px rgba(0,0,0,.15);
+    }
+
+    /* Transition for slight bottom-to-top reveal */
+    .mobile-panel-enter-active,
+    .mobile-panel-leave-active {
+        transition: transform .18s ease, opacity .18s ease;
+    }
+    .mobile-panel-enter-from {
+        transform: translate(-50%, 24px);
+        opacity: 0;
+    }
+    .mobile-panel-enter-to {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
+    .mobile-panel-leave-from {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
+    .mobile-panel-leave-to {
+        transform: translate(-50%, 24px);
+        opacity: 0;
+    }
+
+    :global(.app-sidebar[data-v-27b1954b]) {
+        z-index: 10000 !important;
+    }
 }
 
 /* Popup layout improvements */

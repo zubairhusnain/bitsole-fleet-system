@@ -5,7 +5,7 @@
   </template>
 
   <!-- Admin layout mirrors layout-sample.blade.php -->
-  <div v-else class="app-wrapper">
+  <div v-else class="app-wrapper" :class="{ 'live-tracking-route': route.name === 'live-tracking' }">
     <!--begin::Header-->
     <nav class="app-header navbar navbar-expand bg-body">
       <!--begin::Container-->
