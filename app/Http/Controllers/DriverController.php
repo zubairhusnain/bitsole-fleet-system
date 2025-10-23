@@ -142,7 +142,75 @@ class DriverController extends Controller
         $allowedKeys = ['driverId','email','phone','gender','dob','idCard','passport','healthOk','address','telephone','licence','license','licenseExpiry','assignedVehicle','licenseImage','avatarImage','status','lastRide'];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
+        // Validate DOB: must be before today
+        if (array_key_exists('dob', $attributes) && $attributes['dob']) {
+            try { $dobDate = new \DateTime($attributes['dob']); } catch (\Throwable $e) { $dobDate = null; }
+            $today = new \DateTime('today');
+            if (!$dobDate || $dobDate >= $today) {
+                return response()->json(['message' => 'Date of Birth must be before today'], 422);
+            }
+        }
 
+        // Validate License Expiry: must be after today
+        if (array_key_exists('licenseExpiry', $attributes) && $attributes['licenseExpiry']) {
+            try { $expDate = new \DateTime($attributes['licenseExpiry']); } catch (\Throwable $e) { $expDate = null; }
+            $today = new \DateTime('today');
+            if (!$expDate || $expDate <= $today) {
+                return response()->json(['message' => 'License Expiry must be after today'], 422);
+            }
+        }
+
+        // Validate License Expiry: must be after today
+        if (array_key_exists('licenseExpiry', $attributes) && $attributes['licenseExpiry']) {
+            try { $expDate = new \DateTime($attributes['licenseExpiry']); } catch (\Throwable $e) { $expDate = null; }
+            $today = new \DateTime('today');
+            if (!$expDate || $expDate <= $today) {
+                return response()->json(['message' => 'License Expiry must be after today'], 422);
+            }
+        }
+
+        // Validate Email format if provided
+        if (array_key_exists('email', $attributes) && $attributes['email']) {
+            if (!filter_var($attributes['email'], FILTER_VALIDATE_EMAIL)) {
+                return response()->json(['message' => 'Email Address must be a valid email'], 422);
+            }
+        }
+        // Validate Phone numeric and non-negative if provided
+        if (array_key_exists('phone', $attributes) && $attributes['phone'] !== null && $attributes['phone'] !== '') {
+            $phoneStr = (string) $attributes['phone'];
+            if (!preg_match('/^\d+$/', $phoneStr)) {
+                return response()->json(['message' => 'Phone Number must be numeric and >= 0'], 422);
+            }
+        }
+        // Validate Telephone numeric and non-negative if provided
+        if (array_key_exists('telephone', $attributes) && $attributes['telephone'] !== null && $attributes['telephone'] !== '') {
+            $telStr = (string) $attributes['telephone'];
+            if (!preg_match('/^\d+$/', $telStr)) {
+                return response()->json(['message' => 'Telephone must be numeric and >= 0'], 422);
+            }
+        }
+        // Validate ID Card numeric and non-negative if provided
+        if (array_key_exists('idCard', $attributes) && $attributes['idCard'] !== null && $attributes['idCard'] !== '') {
+            $idStr = (string) $attributes['idCard'];
+            if (!preg_match('/^\d+$/', $idStr)) {
+                return response()->json(['message' => 'ID Card Number must be numeric and >= 0'], 422);
+            }
+        }
+        // Validate Passport numeric and non-negative if provided
+        if (array_key_exists('passport', $attributes) && $attributes['passport'] !== null && $attributes['passport'] !== '') {
+            $passStr = (string) $attributes['passport'];
+            if (!preg_match('/^\d+$/', $passStr)) {
+                return response()->json(['message' => 'Passport Number must be numeric and >= 0'], 422);
+            }
+        }
+        // Validate License Number numeric and non-negative if provided
+        if (array_key_exists('licence', $attributes) && $attributes['licence'] !== null && $attributes['licence'] !== '') {
+            $licStr = (string) $attributes['licence'];
+            if (!preg_match('/^\d+$/', $licStr)) {
+                return response()->json(['message' => 'License Number must be numeric and >= 0'], 422);
+            }
+        }
+        
         // Save uploaded licence image and add to attributes
         $savedImagePath = null;
         if ($request->hasFile('licenceImage')) {
@@ -278,6 +346,66 @@ class DriverController extends Controller
         // Sanitize attributes: whitelist keys used by frontend forms
         $allowedKeys = ['driverId','email','phone','gender','dob','idCard','passport','healthOk','address','telephone','licence','license','licenseExpiry','assignedVehicle','licenseImage','avatarImage','status','lastRide'];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
+
+        // Validate DOB: must be before today
+        if (array_key_exists('dob', $attributes) && $attributes['dob']) {
+            try { $dobDate = new \DateTime($attributes['dob']); } catch (\Throwable $e) { $dobDate = null; }
+            $today = new \DateTime('today');
+            if (!$dobDate || $dobDate >= $today) {
+                return response()->json(['message' => 'Date of Birth must be before today'], 422);
+            }
+        }
+
+        // Validate License Expiry: must be after today
+        if (array_key_exists('licenseExpiry', $attributes) && $attributes['licenseExpiry']) {
+            try { $expDate = new \DateTime($attributes['licenseExpiry']); } catch (\Throwable $e) { $expDate = null; }
+            $today = new \DateTime('today');
+            if (!$expDate || $expDate <= $today) {
+                return response()->json(['message' => 'License Expiry must be after today'], 422);
+            }
+        }
+
+        // Validate Email format if provided
+        if (array_key_exists('email', $attributes) && $attributes['email']) {
+            if (!filter_var($attributes['email'], FILTER_VALIDATE_EMAIL)) {
+                return response()->json(['message' => 'Email Address must be a valid email'], 422);
+            }
+        }
+        // Validate Phone numeric and non-negative if provided
+        if (array_key_exists('phone', $attributes) && $attributes['phone'] !== null && $attributes['phone'] !== '') {
+            $phoneStr = (string) $attributes['phone'];
+            if (!preg_match('/^\d+$/', $phoneStr)) {
+                return response()->json(['message' => 'Phone Number must be numeric and >= 0'], 422);
+            }
+        }
+        // Validate Telephone numeric and non-negative if provided
+        if (array_key_exists('telephone', $attributes) && $attributes['telephone'] !== null && $attributes['telephone'] !== '') {
+            $telStr = (string) $attributes['telephone'];
+            if (!preg_match('/^\d+$/', $telStr)) {
+                return response()->json(['message' => 'Telephone must be numeric and >= 0'], 422);
+            }
+        }
+        // Validate ID Card numeric and non-negative if provided
+        if (array_key_exists('idCard', $attributes) && $attributes['idCard'] !== null && $attributes['idCard'] !== '') {
+            $idStr = (string) $attributes['idCard'];
+            if (!preg_match('/^\d+$/', $idStr)) {
+                return response()->json(['message' => 'ID Card Number must be numeric and >= 0'], 422);
+            }
+        }
+        // Validate Passport numeric and non-negative if provided
+        if (array_key_exists('passport', $attributes) && $attributes['passport'] !== null && $attributes['passport'] !== '') {
+            $passStr = (string) $attributes['passport'];
+            if (!preg_match('/^\d+$/', $passStr)) {
+                return response()->json(['message' => 'Passport Number must be numeric and >= 0'], 422);
+            }
+        }
+        // Validate License Number numeric and non-negative if provided
+        if (array_key_exists('licence', $attributes) && $attributes['licence'] !== null && $attributes['licence'] !== '') {
+            $licStr = (string) $attributes['licence'];
+            if (!preg_match('/^\d+$/', $licStr)) {
+                return response()->json(['message' => 'License Number must be numeric and >= 0'], 422);
+            }
+        }
 
         // Load existing attributes to preserve images when no new upload
         $existingAttrs = [];

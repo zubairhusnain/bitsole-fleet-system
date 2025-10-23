@@ -566,7 +566,6 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-    if (map.value) map.value.remove();
     if (broadcastPing) clearInterval(broadcastPing);
     if (flushTimer) clearTimeout(flushTimer);
     if (pollTimer) clearInterval(pollTimer);
@@ -960,6 +959,11 @@ onBeforeUnmount(() => {
 }
 #liveMap :deep(.leaflet-popup-content-wrapper) {
     border-radius: 10px;
+}
+
+/* Slightly raise Leaflet zoom control on LiveTracking */
+#liveMap :deep(.leaflet-top .leaflet-control-zoom) {
+    margin-top: 2px;
 }
 
 </style>

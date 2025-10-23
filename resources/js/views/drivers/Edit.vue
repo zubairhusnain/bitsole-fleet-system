@@ -45,16 +45,16 @@
             </div>
             <div class="col-12 col-md-3">
               <label class="form-label small">Date of Birth</label>
-              <input v-model="form.dob" type="date" class="form-control" />
+              <input v-model="form.dob" type="date" class="form-control" :max="dobMax" />
             </div>
 
             <div class="col-12 col-md-3">
               <label class="form-label small">ID Card Number</label>
-              <input v-model="form.idCard" type="text" class="form-control" placeholder="ID Card Number" />
+              <input v-model="form.idCard" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="ID Card Number" />
             </div>
             <div class="col-12 col-md-3">
               <label class="form-label small">Passport Number</label>
-              <input v-model="form.passport" type="text" class="form-control" placeholder="Passport Number" />
+              <input v-model="form.passport" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="Passport Number" />
             </div>
 
             <div class="col-12">
@@ -80,7 +80,7 @@
             </div>
             <div class="col-12 col-md-6">
               <label class="form-label small">Phone Number</label>
-              <input v-model="form.phone" type="text" class="form-control" placeholder="Phone Number" />
+              <input v-model="form.phone" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="Phone Number" />
             </div>
             <div class="col-12 col-md-6">
               <label class="form-label small">Address</label>
@@ -88,7 +88,7 @@
             </div>
             <div class="col-12 col-md-6">
               <label class="form-label small">Telephone</label>
-              <input v-model="form.telephone" type="text" class="form-control" placeholder="Telephone number" />
+              <input v-model="form.telephone" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="Telephone number" />
             </div>
           </div>
         </div>
@@ -123,11 +123,11 @@
             </div>
             <div class="col-12 col-md-6">
               <label class="form-label small">License Number</label>
-              <input v-model="form.licence" type="text" class="form-control" placeholder="License Number" />
+              <input v-model="form.licence" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="License Number" />
             </div>
             <div class="col-12 col-md-6">
               <label class="form-label small">Expiry Date</label>
-              <input v-model="form.expiry" type="date" class="form-control" />
+              <input v-model="form.expiry" type="date" class="form-control" :min="expiryMin" />
             </div>
           </div>
         </div>
@@ -163,7 +163,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue';
+import { reactive, ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
@@ -202,6 +202,24 @@ const vehiclesError = ref('');
 
 const existingAvatarUrl = ref('');
 const existingLicenseUrl = ref('');
+
+const dobMax = computed(() => {
+  const today = new Date();
+  const y = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  const yyyy = y.getFullYear();
+  const mm = String(y.getMonth() + 1).padStart(2, '0');
+  const dd = String(y.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+});
+
+const expiryMin = computed(() => {
+  const today = new Date();
+  const t = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  const yyyy = t.getFullYear();
+  const mm = String(t.getMonth() + 1).padStart(2, '0');
+  const dd = String(t.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+});
 
 function parseAttrsMaybe(attr) {
   if (!attr) return {};
@@ -274,6 +292,70 @@ async function submit() {
   message.value = '';
   error.value = '';
   submitting.value = true;
+
+  // Validate DOB is before today
+  const today = new Date();
+  const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (form.dob) {
+    const dobDate = new Date(form.dob);
+    if (dobDate >= todayMid) {
+      error.value = 'Date of Birth must be before today';
+      submitting.value = false;
+      return;
+    }
+  }
+
+  // Validate Expiry is after today
+  if (form.expiry) {
+    const expDate = new Date(form.expiry);
+    if (expDate <= todayMid) {
+      error.value = 'Expiry Date must be after today';
+      submitting.value = false;
+      return;
+    }
+  }
+
+  // Validate email format
+  if (form.email) {
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRe.test(form.email)) {
+      error.value = 'Email Address must be a valid email';
+      submitting.value = false;
+      return;
+    }
+  }
+
+  // Validate phone and telephone numeric and non-negative
+  if (form.phone && !/^\d+$/.test(form.phone)) {
+    error.value = 'Phone Number must be numeric and >= 0';
+    submitting.value = false;
+    return;
+  }
+  if (form.telephone && !/^\d+$/.test(form.telephone)) {
+    error.value = 'Telephone must be numeric and >= 0';
+    submitting.value = false;
+    return;
+  }
+
+  // Validate ID Card numeric and non-negative
+  if (form.idCard && !/^\d+$/.test(form.idCard)) {
+    error.value = 'ID Card Number must be numeric and >= 0';
+    submitting.value = false;
+    return;
+  }
+  // Validate Passport numeric and non-negative
+  if (form.passport && !/^\d+$/.test(form.passport)) {
+    error.value = 'Passport Number must be numeric and >= 0';
+    submitting.value = false;
+    return;
+  }
+  // Validate License Number numeric and non-negative
+  if (form.licence && !/^\d+$/.test(form.licence)) {
+    error.value = 'License Number must be numeric and >= 0';
+    submitting.value = false;
+    return;
+  }
+
   try {
     const attrs = {
       driverId: form.driverId,
