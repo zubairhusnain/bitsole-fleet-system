@@ -13,8 +13,13 @@
                 <!--begin::Start Navbar Links-->
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link" data-lte-toggle="sidebar" href="#" role="button">
-                            <i class="bi bi-list"></i>
+                        <a class="nav-link" href="#" role="button" @click.stop.prevent="toggleSidebar($event)" @touchend.stop.prevent="toggleSidebar($event)" aria-label="Toggle sidebar">
+                            <svg class="menu-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                                <line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <line x1="8" y1="15" x2="16" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
                         </a>
                     </li>
                 </ul>
@@ -40,8 +45,14 @@
                 </RouterLink>
             </div>
             <!-- Mobile close button -->
-            <button class="btn-close sidebar-close d-lg-none" type="button" aria-label="Close sidebar"
-                @click.prevent="closeSidebar" @touchend.stop.prevent="closeSidebar" data-lte-toggle="sidebar"></button>
+            <button class="sidebar-close d-lg-none" type="button" aria-label="Close sidebar"
+                @click.prevent="closeSidebar" @touchend.stop.prevent="closeSidebar">
+                <svg class="close-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                    <line x1="8" y1="8" x2="16" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <line x1="16" y1="8" x2="8" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </button>
             <!--end::Sidebar Brand-->
             <!--begin::Sidebar Wrapper-->
             <div class="sidebar-wrapper mt-4">
@@ -245,6 +256,24 @@ function closeSidebar() {
         body.classList.add('sidebar-collapse');
     }
 }
+
+let lastToggleTs = 0;
+function toggleSidebar(ev) {
+    const now = Date.now();
+    // Dedup rapid click+touch sequences on mobile
+    if (now - lastToggleTs < 300) return;
+    lastToggleTs = now;
+
+    const body = document.body;
+    const isOpen = body.classList.contains('sidebar-open');
+    if (isOpen) {
+        body.classList.remove('sidebar-open');
+        body.classList.add('sidebar-collapse');
+    } else {
+        body.classList.add('sidebar-open');
+        body.classList.remove('sidebar-collapse');
+    }
+}
 </script>
 
 <style scoped>
@@ -280,6 +309,10 @@ nav a.router-link-exact-active {
     right: 12px;
     z-index: 1051;
     display: none;
+    background: none;
+    border: none;
+    padding: 6px;
+    border-radius: 10px;
 }
 
 @media (max-width: 992px) {
@@ -291,6 +324,36 @@ nav a.router-link-exact-active {
 
     body.sidebar-open .app-sidebar .sidebar-close {
         display: inline-block;
+    }
+}
+.app-sidebar .sidebar-close .close-icon {
+    display: inline-block;
+    color: #4a4a4a; /* dark grey close to screenshot */
+}
+
+/* Slightly larger tap target on small screens */
+@media (max-width: 576px) {
+    .app-sidebar .sidebar-close {
+        padding: 8px;
+    }
+    .app-sidebar .sidebar-close .close-icon {
+        width: 28px;
+        height: 28px;
+    }
+}
+.app-header .nav-link .menu-icon {
+    display: inline-block;
+    color: #4a4a4a; /* dark grey close to screenshot */
+}
+
+/* Improve tap target spacing on mobile */
+@media (max-width: 576px) {
+    .app-header .nav-link {
+        padding: 8px 12px;
+    }
+    .app-header .nav-link .menu-icon {
+        width: 28px;
+        height: 28px;
     }
 }
 </style>

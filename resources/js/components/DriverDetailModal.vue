@@ -43,15 +43,15 @@
                     <dl class="section-list">
                       <div class="row g-2 align-items-center">
                         <dt class="col-5 text-muted xsmall text-nowrap">Phone Number</dt>
-                        <dd class="col-7 small mb-0 text-break">{{ attrs.phone || '—' }}</dd>
+                        <dd class="col-7 small mb-0">{{ attrs.phone || '—' }}</dd>
                       </div>
                       <div class="row g-2 align-items-center">
                         <dt class="col-5 text-muted xsmall text-nowrap">Email Address</dt>
-                        <dd class="col-7 small mb-0 text-break">{{ attrs.email || '—' }}</dd>
+                        <dd class="col-7 small mb-0">{{ attrs.email || '—' }}</dd>
                       </div>
                       <div class="row g-2 align-items-center">
                         <dt class="col-5 text-muted xsmall text-nowrap">Address</dt>
-                        <dd class="col-7 small mb-0 text-break">{{ attrs.address || '—' }}</dd>
+                        <dd class="col-7 small mb-0">{{ attrs.address || '—' }}</dd>
                       </div>
                     </dl>
                   </div>
@@ -61,15 +61,15 @@
                     <dl class="section-list">
                       <div class="row g-2 align-items-start">
                         <dt class="col-5 text-muted xsmall text-nowrap">ID Card</dt>
-                        <dd class="col-7 small mb-0 text-break">{{ attrs.idCard || '—' }}</dd>
+                        <dd class="col-7 small mb-0">{{ attrs.idCard || '—' }}</dd>
                       </div>
                       <div class="row g-2 align-items-start">
                         <dt class="col-5 text-muted xsmall text-nowrap">License Number</dt>
-                        <dd class="col-7 small mb-0 text-break">{{ attrs.licence || attrs.license || '—' }}</dd>
+                        <dd class="col-7 small mb-0">{{ attrs.licence || attrs.license || '—' }}</dd>
                       </div>
                       <div class="row g-2 align-items-start">
                         <dt class="col-5 text-muted xsmall text-nowrap">Expiry Date</dt>
-                        <dd class="col-7 small mb-0 text-break">{{ attrs.licenseExpiry || '—' }}</dd>
+                        <dd class="col-7 small mb-0">{{ attrs.licenseExpiry || '—' }}</dd>
                       </div>
                     </dl>
                   </div>
@@ -79,11 +79,11 @@
                     <dl class="section-list">
                       <div class="row g-2 align-items-start">
                         <dt class="col-5 text-muted xsmall text-nowrap">Assigned Vehicle</dt>
-                        <dd class="col-7 small mb-0 text-break">{{ assignedVehicleName || '—' }}</dd>
+                        <dd class="col-7 small mb-0">{{ assignedVehicleName || '—' }}</dd>
                       </div>
                       <div class="row g-2 align-items-start">
                         <dt class="col-5 text-muted xsmall text-nowrap">Plate Number</dt>
-                        <dd class="col-7 small mb-0 text-break">{{ vehiclePlate || '—' }}</dd>
+                        <dd class="col-7 small mb-0">{{ vehiclePlate || '—' }}</dd>
                       </div>
                     </dl>
                   </div>
@@ -159,7 +159,7 @@
                     <div class="progress" style="height: 8px;">
                       <div class="progress-bar bg-primary" role="progressbar" :style="{ width: overallRatingPercent }" :aria-valuenow="metrics.overallRating" aria-valuemin="0" aria-valuemax="100"></div>
                     </div>
-                    <div class="text-muted xsmall mt-1">Here’s your overall rating showing how you handled the ride. Check it out above!</div>
+                    <div class="text-muted xsmall mt-1">Here’s your overall rating showing how you handled the ride. Check it out above.</div>
                   </div>
                 </div>
               </div>
@@ -177,40 +177,40 @@
                     <div class="row g-3">
                       <div class="col-6">
                         <div class="row g-2 align-items-start">
-                          <dt class="col-5 text-muted xsmall text-nowrap">Type</dt>
-                          <dd class="col-7 small mb-0 text-break">{{ vehicleType || '—' }}</dd>
+                          <dt class="col-5 text-muted xsmall text-nowrap">Vehicle Type</dt>
+                          <dd class="col-7 small mb-0">{{ vehicleType || '—' }}</dd>
                         </div>
                       </div>
                       <div class="col-6">
                         <div class="row g-2 align-items-start">
                           <dt class="col-5 text-muted xsmall text-nowrap">Manufacturer</dt>
-                          <dd class="col-7 small mb-0 text-break">{{ vehicleManufacturer || '—' }}</dd>
+                          <dd class="col-7 small mb-0">{{ vehicleManufacturer || '—' }}</dd>
                         </div>
                       </div>
 
                       <div class="col-6">
                         <div class="row g-2 align-items-start">
                           <dt class="col-5 text-muted xsmall text-nowrap">Model</dt>
-                          <dd class="col-7 small mb-0 text-break">{{ vehicleModel || '—' }}</dd>
+                          <dd class="col-7 small mb-0">{{ vehicleModel || '—' }}</dd>
                         </div>
                       </div>
                       <div class="col-6">
                         <div class="row g-2 align-items-start">
                           <dt class="col-5 text-muted xsmall text-nowrap">Color</dt>
-                          <dd class="col-7 small mb-0 text-break">{{ vehicleColor || '—' }}</dd>
+                          <dd class="col-7 small mb-0">{{ vehicleColor || '—' }}</dd>
                         </div>
                       </div>
 
                       <div class="col-6">
                         <div class="row g-2 align-items-start">
                           <dt class="col-5 text-muted xsmall text-nowrap">VIN Number</dt>
-                          <dd class="col-7 small mb-0 text-break">{{ vehicleVin || '—' }}</dd>
+                          <dd class="col-7 small mb-0">{{ vehicleVin || '—' }}</dd>
                         </div>
                       </div>
                       <div class="col-6">
                         <div class="row g-2 align-items-start">
                           <dt class="col-5 text-muted xsmall text-nowrap">Plate Number</dt>
-                          <dd class="col-7 small mb-0 text-break">{{ vehiclePlate || '—' }}</dd>
+                          <dd class="col-7 small mb-0">{{ vehiclePlate || '—' }}</dd>
                         </div>
                       </div>
                     </div>
@@ -495,7 +495,7 @@ const vehicleChipDate = computed(() => vehicle.value?.cardChipDate || fmtDateHum
 
 <style scoped>
 .driver-modal-overlay { position: fixed; inset: 0; background: rgba(9, 12, 28, 0.4); backdrop-filter: blur(2px); z-index: 1050; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 24px; }
-.driver-modal { background: #fff; border-radius: 16px; box-shadow: 0 10px 24px rgba(0,0,0,.15); width: 100%; max-width: 1100px; }
+.driver-modal { background: #fff; border-radius: 16px; box-shadow: 0 10px 24px rgba(0,0,0,.15); width: 100%; max-width: 1100px; font-family: var(--font-sans); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e9ecef; }
 .modal-body { padding: 16px; }
 .info-card { border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,.05); }
@@ -504,7 +504,7 @@ const vehicleChipDate = computed(() => vehicle.value?.cardChipDate || fmtDateHum
 .section-title { font-weight: 600; font-size: .9rem; }
 .section-list dt { margin: 0; }
 .section-list dd { margin: 0; }
-.xsmall { font-size: .78rem; }
+.xsmall { font-size: 0.75rem; }
 .vehicle-photo { width: 100%; height: 180px; overflow: hidden; border-top-left-radius: 12px; border-top-right-radius: 12px; }
 .vehicle-photo img { width: 100%; height: 100%; object-fit: cover; }
 .rating-list { margin: 0; padding: 0; }
@@ -535,7 +535,7 @@ const vehicleChipDate = computed(() => vehicle.value?.cardChipDate || fmtDateHum
 .driver-modal .btn.btn-outline-dark { border-radius: 999px; padding: 4px 12px; }
 .section-list dt, .section-list dd { padding-top: 6px; padding-bottom: 6px; }
 .section-list dt { white-space: nowrap; hyphens: none; overflow-wrap: normal; }
-.section-list dd { word-break: break-word; }
+.section-list dd { overflow-wrap: break-word; word-break: normal; }
 .section-list .row { align-items: flex-start !important; }
 /* Figma-like chips below vehicle photo */
 .vehicle-chips { border-top: 1px solid #dfe5f1; background: #f4f7fb; }
@@ -548,6 +548,6 @@ const vehicleChipDate = computed(() => vehicle.value?.cardChipDate || fmtDateHum
 .driver-modal .btn.btn-outline-secondary,
 .driver-modal .btn.btn-outline-dark { border-radius: 999px; padding: 4px 12px; }
 .section-list dt, .section-list dd { padding-top: 6px; padding-bottom: 6px; }
-.section-list dd { word-break: break-word; }
+.section-list dd { overflow-wrap: break-word; word-break: normal; }
 .section-list .row { align-items: flex-start !important; }
 </style>
