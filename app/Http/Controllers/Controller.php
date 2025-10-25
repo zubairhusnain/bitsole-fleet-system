@@ -15,8 +15,6 @@ use App\Services\DriverService;
 use App\Services\GeofencesService;
 use App\Services\PermissionService;
 use App\Services\ReportService;
-
-use App\Services\StripeService;
 use App\Services\GroupService;
 use App\Services\NotificationService;
 class Controller extends BaseController
@@ -33,7 +31,6 @@ class Controller extends BaseController
     protected GeofencesService $geofencesService;
     protected PermissionService $permissionService;
     protected ReportService $reportService;
-    protected StripeService $stripeService;
     protected GroupService $groupService;
     protected NotificationService $notificationService;
 
@@ -46,7 +43,6 @@ class Controller extends BaseController
         GeofencesService $geofencesService,
         PermissionService $permissionService,
         ReportService $reportService,
-        StripeService $stripeService,
         GroupService $groupService,
         NotificationService $notificationService
     ) {
@@ -58,7 +54,6 @@ class Controller extends BaseController
         $this->geofencesService = $geofencesService;
         $this->permissionService = $permissionService;
         $this->reportService = $reportService;
-        $this->stripeService = $stripeService;
         $this->groupService = $groupService;
         $this->notificationService = $notificationService;
     }
