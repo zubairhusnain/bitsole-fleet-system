@@ -89,7 +89,7 @@ class LiveTrackingController extends Controller
                 'speed' => $pos->speed ?? null,
                 'address' => $pos->address ?? null,
                 'ignition' => $ignition,
-                'status' => $deviceStatus,
+                'status' => ($deviceStatus == "online") ? $deviceStatus : "offline",
                 'activity' => $activity,
                 'motion' => $motion,
                 'online' => $online,
@@ -102,7 +102,6 @@ class LiveTrackingController extends Controller
         })->filter(function ($i) {
             return $i && $i['latitude'] !== null && $i['longitude'] !== null;
         })->values()->all();
-
         return response()->json(['positions' => $positions]);
     }
 }

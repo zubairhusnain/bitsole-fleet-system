@@ -74,6 +74,9 @@
                                     <div class="btn-group btn-group-sm">
                                         <button class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i
                                                 class="bi bi-pencil"></i></button>
+                                        <button v-if="showDeviceDetailLink" class="btn btn-outline-primary" title="View" @click="toDetail(row)">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
                                         <button class="btn btn-outline-danger" title="Delete" @click="remove(row)"
                                             :disabled="deleting[row.device_id] === true">
                                             <i class="bi bi-trash"></i>
@@ -123,6 +126,9 @@ const error = ref('');
 const rows = ref([]);
 const deleting = ref({});
 const meta = ref({ total: 0, current_page: 1, per_page: 25 });
+
+// hide device detail link in production
+const showDeviceDetailLink = !import.meta.env.PROD;
 
 async function fetchPage(n = 1) {
     loading.value = true;
@@ -316,5 +322,10 @@ async function remove(row) {
 function toEdit(row) {
     if (!row?.device_id) return;
     router.push(`/vehicles/${row.device_id}/edit`);
+}
+
+function toDetail(row) {
+    if (!row?.device_id) return;
+    router.push(`/vehicles/${row.device_id}`);
 }
 </script>

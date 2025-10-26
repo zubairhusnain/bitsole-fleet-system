@@ -15,6 +15,7 @@
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/styles/overlayscrollbars.min.css" crossorigin="anonymous" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" crossorigin="anonymous" />
+    <link rel="icon" type="image/png" href="{{ asset('images/login-page-logo.png') }}" />
 
     <!-- Vite-bundled styles and SPA entry -->
     @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))

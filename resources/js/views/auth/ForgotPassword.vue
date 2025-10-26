@@ -44,7 +44,7 @@ import axios from 'axios';
 
 // Resolve assets from Laravel backend in dev; use current origin in prod
 const assetBase = import.meta.env.DEV ? (import.meta.env.VITE_BACKEND_PROXY_TARGET || 'http://127.0.0.1:8001') : window.location.origin;
-const logoSrc = assetBase + '/images/logo.png';
+const logoSrc = assetBase + '/images/login-page-logo.png';
 
 const email = ref('');
 const message = ref('');

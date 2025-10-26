@@ -423,4 +423,153 @@ class VehicleController extends Controller
 
         return response()->json(['message' => 'Vehicle soft-deleted'], 200);
     }
+
+    /**
+     * Return recent positions (waypoints) for a specific device from tc_positions.
+     * Scopes access based on local Devices mapping and user role.
+     */
+    public function position(\Illuminate\Http\Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
+
+        $query = \App\Models\Devices::query()->with(['tcDevice.position'])->where('device_id', $deviceId);
+        if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
+            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
+        } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
+            $distId = $user->distributor_id ?? $user->id;
+            $query->where('distributor_id', $distId)->where('user_id', $user->id);
+        }
+        $mapping = $query->firstOrFail();
+
+        $tc = $mapping->tcDevice;
+        $pos = $tc ? $tc->position : null;
+
+        $position = null;
+        if ($pos) {
+            $attrs = [];
+            if (isset($pos->attributes)) {
+                $attrs = is_array($pos->attributes) ? $pos->attributes : (json_decode($pos->attributes, true) ?? []);
+            }
+            $position = [
+                'id' => (int) ($pos->id ?? 0),
+                'deviceId' => (int) ($tc->id ?? $deviceId),
+                'latitude' => $pos->latitude ?? null,
+                'longitude' => $pos->longitude ?? null,
+                'speed' => $pos->speed ?? null,
+                'address' => $pos->address ?? null,
+                'attributes' => $attrs,
+                'serverTime' => $pos->servertime ?? null,
+            ];
+        }
+
+        return response()->json(['position' => $position]);
+    }
+
+    /**
+     * Return assigned driver details for a specific vehicle.
+     */
+    public function driver(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $role = (int) ($user->role ?? User::ROLE_ADMIN);
+
+        $query = \App\Models\Drivers::query()->with(['tcDriver','tcDevice'])->where('device_id', $deviceId);
+        if ($request->boolean('mine')) {
+            $query->where('user_id', $user->id);
+        } else {
+            if ($role === User::ROLE_DISTRIBUTOR) {
+                $query->where('user_id', $user->id)->where('distributor_id', $user->id);
+            } elseif ($role !== User::ROLE_ADMIN) {
+                $distId = $user->distributor_id ?? $user->id;
+                $query->where('distributor_id', $distId)->where('user_id', $user->id);
+            }
+        }
+
+        $row = $query->first();
+        if (!$row) {
+            return response()->json(['driver' => null]);
+        }
+
+        $tc = $row->tcDriver;
+        $attrs = [];
+        if ($tc && isset($tc->attributes)) {
+            $attrs = is_array($tc->attributes) ? $tc->attributes : (json_decode($tc->attributes, true) ?? []);
+        }
+        $licenseImagePath = $attrs['licenseImage'] ?? null;
+        $avatarImagePath = $attrs['avatarImage'] ?? null;
+
+        return response()->json([
+            'driver' => [
+                'id' => $tc->id ?? null,
+                'uniqueId' => $tc->uniqueId ?? ($tc->uniqueid ?? null),
+                'name' => $tc->name ?? null,
+                'attributes' => $attrs,
+                'deviceId' => $row->device_id ?? $deviceId,
+                'licenseImageUrl' => $licenseImagePath ? \Illuminate\Support\Facades\Storage::url($licenseImagePath) : null,
+                'avatarImageUrl' => $avatarImagePath ? \Illuminate\Support\Facades\Storage::url($avatarImagePath) : null,
+            ],
+        ]);
+    }
+
+    /**
+     * Return rating metrics for a specific vehicle using ReportService summary.
+     */
+    public function rating(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        // Default window: last 7 days, overrideable via query
+        $from = $request->query('from', now()->subDays(7)->toDateTimeString());
+        $to = $request->query('to', now()->toDateTimeString());
+
+        // Prepare payload for ReportService
+        $request->merge([
+            'device_id' => $deviceId,
+            'from_date' => $from,
+            'to_date' => $to,
+        ]);
+
+        try {
+            $summaryList = $this->reportService->report_summary($request);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Report summary failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+            return response()->json(['rating' => null], 200);
+        }
+
+        $first = is_iterable($summaryList) ? (collect($summaryList)->first() ?? null) : null;
+        if (!$first) {
+            return response()->json(['rating' => null], 200);
+        }
+
+        $avgFuel = (float) ($first['avgFuel_l_per_100km'] ?? 0);
+        $avgSpeed = (float) ($first['avgSpeed_kph'] ?? 0);
+        $maxSpeed = (float) ($first['maxSpeed_kph'] ?? 0);
+        $engineHours = (float) ($first['engineHours'] ?? 0);
+        $idleMinutes = (float) ($first['idleTime_minutes'] ?? 0);
+        $harshBraking = (int) ($first['harshBraking'] ?? 0);
+        $overspeed = (int) ($first['overspeedEvents'] ?? 0);
+        $tripCount = (int) ($first['tripCount'] ?? 0);
+
+        // Simple scoring: start at 100, subtract penalties capped
+        $score = 100;
+        $score -= min($overspeed * 2.0, 40);
+        $score -= min($harshBraking * 1.5, 30);
+        $score -= min($idleMinutes / 10.0, 20);
+        $score = max(0, min(100, round($score, 1)));
+
+        return response()->json([
+            'rating' => [
+                'avgFuel_l_per_100km' => $avgFuel,
+                'avgSpeed_kph' => $avgSpeed,
+                'maxSpeed_kph' => $maxSpeed,
+                'engineHours' => $engineHours,
+                'idleTime_minutes' => $idleMinutes,
+                'harshBraking' => $harshBraking,
+                'overspeedEvents' => $overspeed,
+                'tripCount' => $tripCount,
+                'overallScore' => $score,
+                'from' => $from,
+                'to' => $to,
+            ],
+        ]);
+    }
 }

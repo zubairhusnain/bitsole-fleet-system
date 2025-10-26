@@ -41,7 +41,7 @@
             <!--begin::Sidebar Brand-->
             <div class="sidebar-brand">
                 <RouterLink to="/" class="brand-link d-flex align-items-center">
-                    <img :src="logoSrc" alt="App Logo" style="height:24px" />
+                    <img :src="logoSrc" class="mt-3" alt="App Logo" style="height:35px" />
                 </RouterLink>
             </div>
             <!-- Mobile close button -->

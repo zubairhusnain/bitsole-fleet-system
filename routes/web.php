@@ -92,6 +92,14 @@ Route::middleware('auth')->prefix('/web/vehicles')->group(function () {
     Route::get('/options', [\App\Http\Controllers\VehicleController::class, 'options']);
     Route::post('/', [\App\Http\Controllers\VehicleController::class, 'store']);
     Route::get('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'show']);
+    // Waypoints/history for device detail page
+    Route::get('/{deviceId}/positions', [\App\Http\Controllers\VehicleController::class, 'positions']);
+    // Add single current position via tc_devices.positionid
+    Route::get('/{deviceId}/position', [\App\Http\Controllers\VehicleController::class, 'position']);
+    // Driver assigned to this vehicle
+    Route::get('/{deviceId}/driver', [\App\Http\Controllers\VehicleController::class, 'driver']);
+    // Rating metrics derived from reports
+    Route::get('/{deviceId}/rating', [\App\Http\Controllers\VehicleController::class, 'rating']);
     Route::put('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'update']);
     Route::delete('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'destroy']);
 });

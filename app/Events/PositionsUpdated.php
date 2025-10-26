@@ -87,7 +87,7 @@ class PositionsUpdated implements ShouldBroadcastNow
                 'speed' => $pos->speed ?? null,
                 'address' => $pos->address ?? null,
                 'ignition' => $ignition,
-                'status' => $deviceStatus,
+                'status' => ($deviceStatus == "online") ? $deviceStatus : "offline",
                 'activity' => $activity,
                 'motion' => $motion,
                 'online' => $online,

@@ -22,6 +22,8 @@ const Users = () => import('../views/users/Index.vue');
 const Vehicles = () => import('../views/vehicles/Index.vue');
 const VehiclesMaintenance = () => import('../views/vehicles/Maintenance.vue');
 const VehiclesOverview = () => import('../views/vehicles/Overview.vue');
+// Add Vehicle Detail route
+const VehicleDetail = () => import('../views/vehicles/Detail.vue');
 const Alerts = () => import('../views/alerts/Index.vue');
 const Reports = () => import('../views/reports/Analytics.vue');
 const Fuel = () => import('../views/fuel/Index.vue');
@@ -55,6 +57,8 @@ const routes = [
   { path: '/vehicles/overview', name: 'vehicles-overview', component: VehiclesOverview, meta: { requiresAuth: true, title: 'Vehicle Overview' } },
   // Add Vehicle route
   { path: '/vehicles/new', name: 'vehicles-new', component: () => import('../views/vehicles/AddVehicle.vue'), meta: { requiresAuth: true, title: 'Add New Vehicle' } },
+  // Vehicle Detail route
+  { path: '/vehicles/:deviceId', name: 'vehicles-detail', component: VehicleDetail, meta: { requiresAuth: true, title: 'Vehicle Detail' } },
   // Edit Vehicle route
   { path: '/vehicles/:deviceId/edit', name: 'vehicles-edit', component: () => import('../views/vehicles/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Vehicle' } },
   { path: '/reports', name: 'reports', component: Reports, meta: { requiresAuth: true, title: 'Reports & Analytics' } },
