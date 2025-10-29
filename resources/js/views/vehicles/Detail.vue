@@ -13,38 +13,18 @@
         </div>
 
         <div class="row mb-3">
-            <div class="col-auto text-end ms-auto" v-if="device">
+            <div class="col-auto text-end ms-auto" v-if="detailPayload">
                 <div class="d-flex align-items-center gap-3">
                     <span class="badge" :class="statusBadgeClass">{{ statusLabel }}</span>
-                    <span class="text-muted">Last update: {{ lastUpdateDisplay }}</span>
+                    <span class="fw-semibold">{{ deviceName || '-' }}</span>
                 </div>
             </div>
         </div>
 
         <!-- Add error banner -->
         <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="error = ''" />
-
-        <!-- Static top Leaflet map -->
-        <div class="row mb-3">
-            <div class="col-12">
-                <div class="card panel rounded-4 shadow-sm">
-                    <div class="card-body p-0">
-                        <div ref="mapContainer" style="height: calc(60vh - 16px); min-height: 320px;">
-                            <LMap v-if="mapReady" :zoom="zoom" :center="mapCenter" style="height: 100%; width: 100%;">
-                                <LTileLayer :url="tileUrl" :attribution="tileAttribution" />
-                                <LMarker :lat-lng="mapCenter"></LMarker>
-                            </LMap>
-                            <div v-else class="placeholder-glow" style="height: 100%">
-                                <span class="placeholder col-12" style="height: 100%"></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Top widgets under map -->
-        <div class="row g-3 mb-3">
+        <div class="row g-3 mb-3 mt-3">
             <div class="col-12 col-sm-6 col-md-4 col-xl-2">
                 <div class="card panel rounded-4 shadow-sm h-100">
                     <div class="card-body py-2">
@@ -59,7 +39,7 @@
                             </div>
                             <div>
                                 <div class="small text-muted">Time</div>
-                                <div class="fw-semibold">Sep 25 1:33 am</div>
+                                <div class="fw-semibold">{{ lastUpdateDisplay }}</div>
                             </div>
                         </div>
                     </div>
@@ -79,7 +59,7 @@
                             </div>
                             <div>
                                 <div class="small text-muted">Ignition</div>
-                                <div class="fw-semibold">Off</div>
+                                <div class="fw-semibold">{{ ignitionLabel }}</div>
                             </div>
                         </div>
                     </div>
@@ -104,7 +84,7 @@
                             </div>
                             <div>
                                 <div class="small text-muted">Speed</div>
-                                <div class="fw-semibold">0</div>
+                                <div class="fw-semibold">{{ speedDisplay }}</div>
                             </div>
                         </div>
                     </div>
@@ -127,7 +107,7 @@
                             </div>
                             <div>
                                 <div class="small text-muted">Odometer</div>
-                                <div class="fw-semibold">8,896.73Km</div>
+                                <div class="fw-semibold">{{ odometerDisplay }}</div>
                             </div>
                         </div>
                     </div>
@@ -164,15 +144,15 @@
                             <div class="icon-bubble">
                                 <svg viewBox="0 0 48 48" class="icon-svg" aria-hidden="true">
                                     <!-- Battery -->
-                                    <rect x="8" y="18" width="28" height="16" rx="3" fill="none" stroke="#2f9e44"
+                                    <rect x="8" y="18" width="28" height="16" rx="3" fill="none" :stroke="batteryIconStroke"
                                         stroke-width="3" />
-                                    <rect x="36" y="22" width="4" height="8" rx="1" fill="#2f9e44" />
-                                    <rect x="11" y="21" width="14" height="10" rx="2" fill="#69db7c" />
+                                    <rect x="36" y="22" width="4" height="8" rx="1" :fill="batteryIconStroke" />
+                                    <rect x="11" y="21" :width="batteryFillWidth" height="10" rx="2" :fill="batteryIconFill" />
                                 </svg>
                             </div>
                             <div>
                                 <div class="small text-muted">Device Battery</div>
-                                <div class="fw-semibold">%</div>
+                                <div class="fw-semibold">{{ batteryDisplay }}</div>
                             </div>
                         </div>
                     </div>
@@ -180,6 +160,25 @@
             </div>
         </div>
 
+        <!-- Static top Leaflet map -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="card panel rounded-4 shadow-sm">
+                    <div class="card-body p-0">
+                        <div ref="mapContainer" style="height: calc(60vh - 16px); min-height: 320px;">
+                            <LMap v-if="mapReady" :zoom="zoom" :center="mapCenter" style="height: 100%; width: 100%;">
+                                <LTileLayer :url="tileUrl" :attribution="tileAttribution" />
+                                <LMarker :lat-lng="currentLatLng || mapCenter" ref="markerRef" />
+
+                            </LMap>
+                            <div v-else class="placeholder-glow" style="height: 100%">
+                                <span class="placeholder col-12" style="height: 100%"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div v-if="true" class="row g-4">
             <!-- Left column: Vehicle hero + info + tracking -->
             <div class="col-12 col-lg-7">
@@ -191,33 +190,33 @@
                         </div>
                         <h6 class="mb-3 panel-header">Vehicle Information</h6>
                         <div class="row g-3">
-                            <div class="col-12 col-md-6">
+                            <div class="col-12 col-md-4">
                                 <div class="text-muted small">Vehicle Type</div>
-                                <div class="fw-semibold">Sedan Car</div>
+                                <div class="fw-semibold">{{ type || '-' }}</div>
                             </div>
-                            <div class="col-12 col-md-6">
+                            <div class="col-12 col-md-4">
                                 <div class="text-muted small">Manufacturer</div>
-                                <div class="fw-semibold">Toyota</div>
+                                <div class="fw-semibold">{{ manufacturer || '-' }}</div>
                             </div>
-                            <div class="col-12 col-md-6">
+                            <div class="col-12 col-md-4">
                                 <div class="text-muted small">Model</div>
-                                <div class="fw-semibold">Camry SE</div>
+                                <div class="fw-semibold">{{ model || '-' }}</div>
                             </div>
-                            <div class="col-12 col-md-6">
+                            <div class="col-12 col-md-4">
                                 <div class="text-muted small">Color</div>
-                                <div class="fw-semibold">Midnight Black</div>
+                                <div class="fw-semibold">{{ color || '-' }}</div>
                             </div>
-                            <div class="col-12 col-md-6">
+                            <div class="col-12 col-md-4">
                                 <div class="text-muted small">VIN Number</div>
-                                <div class="fw-semibold">WAUYGAF6CCN174200</div>
+                                <div class="fw-semibold">{{ vin || '-' }}</div>
                             </div>
-                            <div class="col-12 col-md-6">
+                            <div class="col-12 col-md-4">
                                 <div class="text-muted small">Plate Number</div>
-                                <div class="fw-semibold">TXR-9283d</div>
+                                <div class="fw-semibold">{{ plate || '-' }}</div>
                             </div>
                         </div>
                         <div class="mt-3 small d-flex flex-wrap gap-4 border-top pt-2">
-                            <span class="fw-semibold text-primary">VHCL-1009</span>
+                            <span class="fw-semibold text-primary">{{ uniqueId || '-' }}</span>
                             <span class="fw-semibold">Lightning Racer</span>
                             <span class="fw-semibold">3N1AB7AP4FY123456</span>
                         </div>
@@ -227,39 +226,23 @@
                     <div class="card-body">
                         <h6 class="mb-3 panel-header">Tracking Information</h6>
                         <div class="row g-3">
+
                             <div class="col-6 col-md-3">
-                                <div class="text-muted small">Ignition</div>
-                                <div class="fw-semibold">off</div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="text-muted small">Speed</div>
-                                <div class="fw-semibold">0 km/h</div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="text-muted small">Odometer</div>
-                                <div class="fw-semibold">211,644 km</div>
+                                <div class="text-muted small">Total Distance</div>
+                                <div class="fw-semibold">{{ totalDistanceDisplay }}</div>
                             </div>
                             <div class="col-6 col-md-3">
                                 <div class="text-muted small">Fuel</div>
-                                <div class="fw-semibold">60 Litres</div>
+                                <div class="fw-semibold">{{ fuelAverage ? (fuelAverage + ' L/100km') : '-' }}</div>
                             </div>
-                        </div>
-                        <div class="row g-3 mt-2">
-                            <div class="col-6 col-md-3">
-                                <div class="text-muted small">Location</div>
-                                <div class="fw-semibold">PLUS KM 426</div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="text-muted small">Last Report</div>
-                                <div class="fw-semibold">14/08/25-15:39</div>
+                             <div class="col-6 col-md-3">
+                                <div class="text-muted small">Total Hours</div>
+                                <div class="fw-semibold">{{ totalHoursDisplay }}</div>
                             </div>
                             <div class="col-6 col-md-3">
                                 <div class="text-muted small">Map Link</div>
-                                <a href="#" class="fw-semibold text-primary text-decoration-underline">Live Location</a>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="text-muted small">Track History</div>
-                                <a href="#" class="fw-semibold text-primary text-decoration-underline">Track History</a>
+                                <a v-if="liveLocationUrl" :href="liveLocationUrl" target="_blank" rel="noopener" class="fw-semibold text-primary text-decoration-underline">Live Location</a>
+                                <span v-else class="fw-semibold text-muted">Live Location</span>
                             </div>
                         </div>
                     </div>
@@ -270,38 +253,47 @@
             <div class="col-12 col-lg-3">
                 <div class="card panel rounded-4 shadow-sm">
                     <div class="card-body">
-                        <div class="d-flex align-items-center gap-3 mb-3">
-                            <img src="https://i.pravatar.cc/100?img=12" alt="Oliver" class="rounded-circle"
-                                style="width:56px;height:56px;object-fit:cover" />
-                            <div class="flex-grow-1">
-                                <div class="fw-semibold">Oliver Thompson</div>
-                                <small class="text-muted">Member Since: July 2020</small>
+                        <template v-if="driver">
+                            <div class="d-flex align-items-center gap-3 mb-3">
+                                <img v-if="driverAvatarUrl" :src="driverAvatarUrl" alt="Driver Avatar" class="rounded-circle"
+                                    style="width:56px;height:56px;object-fit:cover" />
+                                <div v-else class="rounded-circle bg-light d-flex align-items-center justify-content-center"
+                                    style="width:56px;height:56px;">
+                                    <i class="bi bi-person text-muted"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">{{ driverName || '-' }}</div>
+                                    <small class="text-muted" v-if="memberSinceDisplay">Member Since: {{ memberSinceDisplay }}</small>
+                                </div>
+                                <span class="badge" :class="driverStatusClass">{{ driverStatusLabel }}</span>
                             </div>
-                            <span class="badge badge-soft-success">Active</span>
-                        </div>
-                        <h6 class="mb-2">Contact Detail</h6>
-                        <dl class="row mb-3">
-                            <dt class="col-5 text-muted small">Phone Number</dt>
-                            <dd class="col-7 small mb-2">(727) 540-0492</dd>
-                            <dt class="col-5 text-muted small">Email Address</dt>
-                            <dd class="col-7 small mb-2">oliverthompson@gmail.com</dd>
-                            <dt class="col-5 text-muted small">Address</dt>
-                            <dd class="col-7 small mb-2">4545 118th Ave N, Clearwater, Florida USA</dd>
-                        </dl>
-                        <h6 class="mb-2">Licence Information</h6>
-                        <dl class="row mb-3">
-                            <dt class="col-5 text-muted small">ID</dt>
-                            <dd class="col-7 small mb-2">ID-84917-TR55</dd>
-                            <dt class="col-5 text-muted small">License Number</dt>
-                            <dd class="col-7 small mb-2">013-1982-6794</dd>
-                            <dt class="col-5 text-muted small">Expiry Date</dt>
-                            <dd class="col-7 small mb-2">05,15,2035</dd>
-                        </dl>
-                        <h6 class="mb-2">Vehicle Information</h6>
-                        <div class="mb-1 small text-muted">Assigned Vehicle</div>
-                        <div class="fw-semibold">Toyota Camry SE</div>
-                        <div class="mb-1 small text-muted mt-2">Plate Number</div>
-                        <div class="fw-semibold">TXR- 6794</div>
+                            <h6 class="mb-2">Contact Detail</h6>
+                            <dl class="row mb-3">
+                                <dt class="col-5 text-muted small">Phone Number</dt>
+                                <dd class="col-7 small mb-2">{{ driverPhone || '-' }}</dd>
+                                <dt class="col-5 text-muted small">Email Address</dt>
+                                <dd class="col-7 small mb-2">{{ driverEmail || '-' }}</dd>
+                                <dt class="col-5 text-muted small">Address</dt>
+                                <dd class="col-7 small mb-2">{{ driverAddress || '-' }}</dd>
+                            </dl>
+                            <h6 class="mb-2">Licence Information</h6>
+                            <dl class="row mb-3">
+                                <dt class="col-5 text-muted small">ID</dt>
+                                <dd class="col-7 small mb-2">{{ driverIdCard || '-' }}</dd>
+                                <dt class="col-5 text-muted small">License Number</dt>
+                                <dd class="col-7 small mb-2">{{ driverLicenseNumber || '-' }}</dd>
+                                <dt class="col-5 text-muted small">Expiry Date</dt>
+                                <dd class="col-7 small mb-2">{{ driverLicenseExpiry || '-' }}</dd>
+                            </dl>
+                            <h6 class="mb-2">Vehicle Information</h6>
+                            <div class="mb-1 small text-muted">Assigned Vehicle</div>
+                            <div class="fw-semibold">{{ deviceName || '-' }}</div>
+                            <div class="mb-1 small text-muted mt-2">Plate Number</div>
+                            <div class="fw-semibold">{{ plate || '-' }}</div>
+                        </template>
+                        <template v-else>
+                            <div class="text-muted small">No driver is currently assigned to this vehicle.</div>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -548,6 +540,10 @@
                                     <dd class="col-7 small mb-2">{{ ignitionLabel }}</dd>
                                     <dt class="col-5 text-muted small">Speed</dt>
                                     <dd class="col-7 small mb-2">{{ speedDisplay }}</dd>
+                                    <dt class="col-5 text-muted small">Device Temperature</dt>
+                                    <dd class="col-7 small mb-2">{{ temperatureDisplay }}</dd>
+                                    <dt class="col-5 text-muted small">Device Battery</dt>
+                                    <dd class="col-7 small mb-2">{{ batteryDisplay }}</dd>
                                     <dt class="col-5 text-muted small">Odometer</dt>
                                     <dd class="col-7 small mb-2">{{ odometerDisplay }}</dd>
                                     <dt class="col-5 text-muted small">Fuel Average</dt>
@@ -556,6 +552,8 @@
                                     <dd class="col-7 small mb-2">{{ maxSpeed ? maxSpeed + ' km/h' : '-' }}</dd>
                                     <dt class="col-5 text-muted small">Speed Limit</dt>
                                     <dd class="col-7 small mb-2">{{ speedLimit ? speedLimit + ' km/h' : '-' }}</dd>
+                                    <dt class="col-5 text-muted small">Device Source</dt>
+                                    <dd class="col-7 small mb-2">{{ deviceSourceLabel }}</dd>
                                     <dt class="col-5 text-muted small">Location</dt>
                                     <dd class="col-7 small mb-2">{{ currentAddress || '-' }}</dd>
                                     <dt class="col-5 text-muted small">Coordinates</dt>
@@ -655,17 +653,175 @@
                 </div>
             </div>
         </div>
+
+        <!-- Comparison: Static vs Dynamic values -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card panel rounded-4 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="mb-3 panel-header">Static vs Dynamic (API)</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Field</th>
+                                        <th>Static</th>
+                                        <th>Dynamic (API)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(row, idx) in comparisons" :key="idx">
+                                        <td class="small text-muted">{{ row.label }}</td>
+                                        <td class="small">{{ row.static }}</td>
+                                        <td class="small fw-semibold">{{ row.dynamic ?? '-' }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Device Attributes vs Displayed (debug) -->
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="card panel rounded-4 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="mb-3 panel-header">Device Attributes vs Displayed</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Field</th>
+                                        <th>Attribute Key</th>
+                                        <th>Attribute Value</th>
+                                        <th>Displayed</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="small text-muted">Vehicle Type</td>
+                                        <td class="small">{{ typeInfo.key || '-' }}</td>
+                                        <td class="small">{{ typeInfo.value ?? '-' }}</td>
+                                        <td class="small fw-semibold">{{ type || '-' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="small text-muted">Manufacturer</td>
+                                        <td class="small">{{ manufacturerInfo.key || '-' }}</td>
+                                        <td class="small">{{ manufacturerInfo.value ?? '-' }}</td>
+                                        <td class="small fw-semibold">{{ manufacturer || '-' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="small text-muted">Model</td>
+                                        <td class="small">{{ modelInfo.key || '-' }}</td>
+                                        <td class="small">{{ modelInfo.value ?? '-' }}</td>
+                                        <td class="small fw-semibold">{{ model || '-' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="small text-muted">Color</td>
+                                        <td class="small">{{ colorInfo.key || '-' }}</td>
+                                        <td class="small">{{ colorInfo.value ?? '-' }}</td>
+                                        <td class="small fw-semibold">{{ color || '-' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="small text-muted">VIN Number</td>
+                                        <td class="small">{{ vinInfo.key || '-' }}</td>
+                                        <td class="small">{{ vinInfo.value ?? '-' }}</td>
+                                        <td class="small fw-semibold">{{ vin || '-' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="small text-muted">Plate Number</td>
+                                        <td class="small">{{ plateInfo.key || '-' }}</td>
+                                        <td class="small">{{ plateInfo.value ?? '-' }}</td>
+                                        <td class="small fw-semibold">{{ plate || '-' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="small text-muted">Odometer</td>
+                                        <td class="small">{{ odometerInfo.key || '-' }}</td>
+                                        <td class="small">{{ odometerInfo.value ?? '-' }}</td>
+                                        <td class="small fw-semibold">{{ odometerDisplay || '-' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="small text-muted">Device Temperature</td>
+                                        <td class="small">{{ temperatureInfo.key || '-' }}</td>
+                                        <td class="small">{{ temperatureInfo.value ?? '-' }}</td>
+                                        <td class="small fw-semibold">{{ temperatureDisplay || '-' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="small text-muted">Device Battery</td>
+                                        <td class="small">{{ batteryInfo.key || '-' }}</td>
+                                        <td class="small">{{ batteryInfo.value ?? '-' }}</td>
+                                        <td class="small fw-semibold">{{ batteryDisplay || '-' }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weekly Trip History Table (Previous Week) -->
+        <div class="row mt-3 mb-4">
+            <div class="col-12">
+                <div class="card panel rounded-4 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="mb-3 panel-header">Trip History (Previous Week)</h6>
+                        <div v-if="weeklyTrips.length === 0" class="text-muted small">No trips found for the previous week.</div>
+                        <div v-else class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Start Time</th>
+                                        <th>End Time</th>
+                                        <th>Distance</th>
+                                        <th>Duration</th>
+                                        <th>Avg Speed</th>
+                                        <th>Start Address</th>
+                                        <th>End Address</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(t, i) in weeklyTrips" :key="i">
+                                        <td class="small">{{ formatDateTime(t.startTime || t.start_time) }}</td>
+                                        <td class="small">{{ formatDateTime(t.endTime || t.end_time) }}</td>
+                                        <td class="small">{{ formatDistanceKm(t.distance) }}</td>
+                                        <td class="small">{{ formatDuration(t.duration) }}</td>
+                                        <td class="small">{{ formatSpeedKmh(t.averageSpeed ?? t.average_speed) }}</td>
+                                        <td class="small">{{ t.startAddress || t.start_address || '-' }}</td>
+                                        <td class="small">{{ t.endAddress || t.end_address || '-' }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute } from 'vue-router';
 import axios from 'axios';
-import { LMap, LTileLayer, LMarker, LPolyline } from '@vue-leaflet/vue-leaflet';
+import { LMap, LTileLayer, LMarker, LPolyline, LPopup } from '@vue-leaflet/vue-leaflet';
 import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 import { getCurrentUser } from '../../auth';
 import UiAlert from '../../components/UiAlert.vue';
+
+// Ensure Leaflet default marker icons load correctly under Vite bundling
+try {
+    // @ts-ignore
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+        iconRetinaUrl: new URL('leaflet/dist/images/marker-icon-2x.png', import.meta.url).toString(),
+        iconUrl: new URL('leaflet/dist/images/marker-icon.png', import.meta.url).toString(),
+        shadowUrl: new URL('leaflet/dist/images/marker-shadow.png', import.meta.url).toString(),
+    });
+} catch {}
 
 const route = useRoute();
 const deviceId = computed(() => parseInt(route.params.deviceId));
@@ -675,11 +831,15 @@ const positions = ref([]);
 const error = ref('');
 const driver = ref(null);
 const rating = ref(null);
+const weeklyTrips = ref([]);
+const detailPayload = ref(null);
+const driversList = ref([]);
 
 const mapContainer = ref(null);
 const mapReady = ref(false);
 const zoom = ref(13);
 const mapCenter = ref([3.139, 101.6869]); // default center (Kuala Lumpur)
+const markerRef = ref(null);
 const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const tileAttribution = '&copy; OpenStreetMap contributors';
 const polylineColor = '#007bff';
@@ -691,16 +851,29 @@ const currentLatLng = computed(() => {
     return [p.latitude, p.longitude];
 });
 const currentAddress = computed(() => {
+    // Prefer address from detail payload.position; fall back to last position
+    const addr = detailPayload.value?.position?.address || null;
+    if (addr) return addr;
     if (!positions.value.length) return null;
     return positions.value[positions.value.length - 1]?.address || null;
 });
 
 const statusLabel = computed(() => {
-    const s = device.value?.tcDevice?.status || 'unknown';
-    return String(s).toUpperCase();
+    const raw = detailPayload.value?.device?.status;
+    if (raw) {
+        const s = String(raw).toLowerCase();
+        if (s === 'online' || s === 'offline') return s.toUpperCase();
+    }
+    const t = detailPayload.value?.position?.serverTime || detailPayload.value?.position?.servertime || null;
+    if (t) {
+        const dt = new Date(t);
+        const online = (Date.now() - dt.getTime()) < 3600 * 1000; // within 1 hour
+        return online ? 'ONLINE' : 'OFFLINE';
+    }
+    return 'UNKNOWN';
 });
 const statusBadgeClass = computed(() => {
-    const s = String(device.value?.tcDevice?.status || 'unknown').toLowerCase();
+    const s = statusLabel.value.toLowerCase();
     return {
         'text-bg-success': s === 'online',
         'text-bg-danger': s === 'offline',
@@ -708,11 +881,13 @@ const statusBadgeClass = computed(() => {
     };
 });
 const lastUpdateDisplay = computed(() => {
-    const posTime = positions.value.length ? positions.value[positions.value.length - 1]?.serverTime : null;
-    const t = posTime || device.value?.tcDevice?.lastUpdate || null;
+    const t = detailPayload.value?.position?.serverTime
+        || detailPayload.value?.position?.servertime
+        || detailPayload.value?.device?.lastUpdate
+        || null;
     return t ? new Date(t).toLocaleString() : '-';
 });
-const uniqueId = computed(() => device.value?.tcDevice?.uniqueId || device.value?.tcDevice?.uniqueid || null);
+const uniqueId = computed(() => detailPayload.value?.device?.uniqueId || detailPayload.value?.device?.uniqueid || null);
 
 const ignitionLabel = computed(() => {
     const ign = getIgnition();
@@ -758,6 +933,54 @@ async function fetchDevice() {
         }
     } catch (e) {
         error.value = e?.response?.data?.message || 'Failed to load vehicle.';
+    }
+}
+
+function getPreviousWeekRange() {
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun..6=Sat
+    const daysSinceMonday = (day + 6) % 7;
+    const startOfThisWeek = new Date(now);
+    startOfThisWeek.setHours(0, 0, 0, 0);
+    startOfThisWeek.setDate(now.getDate() - daysSinceMonday);
+    const startPrev = new Date(startOfThisWeek);
+    startPrev.setDate(startOfThisWeek.getDate() - 7);
+    const endPrev = new Date(startPrev);
+    endPrev.setDate(startPrev.getDate() + 7);
+    endPrev.setMilliseconds(-1);
+    return { from: startPrev.toISOString(), to: endPrev.toISOString() };
+}
+
+async function fetchDetail() {
+    try {
+        const { from, to } = getPreviousWeekRange();
+        const res = await axios.get(`/web/vehicles/${deviceId.value}/detail`, { params: { from, to } });
+        const d = res.data?.detail || null;
+        detailPayload.value = d;
+        console.log('ddddd response ',d);
+        if (d) {
+            // Seed map center and positions directly from detail payload.position
+            const pos = d.position || null;
+            positions.value = (pos && typeof pos.latitude === 'number' && typeof pos.longitude === 'number')
+                ? [{
+                    latitude: pos.latitude,
+                    longitude: pos.longitude,
+                    speed: pos.speed ?? null,
+                    address: pos.address ?? null,
+                    attributes: parseAttrsMaybe(pos.attributes) ?? {},
+                    serverTime: pos.serverTime ?? pos.servertime ?? null
+                }]
+                : [];
+            if (positions.value.length) {
+                const last = positions.value[positions.value.length - 1];
+                mapCenter.value = [last.latitude, last.longitude];
+            }
+            weeklyTrips.value = Array.isArray(d.trips) ? d.trips : [];
+            driversList.value = Array.isArray(d.drivers) ? d.drivers : [];
+            driver.value = driversList.value.length ? driversList.value[0] : null;
+        }
+    } catch (e) {
+        error.value = e?.response?.data?.message || 'Failed to load detail.';
     }
 }
 
@@ -847,10 +1070,19 @@ async function initWebsocket() {
     }
 }
 
-// Static view: skip dynamic fetches and websockets
-onMounted(() => {
+// Static view enhanced: fetch detail for dynamic content and weekly trips
+onMounted(async () => {
     mapReady.value = true;
     window.addEventListener('resize', handleResize);
+    await fetchDetail();
+    // Open the marker popup by default once the map and marker are ready
+    try { await nextTick(); } catch {}
+    try {
+        if (currentAddress.value) {
+            const mk = markerRef.value?.leafletObject ?? markerRef.value;
+            mk?.openPopup?.();
+        }
+    } catch {}
 });
 
 onBeforeUnmount(() => {
@@ -858,14 +1090,33 @@ onBeforeUnmount(() => {
     if (typeof unsubEcho === 'function') { try { unsubEcho(); } catch (e) { } }
 });
 
+// If address becomes available later, open the popup automatically
+watch(currentAddress, async (addr) => {
+    if (!addr) return;
+    try { await nextTick(); } catch {}
+    try {
+        const mk = markerRef.value?.leafletObject ?? markerRef.value;
+        mk?.openPopup?.();
+    } catch {}
+});
+
 // Vehicle + tracking detail panel computed fields
-const model = computed(() => device.value?.tcDevice?.model || null);
+// Prefer device.model from device object; fallback to attributes 'model'
+const model = computed(() => {
+    const d = detailPayload.value?.device;
+    const fromDevice = d?.model;
+    if (fromDevice !== undefined && fromDevice !== null && fromDevice !== '') return fromDevice;
+    return pickAttr(['model']);
+});
 
 function parseAttrsMaybe(attr) {
     if (!attr) return {};
     try { return typeof attr === 'string' ? JSON.parse(attr) : (attr || {}); } catch { return {}; }
 }
-const tcAttrs = computed(() => parseAttrsMaybe(device.value?.tcDevice?.attributes));
+// Merge attributes from raw device and position into one view model
+const deviceAttrs = computed(() => parseAttrsMaybe(detailPayload.value?.device?.attributes));
+const positionAttrs = computed(() => parseAttrsMaybe(detailPayload.value?.position?.attributes));
+const tcAttrs = computed(() => ({ ...deviceAttrs.value, ...positionAttrs.value }));
 function pickAttr(keys) {
     const a = tcAttrs.value || {};
     for (const k of keys) {
@@ -873,15 +1124,98 @@ function pickAttr(keys) {
     }
     return null;
 }
+// Helper to also return which attribute key was matched
+function pickAttrWithKey(keys) {
+    const a = tcAttrs.value || {};
+    for (const k of keys) {
+        if (a[k] != null && a[k] !== '') return { key: k, value: a[k] };
+    }
+    return { key: null, value: null };
+}
 
 const plate = computed(() => pickAttr(['plate', 'registration', 'regNumber']));
 const vin = computed(() => pickAttr(['vin', 'VIN']));
-const odometer = computed(() => pickAttr(['odometer', 'mileage', 'odometerKm', 'odometer_km']));
+// Odometer from position attributes with unit handling (meters→km)
+const odometerInfo = computed(() => positionPickAttrWithKey([
+    'odometer', 'mileage', 'odometerKm', 'odometer_km',
+    'totalDistance', 'distance', 'odometer_m', 'tripDistance'
+]));
+const odometerKm = computed(() => {
+    const info = odometerInfo.value;
+    const key = String(info.key || '').toLowerCase();
+    const raw = info.value;
+    if (raw == null || raw === '') return null;
+    const n = extractNumber(raw);
+    if (!Number.isFinite(n)) return null;
+    const isMeters = key.includes('distance') || key.endsWith('_m') || key.includes('meter');
+    const km = isMeters ? (n / 1000) : n;
+    return km;
+});
 const odometerDisplay = computed(() => {
-    const val = odometer.value;
-    if (val == null || val === '') return '-';
-    const n = Number(val);
-    return Number.isFinite(n) ? `${Math.round(n)} km` : String(val);
+    const km = odometerKm.value;
+    if (km == null) return '-';
+    const rounded = km >= 100 ? Math.round(km) : Math.round(km * 10) / 10;
+    return `${rounded} km`;
+});
+// Total Distance from position attributes, prioritize totalDistance and related keys
+const totalDistanceInfo = computed(() => positionPickAttrWithKey([
+    'totalDistance', 'distance', 'odometer_m', 'tripDistance'
+]));
+const totalDistanceKm = computed(() => {
+    const info = totalDistanceInfo.value;
+    const key = String(info.key || '').toLowerCase();
+    const raw = info.value;
+    if (raw == null || raw === '') return null;
+    const n = extractNumber(raw);
+    if (!Number.isFinite(n)) return null;
+    const isMeters = key.includes('distance') || key.endsWith('_m') || key.includes('meter');
+    const km = isMeters ? (n / 1000) : n;
+    return km;
+});
+const totalDistanceDisplay = computed(() => {
+    const km = totalDistanceKm.value;
+    if (km == null) return '-';
+    const rounded = km >= 100 ? Math.round(km) : Math.round(km * 10) / 10;
+    return `${rounded} km`;
+});
+// Total Hours: prefer position attributes if available; otherwise sum durations from weekly trips
+const totalHoursInfo = computed(() => positionPickAttrWithKey([
+    'totalHours', 'engineHours', 'workingHours', 'runHours', 'operatingHours', 'hours'
+]));
+const totalHoursFromTrips = computed(() => {
+    const list = Array.isArray(weeklyTrips.value) ? weeklyTrips.value : [];
+    let msSum = 0;
+    for (const t of list) {
+        let d = Number(t?.duration);
+        if (!Number.isFinite(d)) continue;
+        // Heuristic: durations may be in seconds; convert to ms
+        if (d < 100000) d = d * 1000;
+        msSum += d;
+    }
+    if (msSum <= 0) return null;
+    return msSum / 3600000; // hours
+});
+const totalHoursValue = computed(() => {
+    const info = totalHoursInfo.value;
+    const raw = info.value;
+    // Only show hours if attribute exists; no fallback to trips
+    if (raw == null || raw === '') return null;
+    const n = extractNumber(raw);
+    if (!Number.isFinite(n)) return null;
+    // Treat large numeric values as milliseconds
+    if (n >= 100000) return n / 3600000;
+    // If it looks like seconds, convert to hours
+    if (n >= 1000) return n / 3600;
+    // Otherwise assume reported value is in hours
+    return n;
+});
+const totalHoursDisplay = computed(() => {
+    const hours = totalHoursValue.value;
+    if (hours == null) return '-';
+    const totalSeconds = Math.floor(Number(hours) * 3600);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    return `${h} h ${m} m`;
 });
 const fuelAverage = computed(() => pickAttr(['fuelAverage']));
 const maxSpeed = computed(() => pickAttr(['maxSpeed']));
@@ -889,6 +1223,199 @@ const speedLimit = computed(() => pickAttr(['speedLimit']));
 const type = computed(() => pickAttr(['type']));
 const manufacturer = computed(() => pickAttr(['manufacturer']));
 const color = computed(() => pickAttr(['color']));
+// Attribute key+value info for comparison
+const typeInfo = computed(() => pickAttrWithKey(['type']));
+const manufacturerInfo = computed(() => pickAttrWithKey(['manufacturer']));
+const modelInfo = computed(() => {
+    const d = detailPayload.value?.device;
+    const fromDevice = d?.model;
+    if (fromDevice !== undefined && fromDevice !== null && fromDevice !== '') {
+        return { key: 'device.model', value: fromDevice };
+    }
+    return pickAttrWithKey(['model']);
+});
+const colorInfo = computed(() => pickAttrWithKey(['color']));
+const vinInfo = computed(() => pickAttrWithKey(['vin', 'VIN']));
+const plateInfo = computed(() => pickAttrWithKey(['plate', 'registration', 'regNumber']));
+
+// Position-only attribute helpers for dynamic telemetry
+function positionPickAttr(keys) {
+    const a = positionAttrs.value || {};
+    for (const k of keys) {
+        if (a[k] != null && a[k] !== '') return a[k];
+    }
+    return null;
+}
+function positionPickAttrWithKey(keys) {
+    const a = positionAttrs.value || {};
+    for (const k of keys) {
+        if (a[k] != null && a[k] !== '') return { key: k, value: a[k] };
+    }
+    return { key: null, value: null };
+}
+
+// Device Temperature from position attributes (common keys)
+const temperatureInfo = computed(() => positionPickAttrWithKey([
+    'temperature', 'temp', 'cabinTemp', 'engineTemp', 'temp1', 'temp2', 'externalTemp'
+]));
+const temperatureDisplay = computed(() => {
+    const val = temperatureInfo.value?.value;
+    if (val == null || val === '') return '-';
+    const n = Number(val);
+    if (Number.isFinite(n)) {
+        const fixed = Math.abs(n) >= 10 ? n.toFixed(0) : n.toFixed(1);
+        return `${fixed} °C`;
+    }
+    return String(val);
+});
+
+// Device Battery from position attributes (prefer tracker voltage keys, else mobile percent keys)
+function extractNumber(raw) {
+    if (raw == null) return NaN;
+    const s = String(raw).replace(',', '.');
+    const m = s.match(/[-+]?\d*\.?\d+/);
+    return m ? Number(m[0]) : NaN;
+}
+function hasVoltageUnit(s) {
+    const t = String(s || '').toLowerCase();
+    return t.includes('v') || t.includes('volt');
+}
+function hasPercentUnit(s) {
+    const t = String(s || '').toLowerCase();
+    return t.includes('%') || t.includes('percent') || t.includes('pct');
+}
+
+const batteryInfo = computed(() => {
+    const a = positionAttrs.value || {};
+    const trackerKeys = ['batterylevel', 'batteryLevel', 'battery_level', 'voltage', 'batteryVoltage', 'power','battery'];
+    const mobileKeys = ['battery', 'Battery', 'batteryPercent', 'deviceBattery'];
+    const candidates = [];
+    for (const k of trackerKeys) {
+        const v = a[k];
+        if (v != null && v !== '') {
+            const s = String(v);
+            const n = extractNumber(s);
+            const style = 'voltage';
+            const score = Number.isFinite(n) ? (n > 0 ? 3 : 0) : -1;
+            candidates.push({ key: k, value: v, score, style });
+        }
+    }
+    for (const k of mobileKeys) {
+        const v = a[k];
+        if (v != null && v !== '') {
+            const s = String(v);
+            const n = extractNumber(s);
+            const style = hasVoltageUnit(s) ? 'voltage' : 'percent';
+            const score = Number.isFinite(n) ? (n > 0 ? (style === 'voltage' ? 3 : 2) : 0) : -1;
+            candidates.push({ key: k, value: v, score, style });
+        }
+    }
+    candidates.sort((a, b) => b.score - a.score);
+    if (candidates.length > 0 && candidates[0].score >= 0) {
+        return { key: candidates[0].key, value: candidates[0].value };
+    }
+    for (const k of [...trackerKeys, ...mobileKeys]) {
+        const v = a[k];
+        if (v != null && v !== '') return { key: k, value: v };
+    }
+    return { key: null, value: null };
+});
+
+// Raw battery values by device type preference
+const batteryMobileRaw = computed(() => positionPickAttr(['battery', 'Battery', 'batteryPercent', 'deviceBattery']));
+const batteryTrackerRaw = computed(() => positionPickAttr(['batterylevel', 'batteryLevel', 'battery_level', 'voltage', 'batteryVoltage', 'power', 'battery', 'Battery']));
+const batteryDisplay = computed(() => {
+    const a = positionAttrs.value || {};
+    const bl = a.batteryLevel;
+    if (bl !== undefined && bl !== null && bl !== '') {
+        const s = String(bl).trim();
+        return /%/.test(s) ? s : `${s} %`;
+    }
+    const bv = a.battery;
+    if (bv !== undefined && bv !== null && bv !== '') {
+        const s = String(bv).trim();
+        return /\bv(olt)?\b/i.test(s) ? s : `${s} V`;
+    }
+    return '-';
+});
+
+// Calibrated voltage→percent mapping (piecewise linear), tuned for 1S Li-ion
+function voltageToPercent(v) {
+    const points = [
+        [3.40, 0],
+        [3.70, 10],
+        [3.80, 25],
+        [3.90, 60],
+        [3.96, 90],
+        [4.00, 95],
+        [4.20, 100],
+    ];
+    if (!Number.isFinite(v)) return null;
+    if (v <= points[0][0]) return 0;
+    if (v >= points[points.length - 1][0]) return 100;
+    for (let i = 1; i < points.length; i++) {
+        const [vx, px] = points[i];
+        const [vPrev, pPrev] = points[i - 1];
+        if (v <= vx) {
+            const t = (v - vPrev) / (vx - vPrev);
+            const p = pPrev + t * (px - pPrev);
+            return Math.max(0, Math.min(100, Math.round(p)));
+        }
+    }
+    return null;
+}
+
+// Battery percent for icon fill (percent for mobile, voltage→percent for trackers)
+const batteryLevelPercent = computed(() => {
+    const a = positionAttrs.value || {};
+    const bl = a.batteryLevel;
+    if (bl !== undefined && bl !== null && bl !== '') {
+        const n = extractNumber(bl);
+        if (!Number.isFinite(n)) return null;
+        return Math.max(0, Math.min(100, Math.round(n)));
+    }
+    const bv = a.battery;
+    if (bv !== undefined && bv !== null && bv !== '') {
+        const v = extractNumber(bv);
+        return voltageToPercent(v);
+    }
+    return null;
+});
+const batteryIconFill = computed(() => {
+    const p = batteryLevelPercent.value;
+    if (p == null) return '#adb5bd'; // gray for unknown
+    if (p < 20) return '#e03131'; // red
+    if (p < 50) return '#f59f00'; // amber
+    return '#2f9e44'; // green
+});
+const batteryIconStroke = computed(() => {
+    const p = batteryLevelPercent.value;
+    if (p == null) return '#adb5bd';
+    if (p < 20) return '#e03131';
+    if (p < 50) return '#f59f00';
+    return '#2f9e44';
+});
+const batteryFillWidth = computed(() => {
+    const baseWidth = 20; // max inner fill width
+    const p = batteryLevelPercent.value;
+    if (p == null) return 0;
+    return Math.round((Math.max(0, Math.min(100, p)) / 100) * baseWidth);
+});
+
+// Detect if the tracked device is a mobile phone (Traccar client) vs a dedicated GPS tracker
+const isMobileDevice = computed(() => {
+    const protocol = String(detailPayload.value?.position?.protocol || '').toLowerCase();
+    if (['osmand', 'traccar', 'gpslogger', 'android', 'ios'].includes(protocol)) return true;
+    const category = String(deviceAttrs.value?.category || '').toLowerCase();
+    if (category === 'person' || category === 'phone') return true;
+    const hasPercentBattery = ['batteryLevel','battery','deviceBattery','batteryPercent'].some(k => positionAttrs.value?.[k] != null);
+    const hasVoltageBattery = ['power','voltage','batteryVoltage'].some(k => positionAttrs.value?.[k] != null);
+    if (hasPercentBattery && !hasVoltageBattery) return true;
+    const name = String(detailPayload.value?.device?.name || '').toLowerCase();
+    if (name.includes('phone') || name.includes('mobile')) return true;
+    return false;
+});
+const deviceSourceLabel = computed(() => isMobileDevice.value ? 'Mobile Device' : 'GPS Tracker');
 const photos = computed(() => {
     const ph = pickAttr(['photos']);
     if (!ph) return [];
@@ -899,7 +1426,7 @@ function photoUrl(p) {
     return String(p).startsWith('http') ? String(p) : `/storage/${p}`;
 }
 
-const deviceName = computed(() => device.value?.tcDevice?.name || null);
+const deviceName = computed(() => detailPayload.value?.device?.name || null);
 const coordsDisplay = computed(() => {
     if (!positions.value.length) return '-';
     const p = positions.value[positions.value.length - 1];
@@ -907,6 +1434,17 @@ const coordsDisplay = computed(() => {
     const lon = Number(p.longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return '-';
     return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+});
+
+// Link to Google Maps for the latest coordinates
+const liveLocationUrl = computed(() => {
+    if (!positions.value.length) return null;
+    const p = positions.value[positions.value.length - 1];
+    const lat = Number(p.latitude);
+    const lon = Number(p.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    const query = encodeURIComponent(`${lat},${lon}`);
+    return `https://www.google.com/maps/search/?api=1&query=${query}`;
 });
 
 // Driver helpers
@@ -923,8 +1461,33 @@ const driverPhone = computed(() => driverPickAttr(['phone', 'phoneNumber']));
 const driverEmail = computed(() => driverPickAttr(['email', 'emailAddress']));
 const driverAddress = computed(() => driverPickAttr(['address']));
 const driverIdCard = computed(() => driverPickAttr(['idCard', 'idCardNumber', 'nationalId']));
-const driverLicenseNumber = computed(() => driverPickAttr(['license', 'licenseNumber']));
-const driverLicenseExpiry = computed(() => driverPickAttr(['licenseExpiry', 'expiryDate']));
+// Prefer direct fields on driver, then fall back to attribute keys (including British spelling)
+const driverLicenseNumber = computed(() => (
+    driver.value?.licenseNumber
+    || driver.value?.licenceNumber
+    || driverPickAttr([
+        'license', 'licenseNumber',
+        'licence', 'licenceNumber',
+        'license_no', 'licenseNo',
+        'licence_no', 'licenceNo',
+        'driverLicenseNumber', 'driverLicenceNumber',
+        'dlNumber', 'dlNo'
+    ])
+));
+const driverLicenseExpiry = computed(() => (
+    driver.value?.licenseExpiry
+    || driver.value?.licenceExpiry
+    || driver.value?.expiryDate
+    || driver.value?.expirationDate
+    || driver.value?.expireDate
+    || driver.value?.validTill
+    || driver.value?.validUntil
+    || driverPickAttr([
+        'licenseExpiry', 'expiryDate', 'expirationDate', 'expireDate',
+        'licenceExpiry', 'licenceExpire', 'licenceExpiration',
+        'validTill', 'validUntil'
+    ])
+));
 const driverStatusLabel = computed(() => {
     const s = driverPickAttr(['status']);
     return (typeof s === 'string' && s.toLowerCase().includes('active')) ? 'Active' : 'Inactive';
@@ -935,6 +1498,14 @@ const driverStatusClass = computed(() => driverStatusLabel.value === 'Active'
 const memberSinceDisplay = computed(() => {
     const since = driverPickAttr(['memberSince', 'joinedAt', 'createdAt']);
     return since ? new Date(since).toLocaleDateString() : '';
+});
+
+const driverAvatarUrl = computed(() => {
+    if (driver.value?.avatarImageUrl) return driver.value.avatarImageUrl;
+    const raw = driverPickAttr(['avatarImage', 'avatar_image', 'avatar']);
+    if (!raw) return null;
+    const s = String(raw);
+    return s.startsWith('http') ? s : `/storage/${s}`;
 });
 
 // Rating helpers
@@ -956,6 +1527,56 @@ const overspeedPercent = computed(() => {
     return Math.min(100, Math.max(0, Math.round(o * 4)));
 });
 const overallScoreDisplay = computed(() => `${Math.round(Number(rating.value?.overallScore ?? 0))}%`);
+
+// Comparison rows: static vs dynamic
+const comparisons = computed(() => ([
+    { label: 'Vehicle Type', static: 'Sedan Car', dynamic: type.value || '-' },
+    { label: 'Manufacturer', static: 'Toyota', dynamic: manufacturer.value || '-' },
+    { label: 'Model', static: 'Camry SE', dynamic: model.value || '-' },
+    { label: 'Color', static: 'Midnight Black', dynamic: color.value || '-' },
+    { label: 'VIN Number', static: 'WAUYGAF6CCN174200', dynamic: vin.value || '-' },
+    { label: 'Plate Number', static: 'TXR-9283d', dynamic: plate.value || '-' },
+    { label: 'Ignition', static: 'off', dynamic: ignitionLabel.value || '-' },
+    { label: 'Speed', static: '0 km/h', dynamic: speedDisplay.value || '-' },
+    { label: 'Odometer', static: '211,644 km', dynamic: odometerDisplay.value || '-' },
+    { label: 'Fuel', static: '60 Litres', dynamic: fuelAverage.value ? (fuelAverage.value + ' L/100km') : '-' },
+    { label: 'Location', static: 'PLUS KM 426', dynamic: currentAddress.value || '-' },
+    { label: 'Last Report', static: '14/08/25-15:39', dynamic: lastUpdateDisplay.value || '-' },
+]));
+
+// Trips helpers
+function formatDateTime(s) {
+    if (!s) return '-';
+    try { return new Date(s).toLocaleString(); } catch { return String(s); }
+}
+function formatDistanceKm(d) {
+    const n = Number(d);
+    if (!Number.isFinite(n)) return '-';
+    // Traccar distances are in meters
+    return `${(n / 1000).toFixed(2)} km`;
+}
+function formatDuration(d) {
+    if (d == null) return '-';
+    let ms = Number(d);
+    if (!Number.isFinite(ms)) return '-';
+    // Heuristic: if value looks like seconds, convert to ms
+    if (ms < 100000) ms = ms * 1000;
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const hh = String(hours).padStart(2, '0');
+    const mm = String(minutes).padStart(2, '0');
+    const ss = String(seconds).padStart(2, '0');
+    return `${hh}:${mm}:${ss}`;
+}
+function formatSpeedKmh(s) {
+    const n = Number(s);
+    if (!Number.isFinite(n)) return '-';
+    // Trips often report averageSpeed in knots; convert to km/h if reasonable
+    const kmh = Math.round(n * 1.852);
+    return `${kmh} km/h`;
+}
 
 </script>
 

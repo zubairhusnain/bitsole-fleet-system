@@ -424,47 +424,7 @@ class VehicleController extends Controller
         return response()->json(['message' => 'Vehicle soft-deleted'], 200);
     }
 
-    /**
-     * Return recent positions (waypoints) for a specific device from tc_positions.
-     * Scopes access based on local Devices mapping and user role.
-     */
-    public function position(\Illuminate\Http\Request $request, int $deviceId): \Illuminate\Http\JsonResponse
-    {
-        $user = $request->user();
-        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
 
-        $query = \App\Models\Devices::query()->with(['tcDevice.position'])->where('device_id', $deviceId);
-        if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
-        } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
-            $distId = $user->distributor_id ?? $user->id;
-            $query->where('distributor_id', $distId)->where('user_id', $user->id);
-        }
-        $mapping = $query->firstOrFail();
-
-        $tc = $mapping->tcDevice;
-        $pos = $tc ? $tc->position : null;
-
-        $position = null;
-        if ($pos) {
-            $attrs = [];
-            if (isset($pos->attributes)) {
-                $attrs = is_array($pos->attributes) ? $pos->attributes : (json_decode($pos->attributes, true) ?? []);
-            }
-            $position = [
-                'id' => (int) ($pos->id ?? 0),
-                'deviceId' => (int) ($tc->id ?? $deviceId),
-                'latitude' => $pos->latitude ?? null,
-                'longitude' => $pos->longitude ?? null,
-                'speed' => $pos->speed ?? null,
-                'address' => $pos->address ?? null,
-                'attributes' => $attrs,
-                'serverTime' => $pos->servertime ?? null,
-            ];
-        }
-
-        return response()->json(['position' => $position]);
-    }
 
     /**
      * Return assigned driver details for a specific vehicle.
@@ -510,6 +470,76 @@ class VehicleController extends Controller
                 'avatarImageUrl' => $avatarImagePath ? \Illuminate\Support\Facades\Storage::url($avatarImagePath) : null,
             ],
         ]);
+    }
+
+    /**
+     * Device detail payload: latest position plus trips for a time window.
+     * Uses DeviceService::getDeviceDetailWithTrips and enforces role-based access.
+     */
+    public function detail(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        // Map options for trips time window
+        $options = [];
+        $from = $request->query('from');
+        $to = $request->query('to');
+        if ($from) { $options['from'] = $from; }
+        if ($to) { $options['to'] = $to; }
+        if ($request->boolean('includeRaw')) { $options['includeRaw'] = true; }
+
+        $payload = app(\App\Services\DeviceService::class)->getDeviceDetailWithTrips($user, $deviceId, $options);
+
+        return response()->json(['detail' => $payload]);
+    }
+
+    /**
+     * Return positions for a specific vehicle over a time window.
+     * Accepts query params: from, to, hours (or hour), limit.
+     */
+    public function positions(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
+
+        // Authorize via local Devices mapping
+        $query = \App\Models\Devices::query()->with(['tcDevice'])->where('device_id', $deviceId);
+        if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
+            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
+        } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
+            $distId = $user->distributor_id ?? $user->id;
+            $query->where('distributor_id', $distId)->where('user_id', $user->id);
+        }
+        $mapping = $query->firstOrFail();
+
+        // Derive time window
+        $from = $request->query('from');
+        $to = $request->query('to');
+        $hoursRaw = $request->query('hours', $request->query('hour', 24));
+        $hours = is_numeric($hoursRaw) ? max(1, (int) $hoursRaw) : 24;
+        $nowUtc = \Carbon\Carbon::now('UTC');
+        $toIso = $to ? \Carbon\Carbon::parse($to)->timezone('UTC')->format('Y-m-d\TH:i:s\Z') : $nowUtc->format('Y-m-d\TH:i:s\Z');
+        $fromIso = $from ? \Carbon\Carbon::parse($from)->timezone('UTC')->format('Y-m-d\TH:i:s\Z') : $nowUtc->copy()->subHours($hours)->format('Y-m-d\TH:i:s\Z');
+
+        $sessionId = $user->traccarSession ?? session('cookie');
+        $resp = static::curl('/api/positions?deviceId=' . $deviceId . '&from=' . $fromIso . '&to=' . $toIso, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+        if (!isset($resp->responseCode) || $resp->responseCode < 200 || $resp->responseCode >= 300) {
+            return response()->json([
+                'message' => 'Failed to fetch positions from tracking server',
+                'code' => $resp->responseCode ?? 0,
+                'error' => $resp->error ?? null,
+            ], 502);
+        }
+
+        $list = json_decode($resp->response, true) ?? [];
+        $limitRaw = $request->query('limit');
+        if (is_numeric($limitRaw)) {
+            $n = max(1, (int) $limitRaw);
+            if (count($list) > $n) {
+                $list = array_slice($list, count($list) - $n);
+            }
+        }
+
+        return response()->json(['positions' => $list]);
     }
 
     /**

@@ -92,10 +92,10 @@ Route::middleware('auth')->prefix('/web/vehicles')->group(function () {
     Route::get('/options', [\App\Http\Controllers\VehicleController::class, 'options']);
     Route::post('/', [\App\Http\Controllers\VehicleController::class, 'store']);
     Route::get('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'show']);
-    // Waypoints/history for device detail page
+    // Device detail: single payload with latest position and trips
+    Route::get('/{deviceId}/detail', [\App\Http\Controllers\VehicleController::class, 'detail']);
+    // Positions for map/waypoints (time-window support)
     Route::get('/{deviceId}/positions', [\App\Http\Controllers\VehicleController::class, 'positions']);
-    // Add single current position via tc_devices.positionid
-    Route::get('/{deviceId}/position', [\App\Http\Controllers\VehicleController::class, 'position']);
     // Driver assigned to this vehicle
     Route::get('/{deviceId}/driver', [\App\Http\Controllers\VehicleController::class, 'driver']);
     // Rating metrics derived from reports
@@ -116,8 +116,8 @@ Route::middleware('auth')->prefix('/web/drivers')->group(function () {
 
 // Live Tracking: trigger a broadcast of current positions
 Route::middleware('auth')->get('/web/live/positions/broadcast', [\App\Http\Controllers\LiveTrackingController::class, 'broadcast']);
-// Live Tracking: HTTP fallback to fetch current positions
-Route::get('/web/live/positions/current', [\App\Http\Controllers\LiveTrackingController::class, 'current']);
+// Live Tracking: HTTP fallback to fetch current positions (auth-protected)
+Route::middleware('auth')->get('/web/live/positions/current', [\App\Http\Controllers\LiveTrackingController::class, 'current']);
 
 // NEW: Auth-protected Users CRUD
 Route::middleware('auth')->prefix('/web/users')->group(function () {
