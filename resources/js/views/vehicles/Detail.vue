@@ -804,7 +804,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { LMap, LTileLayer, LMarker, LPolyline, LPopup } from '@vue-leaflet/vue-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -824,6 +824,7 @@ try {
 } catch {}
 
 const route = useRoute();
+const router = useRouter();
 const deviceId = computed(() => parseInt(route.params.deviceId));
 
 const device = ref(null);
@@ -978,9 +979,16 @@ async function fetchDetail() {
             weeklyTrips.value = Array.isArray(d.trips) ? d.trips : [];
             driversList.value = Array.isArray(d.drivers) ? d.drivers : [];
             driver.value = driversList.value.length ? driversList.value[0] : null;
+        } else {
+            // No detail payload available → redirect back to vehicles with a message
+            router.push({ path: '/vehicles', query: { error: 'No data available for this vehicle.' } });
+            return;
         }
     } catch (e) {
-        error.value = e?.response?.data?.message || 'Failed to load detail.';
+        const msg = e?.response?.data?.message || 'Failed to load detail.';
+        error.value = msg;
+        // Redirect back with error message for visibility on list page
+        router.push({ path: '/vehicles', query: { error: msg } });
     }
 }
 
@@ -1082,6 +1090,16 @@ onMounted(async () => {
         try { await fetchDevice(); } catch {}
         try { await fetchDetail(); } catch {}
     }
+    // If there is no position after data fetch, redirect back to list with message
+    try {
+        const hasPosition = Array.isArray(positions.value) && positions.value.length > 0
+            && typeof positions.value[positions.value.length - 1].latitude === 'number'
+            && typeof positions.value[positions.value.length - 1].longitude === 'number';
+        if (!hasPosition) {
+            router.push({ path: '/vehicles', query: { error: 'No position available for this vehicle.' } });
+            return;
+        }
+    } catch {}
     // Open the marker popup by default once the map and marker are ready
     try { await nextTick(); } catch {}
     try {
@@ -1339,12 +1357,21 @@ const batteryDisplay = computed(() => {
     const bl = a.batteryLevel;
     if (bl !== undefined && bl !== null && bl !== '') {
         const s = String(bl).trim();
-        return /%/.test(s) ? s : `${s} %`;
+        const n = extractNumber(s);
+        if (Number.isFinite(n)) {
+            return `${Math.round(n)} %`;
+        }
+        return hasPercentUnit(s) ? s : `${s} %`;
     }
     const bv = a.battery;
     if (bv !== undefined && bv !== null && bv !== '') {
         const s = String(bv).trim();
-        return /\bv(olt)?\b/i.test(s) ? s : `${s} V`;
+        const n = extractNumber(s);
+        if (Number.isFinite(n)) {
+            const fixed = Math.abs(n) >= 10 ? n.toFixed(1) : n.toFixed(2);
+            return `${fixed} V`;
+        }
+        return hasVoltageUnit(s) ? s : `${s} V`;
     }
     return '-';
 });
