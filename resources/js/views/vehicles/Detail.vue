@@ -1072,10 +1072,46 @@ async function initWebsocket() {
             if (found.uniqueId && !device.value.tcDevice.uniqueId) device.value.tcDevice.uniqueId = found.uniqueId;
         };
         ch.listen('.positions.updated', handler);
-        unsubEcho = () => { try { ch.stopListening('.positions.updated', handler); } catch (e) { } };
+        // Additional listener to flip polling fallback off once any socket event is received
+        const fallbackHandler = () => {
+            socketsSeen = true;
+            try { stopPositionsPolling(); } catch {}
+            if (fallbackStartTimer) { try { clearTimeout(fallbackStartTimer); } catch {}; fallbackStartTimer = null; }
+        };
+        ch.listen('.positions.updated', fallbackHandler);
+        unsubEcho = () => {
+            try { ch.stopListening('.positions.updated', handler); } catch (e) { }
+            try { ch.stopListening('.positions.updated', fallbackHandler); } catch (e) { }
+        };
     } catch (e) {
         // no-op
     }
+}
+
+// Live polling fallback (single device) to mirror LiveTracking behavior
+let pollTimer = null;
+let socketsSeen = false;
+let fallbackStartTimer = null;
+const POLL_MS = 5000;
+async function pollPositionsOnce() {
+    try {
+        const res = await axios.get(`/web/vehicles/${deviceId.value}/position`).catch(() => ({ data: {} }));
+        const point = res?.data?.position;
+        if (point && typeof point.latitude === 'number' && typeof point.longitude === 'number') {
+            positions.value = [...positions.value, point];
+        }
+    } catch {}
+}
+function startPositionsPolling() {
+    if (pollTimer) return;
+    pollTimer = setInterval(() => { pollPositionsOnce(); }, POLL_MS);
+}
+function stopPositionsPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+function armPollingFallback() {
+    if (fallbackStartTimer) clearTimeout(fallbackStartTimer);
+    fallbackStartTimer = setTimeout(() => { if (!socketsSeen) startPositionsPolling(); }, 8000);
 }
 
 // Static view enhanced: fetch detail for dynamic content and weekly trips
@@ -1090,6 +1126,10 @@ onMounted(async () => {
         try { await fetchDevice(); } catch {}
         try { await fetchDetail(); } catch {}
     }
+    // Subscribe to websocket updates for live tracking
+    try { await initWebsocket(); } catch {}
+    // Arm polling fallback in case sockets are unavailable
+    armPollingFallback();
     // If there is no position after data fetch, redirect back to list with message
     try {
         const hasPosition = Array.isArray(positions.value) && positions.value.length > 0
@@ -1113,6 +1153,13 @@ onMounted(async () => {
 onBeforeUnmount(() => {
     window.removeEventListener('resize', handleResize);
     if (typeof unsubEcho === 'function') { try { unsubEcho(); } catch (e) { } }
+});
+
+// Keep map centered on latest position updates
+watch(currentLatLng, (ll) => {
+    if (Array.isArray(ll) && typeof ll[0] === 'number' && typeof ll[1] === 'number') {
+        mapCenter.value = ll;
+    }
 });
 
 // If address becomes available later, open the popup automatically
