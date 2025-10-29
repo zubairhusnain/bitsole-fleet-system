@@ -654,123 +654,37 @@
             </div>
         </div>
 
-        <!-- Comparison: Static vs Dynamic values -->
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card panel rounded-4 shadow-sm">
-                    <div class="card-body">
-                        <h6 class="mb-3 panel-header">Static vs Dynamic (API)</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle">
-                                <thead>
-                                    <tr>
-                                        <th>Field</th>
-                                        <th>Static</th>
-                                        <th>Dynamic (API)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="(row, idx) in comparisons" :key="idx">
-                                        <td class="small text-muted">{{ row.label }}</td>
-                                        <td class="small">{{ row.static }}</td>
-                                        <td class="small fw-semibold">{{ row.dynamic ?? '-' }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Device Attributes vs Displayed (debug) -->
-        <div class="row mt-3">
-            <div class="col-12">
-                <div class="card panel rounded-4 shadow-sm">
-                    <div class="card-body">
-                        <h6 class="mb-3 panel-header">Device Attributes vs Displayed</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle">
-                                <thead>
-                                    <tr>
-                                        <th>Field</th>
-                                        <th>Attribute Key</th>
-                                        <th>Attribute Value</th>
-                                        <th>Displayed</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td class="small text-muted">Vehicle Type</td>
-                                        <td class="small">{{ typeInfo.key || '-' }}</td>
-                                        <td class="small">{{ typeInfo.value ?? '-' }}</td>
-                                        <td class="small fw-semibold">{{ type || '-' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="small text-muted">Manufacturer</td>
-                                        <td class="small">{{ manufacturerInfo.key || '-' }}</td>
-                                        <td class="small">{{ manufacturerInfo.value ?? '-' }}</td>
-                                        <td class="small fw-semibold">{{ manufacturer || '-' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="small text-muted">Model</td>
-                                        <td class="small">{{ modelInfo.key || '-' }}</td>
-                                        <td class="small">{{ modelInfo.value ?? '-' }}</td>
-                                        <td class="small fw-semibold">{{ model || '-' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="small text-muted">Color</td>
-                                        <td class="small">{{ colorInfo.key || '-' }}</td>
-                                        <td class="small">{{ colorInfo.value ?? '-' }}</td>
-                                        <td class="small fw-semibold">{{ color || '-' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="small text-muted">VIN Number</td>
-                                        <td class="small">{{ vinInfo.key || '-' }}</td>
-                                        <td class="small">{{ vinInfo.value ?? '-' }}</td>
-                                        <td class="small fw-semibold">{{ vin || '-' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="small text-muted">Plate Number</td>
-                                        <td class="small">{{ plateInfo.key || '-' }}</td>
-                                        <td class="small">{{ plateInfo.value ?? '-' }}</td>
-                                        <td class="small fw-semibold">{{ plate || '-' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="small text-muted">Odometer</td>
-                                        <td class="small">{{ odometerInfo.key || '-' }}</td>
-                                        <td class="small">{{ odometerInfo.value ?? '-' }}</td>
-                                        <td class="small fw-semibold">{{ odometerDisplay || '-' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="small text-muted">Device Temperature</td>
-                                        <td class="small">{{ temperatureInfo.key || '-' }}</td>
-                                        <td class="small">{{ temperatureInfo.value ?? '-' }}</td>
-                                        <td class="small fw-semibold">{{ temperatureDisplay || '-' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="small text-muted">Device Battery</td>
-                                        <td class="small">{{ batteryInfo.key || '-' }}</td>
-                                        <td class="small">{{ batteryInfo.value ?? '-' }}</td>
-                                        <td class="small fw-semibold">{{ batteryDisplay || '-' }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Weekly Trip History Table (Previous Week) -->
+        <!-- Trip History Table with Date Range Filters -->
         <div class="row mt-3 mb-4">
             <div class="col-12">
                 <div class="card panel rounded-4 shadow-sm">
                     <div class="card-body">
-                        <h6 class="mb-3 panel-header">Trip History (Previous Week)</h6>
-                        <div v-if="weeklyTrips.length === 0" class="text-muted small">No trips found for the previous week.</div>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <h6 class="mb-0 panel-header">Trip History</h6>
+                                <span v-if="loadingTrips" class="text-muted xsmall d-inline-flex align-items-center">
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                    Loading
+                                </span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <select class="form-select form-select-sm" v-model="tripRangePreset">
+                                    <option value="today">Today</option>
+                                    <option value="prev_week">Previous Week</option>
+                                    <option value="prev_month">Previous Month</option>
+                                    <option value="prev_year">Previous Year</option>
+                                    <option value="custom">Custom Range</option>
+                                </select>
+                                <template v-if="tripRangePreset === 'custom'">
+                                    <input type="date" class="form-control form-control-sm" v-model="customFromDate"/>
+                                    <input type="date" class="form-control form-control-sm" v-model="customToDate"/>
+                                    <button class="btn btn-sm btn-app-dark" @click="applyCustomRange" :disabled="loadingTrips">Apply</button>
+                                </template>
+                            </div>
+                        </div>
+                        <div v-if="weeklyTrips.length === 0" class="text-muted small">No trips found for selected range.</div>
                         <div v-else class="table-responsive">
-                            <table class="table table-sm">
+                            <table class="table table-sm align-middle table-grid-lines table-nowrap">
                                 <thead>
                                     <tr>
                                         <th>Start Time</th>
@@ -833,6 +747,11 @@ const error = ref('');
 const driver = ref(null);
 const rating = ref(null);
 const weeklyTrips = ref([]);
+// Trip history filter state
+const tripRangePreset = ref('prev_week'); // today | prev_week | prev_month | prev_year | custom
+const customFromDate = ref('');
+const customToDate = ref('');
+const loadingTrips = ref(false);
 const detailPayload = ref(null);
 const driversList = ref([]);
 
@@ -992,6 +911,56 @@ async function fetchDetail() {
     }
 }
 
+function startOfDay(d) {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+}
+function endOfDay(d) {
+    const x = new Date(d);
+    x.setHours(23, 59, 59, 999);
+    return x;
+}
+function computeTripRange() {
+    const now = new Date();
+    let from = startOfDay(now), to = endOfDay(now);
+    const preset = tripRangePreset.value;
+    if (preset === 'prev_week') {
+        from = new Date(now); from.setDate(from.getDate() - 7); from = startOfDay(from);
+        to = endOfDay(now);
+    } else if (preset === 'prev_month') {
+        from = new Date(now); from.setMonth(from.getMonth() - 1); from = startOfDay(from);
+        to = endOfDay(now);
+    } else if (preset === 'prev_year') {
+        from = new Date(now); from.setFullYear(from.getFullYear() - 1); from = startOfDay(from);
+        to = endOfDay(now);
+    } else if (preset === 'custom') {
+        const cf = customFromDate.value ? new Date(customFromDate.value) : null;
+        const ct = customToDate.value ? new Date(customToDate.value) : null;
+        if (cf && ct) { from = startOfDay(cf); to = endOfDay(ct); }
+    }
+    return { from: from.toISOString(), to: to.toISOString() };
+}
+
+async function fetchTripsByFilter() {
+    loadingTrips.value = true;
+    try {
+        const { from, to } = computeTripRange();
+        const res = await axios.get(`/web/vehicles/${deviceId.value}/trips`, { params: { from, to } });
+        const list = Array.isArray(res.data?.trips) ? res.data.trips : (Array.isArray(res.data) ? res.data : []);
+        weeklyTrips.value = list;
+    } catch (e) {
+        weeklyTrips.value = [];
+    } finally {
+        loadingTrips.value = false;
+    }
+}
+
+function applyCustomRange() {
+    if (!customFromDate.value || !customToDate.value) return;
+    fetchTripsByFilter();
+}
+
 async function fetchPositions() {
     try {
         const res = await axios.get(`/web/vehicles/${deviceId.value}/position`);
@@ -1130,6 +1099,8 @@ onMounted(async () => {
     try { await initWebsocket(); } catch {}
     // Arm polling fallback in case sockets are unavailable
     armPollingFallback();
+    // Load trips for the selected preset
+    try { await fetchTripsByFilter(); } catch {}
     // If there is no position after data fetch, redirect back to list with message
     try {
         const hasPosition = Array.isArray(positions.value) && positions.value.length > 0
@@ -1160,6 +1131,11 @@ watch(currentLatLng, (ll) => {
     if (Array.isArray(ll) && typeof ll[0] === 'number' && typeof ll[1] === 'number') {
         mapCenter.value = ll;
     }
+});
+
+// React to preset changes (non-custom) by reloading trips
+watch(tripRangePreset, (val) => {
+    if (val !== 'custom') fetchTripsByFilter();
 });
 
 // If address becomes available later, open the popup automatically
