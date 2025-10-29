@@ -571,6 +571,52 @@ class VehicleController extends Controller
     }
 
     /**
+     * Return raw device object from tracking server for this vehicle.
+     */
+    public function deviceRaw(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $device = app(\App\Services\DeviceService::class)->getDeviceRaw($user, $deviceId);
+        return response()->json(['device' => $device]);
+    }
+
+    /**
+     * Return the latest position for this vehicle using its current positionId.
+     */
+    public function positionCurrent(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $pos = app(\App\Services\DeviceService::class)->getCurrentPosition($user, $deviceId);
+        return response()->json(['position' => $pos]);
+    }
+
+    /**
+     * Return trips for a device over a time window.
+     * Query params: from, to
+     */
+    public function trips(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $options = [];
+        $from = $request->query('from');
+        $to = $request->query('to');
+        if ($from) { $options['from'] = $from; }
+        if ($to) { $options['to'] = $to; }
+        $trips = app(\App\Services\DeviceService::class)->getTrips($user, $deviceId, $options);
+        return response()->json(['trips' => $trips]);
+    }
+
+    /**
+     * Return all drivers assigned to this device from tracking server.
+     */
+    public function driversList(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $drivers = app(\App\Services\DeviceService::class)->getDriversForDevice($user, $deviceId);
+        return response()->json(['drivers' => $drivers]);
+    }
+
+    /**
      * Return positions for a specific vehicle over a time window.
      * Accepts query params: from, to, hours (or hour), limit.
      */

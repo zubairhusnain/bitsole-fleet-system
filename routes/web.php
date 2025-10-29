@@ -94,6 +94,11 @@ Route::middleware('auth')->prefix('/web/vehicles')->group(function () {
     Route::get('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'show']);
     // Device detail: single payload with latest position and trips
     Route::get('/{deviceId}/detail', [\App\Http\Controllers\VehicleController::class, 'detail']);
+    // Split endpoints: device-only, latest position, trips-only, drivers list
+    Route::get('/{deviceId}/device', [\App\Http\Controllers\VehicleController::class, 'deviceRaw']);
+    Route::get('/{deviceId}/position', [\App\Http\Controllers\VehicleController::class, 'positionCurrent']);
+    Route::get('/{deviceId}/trips', [\App\Http\Controllers\VehicleController::class, 'trips']);
+    Route::get('/{deviceId}/drivers', [\App\Http\Controllers\VehicleController::class, 'driversList']);
     // Positions for map/waypoints (time-window support)
     Route::get('/{deviceId}/positions', [\App\Http\Controllers\VehicleController::class, 'positions']);
     // Driver assigned to this vehicle

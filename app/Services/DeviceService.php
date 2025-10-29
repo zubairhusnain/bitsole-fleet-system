@@ -368,6 +368,60 @@ class DeviceService
         return $payload;
     }
 
+    /**
+     * Return raw Traccar device for the given deviceId.
+     */
+    public function getDeviceRaw(User $user, int $deviceId): ?array
+    {
+        $sessionId = $user->traccarSession ?? session('cookie');
+        $resp = static::curl('/api/devices?id=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+        $list = json_decode($resp->response, true) ?? [];
+        return isset($list[0]) ? $list[0] : null;
+    }
+
+    /**
+     * Return the current (latest) position for a device using its positionId.
+     */
+    public function getCurrentPosition(User $user, int $deviceId): ?array
+    {
+        $sessionId = $user->traccarSession ?? session('cookie');
+        $deviceResp = static::curl('/api/devices?id=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+        $devices = json_decode($deviceResp->response, true) ?? [];
+        $device = $devices[0] ?? null;
+        $positionId = (int) ($device['positionId'] ?? 0);
+        if ($positionId <= 0) return null;
+        $posResp = static::curl('/api/positions/?deviceId=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+        $positions = json_decode($posResp->response, true) ?? [];
+        return isset($positions[0]) ? $positions[0] : null;
+    }
+
+    /**
+     * Return trips for a device over a time window.
+     * Options: from, to (string|int)
+     */
+    public function getTrips(User $user, int $deviceId, array $options = []): array
+    {
+        $sessionId = $user->traccarSession ?? session('cookie');
+        $toIso = isset($options['to'])
+            ? gmdate('Y-m-d\TH:i:00\Z', is_numeric($options['to']) ? (int)$options['to'] : strtotime((string)$options['to']))
+            : gmdate('Y-m-d\TH:i:00\Z');
+        $fromIso = isset($options['from'])
+            ? gmdate('Y-m-d\TH:i:00\Z', is_numeric($options['from']) ? (int)$options['from'] : strtotime((string)$options['from']))
+            : gmdate('Y-m-d\TH:i:00\Z', strtotime('-1 day'));
+        $resp = static::curl('/api/reports/trips?deviceId=' . $deviceId . '&from=' . $fromIso . '&to=' . $toIso, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+        return json_decode($resp->response, true) ?? [];
+    }
+
+    /**
+     * Return all drivers assigned to the device from tracking server.
+     */
+    public function getDriversForDevice(User $user, int $deviceId): array
+    {
+        $sessionId = $user->traccarSession ?? session('cookie');
+        $resp = static::curl('/api/drivers?deviceId=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+        return json_decode($resp->response, true) ?? [];
+    }
+
     // public function getDeviceDetails($request)
     // {
     //     $id = session('tc_user_id');
