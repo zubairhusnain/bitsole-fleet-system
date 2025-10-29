@@ -22,12 +22,12 @@
         <div class="card-body">
           <div class="row g-3 align-items-start">
             <div class="col-12 col-md-4">
-              <label class="form-label small">Vehicle ID</label>
+              <label class="form-label small">Devuce ID ( EMIE )</label>
               <input v-model="form.uniqueId" type="text" class="form-control" placeholder="VHCL-1016" />
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label small">Vehicle Name</label>
-              <input v-model="form.name" type="text" class="form-control" placeholder="Vehicle Name" />
+              <label class="form-label small">Device Name</label>
+              <input v-model="form.name" type="text" class="form-control" placeholder="Device Name" />
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Vehicle Type</label>

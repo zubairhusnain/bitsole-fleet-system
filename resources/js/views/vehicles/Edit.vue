@@ -28,11 +28,11 @@
           <div class="row g-3 align-items-start">
             <input :value="deviceId" type="hidden" />
             <div class="col-12 col-md-4">
-              <label class="form-label small">Vehicle Name</label>
+              <label class="form-label small">Device Name</label>
               <input v-model="form.name" type="text" class="form-control" placeholder="Vehicle Name" />
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label small">Vehicle ID (uniqueId)</label>
+              <label class="form-label small">Device ID ( EMIE )</label>
               <input v-model="form.uniqueId" type="text" class="form-control" placeholder="uniqueId" disabled />
             </div>
 

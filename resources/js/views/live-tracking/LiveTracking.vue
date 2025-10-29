@@ -25,7 +25,7 @@
                <div class="panel-body" @wheel.stop>
                  <div v-if="loading" class="text-muted small">Loading…</div>
                  <div v-else>
-                   <div v-for="v in filtered" :key="deviceKey(v)" class="vehicle-card" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
+                   <div v-for="v in filtered" :key="deviceKey(v)" :class="['vehicle-card', { 'is-selected': selectedId === deviceKey(v) }]" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
                      <div class="vehicle-avatar">
                        <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
                      </div>
@@ -47,6 +47,7 @@
              </div>
             <l-map v-if="showMap" id="liveMap" :zoom="zoom" :center="center" :options="mapOptions" @ready="onMapReady">
             <l-tile-layer :url="tileUrl" :attribution="tileAttribution" />
+            <l-circle v-if="selectedMarker" :lat-lng="[selectedMarker.lat, selectedMarker.lon]" :radius="200" :color="'#3f8fd7'" :weight="1" :fillColor="'#3f8fd7'" :fillOpacity="0.25" />
             <l-marker v-for="m in markerItems" :key="m.id" :lat-lng="[m.lat, m.lon]" :icon="carIcon" :ref="el => setMarkerRef(m.id, el)">
             <l-popup>
             <div class="popup-card" v-html="m.popup"></div>
@@ -63,7 +64,7 @@
               <div class="panel-body" @wheel.stop>
                 <div v-if="loading" class="text-muted small">Loading…</div>
                 <div v-else>
-                  <div v-for="v in filtered" :key="deviceKey(v)" class="vehicle-card" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
+                  <div v-for="v in filtered" :key="deviceKey(v)" :class="['vehicle-card', { 'is-selected': selectedId === deviceKey(v) }]" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
                     <div class="vehicle-avatar">
                       <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
                     </div>
@@ -94,7 +95,7 @@ import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { getCurrentUser, clearAuthCache } from '../../auth';
-import { LMap, LTileLayer, LMarker, LPopup } from '@vue-leaflet/vue-leaflet';
+import { LMap, LTileLayer, LMarker, LPopup, LCircle } from '@vue-leaflet/vue-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -138,6 +139,7 @@ function setMarkerRef(id, el) {
 const showMap = ref(true);
 const zoom = ref(4);
 const center = ref([39.8283, -98.5795]);
+const selectedId = ref(null);
 const mapOptions = { zoomControl: true, preferCanvas: true };
 const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const tileAttribution = '&copy; OpenStreetMap contributors';
@@ -249,7 +251,13 @@ function applyRealtimePositions(list) {
             longitude: p.longitude,
             speed: p.speed,
             address: p.address,
-            attributes: { ignition: p.ignition, motion: p.motion ?? null, online: p.online ?? null },
+            attributes: {
+                ...(existing.position?.attributes || {}),
+                ignition: p.ignition,
+                motion: p.motion ?? null,
+                online: p.online ?? null,
+                ...(p.attributes || {}),
+            },
         };
         existing.name = existing.name || p.name;
         // Attach lightweight tcDevice stub for display fields when missing
@@ -341,16 +349,33 @@ const markerItems = computed(() => {
         .sort((a, b) => String(a.id).localeCompare(String(b.id)));
 });
 
+const selectedMarker = computed(() => {
+    if (!selectedId.value) return null;
+    return markerItems.value.find(m => String(m.id) === String(selectedId.value)) || null;
+});
+
 watch(
     markerItems,
     (list) => {
-        if (map.value && !fitDone.value && list.length) {
+        if (map.value && !fitDone.value && list.length && !selectedId.value) {
             const bounds = L.latLngBounds(list.map(m => [m.lat, m.lon]));
             try { map.value.fitBounds(bounds.pad(0.2)); } catch { map.value.fitBounds(bounds); }
             fitDone.value = true;
         }
     },
     { flush: 'post' }
+);
+
+// Keep selected vehicle centered while it moves
+watch(
+    selectedMarker,
+    (m) => {
+        if (!m) return;
+        center.value = [m.lat, m.lon];
+        // Ensure a reasonable zoom to visualize 100m radius
+        const current = typeof map.value?.getZoom === 'function' ? map.value.getZoom() : zoom.value;
+        zoom.value = Math.max(current || 0, 15);
+    }
 );
 
 function getImage(v) {
@@ -401,6 +426,64 @@ function statusValue(v) {
 function statusLabel(v) {
     const s = statusValue(v);
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : 'offline';
+}
+
+// Extract fuel value from position attributes
+function fuelDisplay(v) {
+    const attrs = getPosition(v).raw?.attributes || {};
+    const candidates = [
+        'fuel', 'fuelLevel', 'fuel_level', 'fuellevel', 'fuelPercent', 'fuel_percent', 'fuelPct', 'fuel_ratio',
+    ];
+    let keyFound = null;
+    for (const k of candidates) {
+        if (k in attrs) { keyFound = k; break; }
+    }
+    if (!keyFound) {
+        // Fallback: any key that includes 'fuel'
+        for (const k in attrs) {
+            if (String(k).toLowerCase().includes('fuel')) { keyFound = k; break; }
+        }
+    }
+    if (!keyFound) return null;
+    const val = attrs[keyFound];
+    const num = typeof val === 'string' ? parseFloat(val) : (typeof val === 'number' ? val : null);
+    if (!Number.isFinite(num)) return null;
+    const keyLower = String(keyFound).toLowerCase();
+    const isPercent = keyLower.includes('percent') || keyLower.includes('pct') || keyLower.includes('ratio') || keyLower.includes('level');
+    if (isPercent) {
+        const pct = Math.max(0, Math.min(100, Math.round(num)));
+        return `${pct}%`;
+    }
+    const liters = Math.round(num * 10) / 10;
+    return `${liters} L`;
+}
+
+// Extract odometer from position attributes and format in km
+function odometerDisplay(v) {
+    const attrs = getPosition(v).raw?.attributes || {};
+    const primary = ['odometer', 'odometerKm', 'odometer_km'];
+    const distanceKeys = ['totalDistance', 'distance', 'tripDistance'];
+    let keyFound = null;
+    for (const k of [...primary, ...distanceKeys]) {
+        if (k in attrs) { keyFound = k; break; }
+    }
+    if (!keyFound) {
+        // Fallback: any key containing 'odometer' or 'distance'
+        for (const k in attrs) {
+            const kl = String(k).toLowerCase();
+            if (kl.includes('odometer') || kl.includes('distance')) { keyFound = k; break; }
+        }
+    }
+    if (!keyFound) return null;
+    const rawVal = attrs[keyFound];
+    const num = typeof rawVal === 'string' ? parseFloat(rawVal) : (typeof rawVal === 'number' ? rawVal : null);
+    if (!Number.isFinite(num)) return null;
+    const keyLower = String(keyFound).toLowerCase();
+    let km = num;
+    const looksMeters = distanceKeys.map(k => k.toLowerCase()).includes(keyLower) || (!keyLower.includes('km') && num > 1000);
+    if (looksMeters) km = num / 1000;
+    const rounded = Math.round(km * 10) / 10;
+    try { return `${rounded.toLocaleString()} km`; } catch { return `${rounded} km`; }
 }
 
 
@@ -454,6 +537,8 @@ function popupHtml(v) {
     const sClass = statusClass(v);
     const sLabel = statusLabel(v);
     const isOnline = statusIs(v, 'online');
+    const fuel = fuelDisplay(v);
+    const odo = odometerDisplay(v);
     return `
     <div class="popup-card">
       <div class="popup-title-row">
@@ -467,6 +552,8 @@ function popupHtml(v) {
       <div class="popup-row"><span>Last Update:</span> <strong>${lu}</strong></div>
       <div class="popup-row"><span>Ignition:</span> <strong>${ign}</strong></div>
       <div class="popup-row"><span>Speed:</span> <strong>${sp ?? '-'} km/h</strong></div>
+      <div class="popup-row"><span>Fuel:</span> <strong>${fuel ?? '—'}</strong></div>
+      <div class="popup-row"><span>Odometer:</span> <strong>${odo ?? '—'}</strong></div>
       <div class="popup-row"><span>Location:</span> <span>${locText}</span></div>
     </div>
   `;
@@ -504,16 +591,21 @@ async function fetchVehicles() {
 
 function focusVehicle(v) {
     const { lat, lon } = getPosition(v);
+    const id = deviceKey(v);
+    if (typeof id !== 'undefined' && id !== null) selectedId.value = id;
     if (map.value && typeof lat === 'number' && typeof lon === 'number') {
-        const z = typeof map.value.getZoom === 'function' ? Math.max(map.value.getZoom(), 8) : 8;
+        fitDone.value = true; // prevent fitBounds from pulling view away
+        const desiredZoom = 15;
+        const currentZoom = typeof map.value.getZoom === 'function' ? map.value.getZoom() : zoom.value;
+        const z = Math.max(currentZoom || 0, desiredZoom);
+        center.value = [lat, lon];
+        zoom.value = z;
         try {
-            if (typeof map.value.flyTo === 'function') {
-                map.value.flyTo([lat, lon], z, { duration: 0.6 });
-            } else {
+            if (typeof map.value.setView === 'function') {
                 map.value.setView([lat, lon], z, { animate: true });
             }
         } catch {}
-        const mk = markerRefs.get(deviceKey(v));
+        const mk = markerRefs.get(id);
         try { mk?.openPopup?.(); } catch {}
     }
 }
@@ -680,6 +772,10 @@ onBeforeUnmount(() => {
 
 .vehicle-card:hover {
     background: rgba(0, 0, 0, .04);
+}
+
+.vehicle-card.is-selected {
+    background: rgba(33, 150, 243, 0.18);
 }
 
 .vehicle-avatar {
