@@ -1417,9 +1417,19 @@ const isMobileDevice = computed(() => {
 });
 const deviceSourceLabel = computed(() => isMobileDevice.value ? 'Mobile Device' : 'GPS Tracker');
 const photos = computed(() => {
-    const ph = pickAttr(['photos']);
-    if (!ph) return [];
-    return Array.isArray(ph) ? ph : [ph];
+    const out = [];
+    // Prefer array fields first
+    const arrLike = pickAttr(['photos', 'images']);
+    if (arrLike) {
+        if (Array.isArray(arrLike)) out.push(...arrLike);
+        else out.push(arrLike);
+    }
+    // Fallback to single image keys
+    const single = pickAttr(['photo', 'image', 'vehiclePhoto', 'vehicleImage']);
+    if (single) out.push(single);
+    // Normalize: remove empty values and dedupe
+    const uniq = Array.from(new Set(out.filter(v => v !== null && v !== undefined && String(v).trim() !== '')));
+    return uniq;
 });
 function photoUrl(p) {
     if (!p) return '';
