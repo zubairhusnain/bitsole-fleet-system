@@ -77,7 +77,7 @@
                                     <div class="btn-group btn-group-sm">
                                         <button v-if="!row.blocked" class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i
                                                 class="bi bi-pencil"></i></button>
-                                        <button v-if="showDeviceDetailLink && !row.blocked" class="btn btn-outline-primary" title="View" @click="toDetail(row)">
+                                        <button v-if="!row.blocked && hasLocation(row)" class="btn btn-outline-primary" title="View" @click="toDetail(row)">
                                             <i class="bi bi-eye"></i>
                                         </button>
                                         <button v-if="!row.blocked" class="btn btn-outline-warning" title="Block" @click="block(row)"
@@ -405,6 +405,21 @@ function stringifyAttr(v) {
 function goPage(n) { if (n >= 1 && n <= totalPages.value) { page.value = n; fetchPage(n); } }
 function prevPage() { goPage(page.value - 1); }
 function nextPage() { goPage(page.value + 1); }
+
+// Show "View" only for vehicles that have a known position
+function hasLocation(row) {
+    const tc = row?.tc_device ?? row?.tcDevice ?? {};
+    const pos = tc?.position || {};
+    const toNum = (v) => {
+        const n = typeof v === 'string' ? parseFloat(v) : v;
+        return Number.isFinite(n) ? n : null;
+    };
+    const lat = toNum(pos.latitude ?? pos.lat ?? null);
+    const lon = toNum(pos.longitude ?? pos.lon ?? null);
+    if (typeof lat === 'number' && typeof lon === 'number') return true;
+    const pid = row?.positionId ?? row?.positionid ?? tc?.positionId ?? tc?.positionid ?? null;
+    return pid != null;
+}
 
 async function remove(row) {
     if (!row?.device_id) return;

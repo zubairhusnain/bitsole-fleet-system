@@ -13,6 +13,17 @@
         </div>
 
         <div class="row mb-3">
+            <!-- Device switcher dropdown (left of device name/status) -->
+            <div class="col-auto">
+                <div class="d-flex align-items-center gap-2">
+                    <select v-model="selectedDeviceId" class="form-select form-select-sm" @change="switchToSelectedDevice" :disabled="loadingDeviceOptions">
+                        <option v-for="opt in deviceOptions" :key="opt.id" :value="opt.id">
+                            {{ deviceOptionLabel(opt) }}
+                        </option>
+                    </select>
+                    <span v-if="loadingDeviceOptions" class="text-muted small">Loading…</span>
+                </div>
+            </div>
             <div class="col-auto text-end ms-auto" v-if="detailPayload">
                 <div class="d-flex align-items-center gap-3">
                     <span class="badge" :class="statusBadgeClass">{{ statusLabel }}</span>
@@ -778,6 +789,64 @@ const currentAddress = computed(() => {
     return positions.value[positions.value.length - 1]?.address || null;
 });
 
+// Device switcher state and helpers
+const deviceOptions = ref([]);
+const loadingDeviceOptions = ref(false);
+const selectedDeviceId = ref(deviceId.value);
+function deviceOptionLabel(opt) {
+    return opt?.label || opt?.name || opt?.uniqueId || opt?.id;
+}
+async function fetchDeviceOptions() {
+    loadingDeviceOptions.value = true;
+    try {
+        // Fetch full vehicles list so we can filter by position
+        const res = await axios.get('/web/vehicles').catch(() => ({ data: [] }));
+        const data = res?.data ?? [];
+        const list = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+        const filtered = list.filter(hasLocation);
+        // Map to simplified options for dropdown
+        deviceOptions.value = filtered.map(v => ({ id: trackingId(v), label: dropdownDeviceLabel(v), uniqueId: v?.tcDevice?.uniqueId || v?.uniqueId }));
+    } catch (e) {
+        // silent failure; dropdown will be empty
+    } finally {
+        loadingDeviceOptions.value = false;
+    }
+}
+function switchToSelectedDevice() {
+    const id = Number(selectedDeviceId.value);
+    if (!id || Number(route.params.deviceId) === id) return;
+    router.push(`/vehicles/${id}`);
+}
+
+// Helpers mirrored from LiveTracking to detect valid positions
+function trackingId(v) {
+    return v.device_id ?? v.deviceId ?? (v.tcDevice?.id ?? v.tc_device?.id) ?? (typeof v.id === 'number' ? v.id : null);
+}
+function dropdownDeviceLabel(v) {
+    const n = v.name ?? (v.tcDevice?.name ?? v.tc_device?.name);
+    return typeof n === 'string' && n.trim() ? n : 'Unknown';
+}
+function getPosition(v) {
+    const dev = v.tcDevice || v.tc_device || {};
+    const pos = dev.position || dev.tcPosition || dev.tc_position || v.position || v.tcPosition || v.tc_position || v.positionData || {};
+    const latRaw = pos.latitude ?? pos.lat ?? pos.y ?? null;
+    const lonRaw = pos.longitude ?? pos.lon ?? pos.x ?? null;
+    const toNumber = (val) => {
+        const n = typeof val === 'string' ? parseFloat(val) : val;
+        return Number.isFinite(n) ? n : null;
+    };
+    const lat = toNumber(latRaw);
+    const lon = toNumber(lonRaw);
+    return { lat, lon };
+}
+function hasLocation(v) {
+    const { lat, lon } = getPosition(v);
+    if (typeof lat === 'number' && typeof lon === 'number') return true;
+    const dev = v.tcDevice || v.tc_device || {};
+    const pid = v.positionId ?? v.positionid ?? dev.positionId ?? dev.positionid ?? null;
+    return pid != null;
+}
+
 const statusLabel = computed(() => {
     const raw = detailPayload.value?.device?.status;
     if (raw) {
@@ -1087,6 +1156,8 @@ function armPollingFallback() {
 onMounted(async () => {
     mapReady.value = true;
     window.addEventListener('resize', handleResize);
+    // Load device options for switcher
+    try { await fetchDeviceOptions(); } catch {}
     // Load both the base device (for tcDevice.attributes) and detail payload
     try {
         await Promise.all([fetchDevice(), fetchDetail()]);
@@ -1136,6 +1207,34 @@ watch(currentLatLng, (ll) => {
 // React to preset changes (non-custom) by reloading trips
 watch(tripRangePreset, (val) => {
     if (val !== 'custom') fetchTripsByFilter();
+});
+
+// React to device changes by refetching all detail data and rewiring live updates
+watch(deviceId, async (newId, oldId) => {
+    selectedDeviceId.value = newId;
+    // Unsubscribe previous socket and stop polling
+    try { if (typeof unsubEcho === 'function') unsubEcho(); } catch {}
+    try { stopPositionsPolling(); } catch {}
+    try { if (fallbackStartTimer) { clearTimeout(fallbackStartTimer); fallbackStartTimer = null; } } catch {}
+    socketsSeen = false;
+    // Reset state
+    positions.value = [];
+    error.value = '';
+    detailPayload.value = null;
+    driver.value = null;
+    rating.value = null;
+    // Refetch data for new device
+    try {
+        await Promise.all([fetchDevice(), fetchDetail()]);
+    } catch {
+        try { await fetchDevice(); } catch {}
+        try { await fetchDetail(); } catch {}
+    }
+    // Reinit live updates and polling fallback
+    try { await initWebsocket(); } catch {}
+    armPollingFallback();
+    // Reload trips for current preset
+    try { await fetchTripsByFilter(); } catch {}
 });
 
 // If address becomes available later, open the popup automatically
