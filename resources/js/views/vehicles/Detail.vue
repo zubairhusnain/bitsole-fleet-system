@@ -1418,22 +1418,54 @@ const isMobileDevice = computed(() => {
 const deviceSourceLabel = computed(() => isMobileDevice.value ? 'Mobile Device' : 'GPS Tracker');
 const photos = computed(() => {
     const out = [];
-    // Prefer array fields first
+    const toPath = (it) => {
+        if (!it && it !== 0) return '';
+        if (Array.isArray(it)) return it.map(toPath).filter(Boolean);
+        if (typeof it === 'string') {
+            const s = it.trim();
+            if (!s) return '';
+            // Attempt to parse JSON-encoded arrays or objects
+            if ((s.startsWith('[') && s.endsWith(']')) || (s.startsWith('{') && s.endsWith('}'))) {
+                try {
+                    const parsed = JSON.parse(s);
+                    return toPath(parsed);
+                } catch { /* fall through */ }
+            }
+            return s;
+        }
+        if (typeof it === 'number') return String(it);
+        if (typeof it === 'object') {
+            const cand = it.url ?? it.path ?? it.src ?? it.image ?? it.photo;
+            return typeof cand === 'string' ? cand.trim() : '';
+        }
+        return '';
+    };
+
+    // Prefer array-style fields first (can be array, JSON string, or object)
     const arrLike = pickAttr(['photos', 'images']);
-    if (arrLike) {
-        if (Array.isArray(arrLike)) out.push(...arrLike);
-        else out.push(arrLike);
-    }
+    const arrResolved = toPath(arrLike);
+    if (Array.isArray(arrResolved)) out.push(...arrResolved);
+    else if (typeof arrResolved === 'string' && arrResolved) out.push(arrResolved);
+
     // Fallback to single image keys
-    const single = pickAttr(['photo', 'image', 'vehiclePhoto', 'vehicleImage']);
-    if (single) out.push(single);
+    const single = toPath(pickAttr(['photo', 'image', 'vehiclePhoto', 'vehicleImage']));
+    if (Array.isArray(single)) out.push(...single);
+    else if (typeof single === 'string' && single) out.push(single);
+
     // Normalize: remove empty values and dedupe
-    const uniq = Array.from(new Set(out.filter(v => v !== null && v !== undefined && String(v).trim() !== '')));
+    const uniq = Array.from(new Set(out.filter(v => typeof v === 'string' && v.trim() !== '')));
     return uniq;
 });
 function photoUrl(p) {
-    if (!p) return '';
-    return String(p).startsWith('http') ? String(p) : `/storage/${p}`;
+    if (!p && p !== 0) return '';
+    const raw = String(p).trim();
+    if (!raw) return '';
+    if (raw.startsWith('http') || raw.startsWith('data:')) return raw;
+    if (raw.startsWith('/')) return raw; // already absolute from root
+    if (raw.startsWith('storage/')) return `/${raw}`;
+    if (raw.startsWith('public/')) return `/${raw.replace(/^public\//, 'storage/')}`;
+    // default: treat as a public disk path under storage
+    return `/storage/${raw.replace(/^\/*/, '')}`;
 }
 
 const deviceName = computed(() => detailPayload.value?.device?.name || null);
