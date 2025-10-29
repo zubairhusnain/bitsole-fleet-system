@@ -71,8 +71,8 @@
                 <td class="text-muted text-nowrap">{{ row.lastRide }}</td>
                 <td class="text-end">
                   <div class="btn-group btn-group-sm">
-                    <button v-if="!isProd" class="btn btn-outline-primary" title="View" @click="openDetails(row)"><i class="bi bi-person-lines-fill"></i></button>
-                    <button class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i class="bi bi-pencil"></i></button>
+                    <button v-if="!isProd && !row.blocked" class="btn btn-outline-primary" title="View" @click="openDetails(row)"><i class="bi bi-person-lines-fill"></i></button>
+                    <button v-if="!row.blocked" class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i class="bi bi-pencil"></i></button>
                     <button v-if="!row.blocked" class="btn btn-outline-warning" title="Block" @click="blockDriver(row.id, row.name)" :disabled="blocking[row.id] === true">
                       <i class="bi bi-slash-circle"></i>
                     </button>

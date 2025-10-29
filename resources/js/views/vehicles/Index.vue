@@ -75,9 +75,9 @@
                                 <td class="text-muted text-nowrap">{{ row.location ?? '—' }}</td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i
+                                        <button v-if="!row.blocked" class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i
                                                 class="bi bi-pencil"></i></button>
-                                        <button v-if="showDeviceDetailLink" class="btn btn-outline-primary" title="View" @click="toDetail(row)">
+                                        <button v-if="showDeviceDetailLink && !row.blocked" class="btn btn-outline-primary" title="View" @click="toDetail(row)">
                                             <i class="bi bi-eye"></i>
                                         </button>
                                         <button v-if="!row.blocked" class="btn btn-outline-warning" title="Block" @click="block(row)"
