@@ -217,6 +217,74 @@ function parseAttrs(val) {
     try { return typeof val === 'string' ? JSON.parse(val) : (val || {}); } catch { return {}; }
 }
 
+// Animated marker display positions (decoupled from raw device positions)
+const displayPositions = reactive({}); // { [id]: { lat, lon } }
+const animations = new Map(); // { id -> { raf } }
+const ANIM_MS = 1000; // default animation duration per update
+const JUMP_CUTOFF_METERS = 1500; // skip animation for large jumps
+
+function setDisplayPos(id, lat, lon) {
+    if (typeof id === 'undefined' || id === null) return;
+    if (typeof lat !== 'number' || typeof lon !== 'number') return;
+    displayPositions[id] = { lat, lon };
+}
+
+function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function distanceMeters(a, b) {
+    if (!a || !b || typeof a.lat !== 'number' || typeof a.lon !== 'number' || typeof b.lat !== 'number' || typeof b.lon !== 'number') return NaN;
+    const R = 6371000;
+    const toRad = Math.PI / 180;
+    const dLat = (b.lat - a.lat) * toRad;
+    const dLon = (b.lon - a.lon) * toRad;
+    const lat1 = a.lat * toRad;
+    const lat2 = b.lat * toRad;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function animateMarkerTo(id, toLat, toLon, duration = ANIM_MS) {
+    if (typeof toLat !== 'number' || typeof toLon !== 'number') return;
+    const current = displayPositions[id];
+    const from = current && typeof current.lat === 'number' && typeof current.lon === 'number' ? current : null;
+    if (!from) {
+        // No current display state; snap to target to establish baseline
+        setDisplayPos(id, toLat, toLon);
+        return;
+    }
+    const dist = distanceMeters(from, { lat: toLat, lon: toLon });
+    if (!Number.isFinite(dist) || dist > JUMP_CUTOFF_METERS) {
+        // Large jump or invalid; snap without animating
+        setDisplayPos(id, toLat, toLon);
+        return;
+    }
+    const startLat = from.lat;
+    const startLon = from.lon;
+    const dLat = toLat - startLat;
+    const dLon = toLon - startLon;
+    const startTime = performance?.now ? performance.now() : Date.now();
+    const prev = animations.get(id);
+    if (prev?.raf) {
+        try { cancelAnimationFrame(prev.raf); } catch {}
+    }
+    const anim = { raf: 0 };
+    const step = (now) => {
+        const tRaw = Math.min(1, ((now ?? (performance?.now ? performance.now() : Date.now())) - startTime) / duration);
+        const t = tRaw < 0 ? 0 : tRaw;
+        const e = easeInOutCubic(t);
+        setDisplayPos(id, startLat + dLat * e, startLon + dLon * e);
+        if (t < 1) {
+            anim.raf = requestAnimationFrame(step);
+        } else {
+            animations.delete(id);
+        }
+    };
+    animations.set(id, anim);
+    anim.raf = requestAnimationFrame(step);
+}
+
 function trackingId(v) {
     return v.device_id ?? v.deviceId ?? (v.tcDevice?.id ?? v.tc_device?.id) ?? (typeof v.id === 'number' ? v.id : null);
 }
@@ -238,9 +306,13 @@ function deviceName(v) {
 // Merge realtime positions into the vehicles list (dedupe by tracking device id)
 function applyRealtimePositions(list) {
     const base = new Map();
+    const before = new Map();
     for (const v of vehicles.value) {
         const key = trackingId(v);
-        if (key != null) base.set(key, v);
+        if (key != null) {
+            base.set(key, v);
+            before.set(key, v);
+        }
     }
     list.forEach(p => {
         const id = p.id ?? p.deviceId ?? null; // positions payload uses tracking device id
@@ -295,6 +367,24 @@ function applyRealtimePositions(list) {
         base.set(id, existing);
     });
     vehicles.value = Array.from(base.values());
+
+    // Kick off marker animations towards new positions for updated devices
+    list.forEach(p => {
+        const id = p.id ?? p.deviceId ?? null;
+        const toLatRaw = p.latitude ?? p.lat ?? null;
+        const toLonRaw = p.longitude ?? p.lon ?? null;
+        const toLat = typeof toLatRaw === 'string' ? parseFloat(toLatRaw) : toLatRaw;
+        const toLon = typeof toLonRaw === 'string' ? parseFloat(toLonRaw) : toLonRaw;
+        if (!id || !Number.isFinite(toLat) || !Number.isFinite(toLon)) return;
+        if (!displayPositions[id]) {
+            const prevV = before.get(id);
+            const prevPos = prevV ? getPosition(prevV) : null;
+            if (prevPos && typeof prevPos.lat === 'number' && typeof prevPos.lon === 'number') {
+                setDisplayPos(id, prevPos.lat, prevPos.lon);
+            }
+        }
+        animateMarkerTo(id, toLat, toLon);
+    });
 }
 
 function getPosition(v) {
@@ -343,7 +433,11 @@ const markerItems = computed(() => {
     return filtered.value
         .map(v => {
             const { lat, lon } = getPosition(v);
-            return { id: deviceKey(v), lat, lon, popup: popupHtml(v) };
+            const id = deviceKey(v);
+            const disp = displayPositions[id];
+            const dlat = typeof disp?.lat === 'number' ? disp.lat : lat;
+            const dlon = typeof disp?.lon === 'number' ? disp.lon : lon;
+            return { id, lat: dlat, lon: dlon, popup: popupHtml(v) };
         })
         .filter(m => typeof m.lat === 'number' && typeof m.lon === 'number')
         .sort((a, b) => String(a.id).localeCompare(String(b.id)));
@@ -668,6 +762,10 @@ onBeforeUnmount(() => {
             visibilityHandler = null;
         }
         window.removeEventListener('resize', updatePanelVisibilityForViewport);
+    } catch {}
+    try {
+        animations.forEach(a => { if (a?.raf) cancelAnimationFrame(a.raf); });
+        animations.clear();
     } catch {}
 });
 </script>

@@ -26,6 +26,15 @@
               <input v-model="form.uniqueId" type="text" class="form-control" placeholder="VHCL-1016" />
             </div>
             <div class="col-12 col-md-4">
+              <label class="form-label small">Tracker Model</label>
+              <select v-model="form.attributes.trackerModel" class="form-select">
+                <option value="">-- Select Tracker Model --</option>
+                <option>Teltonika-FMC-003</option>
+                <option>Teltonika-FMC-150</option>
+                <option>Teltonika-FMC-130</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-4">
               <label class="form-label small">Device Name</label>
               <input v-model="form.name" type="text" class="form-control" placeholder="Device Name" />
             </div>
@@ -143,7 +152,8 @@ const form = reactive({
     vin: '',
     odometer: '',
     fuelAverage: '',
-    maxSpeed: ''
+    maxSpeed: '',
+    trackerModel: ''
   },
 
 });

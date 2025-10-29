@@ -35,6 +35,15 @@
               <label class="form-label small">Device ID ( EMIE )</label>
               <input v-model="form.uniqueId" type="text" class="form-control" placeholder="uniqueId" disabled />
             </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Tracker Model</label>
+              <select v-model="form.attributes.trackerModel" class="form-select">
+                <option value="">-- Select Tracker Model --</option>
+                <option>Teltonika-FMC-003</option>
+                <option>Teltonika-FMC-150</option>
+                <option>Teltonika-FMC-130</option>
+              </select>
+            </div>
 
             <div class="col-12 col-md-4">
               <label class="form-label small">Vehicle Type</label>
@@ -152,7 +161,8 @@ const form = reactive({
     vin: '',
     odometer: '',
     fuelAverage: '',
-    maxSpeed: ''
+    maxSpeed: '',
+    trackerModel: ''
   }
 });
 
@@ -225,6 +235,7 @@ function hydrateFormFromTc(tc) {
   form.attributes.odometer = attrs.odometer || attrs.totalDistance || '';
   form.attributes.fuelAverage = attrs.fuelAverage || '';
   form.attributes.maxSpeed = attrs.maxSpeed || attrs.speedLimit || '';
+  form.attributes.trackerModel = attrs.trackerModel || attrs.deviceModel || attrs.gpsModel || attrs.teltonikaModel || '';
 
   // Hydrate previews from existing attributes.photos if present
   const photosArr = Array.isArray(attrs.photos)
