@@ -185,8 +185,8 @@
                 <div class="card panel rounded-4 shadow-sm">
                     <div class="card-body">
                         <div class="vehicle-hero mb-3 rounded-3 overflow-hidden">
-                            <img src="https://images.unsplash.com/photo-1549924231-f129b911e442?q=80&w=1600&auto=format&fit=crop"
-                                alt="Camry" class="w-100" />
+                            <img v-if="photos && photos.length" :src="photoUrl(photos[0])" alt="Vehicle image" class="w-100" />
+                            <img v-else src="https://images.unsplash.com/photo-1549924231-f129b911e442?q=80&w=1600&auto=format&fit=crop" alt="Vehicle image" class="w-100" />
                         </div>
                         <h6 class="mb-3 panel-header">Vehicle Information</h6>
                         <div class="row g-3">
@@ -1074,7 +1074,14 @@ async function initWebsocket() {
 onMounted(async () => {
     mapReady.value = true;
     window.addEventListener('resize', handleResize);
-    await fetchDetail();
+    // Load both the base device (for tcDevice.attributes) and detail payload
+    try {
+        await Promise.all([fetchDevice(), fetchDetail()]);
+    } catch {
+        // Fallback sequential if parallel fails for any reason
+        try { await fetchDevice(); } catch {}
+        try { await fetchDetail(); } catch {}
+    }
     // Open the marker popup by default once the map and marker are ready
     try { await nextTick(); } catch {}
     try {
@@ -1114,7 +1121,10 @@ function parseAttrsMaybe(attr) {
     try { return typeof attr === 'string' ? JSON.parse(attr) : (attr || {}); } catch { return {}; }
 }
 // Merge attributes from raw device and position into one view model
-const deviceAttrs = computed(() => parseAttrsMaybe(detailPayload.value?.device?.attributes));
+// Prefer attributes from the base device (tcDevice.attributes), fallback to detail payload
+const deviceAttrsFromDetail = computed(() => parseAttrsMaybe(detailPayload.value?.device?.attributes));
+const deviceAttrsFromDevice = computed(() => parseAttrsMaybe(device.value?.tcDevice?.attributes));
+const deviceAttrs = computed(() => ({ ...deviceAttrsFromDevice.value, ...deviceAttrsFromDetail.value }));
 const positionAttrs = computed(() => parseAttrsMaybe(detailPayload.value?.position?.attributes));
 const tcAttrs = computed(() => ({ ...deviceAttrs.value, ...positionAttrs.value }));
 function pickAttr(keys) {
