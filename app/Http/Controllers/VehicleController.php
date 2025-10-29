@@ -18,8 +18,8 @@ class VehicleController extends Controller
         $user = $request->user();
         $role = (int) ($user->role ?? User::ROLE_ADMIN);
 
-        // Eager load tcDevice and its current position
-        $query = Devices::query()->with(['tcDevice.position']);
+        // Eager load tcDevice and its current position; include soft-deleted (blocked) devices
+        $query = Devices::withTrashed()->with(['tcDevice.position']);
 
         // Optional: scope strictly to current user's assignment when requested
         if ($request->boolean('mine')) {
@@ -401,27 +401,105 @@ class VehicleController extends Controller
 
     public function destroy(Request $request, int $deviceId)
     {
-        // Local-only soft delete; do not remove from tracking server
-        $device = Devices::withTrashed()->where('device_id', $deviceId)->first();
-        if (!$device) {
-            return response()->json(['message' => 'Vehicle not found'], 404);
+        // Soft delete by default (block). Use force=1 (or hard=1) to permanently delete remotely + locally.
+        $force = $request->boolean('force') || $request->boolean('hard');
+
+        if (!$force) {
+            // SOFT DELETE (block): mark local record as deleted, do not delete on tracking server
+            $device = Devices::where('device_id', $deviceId)->first();
+            if (!$device) {
+                return response()->json(['message' => 'Vehicle not found'], 404);
+            }
+            if (method_exists($device, 'trashed') && $device->trashed()) {
+                return response()->json(['message' => 'Vehicle already blocked'], 200);
+            }
+            try {
+                $device->delete();
+            } catch (\Throwable $e) {
+                Log::warning('Vehicle soft delete failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+                return response()->json([
+                    'message' => 'Failed to block vehicle',
+                    'error' => $e->getMessage(),
+                ], 500);
+            }
+            return response()->json(['message' => 'Vehicle blocked'], 200);
         }
 
-        if (method_exists($device, 'trashed') && $device->trashed()) {
-            return response()->json(['message' => 'Vehicle already soft-deleted'], 200);
-        }
+        // HARD DELETE: delete device on tracking server (Traccar), permanently remove local record,
+        // and clean up any locally stored vehicle photos referenced in attributes
 
+        // Load existing photo paths from local attributes
+        $existingPhotos = [];
         try {
-            $device->delete();
+            $row = Devices::with(['tcDevice'])->where('device_id', $deviceId)->first();
+            $tc = $row ? $row->tcDevice : null;
+            if ($tc && isset($tc->attributes)) {
+                $attrs = is_array($tc->attributes)
+                    ? $tc->attributes
+                    : (json_decode($tc->attributes, true) ?? []);
+                $photos = $attrs['photos'] ?? [];
+                $existingPhotos = array_values(array_filter(is_array($photos) ? $photos : [$photos]));
+            }
         } catch (\Throwable $e) {
-            Log::warning('Local device soft delete failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
-            return response()->json([
-                'message' => 'Failed to soft-delete vehicle locally',
-                'error' => $e->getMessage(),
-            ], 500);
+            Log::warning('Failed to read existing vehicle photos before delete', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
         }
 
-        return response()->json(['message' => 'Vehicle soft-deleted'], 200);
+        // 1) Attempt to delete on tracking server
+        try {
+            // DeviceService expects device_detail_id on the request
+            $request->merge(['device_detail_id' => $deviceId]);
+            $tracking = \App\Services\DeviceService::deviceDelete($request);
+        } catch (\Throwable $e) {
+            Log::warning('Tracking server delete call failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+            return response()->json([
+                'message' => 'Failed to delete device on tracking server',
+                'error' => $e->getMessage(),
+            ], 502);
+        }
+
+        // Accept 2xx as success; treat 404 (not found) as non-fatal (already deleted remotely)
+        $code = (int) ($tracking->responseCode ?? 0);
+        if (!($code >= 200 && $code < 300) && $code !== 404) {
+            return response()->json([
+                'message' => 'Failed to delete device on tracking server',
+                'code' => $code,
+            ], 502);
+        }
+
+        // 2) Clean up locally stored photos (ignore external URLs)
+        if (!empty($existingPhotos)) {
+            foreach ($existingPhotos as $p) {
+                try {
+                    $isExternal = is_string($p) && preg_match('/^https?:\/\//i', $p);
+                    if (!$isExternal && is_string($p) && trim($p) !== '') {
+                        Storage::disk('public')->delete($p);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to delete vehicle photo', ['path' => $p, 'device_id' => $deviceId, 'error' => $e->getMessage()]);
+                }
+            }
+        }
+
+        // 3) Permanently delete local record if present
+        $device = Devices::withTrashed()->where('device_id', $deviceId)->first();
+        if ($device) {
+            try {
+                // Ensure hard delete even if previously soft-deleted
+                $device->forceDelete();
+            } catch (\Throwable $e) {
+                Log::warning('Local device hard delete failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+                return response()->json([
+                    'message' => 'Deleted on tracking server, but failed to delete locally',
+                    'error' => $e->getMessage(),
+                ], 500);
+            }
+        }
+
+        return response()->json([
+            'message' => $code === 404
+                ? 'Vehicle deleted locally; not found on tracking server'
+                : 'Vehicle deleted from tracking server and locally',
+        ], 200);
     }
 
 
@@ -601,5 +679,42 @@ class VehicleController extends Controller
                 'to' => $to,
             ],
         ]);
+    }
+
+    /**
+     * Restore (activate) a soft-deleted vehicle.
+     */
+    public function restore(Request $request, int $deviceId)
+    {
+        $user = $request->user();
+        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
+
+        $query = \App\Models\Devices::withTrashed()->where('device_id', $deviceId);
+        if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
+            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
+        } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
+            $distId = $user->distributor_id ?? $user->id;
+            $query->where('distributor_id', $distId)->where('user_id', $user->id);
+        }
+
+        $device = $query->first();
+        if (!$device) {
+            return response()->json(['message' => 'Vehicle not found'], 404);
+        }
+        if (method_exists($device, 'trashed') && !$device->trashed()) {
+            return response()->json(['message' => 'Vehicle already active'], 200);
+        }
+
+        try {
+            $device->restore();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Vehicle restore failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+            return response()->json([
+                'message' => 'Failed to activate vehicle',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json(['message' => 'Vehicle activated'], 200);
     }
 }

@@ -101,6 +101,8 @@ Route::middleware('auth')->prefix('/web/vehicles')->group(function () {
     // Rating metrics derived from reports
     Route::get('/{deviceId}/rating', [\App\Http\Controllers\VehicleController::class, 'rating']);
     Route::put('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'update']);
+    // Restore a soft-deleted (blocked) vehicle
+    Route::patch('/{deviceId}/restore', [\App\Http\Controllers\VehicleController::class, 'restore']);
     Route::delete('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'destroy']);
 });
 
@@ -110,6 +112,8 @@ Route::middleware('auth')->prefix('/web/drivers')->group(function () {
     Route::get('/{driverId}', [\App\Http\Controllers\DriverController::class, 'show']);
     Route::post('/', [\App\Http\Controllers\DriverController::class, 'store']);
     Route::put('/{driverId}', [\App\Http\Controllers\DriverController::class, 'update']);
+    // Restore a soft-deleted (blocked) driver
+    Route::patch('/{driverId}/restore', [\App\Http\Controllers\DriverController::class, 'restore']);
     Route::delete('/{driverId}', [\App\Http\Controllers\DriverController::class, 'destroy']);
 
 });

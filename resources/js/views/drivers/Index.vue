@@ -57,6 +57,7 @@
                     <img v-if="row.avatarUrl" :src="row.avatarUrl" alt="Avatar" class="rounded-circle" style="width:32px;height:32px;object-fit:cover;" />
                     <i v-else class="bi bi-person-circle fs-5 text-muted"></i>
                     <span>{{ row.name }}</span>
+                    <span v-if="row.blocked" class="badge rounded-pill bg-danger ms-2">Blocked</span>
                   </div>
                 </td>
                 <td class="text-muted text-nowrap">{{ row.email }}</td>
@@ -72,7 +73,13 @@
                   <div class="btn-group btn-group-sm">
                     <button v-if="!isProd" class="btn btn-outline-primary" title="View" @click="openDetails(row)"><i class="bi bi-person-lines-fill"></i></button>
                     <button class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-outline-danger" title="Delete" @click="deleteDriver(row.id, row.name)" :disabled="deleting[row.id] === true">
+                    <button v-if="!row.blocked" class="btn btn-outline-warning" title="Block" @click="blockDriver(row.id, row.name)" :disabled="blocking[row.id] === true">
+                      <i class="bi bi-slash-circle"></i>
+                    </button>
+                    <button v-if="row.blocked" class="btn btn-outline-success" title="Activate" @click="activateDriver(row.id, row.name)" :disabled="activating[row.id] === true">
+                      <i class="bi bi-check-circle"></i>
+                    </button>
+                    <button v-if="row.blocked" class="btn btn-outline-danger" title="Permanent Delete" @click="deleteDriverPermanent(row.id, row.name)" :disabled="deleting[row.id] === true">
                       <i class="bi bi-trash"></i>
                     </button>
                   </div>
@@ -118,6 +125,8 @@ const loading = ref(false);
 const error = ref('');
 const rows = ref([]);
 const deleting = ref({});
+const blocking = ref({});
+const activating = ref({});
 const detailVisible = ref(false);
 const detailId = ref(null);
 function openDetails(row) {
@@ -128,6 +137,7 @@ function openDetails(row) {
 
 function formatDriver(d) {
   const attrs = d?.attributes || {};
+  const status  = (d?.deviceStatus || d?.status || attrs?.status || '-');
   return {
     id: d?.id ?? Math.random(),
     code: d?.uniqueId || (d?.id ? `DRV-${d.id}` : '-'),
@@ -137,9 +147,10 @@ function formatDriver(d) {
     licence: attrs?.licence || attrs?.license || '-',
     expiry: attrs?.licenseExpiry || '-',
     vehicle: d?.deviceName || d?.deviceUniqueId || attrs?.assignedVehicle || '-',
-    status: (d?.deviceStatus || d?.status || attrs?.status || '-'),
+    status: (status =="online") ? status :"offline",
     lastRide: attrs?.lastRide || '-',
     avatarUrl: d?.avatarImageUrl || (attrs?.avatarImage ? `/storage/${attrs.avatarImage}` : ''),
+    blocked: !!(d?.blocked || d?.deletedAt),
   };
 }
 
@@ -157,9 +168,34 @@ async function fetchDrivers() {
   }
 }
 
-async function deleteDriver(id, name) {
+async function blockDriver(id, name) {
   const result = await Swal.fire({
-    title: `Delete driver ${name || id}?`,
+    title: `Block driver ${name || id}?`,
+    text: 'This will hide the driver and mark as blocked.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Block',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#f59f00',
+  });
+  if (!result.isConfirmed) return;
+  blocking.value[id] = true;
+  error.value = '';
+  try {
+    await axios.delete(`/web/drivers/${id}`);
+    await Swal.fire({ title: 'Blocked', text: 'Driver has been blocked.', icon: 'success', timer: 1200, showConfirmButton: false });
+    fetchDrivers();
+  } catch (e) {
+    error.value = e?.response?.data?.message || 'Failed to block driver';
+    await Swal.fire({ title: 'Block failed', text: error.value, icon: 'error' });
+  } finally {
+    blocking.value[id] = false;
+  }
+}
+
+async function deleteDriverPermanent(id, name) {
+  const result = await Swal.fire({
+    title: `Permanently delete driver ${name || id}?`,
     text: 'This action cannot be undone.',
     icon: 'warning',
     showCancelButton: true,
@@ -171,11 +207,11 @@ async function deleteDriver(id, name) {
   deleting.value[id] = true;
   error.value = '';
   try {
-    await axios.delete(`/web/drivers/${id}`);
+    await axios.delete(`/web/drivers/${id}`, { params: { force: 1 } });
     rows.value = rows.value.filter(r => r.id !== id);
     await Swal.fire({
       title: 'Deleted',
-      text: 'Driver has been deleted.',
+      text: 'Driver has been permanently deleted.',
       icon: 'success',
       timer: 1400,
       showConfirmButton: false,
@@ -189,6 +225,31 @@ async function deleteDriver(id, name) {
     });
   } finally {
     deleting.value[id] = false;
+  }
+}
+
+async function activateDriver(id, name) {
+  const result = await Swal.fire({
+    title: `Activate driver ${name || id}?`,
+    text: 'This will restore the driver and show in the list.',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Activate',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#28a745',
+  });
+  if (!result.isConfirmed) return;
+  activating.value[id] = true;
+  error.value = '';
+  try {
+    await axios.patch(`/web/drivers/${id}/restore`);
+    await Swal.fire({ title: 'Activated', text: 'Driver has been activated.', icon: 'success', timer: 1200, showConfirmButton: false });
+    fetchDrivers();
+  } catch (e) {
+    error.value = e?.response?.data?.message || 'Failed to activate driver';
+    await Swal.fire({ title: 'Activate failed', text: error.value, icon: 'error' });
+  } finally {
+    activating.value[id] = false;
   }
 }
 
