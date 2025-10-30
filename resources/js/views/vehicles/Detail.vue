@@ -1010,11 +1010,10 @@ async function fetchPerformance() {
 
 async function fetchDetail() {
     try {
-        const { from, to } = getPreviousWeekRange();
-        const res = await axios.get(`/web/vehicles/${deviceId.value}/detail`, { params: { from, to } });
+        const res = await axios.get(`/web/vehicles/${deviceId.value}/detail`);
         const d = res.data?.detail || null;
         detailPayload.value = d;
-        console.log('ddddd response ',d);
+        // console.log('detail response', d);
         if (d) {
             // Seed map center and positions directly from detail payload.position
             const pos = d.position || null;
@@ -1032,7 +1031,6 @@ async function fetchDetail() {
                 const last = positions.value[positions.value.length - 1];
                 mapCenter.value = [last.latitude, last.longitude];
             }
-            weeklyTrips.value = Array.isArray(d.trips) ? d.trips : [];
             driversList.value = Array.isArray(d.drivers) ? d.drivers : [];
             driver.value = driversList.value.length ? driversList.value[0] : null;
         } else {
@@ -1225,23 +1223,17 @@ onMounted(async () => {
     pageLoading.value = true;
     mapReady.value = true;
     window.addEventListener('resize', handleResize);
-    // Load device options for switcher
-    try { await fetchDeviceOptions(); } catch {}
-    // Load both the base device (for tcDevice.attributes) and detail payload
-    try {
-        await Promise.all([fetchDevice(), fetchDetail()]);
-    } catch {
-        // Fallback sequential if parallel fails for any reason
-        try { await fetchDevice(); } catch {}
-        try { await fetchDetail(); } catch {}
-    }
+    // Start performance and trips in parallel (do not await for initial render)
+    const perfPromise = fetchPerformance();
+    const tripsPromise = fetchTripsByFilter();
+    // Load device options for switcher in background (do not await)
+    try { fetchDeviceOptions(); } catch {}
+    // Fetch core detail payload (device + position + drivers) and gate page render
+    try { await fetchDetail(); } catch {}
     // Subscribe to websocket updates for live tracking
     try { await initWebsocket(); } catch {}
     // Arm polling fallback in case sockets are unavailable
     armPollingFallback();
-    // Load trips for the selected preset
-    try { await fetchTripsByFilter(); } catch {}
-    try { await fetchPerformance(); } catch {}
     // If there is no position after data fetch, redirect back to list with message
     try {
         const hasPosition = Array.isArray(positions.value) && positions.value.length > 0
@@ -1261,6 +1253,8 @@ onMounted(async () => {
         }
     } catch {}
     pageLoading.value = false;
+    // Allow perf/trips promises to settle in background; errors are handled internally
+    try { await Promise.allSettled([perfPromise, tripsPromise]); } catch {}
 });
 
 onBeforeUnmount(() => {
@@ -1295,21 +1289,16 @@ watch(deviceId, async (newId, oldId) => {
     detailPayload.value = null;
     driver.value = null;
     rating.value = null;
-    // Refetch data for new device
-    try {
-        await Promise.all([fetchDevice(), fetchDetail()]);
-    } catch {
-        try { await fetchDevice(); } catch {}
-        try { await fetchDetail(); } catch {}
-    }
-    // Refresh performance dashboard
-    try { await fetchPerformance(); } catch {}
+    // Start perf and trips in parallel for new device
+    const perfPromise = fetchPerformance();
+    const tripsPromise = fetchTripsByFilter();
+    // Fetch core detail payload and gate render completion
+    try { await fetchDetail(); } catch {}
     // Reinit live updates and polling fallback
     try { await initWebsocket(); } catch {}
     armPollingFallback();
-    // Reload trips for current preset
-    try { await fetchTripsByFilter(); } catch {}
     pageLoading.value = false;
+    try { await Promise.allSettled([perfPromise, tripsPromise]); } catch {}
 });
 
 // If address becomes available later, open the popup automatically

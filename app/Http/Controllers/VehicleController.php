@@ -551,23 +551,21 @@ class VehicleController extends Controller
     }
 
     /**
-     * Device detail payload: latest position plus trips for a time window.
-     * Uses DeviceService::getDeviceDetailWithTrips and enforces role-based access.
+     * Device detail payload: latest position with device and drivers.
+     * Trips are fetched via the separate /trips endpoint to avoid delay.
      */
     public function detail(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
         $user = $request->user();
-        // Map options for trips time window
-        $options = [];
-        $from = $request->query('from');
-        $to = $request->query('to');
-        if ($from) { $options['from'] = $from; }
-        if ($to) { $options['to'] = $to; }
-        if ($request->boolean('includeRaw')) { $options['includeRaw'] = true; }
+        // Release session lock early to allow other concurrent requests (performance/trips)
+        try { if (PHP_SESSION_ACTIVE === session_status()) { @session_write_close(); } } catch (\Throwable $e) {}
+        // Simple timing instrumentation to help diagnose slow responses
+        $start = microtime(true);
+        $payload = app(\App\Services\DeviceService::class)->getDeviceDetailWithTrips($user, $deviceId, []);
+        $elapsedMs = (int) round((microtime(true) - $start) * 1000);
+        Log::info('Vehicle detail latency', ['deviceId' => $deviceId, 'ms' => $elapsedMs]);
 
-        $payload = app(\App\Services\DeviceService::class)->getDeviceDetailWithTrips($user, $deviceId, $options);
-
-        return response()->json(['detail' => $payload]);
+        return response()->json(['detail' => $payload, 'latencyMs' => $elapsedMs]);
     }
 
     /**
@@ -597,13 +595,18 @@ class VehicleController extends Controller
     public function trips(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
         $user = $request->user();
+        // Release session lock early to allow concurrency with other endpoints
+        try { if (PHP_SESSION_ACTIVE === session_status()) { @session_write_close(); } } catch (\Throwable $e) {}
+        $start = microtime(true);
         $options = [];
         $from = $request->query('from');
         $to = $request->query('to');
         if ($from) { $options['from'] = $from; }
         if ($to) { $options['to'] = $to; }
         $trips = app(\App\Services\DeviceService::class)->getTrips($user, $deviceId, $options);
-        return response()->json(['trips' => $trips]);
+        $elapsedMs = (int) round((microtime(true) - $start) * 1000);
+        Log::info('Vehicle trips latency', ['deviceId' => $deviceId, 'ms' => $elapsedMs]);
+        return response()->json(['trips' => $trips, 'latencyMs' => $elapsedMs]);
     }
 
     /**
@@ -736,6 +739,9 @@ class VehicleController extends Controller
      */
     public function performance(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
+        // Release session lock early to allow concurrency with detail/trips
+        try { if (PHP_SESSION_ACTIVE === session_status()) { @session_write_close(); } } catch (\Throwable $e) {}
+        $start = microtime(true);
         // Accept window; default last 7 days
         $from = $request->query('from', now()->subDays(7)->toDateTimeString());
         $to = $request->query('to', now()->toDateTimeString());
@@ -818,6 +824,7 @@ class VehicleController extends Controller
                 'from' => $from,
                 'to' => $to,
             ],
+            'latencyMs' => (int) round((microtime(true) - $start) * 1000),
         ]);
     }
 

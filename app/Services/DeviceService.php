@@ -275,33 +275,17 @@ class DeviceService
     }
 
     /**
-     * Fetch a single device from Traccar with its latest position and trips history.
+     * Fetch a single device from Traccar with its latest position and drivers list.
      *
-     * Input options:
-     * - from (string|int): start time (parseable string or timestamp). Defaults to now - 24h.
-     * - to (string|int): end time (parseable string or timestamp). Defaults to now.
-     * - includeRaw (bool): include raw Traccar device/position payloads.
-     *
-     * Returns a compact payload similar to live tracking, plus trips.
+     * Notes:
+     * - Trips are no longer included here; use getTrips() endpoint.
+     * - Time window filters are ignored to minimize response time.
+     * - includeRaw option is retained for future use but not required.
      */
     public function getDeviceDetailWithTrips(User $user, int $deviceId, array $options = []): array
     {
         $sessionId = $user->traccarSession ?? session('cookie');
         $includeRaw = (bool)($options['includeRaw'] ?? false);
-
-        // Resolve time window
-        $toIso = null;
-        $fromIso = null;
-        if (isset($options['to'])) {
-            $toIso = gmdate('Y-m-d\TH:i:00\Z', is_numeric($options['to']) ? (int)$options['to'] : strtotime((string)$options['to']));
-        } else {
-            $toIso = gmdate('Y-m-d\TH:i:00\Z');
-        }
-        if (isset($options['from'])) {
-            $fromIso = gmdate('Y-m-d\TH:i:00\Z', is_numeric($options['from']) ? (int)$options['from'] : strtotime((string)$options['from']));
-        } else {
-            $fromIso = gmdate('Y-m-d\TH:i:00\Z', strtotime('-1 day'));
-        }
 
         // Fetch device from Traccar
         $deviceResp = static::curl('/api/devices?id=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
@@ -314,9 +298,16 @@ class DeviceService
         // Fetch position if available
         $position = null;
         if (!empty($device['positionId'])) {
-            $posResp = static::curl('/api/positions/?deviceId=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+            // Use direct position id lookup for current position, which is faster than filtering by deviceId
+            $posId = $device['positionId'];
+            $posResp = static::curl('/api/positions?id=' . $posId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
             $posList = json_decode($posResp->response, true) ?? [];
-            $position = $posList[0] ?? null;
+            // Traccar may return an array with a single element or a single object; handle both
+            if (is_array($posList)) {
+                $position = isset($posList[0]) ? $posList[0] : (count($posList) ? $posList : null);
+            } else {
+                $position = $posList ?: null;
+            }
         }
 
         // Normalize attributes
@@ -352,17 +343,11 @@ class DeviceService
         $payload = [
             'device' => $device,
             'position' => $position,
-            'from' => $fromIso,
-            'to' => $toIso,
         ];
 
-        // Fetch trips history
-        $tripsResp = static::curl('/api/reports/trips?deviceId=' . $deviceId . '&from=' . $fromIso . '&to=' . $toIso, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
-        $trips = json_decode($tripsResp->response, true) ?? [];
-
-        $driverResp = static::curl('/api/drivers?deviceId='.$deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+        // Fetch drivers (assigned to this device)
+        $driverResp = static::curl('/api/drivers?deviceId=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
         $drivers = json_decode($driverResp->response, true) ?? [];
-        $payload['trips'] = $trips;
         $payload['drivers'] = $drivers;
 
         return $payload;
