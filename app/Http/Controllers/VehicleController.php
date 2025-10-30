@@ -728,6 +728,214 @@ class VehicleController extends Controller
     }
 
     /**
+     * Consolidated performance payload for dashboard:
+     * - Summary metrics (/api/reports/summary)
+     * - Severe events counts (/api/reports/events)
+     * - Maintenance status derived from /api/maintenances and /api/permissions
+     * - Overall rating: 100 - (harshBraking * 5)
+     */
+    public function performance(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        // Accept window; default last 7 days
+        $from = $request->query('from', now()->subDays(7)->toDateTimeString());
+        $to = $request->query('to', now()->toDateTimeString());
+
+        // Prepare payload for ReportService
+        $request->merge([
+            'device_id' => $deviceId,
+            'from_date' => $from,
+            'to_date' => $to,
+        ]);
+
+        // Summary/events/stops via ReportService
+        $first = null;
+        try {
+            $summaryList = $this->reportService->report_summary($request);
+            $first = is_iterable($summaryList) ? (collect($summaryList)->first() ?? null) : null;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Performance summary failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+        }
+
+        // Fallback when no summary
+        if (!$first) {
+            $first = [
+                'distance_km' => 0,
+                'spentFuel_litres' => 0,
+                'avgFuel_l_per_100km' => 0,
+                'engineHours' => 0,
+                'maxSpeed_kph' => 0,
+                'avgSpeed_kph' => 0,
+                'tripCount' => 0,
+                'stopCount' => 0,
+                'idleTime_minutes' => 0,
+                'harshBraking' => 0,
+                'harshAcceleration' => 0,
+                'overspeedEvents' => 0,
+            ];
+        }
+
+        // Current position attributes for maintenance math
+        $user = $request->user();
+        $position = null;
+        try {
+            $position = app(\App\Services\DeviceService::class)->getCurrentPosition($user, $deviceId);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Current position fetch failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+        }
+        $attrs = is_array($position) ? (is_array($position['attributes'] ?? null) ? $position['attributes'] : (json_decode($position['attributes'] ?? '[]', true) ?? [])) : [];
+        $odometerKm = $this->extractOdometerKm($attrs);
+        $engineHours = (float) ($first['engineHours'] ?? ($attrs['hours'] ?? 0));
+
+        // Maintenance status from /api/maintenances + /api/permissions
+        $maintenance = $this->computeMaintenanceStatus($request, $deviceId, $odometerKm, $engineHours);
+
+        // Overall rating per requirement
+        $harshBraking = (int) ($first['harshBraking'] ?? 0);
+        $overallRating = max(0, min(100, 100 - ($harshBraking * 5)));
+
+        return response()->json([
+            'performance' => [
+                'summary' => [
+                    'distance_km' => (float) ($first['distance_km'] ?? 0),
+                    'spentFuel_litres' => (float) ($first['spentFuel_litres'] ?? 0),
+                    'avgFuel_l_per_100km' => (float) ($first['avgFuel_l_per_100km'] ?? 0),
+                    'avgSpeed_kph' => (float) ($first['avgSpeed_kph'] ?? 0),
+                    'maxSpeed_kph' => (float) ($first['maxSpeed_kph'] ?? 0),
+                    'engineHours' => (float) ($first['engineHours'] ?? 0),
+                    'tripCount' => (int) ($first['tripCount'] ?? 0),
+                    'stopCount' => (int) ($first['stopCount'] ?? 0),
+                    'idleTime_minutes' => (float) ($first['idleTime_minutes'] ?? 0),
+                ],
+                'events' => [
+                    'harshBraking' => (int) ($first['harshBraking'] ?? 0),
+                    'harshAcceleration' => (int) ($first['harshAcceleration'] ?? 0),
+                    'overspeedEvents' => (int) ($first['overspeedEvents'] ?? 0),
+                ],
+                'maintenance' => $maintenance,
+                'rating' => [
+                    'overallScore' => $overallRating,
+                ],
+                'from' => $from,
+                'to' => $to,
+            ],
+        ]);
+    }
+
+    private function extractOdometerKm(array $attrs): float
+    {
+        $metersKeys = ['totalDistance', 'distance', 'odometer_m', 'tripDistance'];
+        $kmKeys = ['odometerKm', 'mileage'];
+        $numeric = function($v) { return is_numeric($v) ? (float)$v : null; };
+
+        foreach ($kmKeys as $k) {
+            if (array_key_exists($k, $attrs)) {
+                $val = $numeric($attrs[$k]);
+                if ($val !== null) return round($val, 2);
+            }
+        }
+        foreach ($metersKeys as $k) {
+            if (array_key_exists($k, $attrs)) {
+                $val = $numeric($attrs[$k]);
+                if ($val !== null) return round($val / 1000.0, 2);
+            }
+        }
+        // Some trackers store odometer as km directly
+        if (array_key_exists('odometer', $attrs) && is_numeric($attrs['odometer'])) {
+            $odo = (float) $attrs['odometer'];
+            // Heuristic: values > 100000 likely meters
+            return round(($odo >= 100000 ? ($odo / 1000.0) : $odo), 2);
+        }
+        return 0.0;
+    }
+
+    private function computeMaintenanceStatus(Request $request, int $deviceId, float $odometerKm, float $engineHours): array
+    {
+        $sessionId = $request->user()->traccarSession ?? session('cookie');
+        $headers = ['Content-Type: application/json', 'Accept: application/json'];
+
+        // Fetch maintenances
+        $maintRaw = static::curl('/api/maintenances', 'GET', $sessionId, '', $headers);
+        $maint = json_decode($maintRaw->response ?? '[]', true) ?? [];
+        // Fetch permissions to map maintenance -> device
+        $permRaw = static::curl('/api/permissions', 'GET', $sessionId, '', $headers);
+        $perms = json_decode($permRaw->response ?? '[]', true) ?? [];
+
+        $assignedIds = collect($perms)
+            ->filter(function ($p) use ($deviceId) {
+                return (int) ($p['deviceId'] ?? 0) === (int) $deviceId && isset($p['maintenanceId']);
+            })
+            ->pluck('maintenanceId')
+            ->unique()
+            ->values();
+
+        $schedules = collect($maint)
+            ->filter(function ($m) use ($assignedIds, $deviceId) {
+                $matchAssigned = $assignedIds->contains($m['id'] ?? null);
+                $directDevice = (int)($m['deviceId'] ?? 0) === (int) $deviceId;
+                return $matchAssigned || $directDevice;
+            })
+            ->values();
+
+        if ($schedules->isEmpty()) {
+            return [
+                'statusPercent' => 100,
+                'remainingKm' => null,
+                'remainingHours' => null,
+                'nextDueDays' => null,
+                'scheduleName' => null,
+                'message' => 'No maintenance schedule assigned',
+            ];
+        }
+
+        // Prefer odometer-based schedule; then hours; then time
+        $picked = $schedules->first(function ($m) { return strtolower($m['type'] ?? '') === 'odometer' || strtolower($m['type'] ?? '') === 'distance'; })
+            ?? $schedules->first(function ($m) { return strtolower($m['type'] ?? '') === 'enginehours' || strtolower($m['type'] ?? '') === 'hours'; })
+            ?? $schedules->first();
+
+        $type = strtolower($picked['type'] ?? '');
+        $periodRaw = (float) ($picked['period'] ?? 0);
+        $startRaw = $picked['start'] ?? null;
+
+        $statusPercent = 100.0;
+        $remainingKm = null;
+        $remainingHours = null;
+        $nextDueDays = null;
+
+        if (in_array($type, ['odometer', 'distance'])) {
+            $periodKm = $periodRaw >= 1000 ? ($periodRaw / 1000.0) : $periodRaw; // meters → km heuristic
+            $periodKm = max(1.0, $periodKm);
+            $sinceCycle = $odometerKm > 0 ? fmod($odometerKm, $periodKm) : 0.0;
+            $remainingKm = round(max(0.0, $periodKm - $sinceCycle), 1);
+            $statusPercent = round(($remainingKm / $periodKm) * 100.0, 1);
+        } elseif (in_array($type, ['enginehours', 'hours'])) {
+            $periodHours = max(1.0, $periodRaw);
+            $sinceCycle = $engineHours > 0 ? fmod($engineHours, $periodHours) : 0.0;
+            $remainingHours = round(max(0.0, $periodHours - $sinceCycle), 1);
+            $statusPercent = round(($remainingHours / $periodHours) * 100.0, 1);
+        } else {
+            // time-based (ms or seconds). Approximate in days using start.
+            $now = \Carbon\Carbon::now('UTC');
+            $start = $startRaw ? \Carbon\Carbon::parse($startRaw)->timezone('UTC') : $now->copy()->subDays((int) $periodRaw);
+            // Guess unit: if very large, assume milliseconds
+            $periodSeconds = $periodRaw >= 86400 * 365 ? ($periodRaw / 1000.0) : $periodRaw; // ms → s heuristic
+            $periodDays = max(1.0, $periodSeconds / 86400.0);
+            $elapsedDays = max(0.0, $now->diffInDays($start));
+            $sinceCycle = fmod($elapsedDays, $periodDays);
+            $nextDueDays = round(max(0.0, $periodDays - $sinceCycle), 1);
+            $statusPercent = round(($nextDueDays / $periodDays) * 100.0, 1);
+        }
+
+        return [
+            'statusPercent' => max(0.0, min(100.0, $statusPercent)),
+            'remainingKm' => $remainingKm,
+            'remainingHours' => $remainingHours,
+            'nextDueDays' => $nextDueDays,
+            'scheduleName' => $picked['name'] ?? null,
+            'type' => $picked['type'] ?? null,
+        ];
+    }
+
+    /**
      * Restore (activate) a soft-deleted vehicle.
      */
     public function restore(Request $request, int $deviceId)

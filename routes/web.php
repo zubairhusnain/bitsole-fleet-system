@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 Route::get('/testing', function () {
+
             try {
             // Raw SQL query to select all columns from the 'tc_users' table
             // We prepend the schema name 'omayer' to ensure the database
@@ -105,10 +106,13 @@ Route::middleware('auth')->prefix('/web/vehicles')->group(function () {
     Route::get('/{deviceId}/driver', [\App\Http\Controllers\VehicleController::class, 'driver']);
     // Rating metrics derived from reports
     Route::get('/{deviceId}/rating', [\App\Http\Controllers\VehicleController::class, 'rating']);
+    // Consolidated performance summary for dashboard (summary/events/maintenance)
+    Route::get('/{deviceId}/performance', [\App\Http\Controllers\VehicleController::class, 'performance']);
     Route::put('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'update']);
     // Restore a soft-deleted (blocked) vehicle
     Route::patch('/{deviceId}/restore', [\App\Http\Controllers\VehicleController::class, 'restore']);
     Route::delete('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'destroy']);
+
 });
 
 // NEW: Auth-protected Drivers CRUD & assignment

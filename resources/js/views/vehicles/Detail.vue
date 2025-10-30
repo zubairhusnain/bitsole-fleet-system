@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div v-if="!pageLoading">
         <div class="app-content-header mb-2">
             <ol class="breadcrumb mb-0 small text-muted">
                 <li class="breadcrumb-item">
@@ -309,79 +309,99 @@
                 </div>
             </div>
 
-            <!-- Right column: Vehicle Rating -->
+            <!-- Right column: Performance Dashboard -->
             <div class="col-12 col-lg-2">
                 <div class="card panel rounded-4 shadow-sm">
                     <div class="card-body">
                         <h6 class="mb-2">Vehicle Rating</h6>
-                        <div class="small text-muted mb-3">This rating reflects your vehicle during driving feel.</div>
+                        <div class="small text-muted mb-2">This rating reflects your vehicle during driving feel.</div>
+
+                        <div class="mb-2">
+                            <span v-if="loadingPerformance" class="text-muted xsmall d-inline-flex align-items-center">
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                Loading
+                            </span>
+                            <UiAlert :show="!!performanceError" :message="performanceError" variant="danger" dismissible @dismiss="performanceError = ''" />
+                        </div>
+
+                        <!-- Dynamic metrics sourced from Traccar summary/events -->
                         <div class="metric-item mb-2">
                             <div class="d-flex align-items-center">
                                 <i class="bi bi-fuel-pump me-2 metric-icon"></i>
                                 <div class="flex-grow-1">
                                     <div class="fw-semibold">Fuel Average</div>
-                                    <div class="small text-muted">8 km/h</div>
+                                    <div class="small text-muted">{{ (perfSummary.avgSpeed_kph ?? 0) }} km/h</div>
                                 </div>
                             </div>
                             <div class="progress progress-thin mt-2">
-                                <div class="progress-bar bg-primary" style="width: 74%"></div>
+                                <div class="progress-bar bg-primary" :style="{ width: perfSpeedPercent + '%' }"></div>
                             </div>
                         </div>
+
                         <div class="metric-item mb-2">
                             <div class="d-flex align-items-center">
-                                <i class="bi bi-thermometer-high me-2 metric-icon"></i>
+                                <i class="bi bi-thermometer-half me-2 metric-icon"></i>
                                 <div class="flex-grow-1">
-                                    <div class="fw-semibold">Heat up Gage</div>
-                                    <div class="small text-muted">74%</div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="fw-semibold">Heat up Gage</div>
+                                        <div class="small text-muted">{{ perfFuelPercent }}%</div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="progress progress-thin mt-2">
-                                <div class="progress-bar bg-warning" style="width: 74%"></div>
+                                <div class="progress-bar bg-warning" :style="{ width: perfFuelPercent + '%' }"></div>
                             </div>
                         </div>
+
                         <div class="metric-item mb-2">
                             <div class="d-flex align-items-center">
                                 <i class="bi bi-tools me-2 metric-icon"></i>
                                 <div class="flex-grow-1">
-                                    <div class="fw-semibold">Well Service</div>
-                                    <div class="small text-muted">100%</div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="fw-semibold">Well Service</div>
+                                        <div class="small text-muted">{{ wellServicePercent }}%</div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="progress progress-thin mt-2">
-                                <div class="progress-bar bg-success" style="width: 100%"></div>
+                                <div class="progress-bar bg-success" :style="{ width: wellServicePercent + '%' }"></div>
                             </div>
                         </div>
+
                         <div class="metric-item mb-2">
                             <div class="d-flex align-items-center">
                                 <i class="bi bi-shield-check me-2 metric-icon"></i>
                                 <div class="flex-grow-1">
-                                    <div class="fw-semibold">Tyre Condition</div>
-                                    <div class="small text-muted">97%</div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="fw-semibold">Tyre Condition</div>
+                                        <div class="small text-muted">{{ perfDistancePercent }}%</div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="progress progress-thin mt-2">
-                                <div class="progress-bar bg-info" style="width: 97%"></div>
+                                <div class="progress-bar bg-info" :style="{ width: perfDistancePercent + '%' }"></div>
                             </div>
                         </div>
+
                         <div class="metric-item mb-2">
                             <div class="d-flex align-items-center">
                                 <i class="bi bi-exclamation-triangle me-2 metric-icon"></i>
                                 <div class="flex-grow-1">
                                     <div class="fw-semibold">Brake failure</div>
-                                    <div class="small text-muted">20 Times</div>
+                                    <div class="small text-muted">{{ perfEvents.harshBraking ?? 0 }} Times</div>
                                 </div>
                             </div>
                             <div class="progress progress-thin mt-2">
-                                <div class="progress-bar bg-danger" style="width: 60%"></div>
+                                <div class="progress-bar bg-danger" :style="{ width: perfBrakePercent + '%' }"></div>
                             </div>
                         </div>
+
                         <h6 class="mt-3 mb-1">Overall Rating</h6>
-                        <div class="small text-muted mb-2">Here's your overall rating showing how vehicle responded.
-                            Check it out above!</div>
+                        <div class="small text-muted mb-2">Here's your overall rating showing how vehicle responded. Check it out above!</div>
                         <div class="progress" style="height: 10px;">
-                            <div class="progress-bar" style="width: 82.4%"></div>
+                            <div class="progress-bar bg-primary" :style="{ width: perfOverallScore + '%' }"></div>
                         </div>
-                        <div class="text-end small fw-semibold mt-1 text-muted">82.4%</div>
+                        <div class="text-end small fw-semibold mt-1 text-muted">{{ perfOverallScore.toFixed(1) }}%</div>
                     </div>
                 </div>
             </div>
@@ -725,6 +745,11 @@
             </div>
         </div>
     </div>
+    <div v-else class="d-flex align-items-center justify-content-center" style="min-height: 50vh;">
+        <div class="spinner-border text-primary" role="status" aria-live="polite" aria-busy="true">
+            <span class="visually-hidden">Loading…</span>
+        </div>
+    </div>
 </template>
 
 <script setup>
@@ -765,6 +790,18 @@ const customToDate = ref('');
 const loadingTrips = ref(false);
 const detailPayload = ref(null);
 const driversList = ref([]);
+// Page-level loader to consolidate multiple loaders during initial render
+const pageLoading = ref(false);
+
+// Performance dashboard state
+const perfSummary = ref({});
+const perfEvents = ref({});
+const perfMaintenance = ref({});
+const loadingPerformance = ref(false);
+const performanceError = ref('');
+const perfOverallScoreRef = ref(0);
+
+// Removed demo placeholders; card now uses dynamic perfSummary/perfEvents/perfMaintenance
 
 const mapContainer = ref(null);
 const mapReady = ref(false);
@@ -938,6 +975,37 @@ function getPreviousWeekRange() {
     endPrev.setDate(startPrev.getDate() + 7);
     endPrev.setMilliseconds(-1);
     return { from: startPrev.toISOString(), to: endPrev.toISOString() };
+}
+
+function getPreviousMonthRange() {
+    const now = new Date();
+    const from = new Date(now);
+    from.setMonth(from.getMonth() - 1);
+    const start = startOfDay(from);
+    const end = endOfDay(now);
+    return { from: start.toISOString(), to: end.toISOString() };
+}
+
+async function fetchPerformance() {
+    loadingPerformance.value = true;
+    performanceError.value = '';
+    try {
+        const id = deviceId.value;
+        const { from, to } = getPreviousMonthRange();
+        const params = { from, to };
+        const res = await axios.get(`/web/vehicles/${id}/performance`, { params });
+        const perf = res.data?.performance || res.data || {};
+        perfSummary.value = perf.summary || {};
+        perfEvents.value = perf.events || {};
+        perfMaintenance.value = perf.maintenance || {};
+        const harsh = Number(perfEvents.value?.harshBraking ?? 0);
+        const score = Number(perf?.rating?.overallScore ?? (100 - (harsh * 5)));
+        perfOverallScoreRef.value = Math.max(0, Math.min(100, score));
+    } catch (e) {
+        performanceError.value = e?.response?.data?.message || 'Failed to load performance.';
+    } finally {
+        loadingPerformance.value = false;
+    }
 }
 
 async function fetchDetail() {
@@ -1154,6 +1222,7 @@ function armPollingFallback() {
 
 // Static view enhanced: fetch detail for dynamic content and weekly trips
 onMounted(async () => {
+    pageLoading.value = true;
     mapReady.value = true;
     window.addEventListener('resize', handleResize);
     // Load device options for switcher
@@ -1172,6 +1241,7 @@ onMounted(async () => {
     armPollingFallback();
     // Load trips for the selected preset
     try { await fetchTripsByFilter(); } catch {}
+    try { await fetchPerformance(); } catch {}
     // If there is no position after data fetch, redirect back to list with message
     try {
         const hasPosition = Array.isArray(positions.value) && positions.value.length > 0
@@ -1190,6 +1260,7 @@ onMounted(async () => {
             mk?.openPopup?.();
         }
     } catch {}
+    pageLoading.value = false;
 });
 
 onBeforeUnmount(() => {
@@ -1212,6 +1283,7 @@ watch(tripRangePreset, (val) => {
 // React to device changes by refetching all detail data and rewiring live updates
 watch(deviceId, async (newId, oldId) => {
     selectedDeviceId.value = newId;
+    pageLoading.value = true;
     // Unsubscribe previous socket and stop polling
     try { if (typeof unsubEcho === 'function') unsubEcho(); } catch {}
     try { stopPositionsPolling(); } catch {}
@@ -1230,11 +1302,14 @@ watch(deviceId, async (newId, oldId) => {
         try { await fetchDevice(); } catch {}
         try { await fetchDetail(); } catch {}
     }
+    // Refresh performance dashboard
+    try { await fetchPerformance(); } catch {}
     // Reinit live updates and polling fallback
     try { await initWebsocket(); } catch {}
     armPollingFallback();
     // Reload trips for current preset
     try { await fetchTripsByFilter(); } catch {}
+    pageLoading.value = false;
 });
 
 // If address becomes available later, open the popup automatically
@@ -1728,6 +1803,46 @@ const overspeedPercent = computed(() => {
     return Math.min(100, Math.max(0, Math.round(o * 4)));
 });
 const overallScoreDisplay = computed(() => `${Math.round(Number(rating.value?.overallScore ?? 0))}%`);
+
+// Performance dashboard computed metrics
+const perfFuelPercent = computed(() => {
+    const f = Number(perfSummary.value?.avgFuel_l_per_100km ?? 0);
+    const target = 15;
+    return Math.min(100, Math.max(0, Math.round((f / target) * 100)));
+});
+const perfSpeedPercent = computed(() => {
+    const s = Number(perfSummary.value?.avgSpeed_kph ?? 0);
+    return Math.min(100, Math.max(0, Math.round((s / 120) * 100)));
+});
+const perfDistancePercent = computed(() => {
+    const d = Number(perfSummary.value?.distance_km ?? 0);
+    const target = 500; // normalize against 500km window
+    return Math.min(100, Math.max(0, Math.round((d / target) * 100)));
+});
+const wellServicePercent = computed(() => {
+    const p = Number(perfMaintenance.value?.statusPercent ?? 0);
+    return Math.min(100, Math.max(0, Math.round(p)));
+});
+const wellServiceLabel = computed(() => {
+    const name = perfMaintenance.value?.scheduleName || '';
+    const remKm = perfMaintenance.value?.remainingKm;
+    const remHr = perfMaintenance.value?.remainingHours;
+    const days = perfMaintenance.value?.nextDueDays;
+    const parts = [];
+    if (Number.isFinite(remKm)) parts.push(`${Math.round(remKm)} km left`);
+    if (Number.isFinite(remHr)) parts.push(`${Math.round(remHr)} h left`);
+    if (Number.isFinite(days)) parts.push(`${Math.round(days)} days`);
+    const suffix = parts.length ? parts.join(', ') : 'Up to date';
+    return name ? `${name} • ${suffix}` : suffix;
+});
+const perfBrakePercent = computed(() => {
+    const b = Number(perfEvents.value?.harshBraking ?? 0);
+    return Math.min(100, Math.max(0, Math.round(b * 5)));
+});
+const perfOverallScore = computed(() => {
+    const s = Number(perfOverallScoreRef.value ?? 0);
+    return Math.min(100, Math.max(0, s));
+});
 
 // Comparison rows: static vs dynamic
 const comparisons = computed(() => ([
