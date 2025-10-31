@@ -243,7 +243,7 @@
                                 <div class="fw-semibold">{{ totalDistanceDisplay }}</div>
                             </div>
                             <div class="col-6 col-md-3">
-                                <div class="text-muted small">Fuel</div>
+                                <div class="text-muted small">Fuel Average</div>
                                 <div class="fw-semibold">{{ fuelAverage ? (fuelAverage + ' L/100km') : '-' }}</div>
                             </div>
                              <div class="col-6 col-md-3">
@@ -254,6 +254,10 @@
                                 <div class="text-muted small">Map Link</div>
                                 <a v-if="liveLocationUrl" :href="liveLocationUrl" target="_blank" rel="noopener" class="fw-semibold text-primary text-decoration-underline">Live Location</a>
                                 <span v-else class="fw-semibold text-muted">Live Location</span>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="text-muted small">Fuel Level</div>
+                                <div class="fw-semibold">{{ fuelLevelDisplay }}</div>
                             </div>
                         </div>
                     </div>
@@ -566,32 +570,34 @@
                                 <h6 class="mb-0">Tracking Information</h6>
                             </div>
                             <div class="card-body">
-                                <dl class="row mb-0">
-                                    <dt class="col-5 text-muted small">Ignition</dt>
-                                    <dd class="col-7 small mb-2">{{ ignitionLabel }}</dd>
-                                    <dt class="col-5 text-muted small">Speed</dt>
-                                    <dd class="col-7 small mb-2">{{ speedDisplay }}</dd>
-                                    <dt class="col-5 text-muted small">Device Temperature</dt>
-                                    <dd class="col-7 small mb-2">{{ temperatureDisplay }}</dd>
-                                    <dt class="col-5 text-muted small">Device Battery</dt>
-                                    <dd class="col-7 small mb-2">{{ batteryDisplay }}</dd>
-                                    <dt class="col-5 text-muted small">Odometer</dt>
-                                    <dd class="col-7 small mb-2">{{ odometerDisplay }}</dd>
-                                    <dt class="col-5 text-muted small">Fuel Average</dt>
-                                    <dd class="col-7 small mb-2">{{ fuelAverage ? fuelAverage + ' L/100km' : '-' }}</dd>
-                                    <dt class="col-5 text-muted small">Max Speed</dt>
-                                    <dd class="col-7 small mb-2">{{ maxSpeed ? maxSpeed + ' km/h' : '-' }}</dd>
-                                    <dt class="col-5 text-muted small">Speed Limit</dt>
-                                    <dd class="col-7 small mb-2">{{ speedLimit ? speedLimit + ' km/h' : '-' }}</dd>
-                                    <dt class="col-5 text-muted small">Device Source</dt>
-                                    <dd class="col-7 small mb-2">{{ deviceSourceLabel }}</dd>
-                                    <dt class="col-5 text-muted small">Location</dt>
-                                    <dd class="col-7 small mb-2">{{ currentAddress || '-' }}</dd>
-                                    <dt class="col-5 text-muted small">Coordinates</dt>
-                                    <dd class="col-7 small mb-2">{{ coordsDisplay }}</dd>
-                                    <dt class="col-5 text-muted small">Last Report</dt>
-                                    <dd class="col-7 small mb-2">{{ lastUpdateDisplay }}</dd>
-                                </dl>
+                            <dl class="row mb-0">
+                                <dt class="col-5 text-muted small">Ignition</dt>
+                                <dd class="col-7 small mb-2">{{ ignitionLabel }}</dd>
+                                <dt class="col-5 text-muted small">Speed</dt>
+                                <dd class="col-7 small mb-2">{{ speedDisplay }}</dd>
+                                <dt class="col-5 text-muted small">Device Temperature</dt>
+                                <dd class="col-7 small mb-2">{{ temperatureDisplay }}</dd>
+                                <dt class="col-5 text-muted small">Device Battery</dt>
+                                <dd class="col-7 small mb-2">{{ batteryDisplay }}</dd>
+                                <dt class="col-5 text-muted small">Odometer</dt>
+                                <dd class="col-7 small mb-2">{{ odometerDisplay }}</dd>
+                                <dt class="col-5 text-muted small">Fuel Level</dt>
+                                <dd class="col-7 small mb-2">{{ fuelLevelDisplay }}</dd>
+                                <dt class="col-5 text-muted small">Fuel Average</dt>
+                                <dd class="col-7 small mb-2">{{ fuelAverage ? fuelAverage + ' L/100km' : '-' }}</dd>
+                                <dt class="col-5 text-muted small">Max Speed</dt>
+                                <dd class="col-7 small mb-2">{{ maxSpeed ? maxSpeed + ' km/h' : '-' }}</dd>
+                                <dt class="col-5 text-muted small">Speed Limit</dt>
+                                <dd class="col-7 small mb-2">{{ speedLimit ? speedLimit + ' km/h' : '-' }}</dd>
+                                <dt class="col-5 text-muted small">Device Source</dt>
+                                <dd class="col-7 small mb-2">{{ deviceSourceLabel }}</dd>
+                                <dt class="col-5 text-muted small">Location</dt>
+                                <dd class="col-7 small mb-2">{{ currentAddress || '-' }}</dd>
+                                <dt class="col-5 text-muted small">Coordinates</dt>
+                                <dd class="col-7 small mb-2">{{ coordsDisplay }}</dd>
+                                <dt class="col-5 text-muted small">Last Report</dt>
+                                <dd class="col-7 small mb-2">{{ lastUpdateDisplay }}</dd>
+                            </dl>
                             </div>
                         </div>
                     </div>
@@ -759,6 +765,7 @@ import axios from 'axios';
 import { LMap, LTileLayer, LMarker, LPolyline, LPopup } from '@vue-leaflet/vue-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { formatTelemetry } from '../../utils/telemetry';
 import { getCurrentUser } from '../../auth';
 import UiAlert from '../../components/UiAlert.vue';
 
@@ -1349,27 +1356,18 @@ function pickAttrWithKey(keys) {
 
 const plate = computed(() => pickAttr(['plate', 'registration', 'regNumber']));
 const vin = computed(() => pickAttr(['vin', 'VIN']));
-// Odometer from position attributes with unit handling (meters→km)
-const odometerInfo = computed(() => positionPickAttrWithKey([
-    'odometer', 'mileage', 'odometerKm', 'odometer_km',
-    'totalDistance', 'distance', 'odometer_m', 'tripDistance'
-]));
-const odometerKm = computed(() => {
-    const info = odometerInfo.value;
-    const key = String(info.key || '').toLowerCase();
-    const raw = info.value;
-    if (raw == null || raw === '') return null;
-    const n = extractNumber(raw);
-    if (!Number.isFinite(n)) return null;
-    const isMeters = key.includes('distance') || key.endsWith('_m') || key.includes('meter');
-    const km = isMeters ? (n / 1000) : n;
-    return km;
-});
+// Odometer display via shared telemetry formatter
 const odometerDisplay = computed(() => {
-    const km = odometerKm.value;
-    if (km == null) return '-';
-    const rounded = km >= 100 ? Math.round(km) : Math.round(km * 10) / 10;
-    return `${rounded} km`;
+    const pos = detailPayload.value?.position || {};
+    const tel = formatTelemetry(pos?.attributes, { protocol: pos?.protocol, model: model.value });
+    return tel?.odometer?.display ?? '-';
+});
+
+// Fuel display via shared telemetry formatter
+const fuelLevelDisplay = computed(() => {
+    const pos = detailPayload.value?.position || {};
+    const tel = formatTelemetry(pos?.attributes, { protocol: pos?.protocol, model: model.value });
+    return tel?.fuel?.display ?? '-';
 });
 // Total Distance from position attributes, prioritize totalDistance and related keys
 const totalDistanceInfo = computed(() => positionPickAttrWithKey([

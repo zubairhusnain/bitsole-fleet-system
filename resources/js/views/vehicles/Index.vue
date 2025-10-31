@@ -46,7 +46,7 @@
                                 <th class="fw-semibold py-2">Odometer</th>
                                 <th class="fw-semibold py-2">Ignition</th>
                                 <th class="fw-semibold py-2">Speed (Km/h)</th>
-                                <th class="fw-semibold py-2">Location</th>
+                                <th class="fw-semibold py-2">Fuel Level</th>
                                 <th class="fw-semibold py-2 text-end">Actions</th>
                             </tr>
                         </thead>
@@ -72,7 +72,7 @@
                                         {{ row.speed ?? '—' }}
                                     </span>
                                 </td>
-                                <td class="text-muted text-nowrap">{{ row.location ?? '—' }}</td>
+                                <td class="text-muted text-nowrap">{{ row.fuel ?? '—' }}</td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
                                         <button v-if="!row.blocked" class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i
@@ -126,6 +126,7 @@ import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
 import Swal from 'sweetalert2';
 import UiAlert from '../../components/UiAlert.vue';
+import { formatTelemetry } from '../../utils/telemetry';
 
 const router = useRouter();
 const route = useRoute();
@@ -215,21 +216,10 @@ function deriveRow(r) {
     const name = r.name ?? tc.name ?? pickAttr(attrs, ['name']);
     const vin = r.vin ?? pickAttr(attrs, ['vin', 'VIN']);
     const plate = r.plate ?? pickAttr(attrs, ['plate', 'licensePlate', 'registration', 'regNumber']);
-    // Odometer: support various attribute keys and convert meters to km when needed
-    const odoKeys = ['odometer', 'mileage', 'odometerKm', 'odometer_km', 'totalDistance', 'distance', 'odometer_m', 'tripDistance'];
-    let odoInfo = pickAttrWithKey(posAttrs, odoKeys);
-    if (!odoInfo.key) { odoInfo = pickAttrWithKey(attrs, odoKeys); }
-    let odometer = null;
-    if (odoInfo.key) {
-        const keyLower = String(odoInfo.key).toLowerCase();
-        const n = extractNumber(odoInfo.value);
-        if (Number.isFinite(n)) {
-            const isMeters = keyLower.includes('distance') || keyLower.endsWith('_m') || keyLower.includes('meter');
-            const km = isMeters ? (n / 1000) : n;
-            const rounded = km >= 100 ? Math.round(km) : Math.round(km * 10) / 10;
-            odometer = `${rounded} km`;
-        }
-    }
+    const model = r.model ?? tc.model ?? pickAttr(attrs, ['model']);
+    // Odometer via shared telemetry formatter (position-first, protocol-aware)
+    const tel = formatTelemetry(pos.attributes, { protocol: pos.protocol, model });
+    const odometer = tel?.odometer?.display ?? null;
     // ignition: prefer tc.position.attributes.ignition, fallback to tc_device.attributes
     const ignRaw = posAttrs.ignition ?? (r.ignition ?? pickAttr(attrs, ['ignition', 'Ignition']));
     const ignition = ignRaw === true || ignRaw === 1 || String(ignRaw).toLowerCase() === 'on'
@@ -257,9 +247,10 @@ function deriveRow(r) {
         coords = `${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}`;
     }
     const location = pos.address ?? (r.location ?? pickAttr(attrs, ['address', 'location'])) ?? coords;
+    const fuel = tel?.fuel?.display ?? null;
 
     const blocked = !!(r?.deleted_at || r?.deletedAt || r?.blocked);
-    return { ...r, uniqueid, name, vin, plate, odometer, ignition, speed, location, blocked };
+    return { ...r, uniqueid, name, vin, plate, model, odometer, ignition, speed, location, fuel, blocked };
 }
 
 async function block(row) {

@@ -98,6 +98,7 @@ import { getCurrentUser, clearAuthCache } from '../../auth';
 import { LMap, LTileLayer, LMarker, LPopup, LCircle } from '@vue-leaflet/vue-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { formatTelemetry } from '../../utils/telemetry';
 
 const map = ref(null);
 const markerRefs = new Map();
@@ -286,7 +287,7 @@ function animateMarkerTo(id, toLat, toLon, duration = ANIM_MS) {
 }
 
 function trackingId(v) {
-    return v.device_id ?? v.deviceId ?? (v.tcDevice?.id ?? v.tc_device?.id) ?? (typeof v.id === 'number' ? v.id : null);
+    return v.device_id ?? v.deviceId ?? (typeof v.id === 'number' ? v.id : null);
 }
 
 function cryptoRandomId() {
@@ -299,7 +300,7 @@ function deviceKey(v) {
 }
 
 function deviceName(v) {
-    const n = v.name ?? (v.tcDevice?.name ?? v.tc_device?.name);
+    const n = v.name;
     return typeof n === 'string' && n.trim() ? n : 'Unknown';
 }
 
@@ -332,37 +333,29 @@ function applyRealtimePositions(list) {
             },
         };
         existing.name = existing.name || p.name;
-        // Attach lightweight tcDevice stub for display fields when missing
-        if (!existing.tcDevice) {
-            existing.tcDevice = { id, name: existing.name };
-        }
         // Preserve uniqueId when provided by backend positions payloads
-        if (p.uniqueId && !existing.tcDevice.uniqueId) {
-            existing.tcDevice.uniqueId = p.uniqueId;
+        if (p.uniqueId && !existing.uniqueId) {
+            existing.uniqueId = p.uniqueId;
         }
-        // Update lastUpdate from backend payload (tcDevice)
+        // Update lastUpdate from backend payload
         if (p.lastUpdate) {
-            existing.tcDevice.lastUpdate = p.lastUpdate;
+            existing.lastUpdate = p.lastUpdate;
         }
-        // Only set status when payload explicitly provides tc_devices-style status
+        // Derive status from payload
         if (p.status && ['online','offline','unknown'].includes(String(p.status).toLowerCase())) {
-            existing.tcDevice.status = String(p.status).toLowerCase();
-        }
-        // Fallback: derive status from p.online or serverTime when p.status missing
-        if (!existing.tcDevice.status) {
-            if (typeof p.online === 'boolean') {
-                existing.tcDevice.status = p.online ? 'online' : 'offline';
-            } else if (p.serverTime) {
-                const t = Date.parse(p.serverTime);
-                if (!Number.isNaN(t)) {
-                    const isRecent = (Date.now() - t) <= (60 * 60 * 1000);
-                    existing.tcDevice.status = isRecent ? 'online' : 'offline';
-                }
+            existing.status = String(p.status).toLowerCase();
+        } else if (typeof p.online === 'boolean') {
+            existing.status = p.online ? 'online' : 'offline';
+        } else if (p.serverTime) {
+            const t = Date.parse(p.serverTime);
+            if (!Number.isNaN(t)) {
+                const isRecent = (Date.now() - t) <= (60 * 60 * 1000);
+                existing.status = isRecent ? 'online' : 'offline';
             }
         }
         // Preserve device-level attributes for UI (image, meta)
-        if (p.attributes && !existing.tcDevice.attributes) {
-            existing.tcDevice.attributes = p.attributes;
+        if (p.attributes && !existing.attributes) {
+            existing.attributes = p.attributes;
         }
         base.set(id, existing);
     });
@@ -388,8 +381,7 @@ function applyRealtimePositions(list) {
 }
 
 function getPosition(v) {
-    const dev = v.tcDevice || v.tc_device || {};
-    const pos = dev.position || dev.tcPosition || dev.tc_position || v.position || v.tcPosition || v.tc_position || v.positionData || {};
+    const pos = v.position || v.positionData || {};
     const latRaw = pos.latitude ?? pos.lat ?? pos.y ?? null;
     const lonRaw = pos.longitude ?? pos.lon ?? pos.x ?? null;
     const toNumber = (val) => {
@@ -414,8 +406,7 @@ function getPosition(v) {
 function hasLocation(v) {
     const { lat, lon } = getPosition(v);
     if (typeof lat === 'number' && typeof lon === 'number') return true;
-    const dev = v.tcDevice || v.tc_device || {};
-    const pid = v.positionId ?? v.positionid ?? dev.positionId ?? dev.positionid ?? null;
+    const pid = v.positionId ?? v.positionid ?? null;
     return pid != null;
 }
 
@@ -473,8 +464,7 @@ watch(
 );
 
 function getImage(v) {
-    const tc = v.tcDevice || v.tc_device || {};
-    const attrs = parseAttrs(tc.attributes);
+    const attrs = parseAttrs(v.attributes);
     const photos = attrs?.photos;
     let candidate = '';
 
@@ -491,10 +481,9 @@ function getImage(v) {
 }
 
 function statusText(v) {
-    const tc = v.tcDevice || v.tc_device || {};
     const pos = getPosition(v);
     const online = pos.raw?.attributes?.online;
-    if (typeof tc.status === 'string' && tc.status) return tc.status;
+    if (typeof v.status === 'string' && v.status) return v.status;
     if (online === false) return 'Inactive';
     const status = v.status || (pos.ignition === true ? (pos.speed > 0 ? 'moving' : 'idle') : (pos.ignition === false ? 'stopped' : null));
     return status || 'Unknown';
@@ -508,8 +497,7 @@ function statusClass(v) {
 }
 
 function statusValue(v) {
-    const tc = v.tcDevice || v.tc_device || {};
-    const rawStatus = typeof tc.status === 'string' ? tc.status.trim().toLowerCase() : '';
+    const rawStatus = typeof v.status === 'string' ? v.status.trim().toLowerCase() : '';
     if (['online','offline','unknown'].includes(rawStatus)) return rawStatus;
     const { raw } = getPosition(v);
     const online = raw?.attributes?.online;
@@ -524,60 +512,18 @@ function statusLabel(v) {
 
 // Extract fuel value from position attributes
 function fuelDisplay(v) {
-    const attrs = getPosition(v).raw?.attributes || {};
-    const candidates = [
-        'fuel', 'fuelLevel', 'fuel_level', 'fuellevel', 'fuelPercent', 'fuel_percent', 'fuelPct', 'fuel_ratio',
-    ];
-    let keyFound = null;
-    for (const k of candidates) {
-        if (k in attrs) { keyFound = k; break; }
-    }
-    if (!keyFound) {
-        // Fallback: any key that includes 'fuel'
-        for (const k in attrs) {
-            if (String(k).toLowerCase().includes('fuel')) { keyFound = k; break; }
-        }
-    }
-    if (!keyFound) return null;
-    const val = attrs[keyFound];
-    const num = typeof val === 'string' ? parseFloat(val) : (typeof val === 'number' ? val : null);
-    if (!Number.isFinite(num)) return null;
-    const keyLower = String(keyFound).toLowerCase();
-    const isPercent = keyLower.includes('percent') || keyLower.includes('pct') || keyLower.includes('ratio') || keyLower.includes('level');
-    if (isPercent) {
-        const pct = Math.max(0, Math.min(100, Math.round(num)));
-        return `${pct}%`;
-    }
-    const liters = Math.round(num * 10) / 10;
-    return `${liters} L`;
+    const pos = getPosition(v).raw || {};
+    const model = v.model || null;
+    const tel = formatTelemetry(pos.attributes, { protocol: pos.protocol, model });
+    return tel.fuel ? tel.fuel.display : null;
 }
 
 // Extract odometer from position attributes and format in km
 function odometerDisplay(v) {
-    const attrs = getPosition(v).raw?.attributes || {};
-    const primary = ['odometer', 'odometerKm', 'odometer_km'];
-    const distanceKeys = ['totalDistance', 'distance', 'tripDistance'];
-    let keyFound = null;
-    for (const k of [...primary, ...distanceKeys]) {
-        if (k in attrs) { keyFound = k; break; }
-    }
-    if (!keyFound) {
-        // Fallback: any key containing 'odometer' or 'distance'
-        for (const k in attrs) {
-            const kl = String(k).toLowerCase();
-            if (kl.includes('odometer') || kl.includes('distance')) { keyFound = k; break; }
-        }
-    }
-    if (!keyFound) return null;
-    const rawVal = attrs[keyFound];
-    const num = typeof rawVal === 'string' ? parseFloat(rawVal) : (typeof rawVal === 'number' ? rawVal : null);
-    if (!Number.isFinite(num)) return null;
-    const keyLower = String(keyFound).toLowerCase();
-    let km = num;
-    const looksMeters = distanceKeys.map(k => k.toLowerCase()).includes(keyLower) || (!keyLower.includes('km') && num > 1000);
-    if (looksMeters) km = num / 1000;
-    const rounded = Math.round(km * 10) / 10;
-    try { return `${rounded.toLocaleString()} km`; } catch { return `${rounded} km`; }
+    const pos = getPosition(v).raw || {};
+    const model = v.model || null;
+    const tel = formatTelemetry(pos.attributes, { protocol: pos.protocol, model });
+    return tel.odometer ? tel.odometer.display : null;
 }
 
 
@@ -597,15 +543,14 @@ function formatTime(val) {
 }
 
 function lastUpdate(v) {
-    const tc = v.tcDevice || v.tc_device || {};
     const pos = getPosition(v).raw || {};
-    return tc.lastUpdate || tc.lastupdate || pos.serverTime || pos.deviceTime || pos.fixTime || null;
+    // Prefer explicit device-level lastUpdate from the object, then position timestamps
+    return v.lastUpdate || v.lastupdate || pos.serverTime || pos.deviceTime || pos.fixTime || null;
 }
 
 function uniqueId(v) {
-    const tc = v.tcDevice || v.tc_device || {};
-    const attrs = parseAttrs(tc.attributes);
-    return v.uniqueId || v.uniqueid || tc.uniqueId || tc.uniqueid || attrs.uniqueId || attrs.uniqueid || null;
+    const attrs = parseAttrs(v.attributes);
+    return v.uniqueId || v.uniqueid || attrs.uniqueId || attrs.uniqueid || null;
 }
 
 function speedKmh(speed) {

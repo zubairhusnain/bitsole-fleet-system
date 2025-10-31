@@ -199,77 +199,96 @@ class DeviceService
             $positionMap = collect($positions)->keyBy('id');
         }
 
-        // Build compact devices-with-position payload
+        // Build compact devices-with-position payload using collection filter+map
         $now = now();
-        $positionsPayload = [];
-        foreach ($traccarDevices as $device) {
-            $position = $positionMap[$device['positionId']] ?? null;
-            if (!$position) { continue; }
+        $positionsPayload = collect($traccarDevices)
+            // Keep only devices that have a valid mapped position
+            ->filter(function ($device) use ($positionMap) {
+                $posId = $device['positionId'] ?? null;
+                return is_numeric($posId) && (int)$posId > 0 && $positionMap->has((int)$posId);
+            })
+            ->map(function ($device) use ($positionMap, $now, $includeRaw, $source) {
+                $posId = (int)($device['positionId'] ?? 0);
+                $position = $positionMap->get($posId) ?? null;
+                if (!$position) { return null; }
 
-            $attrs = [];
-            if (isset($position['attributes'])) {
-                $attrs = is_array($position['attributes']) ? $position['attributes'] : (json_decode($position['attributes'], true) ?? []);
-            }
+                $attrs = [];
+                if (isset($position['attributes'])) {
+                    $attrs = is_array($position['attributes']) ? $position['attributes'] : (json_decode($position['attributes'], true) ?? []);
+                }
 
-            $serverTimeRaw = $position['serverTime'] ?? ($position['servertime'] ?? null);
-            $serverTime = $serverTimeRaw ? \Carbon\Carbon::parse($serverTimeRaw) : null;
-            $online = $serverTime ? $serverTime->gte($now->copy()->subHour()) : false;
+                $serverTimeRaw = $position['serverTime'] ?? ($position['servertime'] ?? null);
+                $serverTime = $serverTimeRaw ? \Carbon\Carbon::parse($serverTimeRaw) : null;
+                $online = $serverTime ? $serverTime->gte($now->copy()->subHour()) : false;
 
-            $motion = isset($attrs['motion']) ? (int)$attrs['motion'] : null;
-            $ignition = $attrs['ignition'] ?? null;
+                $motion = isset($attrs['motion']) ? (int)$attrs['motion'] : null;
+                $ignition = $attrs['ignition'] ?? null;
 
-            $activity = 'noData';
-            if ($serverTime) {
-                if ($serverTime->lt($now->copy()->subHour())) {
-                    $activity = 'inActive';
-                } else {
-                    if ($motion === 1) {
-                        $activity = 'moving';
-                    } elseif ($ignition === 1 && $motion === 0) {
-                        $activity = 'idle';
-                    } elseif ($motion === 0 && $ignition === 0) {
-                        $activity = 'stopped';
+                $activity = 'noData';
+                if ($serverTime) {
+                    if ($serverTime->lt($now->copy()->subHour())) {
+                        $activity = 'inActive';
                     } else {
-                        $activity = 'noData';
+                        if ($motion === 1) {
+                            $activity = 'moving';
+                        } elseif ($ignition === 1 && $motion === 0) {
+                            $activity = 'idle';
+                        } elseif ($motion === 0 && $ignition === 0) {
+                            $activity = 'stopped';
+                        } else {
+                            $activity = 'noData';
+                        }
                     }
                 }
-            }
 
-            $statusRaw = strtolower(trim((string)($device['status'] ?? 'unknown')));
-            $deviceStatus = in_array($statusRaw, ['online','offline','unknown']) ? $statusRaw : 'unknown';
+                $statusRaw = strtolower(trim((string)($device['status'] ?? 'unknown')));
+                $deviceStatus = in_array($statusRaw, ['online','offline','unknown']) ? $statusRaw : 'unknown';
 
-            $payload = [
-                'id' => (int)$device['id'],
-                'name' => $device['name'] ?? ('Device #' . $device['id']),
-                'latitude' => $position['latitude'] ?? null,
-                'longitude' => $position['longitude'] ?? null,
-                'speed' => $position['speed'] ?? null,
-                'address' => $position['address'] ?? null,
-                'ignition' => $ignition,
-                'status' => ($deviceStatus === 'online') ? 'online' : 'offline',
-                'activity' => $activity,
-                'motion' => $motion,
-                'online' => $online,
-                'positionId' => $device['positionId'] ?? null,
-                'lastUpdate' => $device['lastUpdate'] ?? null,
-                'uniqueId' => ($device['uniqueId'] ?? $device['uniqueid'] ?? null),
-                'attributes' => $attrs,
-                'serverTime' => $serverTimeRaw,
-            ];
+                // Normalize coordinate types for frontend consumers
+                $latRaw = $position['latitude'] ?? null;
+                $lonRaw = $position['longitude'] ?? null;
+                $latitude = is_numeric($latRaw) ? (float)$latRaw : null;
+                $longitude = is_numeric($lonRaw) ? (float)$lonRaw : null;
 
-            if ($includeRaw) {
-                $payload['device'] = $device;
-                $payload['position'] = $position;
-            }
-            if ($source) {
-                $payload['source'] = $source;
-            }
+                $payload = [
+                    'id' => (int)$device['id'],
+                    'name' => $device['name'] ?? ('Device #' . $device['id']),
+                    'latitude' => $latitude,
+                    'longitude' => $longitude,
+                    'speed' => $position['speed'] ?? null,
+                    'address' => $position['address'] ?? null,
+                    'ignition' => $ignition,
+                    'status' => ($deviceStatus === 'online') ? 'online' : 'offline',
+                    'activity' => $activity,
+                    'motion' => $motion,
+                    'online' => $online,
+                    'positionId' => $device['positionId'] ?? null,
+                    'lastUpdate' => $device['lastUpdate'] ?? null,
+                    'uniqueId' => ($device['uniqueId'] ?? $device['uniqueid'] ?? null),
+                    'attributes' => $attrs,
+                    'serverTime' => $serverTimeRaw,
+                ];
 
-            // Filter out entries missing coordinates
-            if ($payload['latitude'] !== null && $payload['longitude'] !== null) {
-                $positionsPayload[] = $payload;
-            }
-        }
+                if ($includeRaw) {
+                    $payload['device'] = $device;
+                    $payload['position'] = $position;
+                }
+                if ($source) {
+                    $payload['source'] = $source;
+                }
+
+                // Return null entries to be filtered out later if coordinates missing
+                if ($payload['latitude'] === null || $payload['longitude'] === null) {
+                    return null;
+                }
+                return $payload;
+            })
+            // Filter out any nulls and ensure coordinates exist
+            ->filter(function ($p) {
+                return $p && $p['latitude'] !== null && $p['longitude'] !== null;
+            })
+            ->values()
+            ->all();
 
         return $positionsPayload;
     }
@@ -300,7 +319,7 @@ class DeviceService
         if (!empty($device['positionId'])) {
             // Use direct position id lookup for current position, which is faster than filtering by deviceId
             $posId = $device['positionId'];
-            $posResp = static::curl('/api/positions?id=' . $posId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+            $posResp = static::curl('/api/positions?deviceId=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
             $posList = json_decode($posResp->response, true) ?? [];
             // Traccar may return an array with a single element or a single object; handle both
             if (is_array($posList)) {

@@ -19,89 +19,23 @@ class LiveTrackingController extends Controller
     public function current(\Illuminate\Http\Request $request): JsonResponse
     {
         $user = $request->user();
-        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
+        $mine = $request->boolean('mine');
+        $deviceIdParam = $request->input('deviceId');
 
-        // Scope via local Devices mapping, eager load tcDevice + position
-        $query = \App\Models\Devices::query()->with(['tcDevice.position']);
+        // Fetch live devices directly from Traccar via DeviceService and map positions
+        $positions = app(\App\Services\DeviceService::class)->getLiveDevices($user, [
+            'mine' => $mine,
+            'source' => 'current',
+        ]);
 
-        if ($request->boolean('mine')) {
-            $query->where('user_id', $user->id);
-        } else {
-            if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-                $query->where('user_id', $user->id)
-                      ->where('distributor_id', $user->id);
-            } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
-                $distId = $user->distributor_id ?? $user->id;
-                $query->where('distributor_id', $distId)
-                      ->where('user_id', $user->id);
-            }
-            // Admin sees all
+        // Optional: filter by a specific deviceId when provided
+        if ($deviceIdParam !== null && is_numeric($deviceIdParam)) {
+            $did = (int) $deviceIdParam;
+            $positions = array_values(array_filter($positions, function ($p) use ($did) {
+                return (int) ($p['id'] ?? 0) === $did;
+            }));
         }
 
-        $devices = $query->get();
-
-        $positions = $devices->map(function ($device) {
-            $tc = $device->tcDevice;
-            if (!$tc) { return null; }
-            $pos = $tc->position;
-
-            $posAttributes = [];
-            if ($pos && isset($pos->attributes)) {
-                $posAttributes = is_array($pos->attributes)
-                    ? $pos->attributes
-                    : (json_decode($pos->attributes, true) ?? []);
-            }
-
-            $serverTimeRaw = $pos->serverTime ?? null;
-            $serverTime = $serverTimeRaw ? Carbon::parse($serverTimeRaw) : null;
-            $now = Carbon::now();
-            $online = $serverTime ? $serverTime->gte($now->copy()->subHour()) : false;
-
-            $motion = isset($posAttributes['motion']) ? (int) $posAttributes['motion'] : null;
-            $ignition = $posAttributes['ignition'] ?? null;
-
-            $activity = 'noData';
-            if ($serverTime) {
-                if ($serverTime->lt($now->copy()->subHour())) {
-                    $activity = 'inActive';
-                } else {
-                    if ($motion === 1) {
-                        $activity = 'moving';
-                    } elseif ($ignition === 1 && $motion === 0) {
-                        $activity = 'idle';
-                    } elseif ($motion === 0 && $ignition === 0) {
-                        $activity = 'stopped';
-                    } else {
-                        $activity = 'noData';
-                    }
-                }
-            }
-
-            // Normalize tc_devices.status to online/offline/unknown to match Traccar
-            $statusRaw = strtolower(trim((string) ($tc->status ?? '')));
-            $deviceStatus = in_array($statusRaw, ['online','offline','unknown']) ? $statusRaw : 'unknown';
-
-            return [
-                'id' => $tc->id,
-                'name' => $tc->name ?? ('Device #' . $tc->id),
-                'latitude' => $pos->latitude ?? null,
-                'longitude' => $pos->longitude ?? null,
-                'speed' => $pos->speed ?? null,
-                'address' => $pos->address ?? null,
-                'ignition' => $ignition,
-                'status' => ($deviceStatus == "online") ? $deviceStatus : "offline",
-                'activity' => $activity,
-                'motion' => $motion,
-                'online' => $online,
-                'positionId' => $tc->positionid ?? null,
-                'lastUpdate' => $tc->lastUpdate ?? null,
-                'uniqueId' => ($tc->uniqueId ?? $tc->uniqueid ?? null),
-                'attributes' => $tc->attributes ?? null,
-                'serverTime' => $serverTimeRaw,
-            ];
-        })->filter(function ($i) {
-            return $i && $i['latitude'] !== null && $i['longitude'] !== null;
-        })->values()->all();
         return response()->json(['positions' => $positions]);
     }
 }
