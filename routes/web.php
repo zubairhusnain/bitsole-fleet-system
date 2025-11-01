@@ -141,3 +141,14 @@ Route::middleware('auth')->prefix('/web/users')->group(function () {
     Route::put('/{userId}', [UserController::class, 'update']);
     Route::delete('/{userId}', [UserController::class, 'destroy']);
 });
+
+// NEW: Auth-protected Zones CRUD
+Route::middleware('auth')->prefix('/web/zones')->group(function () {
+    Route::get('/', [\App\Http\Controllers\ZoneController::class, 'index']);
+    Route::get('/{zoneId}', [\App\Http\Controllers\ZoneController::class, 'show']);
+    Route::post('/', [\App\Http\Controllers\ZoneController::class, 'store']);
+    Route::put('/{zoneId}', [\App\Http\Controllers\ZoneController::class, 'update']);
+    // Restore a soft-deleted (blocked) zone
+    Route::patch('/{zoneId}/restore', [\App\Http\Controllers\ZoneController::class, 'restore']);
+    Route::delete('/{zoneId}', [\App\Http\Controllers\ZoneController::class, 'destroy']);
+});

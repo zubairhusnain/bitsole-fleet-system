@@ -32,7 +32,7 @@
               <input v-model="form.name" type="text" class="form-control" placeholder="Vehicle Name" />
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label small">Device ID ( EMIE )</label>
+              <label class="form-label small">Device ID ( IMEI )</label>
               <input v-model="form.uniqueId" type="text" class="form-control" placeholder="uniqueId" disabled />
             </div>
             <div class="col-12 col-md-4">

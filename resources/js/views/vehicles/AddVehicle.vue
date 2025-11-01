@@ -22,7 +22,7 @@
         <div class="card-body">
           <div class="row g-3 align-items-start">
             <div class="col-12 col-md-4">
-              <label class="form-label small">Devuce ID ( EMIE )</label>
+              <label class="form-label small">Device ID ( IMEI )</label>
               <input v-model="form.uniqueId" type="text" class="form-control" placeholder="VHCL-1016" />
             </div>
             <div class="col-12 col-md-4">

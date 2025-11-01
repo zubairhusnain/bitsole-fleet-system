@@ -28,6 +28,9 @@ const Alerts = () => import('../views/alerts/Index.vue');
 const Reports = () => import('../views/reports/Analytics.vue');
 const Fuel = () => import('../views/fuel/Index.vue');
 const Zones = () => import('../views/zones/Index.vue');
+// Zones add/edit
+const ZonesAdd = () => import('../views/zones/AddZone.vue');
+const ZonesEdit = () => import('../views/zones/Edit.vue');
 
 const routes = [
   { path: '/', name: 'home', component: HomeView },
@@ -65,6 +68,8 @@ const routes = [
   { path: '/alerts', name: 'alerts', component: Alerts, meta: { requiresAuth: true, title: 'Alerts & Notifications' } },
   { path: '/fuel', name: 'fuel', component: Fuel, meta: { requiresAuth: true, title: 'Fuel Management' } },
   { path: '/zones', name: 'zones', component: Zones, meta: { requiresAuth: true, title: 'Zone Management' } },
+  { path: '/zones/new', name: 'zones-new', component: ZonesAdd, meta: { requiresAuth: true, title: 'Add New Zone' } },
+  { path: '/zones/:zoneId/edit', name: 'zones-edit', component: ZonesEdit, meta: { requiresAuth: true, title: 'Edit Zone' } },
 ];
 
 const router = createRouter({

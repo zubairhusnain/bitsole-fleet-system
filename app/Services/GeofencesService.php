@@ -242,6 +242,10 @@ class GeofencesService
             "user_id" => $userId,
             "type"    => $type
         ];
+        // Follow driver pattern: include additional values as geofence attributes
+        $attributes["status"] = $request->status ?? null;
+        $attributes["speed"] = isset($request->speed) ? (float) $request->speed : null;
+        $attributes["distributor_id"] = $request->user()->distributor_id ?? null;
 
         $lat    = $request->lat;
         $lon    = $request->lng;
@@ -350,7 +354,7 @@ class GeofencesService
      * @param int   $numPoints Number of points to approximate the circle
      * @return string WKT polygon string representing the circle
      */
-    private function createCircleWKT($lat, $lon, $radius, $numPoints = 32)
+    public function createCircleWKT($lat, $lon, $radius, $numPoints = 32)
     {
         $earthRadius = 6378137; // Earth's radius in meters
         $points = [];
