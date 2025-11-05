@@ -47,8 +47,7 @@ class DeviceService
     //     }
 
     //     if ($request->filled('group_id') && $request->group_id >0) {
-    //         $group = DeviceGroup::where('groupId', $request->group_id)
-    //                             ->where('user_id', $user->id)
+    //         $group = Devices::where('user_id', $user->id)
     //                             ->first();
     //         if ($group) {
     //             $deviceIds = json_decode($group->deviceIds, true) ?? [];
@@ -140,6 +139,292 @@ class DeviceService
     //         'nextDevice' => $nextDevice,
     //     ];
     // }
+
+    /**
+     * Build positions payload using Traccar API via local device mapping.
+     * Mirrors getAllDevices approach (Traccar API), not direct DB joins.
+     *
+     * Options:
+     * - mine (bool): restrict to user's own devices
+     * - includeRaw (bool): include raw device and position arrays from Traccar
+     * - source (string): payload discriminator (e.g., 'current' or 'updated')
+     */
+    public function getLiveDevices(User $user, array $options = []): array
+    {
+        $sessionId = $user->traccarSession ?? session('cookie');
+        $mine = (bool)($options['mine'] ?? false);
+        $includeRaw = (bool)($options['includeRaw'] ?? false);
+        $source = $options['source'] ?? null;
+
+        // Scope devices for this user (mirror VehicleController role logic)
+        // Note: Devices table does not have device_type; use user/distributor scoping only
+        $query = Devices::query();
+
+        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
+        if ($mine) {
+            // Strictly the current user's assigned devices
+            $query->where('user_id', $user->id);
+        } else {
+            if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
+                // Distributor: both user_id and distributor_id must match self
+                $query->where('user_id', $user->id)
+                      ->where('distributor_id', $user->id);
+            } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
+                // Non-admin (user/fleet manager): user_id must match; distributor scoped to user's distributor
+                $distId = $user->distributor_id ?? $user->id;
+                $query->where('distributor_id', $distId)
+                      ->where('user_id', $user->id);
+            }
+            // Admin: see all devices; no additional where
+        }
+
+        $all_Device = $query->orderBy('id', 'desc')->get();
+        $deviceIds = $all_Device->pluck('device_id')->toArray();
+
+        // Fetch Traccar devices in one call
+        $traccarDevices = [];
+        if (!empty($deviceIds)) {
+            $getIds = implode('&id=', $deviceIds);
+            $response = static::curl('/api/devices?id=' . $getIds, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+            $traccarDevices = json_decode($response->response, true) ?? [];
+        }
+
+        // Fetch Traccar positions in one call
+        $positionIds = collect($traccarDevices)->pluck('positionId')->unique()->filter()->toArray();
+        $positionMap = collect();
+        if (!empty($positionIds)) {
+            $param = '/?id=' . implode('&id=', $positionIds);
+            $positionResponse = static::curl('/api/positions' . $param, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+            $positions = json_decode($positionResponse->response, true) ?? [];
+            $positionMap = collect($positions)->keyBy('id');
+        }
+
+        // Build compact devices-with-position payload using collection filter+map
+        $now = now();
+        $positionsPayload = collect($traccarDevices)
+            // Keep only devices that have a valid mapped position
+            ->filter(function ($device) use ($positionMap) {
+                $posId = $device['positionId'] ?? null;
+                return is_numeric($posId) && (int)$posId > 0 && $positionMap->has((int)$posId);
+            })
+            ->map(function ($device) use ($positionMap, $now, $includeRaw, $source) {
+                $posId = (int)($device['positionId'] ?? 0);
+                $position = $positionMap->get($posId) ?? null;
+                if (!$position) { return null; }
+
+                $attrs = [];
+                if (isset($position['attributes'])) {
+                    $attrs = is_array($position['attributes']) ? $position['attributes'] : (json_decode($position['attributes'], true) ?? []);
+                }
+
+                $serverTimeRaw = $position['serverTime'] ?? ($position['servertime'] ?? null);
+                $serverTime = $serverTimeRaw ? \Carbon\Carbon::parse($serverTimeRaw) : null;
+                $online = $serverTime ? $serverTime->gte($now->copy()->subHour()) : false;
+
+                $motion = isset($attrs['motion']) ? (int)$attrs['motion'] : null;
+                $ignition = $attrs['ignition'] ?? null;
+
+                $activity = 'noData';
+                if ($serverTime) {
+                    if ($serverTime->lt($now->copy()->subHour())) {
+                        $activity = 'inActive';
+                    } else {
+                        if ($motion === 1) {
+                            $activity = 'moving';
+                        } elseif ($ignition === 1 && $motion === 0) {
+                            $activity = 'idle';
+                        } elseif ($motion === 0 && $ignition === 0) {
+                            $activity = 'stopped';
+                        } else {
+                            $activity = 'noData';
+                        }
+                    }
+                }
+
+                $statusRaw = strtolower(trim((string)($device['status'] ?? 'unknown')));
+                $deviceStatus = in_array($statusRaw, ['online','offline','unknown']) ? $statusRaw : 'unknown';
+
+                // Normalize coordinate types for frontend consumers
+                $latRaw = $position['latitude'] ?? null;
+                $lonRaw = $position['longitude'] ?? null;
+                $latitude = is_numeric($latRaw) ? (float)$latRaw : null;
+                $longitude = is_numeric($lonRaw) ? (float)$lonRaw : null;
+
+                $payload = [
+                    'id' => (int)$device['id'],
+                    'name' => $device['name'] ?? ('Device #' . $device['id']),
+                    'latitude' => $latitude,
+                    'longitude' => $longitude,
+                    'speed' => $position['speed'] ?? null,
+                    'address' => $position['address'] ?? null,
+                    'ignition' => $ignition,
+                    'status' => ($deviceStatus === 'online') ? 'online' : 'offline',
+                    'activity' => $activity,
+                    'motion' => $motion,
+                    'online' => $online,
+                    'positionId' => $device['positionId'] ?? null,
+                    'lastUpdate' => $device['lastUpdate'] ?? null,
+                    'uniqueId' => ($device['uniqueId'] ?? $device['uniqueid'] ?? null),
+                    'attributes' => $attrs,
+                    'serverTime' => $serverTimeRaw,
+                ];
+
+                if ($includeRaw) {
+                    $payload['device'] = $device;
+                    $payload['position'] = $position;
+                }
+                if ($source) {
+                    $payload['source'] = $source;
+                }
+
+                // Return null entries to be filtered out later if coordinates missing
+                if ($payload['latitude'] === null || $payload['longitude'] === null) {
+                    return null;
+                }
+                return $payload;
+            })
+            // Filter out any nulls and ensure coordinates exist
+            ->filter(function ($p) {
+                return $p && $p['latitude'] !== null && $p['longitude'] !== null;
+            })
+            ->values()
+            ->all();
+
+        return $positionsPayload;
+    }
+
+    /**
+     * Fetch a single device from Traccar with its latest position and drivers list.
+     *
+     * Notes:
+     * - Trips are no longer included here; use getTrips() endpoint.
+     * - Time window filters are ignored to minimize response time.
+     * - includeRaw option is retained for future use but not required.
+     */
+    public function getDeviceDetailWithTrips(User $user, int $deviceId, array $options = []): array
+    {
+        $sessionId = $user->traccarSession ?? session('cookie');
+        $includeRaw = (bool)($options['includeRaw'] ?? false);
+
+        // Fetch device from Traccar
+        $deviceResp = static::curl('/api/devices?id=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+        $devices = json_decode($deviceResp->response, true) ?? [];
+        $device = $devices[0] ?? null;
+        if (!$device) {
+            return [];
+        }
+
+        // Fetch position if available
+        $position = null;
+        if (!empty($device['positionId'])) {
+            // Use direct position id lookup for current position, which is faster than filtering by deviceId
+            $posId = $device['positionId'];
+            $posResp = static::curl('/api/positions?deviceId=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+            $posList = json_decode($posResp->response, true) ?? [];
+            // Traccar may return an array with a single element or a single object; handle both
+            if (is_array($posList)) {
+                $position = isset($posList[0]) ? $posList[0] : (count($posList) ? $posList : null);
+            } else {
+                $position = $posList ?: null;
+            }
+        }
+
+        // Normalize attributes
+        $attrs = [];
+        if (isset($position['attributes'])) {
+            $attrs = is_array($position['attributes']) ? $position['attributes'] : (json_decode($position['attributes'], true) ?? []);
+        }
+
+        $now = now();
+        $serverTimeRaw = $position['serverTime'] ?? ($position['servertime'] ?? null);
+        $serverTime = $serverTimeRaw ? \Carbon\Carbon::parse($serverTimeRaw) : null;
+        $online = $serverTime ? $serverTime->gte($now->copy()->subHour()) : false;
+        $motion = isset($attrs['motion']) ? (int)$attrs['motion'] : null;
+        $ignition = $attrs['ignition'] ?? null;
+        $activity = 'noData';
+        if ($serverTime) {
+            if ($serverTime->lt($now->copy()->subHour())) {
+                $activity = 'inActive';
+            } else {
+                if ($motion === 1) {
+                    $activity = 'moving';
+                } elseif ($ignition === 1 && $motion === 0) {
+                    $activity = 'idle';
+                } elseif ($motion === 0 && $ignition === 0) {
+                    $activity = 'stopped';
+                } else {
+                    $activity = 'noData';
+                }
+            }
+        }
+
+        // Build raw payload for frontend to compute display logic
+        $payload = [
+            'device' => $device,
+            'position' => $position,
+        ];
+
+        // Fetch drivers (assigned to this device)
+        $driverResp = static::curl('/api/drivers?deviceId=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+        $drivers = json_decode($driverResp->response, true) ?? [];
+        $payload['drivers'] = $drivers;
+
+        return $payload;
+    }
+
+    /**
+     * Return raw Traccar device for the given deviceId.
+     */
+    public function getDeviceRaw(User $user, int $deviceId): ?array
+    {
+        $sessionId = $user->traccarSession ?? session('cookie');
+        $resp = static::curl('/api/devices?id=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+        $list = json_decode($resp->response, true) ?? [];
+        return isset($list[0]) ? $list[0] : null;
+    }
+
+    /**
+     * Return the current (latest) position for a device using its positionId.
+     */
+    public function getCurrentPosition(User $user, int $deviceId): ?array
+    {
+        $sessionId = $user->traccarSession ?? session('cookie');
+        $deviceResp = static::curl('/api/devices?id=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+        $devices = json_decode($deviceResp->response, true) ?? [];
+        $device = $devices[0] ?? null;
+        $positionId = (int) ($device['positionId'] ?? 0);
+        if ($positionId <= 0) return null;
+        $posResp = static::curl('/api/positions/?deviceId=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+        $positions = json_decode($posResp->response, true) ?? [];
+        return isset($positions[0]) ? $positions[0] : null;
+    }
+
+    /**
+     * Return trips for a device over a time window.
+     * Options: from, to (string|int)
+     */
+    public function getTrips(User $user, int $deviceId, array $options = []): array
+    {
+        $sessionId = $user->traccarSession ?? session('cookie');
+        $toIso = isset($options['to'])
+            ? gmdate('Y-m-d\TH:i:00\Z', is_numeric($options['to']) ? (int)$options['to'] : strtotime((string)$options['to']))
+            : gmdate('Y-m-d\TH:i:00\Z');
+        $fromIso = isset($options['from'])
+            ? gmdate('Y-m-d\TH:i:00\Z', is_numeric($options['from']) ? (int)$options['from'] : strtotime((string)$options['from']))
+            : gmdate('Y-m-d\TH:i:00\Z', strtotime('-1 day'));
+        $resp = static::curl('/api/reports/trips?deviceId=' . $deviceId . '&from=' . $fromIso . '&to=' . $toIso, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+        return json_decode($resp->response, true) ?? [];
+    }
+
+    /**
+     * Return all drivers assigned to the device from tracking server.
+     */
+    public function getDriversForDevice(User $user, int $deviceId): array
+    {
+        $sessionId = $user->traccarSession ?? session('cookie');
+        $resp = static::curl('/api/drivers?deviceId=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+        return json_decode($resp->response, true) ?? [];
+    }
 
     // public function getDeviceDetails($request)
     // {

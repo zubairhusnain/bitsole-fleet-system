@@ -25,7 +25,7 @@
                <div class="panel-body" @wheel.stop>
                  <div v-if="loading" class="text-muted small">Loading…</div>
                  <div v-else>
-                   <div v-for="v in filtered" :key="deviceKey(v)" class="vehicle-card" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
+                   <div v-for="v in filtered" :key="deviceKey(v)" :class="['vehicle-card', { 'is-selected': selectedId === deviceKey(v) }]" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
                      <div class="vehicle-avatar">
                        <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
                      </div>
@@ -47,6 +47,7 @@
              </div>
             <l-map v-if="showMap" id="liveMap" :zoom="zoom" :center="center" :options="mapOptions" @ready="onMapReady">
             <l-tile-layer :url="tileUrl" :attribution="tileAttribution" />
+            <l-circle v-if="selectedMarker" :lat-lng="[selectedMarker.lat, selectedMarker.lon]" :radius="200" :color="'#3f8fd7'" :weight="1" :fillColor="'#3f8fd7'" :fillOpacity="0.25" />
             <l-marker v-for="m in markerItems" :key="m.id" :lat-lng="[m.lat, m.lon]" :icon="carIcon" :ref="el => setMarkerRef(m.id, el)">
             <l-popup>
             <div class="popup-card" v-html="m.popup"></div>
@@ -63,7 +64,7 @@
               <div class="panel-body" @wheel.stop>
                 <div v-if="loading" class="text-muted small">Loading…</div>
                 <div v-else>
-                  <div v-for="v in filtered" :key="deviceKey(v)" class="vehicle-card" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
+                  <div v-for="v in filtered" :key="deviceKey(v)" :class="['vehicle-card', { 'is-selected': selectedId === deviceKey(v) }]" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
                     <div class="vehicle-avatar">
                       <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
                     </div>
@@ -94,9 +95,10 @@ import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { getCurrentUser, clearAuthCache } from '../../auth';
-import { LMap, LTileLayer, LMarker, LPopup } from '@vue-leaflet/vue-leaflet';
+import { LMap, LTileLayer, LMarker, LPopup, LCircle } from '@vue-leaflet/vue-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { formatTelemetry } from '../../utils/telemetry';
 
 const map = ref(null);
 const markerRefs = new Map();
@@ -138,6 +140,7 @@ function setMarkerRef(id, el) {
 const showMap = ref(true);
 const zoom = ref(4);
 const center = ref([39.8283, -98.5795]);
+const selectedId = ref(null);
 const mapOptions = { zoomControl: true, preferCanvas: true };
 const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const tileAttribution = '&copy; OpenStreetMap contributors';
@@ -215,8 +218,76 @@ function parseAttrs(val) {
     try { return typeof val === 'string' ? JSON.parse(val) : (val || {}); } catch { return {}; }
 }
 
+// Animated marker display positions (decoupled from raw device positions)
+const displayPositions = reactive({}); // { [id]: { lat, lon } }
+const animations = new Map(); // { id -> { raf } }
+const ANIM_MS = 1000; // default animation duration per update
+const JUMP_CUTOFF_METERS = 1500; // skip animation for large jumps
+
+function setDisplayPos(id, lat, lon) {
+    if (typeof id === 'undefined' || id === null) return;
+    if (typeof lat !== 'number' || typeof lon !== 'number') return;
+    displayPositions[id] = { lat, lon };
+}
+
+function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function distanceMeters(a, b) {
+    if (!a || !b || typeof a.lat !== 'number' || typeof a.lon !== 'number' || typeof b.lat !== 'number' || typeof b.lon !== 'number') return NaN;
+    const R = 6371000;
+    const toRad = Math.PI / 180;
+    const dLat = (b.lat - a.lat) * toRad;
+    const dLon = (b.lon - a.lon) * toRad;
+    const lat1 = a.lat * toRad;
+    const lat2 = b.lat * toRad;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function animateMarkerTo(id, toLat, toLon, duration = ANIM_MS) {
+    if (typeof toLat !== 'number' || typeof toLon !== 'number') return;
+    const current = displayPositions[id];
+    const from = current && typeof current.lat === 'number' && typeof current.lon === 'number' ? current : null;
+    if (!from) {
+        // No current display state; snap to target to establish baseline
+        setDisplayPos(id, toLat, toLon);
+        return;
+    }
+    const dist = distanceMeters(from, { lat: toLat, lon: toLon });
+    if (!Number.isFinite(dist) || dist > JUMP_CUTOFF_METERS) {
+        // Large jump or invalid; snap without animating
+        setDisplayPos(id, toLat, toLon);
+        return;
+    }
+    const startLat = from.lat;
+    const startLon = from.lon;
+    const dLat = toLat - startLat;
+    const dLon = toLon - startLon;
+    const startTime = performance?.now ? performance.now() : Date.now();
+    const prev = animations.get(id);
+    if (prev?.raf) {
+        try { cancelAnimationFrame(prev.raf); } catch {}
+    }
+    const anim = { raf: 0 };
+    const step = (now) => {
+        const tRaw = Math.min(1, ((now ?? (performance?.now ? performance.now() : Date.now())) - startTime) / duration);
+        const t = tRaw < 0 ? 0 : tRaw;
+        const e = easeInOutCubic(t);
+        setDisplayPos(id, startLat + dLat * e, startLon + dLon * e);
+        if (t < 1) {
+            anim.raf = requestAnimationFrame(step);
+        } else {
+            animations.delete(id);
+        }
+    };
+    animations.set(id, anim);
+    anim.raf = requestAnimationFrame(step);
+}
+
 function trackingId(v) {
-    return v.device_id ?? v.deviceId ?? (v.tcDevice?.id ?? v.tc_device?.id) ?? (typeof v.id === 'number' ? v.id : null);
+    return v.device_id ?? v.deviceId ?? (typeof v.id === 'number' ? v.id : null);
 }
 
 function cryptoRandomId() {
@@ -229,16 +300,20 @@ function deviceKey(v) {
 }
 
 function deviceName(v) {
-    const n = v.name ?? (v.tcDevice?.name ?? v.tc_device?.name);
+    const n = v.name;
     return typeof n === 'string' && n.trim() ? n : 'Unknown';
 }
 
 // Merge realtime positions into the vehicles list (dedupe by tracking device id)
 function applyRealtimePositions(list) {
     const base = new Map();
+    const before = new Map();
     for (const v of vehicles.value) {
         const key = trackingId(v);
-        if (key != null) base.set(key, v);
+        if (key != null) {
+            base.set(key, v);
+            before.set(key, v);
+        }
     }
     list.forEach(p => {
         const id = p.id ?? p.deviceId ?? null; // positions payload uses tracking device id
@@ -249,49 +324,64 @@ function applyRealtimePositions(list) {
             longitude: p.longitude,
             speed: p.speed,
             address: p.address,
-            attributes: { ignition: p.ignition, motion: p.motion ?? null, online: p.online ?? null },
+            attributes: {
+                ...(existing.position?.attributes || {}),
+                ignition: p.ignition,
+                motion: p.motion ?? null,
+                online: p.online ?? null,
+                ...(p.attributes || {}),
+            },
         };
         existing.name = existing.name || p.name;
-        // Attach lightweight tcDevice stub for display fields when missing
-        if (!existing.tcDevice) {
-            existing.tcDevice = { id, name: existing.name };
-        }
         // Preserve uniqueId when provided by backend positions payloads
-        if (p.uniqueId && !existing.tcDevice.uniqueId) {
-            existing.tcDevice.uniqueId = p.uniqueId;
+        if (p.uniqueId && !existing.uniqueId) {
+            existing.uniqueId = p.uniqueId;
         }
-        // Update lastUpdate from backend payload (tcDevice)
+        // Update lastUpdate from backend payload
         if (p.lastUpdate) {
-            existing.tcDevice.lastUpdate = p.lastUpdate;
+            existing.lastUpdate = p.lastUpdate;
         }
-        // Only set status when payload explicitly provides tc_devices-style status
+        // Derive status from payload
         if (p.status && ['online','offline','unknown'].includes(String(p.status).toLowerCase())) {
-            existing.tcDevice.status = String(p.status).toLowerCase();
-        }
-        // Fallback: derive status from p.online or serverTime when p.status missing
-        if (!existing.tcDevice.status) {
-            if (typeof p.online === 'boolean') {
-                existing.tcDevice.status = p.online ? 'online' : 'offline';
-            } else if (p.serverTime) {
-                const t = Date.parse(p.serverTime);
-                if (!Number.isNaN(t)) {
-                    const isRecent = (Date.now() - t) <= (60 * 60 * 1000);
-                    existing.tcDevice.status = isRecent ? 'online' : 'offline';
-                }
+            existing.status = String(p.status).toLowerCase();
+        } else if (typeof p.online === 'boolean') {
+            existing.status = p.online ? 'online' : 'offline';
+        } else if (p.serverTime) {
+            const t = Date.parse(p.serverTime);
+            if (!Number.isNaN(t)) {
+                const isRecent = (Date.now() - t) <= (60 * 60 * 1000);
+                existing.status = isRecent ? 'online' : 'offline';
             }
         }
         // Preserve device-level attributes for UI (image, meta)
-        if (p.attributes && !existing.tcDevice.attributes) {
-            existing.tcDevice.attributes = p.attributes;
+        if (p.attributes && !existing.attributes) {
+            existing.attributes = p.attributes;
         }
         base.set(id, existing);
     });
     vehicles.value = Array.from(base.values());
+
+    // Kick off marker animations towards new positions for updated devices
+    list.forEach(p => {
+        const id = p.id ?? p.deviceId ?? null;
+        const toLatRaw = p.latitude ?? p.lat ?? null;
+        const toLonRaw = p.longitude ?? p.lon ?? null;
+        const toLat = typeof toLatRaw === 'string' ? parseFloat(toLatRaw) : toLatRaw;
+        const toLon = typeof toLonRaw === 'string' ? parseFloat(toLonRaw) : toLonRaw;
+        if (!id || !Number.isFinite(toLat) || !Number.isFinite(toLon)) return;
+        if (!displayPositions[id]) {
+            const prevV = before.get(id);
+            const prevPos = prevV ? getPosition(prevV) : null;
+            if (prevPos && typeof prevPos.lat === 'number' && typeof prevPos.lon === 'number') {
+                setDisplayPos(id, prevPos.lat, prevPos.lon);
+            }
+        }
+        animateMarkerTo(id, toLat, toLon);
+    });
 }
 
 function getPosition(v) {
-    const dev = v.tcDevice || v.tc_device || {};
-    const pos = dev.position || dev.tcPosition || dev.tc_position || v.position || v.tcPosition || v.tc_position || v.positionData || {};
+    const pos = v.position || v.positionData || {};
     const latRaw = pos.latitude ?? pos.lat ?? pos.y ?? null;
     const lonRaw = pos.longitude ?? pos.lon ?? pos.x ?? null;
     const toNumber = (val) => {
@@ -316,8 +406,7 @@ function getPosition(v) {
 function hasLocation(v) {
     const { lat, lon } = getPosition(v);
     if (typeof lat === 'number' && typeof lon === 'number') return true;
-    const dev = v.tcDevice || v.tc_device || {};
-    const pid = v.positionId ?? v.positionid ?? dev.positionId ?? dev.positionid ?? null;
+    const pid = v.positionId ?? v.positionid ?? null;
     return pid != null;
 }
 
@@ -335,16 +424,25 @@ const markerItems = computed(() => {
     return filtered.value
         .map(v => {
             const { lat, lon } = getPosition(v);
-            return { id: deviceKey(v), lat, lon, popup: popupHtml(v) };
+            const id = deviceKey(v);
+            const disp = displayPositions[id];
+            const dlat = typeof disp?.lat === 'number' ? disp.lat : lat;
+            const dlon = typeof disp?.lon === 'number' ? disp.lon : lon;
+            return { id, lat: dlat, lon: dlon, popup: popupHtml(v) };
         })
         .filter(m => typeof m.lat === 'number' && typeof m.lon === 'number')
         .sort((a, b) => String(a.id).localeCompare(String(b.id)));
 });
 
+const selectedMarker = computed(() => {
+    if (!selectedId.value) return null;
+    return markerItems.value.find(m => String(m.id) === String(selectedId.value)) || null;
+});
+
 watch(
     markerItems,
     (list) => {
-        if (map.value && !fitDone.value && list.length) {
+        if (map.value && !fitDone.value && list.length && !selectedId.value) {
             const bounds = L.latLngBounds(list.map(m => [m.lat, m.lon]));
             try { map.value.fitBounds(bounds.pad(0.2)); } catch { map.value.fitBounds(bounds); }
             fitDone.value = true;
@@ -353,9 +451,20 @@ watch(
     { flush: 'post' }
 );
 
+// Keep selected vehicle centered while it moves
+watch(
+    selectedMarker,
+    (m) => {
+        if (!m) return;
+        center.value = [m.lat, m.lon];
+        // Ensure a reasonable zoom to visualize 100m radius
+        const current = typeof map.value?.getZoom === 'function' ? map.value.getZoom() : zoom.value;
+        zoom.value = Math.max(current || 0, 15);
+    }
+);
+
 function getImage(v) {
-    const tc = v.tcDevice || v.tc_device || {};
-    const attrs = parseAttrs(tc.attributes);
+    const attrs = parseAttrs(v.attributes);
     const photos = attrs?.photos;
     let candidate = '';
 
@@ -372,10 +481,9 @@ function getImage(v) {
 }
 
 function statusText(v) {
-    const tc = v.tcDevice || v.tc_device || {};
     const pos = getPosition(v);
     const online = pos.raw?.attributes?.online;
-    if (typeof tc.status === 'string' && tc.status) return tc.status;
+    if (typeof v.status === 'string' && v.status) return v.status;
     if (online === false) return 'Inactive';
     const status = v.status || (pos.ignition === true ? (pos.speed > 0 ? 'moving' : 'idle') : (pos.ignition === false ? 'stopped' : null));
     return status || 'Unknown';
@@ -389,8 +497,7 @@ function statusClass(v) {
 }
 
 function statusValue(v) {
-    const tc = v.tcDevice || v.tc_device || {};
-    const rawStatus = typeof tc.status === 'string' ? tc.status.trim().toLowerCase() : '';
+    const rawStatus = typeof v.status === 'string' ? v.status.trim().toLowerCase() : '';
     if (['online','offline','unknown'].includes(rawStatus)) return rawStatus;
     const { raw } = getPosition(v);
     const online = raw?.attributes?.online;
@@ -401,6 +508,29 @@ function statusValue(v) {
 function statusLabel(v) {
     const s = statusValue(v);
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : 'offline';
+}
+
+// Extract fuel value from position attributes
+function fuelDisplay(v) {
+    const pos = getPosition(v).raw || {};
+    const model = v.model || null;
+    const cap = (v.attributes && (v.attributes.fuelTankCapacity || v.attributes.FuelTankCapacity || v.attributes.fueltankcapacity)) || null;
+    const tel = formatTelemetry(pos.attributes, { protocol: pos.protocol, model, capacity: cap });
+    if (!tel.fuel) return null;
+    const liters = tel.fuel.liters;
+    const percent = tel.fuel.percent;
+    if (liters != null && percent != null) return `${liters} L (${percent}%)`;
+    if (liters != null) return `${liters} L`;
+    if (percent != null) return `${percent}%`;
+    return null;
+}
+
+// Extract odometer from position attributes and format in km
+function odometerDisplay(v) {
+    const pos = getPosition(v).raw || {};
+    const model = v.model || null;
+    const tel = formatTelemetry(pos.attributes, { protocol: pos.protocol, model });
+    return tel.odometer ? tel.odometer.display : null;
 }
 
 
@@ -420,15 +550,14 @@ function formatTime(val) {
 }
 
 function lastUpdate(v) {
-    const tc = v.tcDevice || v.tc_device || {};
     const pos = getPosition(v).raw || {};
-    return tc.lastUpdate || tc.lastupdate || pos.serverTime || pos.deviceTime || pos.fixTime || null;
+    // Prefer explicit device-level lastUpdate from the object, then position timestamps
+    return v.lastUpdate || v.lastupdate || pos.serverTime || pos.deviceTime || pos.fixTime || null;
 }
 
 function uniqueId(v) {
-    const tc = v.tcDevice || v.tc_device || {};
-    const attrs = parseAttrs(tc.attributes);
-    return v.uniqueId || v.uniqueid || tc.uniqueId || tc.uniqueid || attrs.uniqueId || attrs.uniqueid || null;
+    const attrs = parseAttrs(v.attributes);
+    return v.uniqueId || v.uniqueid || attrs.uniqueId || attrs.uniqueid || null;
 }
 
 function speedKmh(speed) {
@@ -454,6 +583,8 @@ function popupHtml(v) {
     const sClass = statusClass(v);
     const sLabel = statusLabel(v);
     const isOnline = statusIs(v, 'online');
+    const fuel = fuelDisplay(v);
+    const odo = odometerDisplay(v);
     return `
     <div class="popup-card">
       <div class="popup-title-row">
@@ -467,6 +598,8 @@ function popupHtml(v) {
       <div class="popup-row"><span>Last Update:</span> <strong>${lu}</strong></div>
       <div class="popup-row"><span>Ignition:</span> <strong>${ign}</strong></div>
       <div class="popup-row"><span>Speed:</span> <strong>${sp ?? '-'} km/h</strong></div>
+      <div class="popup-row"><span>Fuel:</span> <strong>${fuel ?? '—'}</strong></div>
+      <div class="popup-row"><span>Odometer:</span> <strong>${odo ?? '—'}</strong></div>
       <div class="popup-row"><span>Location:</span> <span>${locText}</span></div>
     </div>
   `;
@@ -504,16 +637,21 @@ async function fetchVehicles() {
 
 function focusVehicle(v) {
     const { lat, lon } = getPosition(v);
+    const id = deviceKey(v);
+    if (typeof id !== 'undefined' && id !== null) selectedId.value = id;
     if (map.value && typeof lat === 'number' && typeof lon === 'number') {
-        const z = typeof map.value.getZoom === 'function' ? Math.max(map.value.getZoom(), 8) : 8;
+        fitDone.value = true; // prevent fitBounds from pulling view away
+        const desiredZoom = 15;
+        const currentZoom = typeof map.value.getZoom === 'function' ? map.value.getZoom() : zoom.value;
+        const z = Math.max(currentZoom || 0, desiredZoom);
+        center.value = [lat, lon];
+        zoom.value = z;
         try {
-            if (typeof map.value.flyTo === 'function') {
-                map.value.flyTo([lat, lon], z, { duration: 0.6 });
-            } else {
+            if (typeof map.value.setView === 'function') {
                 map.value.setView([lat, lon], z, { animate: true });
             }
         } catch {}
-        const mk = markerRefs.get(deviceKey(v));
+        const mk = markerRefs.get(id);
         try { mk?.openPopup?.(); } catch {}
     }
 }
@@ -576,6 +714,10 @@ onBeforeUnmount(() => {
             visibilityHandler = null;
         }
         window.removeEventListener('resize', updatePanelVisibilityForViewport);
+    } catch {}
+    try {
+        animations.forEach(a => { if (a?.raf) cancelAnimationFrame(a.raf); });
+        animations.clear();
     } catch {}
 });
 </script>
@@ -680,6 +822,10 @@ onBeforeUnmount(() => {
 
 .vehicle-card:hover {
     background: rgba(0, 0, 0, .04);
+}
+
+.vehicle-card.is-selected {
+    background: rgba(33, 150, 243, 0.18);
 }
 
 .vehicle-avatar {

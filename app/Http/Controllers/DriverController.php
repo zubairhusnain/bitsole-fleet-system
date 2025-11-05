@@ -16,7 +16,7 @@ class DriverController extends Controller
         $user = $request->user();
         $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
 
-        $query = \App\Models\Drivers::query()->with(['tcDriver', 'tcDevice']);
+        $query = \App\Models\Drivers::withTrashed()->with(['tcDriver', 'tcDevice']);
 
         if ($request->boolean('mine')) {
             $query->where('user_id', $user->id);
@@ -63,6 +63,8 @@ class DriverController extends Controller
                 'avatarImage' => $avatarImagePath,
                 'licenseImageUrl' => $licenseImageUrl,
                 'avatarImageUrl' => $avatarImageUrl,
+                'deletedAt' => $row->deleted_at ? $row->deleted_at->format('c') : null,
+                'blocked' => method_exists($row, 'trashed') ? $row->trashed() : false,
             ];
         })->values();
 
@@ -210,7 +212,7 @@ class DriverController extends Controller
                 return response()->json(['message' => 'License Number must be numeric and >= 0'], 422);
             }
         }
-        
+
         // Save uploaded licence image and add to attributes
         $savedImagePath = null;
         if ($request->hasFile('licenceImage')) {
@@ -528,28 +530,142 @@ class DriverController extends Controller
     }
 
     /**
-     * Soft delete a driver locally (do not delete on tracking server).
+     * Hard delete a driver: remove from tracking server and permanently delete locally.
      */
     public function destroy(Request $request, int $driverId)
     {
-        // Only perform local soft delete; do not call tracking server
-        $local = \App\Models\Drivers::withTrashed()->where('driver_id', $driverId)->first();
-        if (!$local) {
-            return response()->json(['message' => 'Driver not found'], 404);
-        }
+        // Soft delete by default (block). Use force=1 (or hard=1) to permanently delete remotely + locally.
+        $force = $request->boolean('force') || $request->boolean('hard');
 
-        if (method_exists($local, 'trashed') && !$local->trashed()) {
+        if (!$force) {
+            // SOFT DELETE (block): mark local record as deleted, do not delete on tracking server
+            $local = \App\Models\Drivers::where('driver_id', $driverId)->first();
+            if (!$local) {
+                return response()->json(['message' => 'Driver not found'], 404);
+            }
+            if (method_exists($local, 'trashed') && $local->trashed()) {
+                return response()->json(['message' => 'Driver already blocked'], 200);
+            }
             try {
                 $local->delete();
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Local driver soft delete failed', ['driver_id' => $driverId, 'error' => $e->getMessage()]);
-                return response()->json(['message' => 'Failed to soft delete driver'], 500);
+                Log::warning('Driver soft delete failed', ['driver_id' => $driverId, 'error' => $e->getMessage()]);
+                return response()->json([
+                    'message' => 'Failed to block driver',
+                    'error' => $e->getMessage(),
+                ], 500);
+            }
+            return response()->json(['message' => 'Driver blocked'], 200);
+        }
+
+        // HARD DELETE: delete driver on tracking server (Traccar), permanently remove local record,
+        // and clean up any locally stored images referenced in attributes
+
+        // Load existing local attributes to clean up images later
+        $licenseImagePath = null;
+        $avatarImagePath = null;
+        try {
+            $row = \App\Models\Drivers::with(['tcDriver'])->where('driver_id', $driverId)->first();
+            $tc = $row ? $row->tcDriver : null;
+            if ($tc && isset($tc->attributes)) {
+                $attrs = is_array($tc->attributes)
+                    ? $tc->attributes
+                    : (json_decode($tc->attributes, true) ?? []);
+                $licenseImagePath = $attrs['licenseImage'] ?? null;
+                $avatarImagePath = $attrs['avatarImage'] ?? null;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to read existing driver images before delete', ['driver_id' => $driverId, 'error' => $e->getMessage()]);
+        }
+
+        // 1) Attempt to delete on tracking server
+        try {
+            $resp = \App\Services\DriverService::driverDelete($request, $driverId);
+        } catch (\Throwable $e) {
+            Log::warning('Tracking server driver delete call failed', ['driver_id' => $driverId, 'error' => $e->getMessage()]);
+            return response()->json([
+                'message' => 'Failed to delete driver on tracking server',
+                'error' => $e->getMessage(),
+            ], 502);
+        }
+
+        $code = (int) ($resp->responseCode ?? 0);
+        if (!($code >= 200 && $code < 300) && $code !== 404) {
+            return response()->json([
+                'message' => 'Failed to delete driver on tracking server',
+                'code' => $code,
+            ], 502);
+        }
+
+        // 2) Clean up locally stored images (ignore external URLs)
+        foreach ([$licenseImagePath, $avatarImagePath] as $p) {
+            if (!$p) continue;
+            try {
+                $isExternal = is_string($p) && preg_match('/^https?:\/\//i', $p);
+                if (!$isExternal && is_string($p) && trim($p) !== '') {
+                    Storage::disk('public')->delete($p);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Failed to delete driver image', ['path' => $p, 'driver_id' => $driverId, 'error' => $e->getMessage()]);
             }
         }
 
+        // 3) Permanently delete local record if present
+        $local = \App\Models\Drivers::withTrashed()->where('driver_id', $driverId)->first();
+        if ($local) {
+            try {
+                $local->forceDelete();
+            } catch (\Throwable $e) {
+                Log::warning('Local driver hard delete failed', ['driver_id' => $driverId, 'error' => $e->getMessage()]);
+                return response()->json([
+                    'message' => 'Deleted on tracking server, but failed to delete locally',
+                    'error' => $e->getMessage(),
+                ], 500);
+            }
+        }
 
-        return response()->json(['message' => 'Driver deleted'], 200);
+        return response()->json([
+            'message' => $code === 404
+                ? 'Driver deleted locally; not found on tracking server'
+                : 'Driver deleted from tracking server and locally',
+        ], 200);
     }
 
+    /**
+     * Restore (activate) a soft-deleted driver.
+     */
+    public function restore(Request $request, int $driverId)
+    {
+        $user = $request->user();
+        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
+
+        $query = \App\Models\Drivers::withTrashed()->where('driver_id', $driverId);
+        if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
+            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
+        } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
+            $distId = $user->distributor_id ?? $user->id;
+            $query->where('distributor_id', $distId)->where('user_id', $user->id);
+        }
+
+        $local = $query->first();
+        if (!$local) {
+            return response()->json(['message' => 'Driver not found'], 404);
+        }
+        if (method_exists($local, 'trashed') && !$local->trashed()) {
+            return response()->json(['message' => 'Driver already active'], 200);
+        }
+
+        try {
+            $local->restore();
+        } catch (\Throwable $e) {
+            Log::warning('Driver restore failed', ['driver_id' => $driverId, 'error' => $e->getMessage()]);
+            return response()->json([
+                'message' => 'Failed to activate driver',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json(['message' => 'Driver activated'], 200);
+    }
 
 }

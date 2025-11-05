@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 Route::get('/testing', function () {
+
             try {
             // Raw SQL query to select all columns from the 'tc_users' table
             // We prepend the schema name 'omayer' to ensure the database
@@ -92,16 +93,26 @@ Route::middleware('auth')->prefix('/web/vehicles')->group(function () {
     Route::get('/options', [\App\Http\Controllers\VehicleController::class, 'options']);
     Route::post('/', [\App\Http\Controllers\VehicleController::class, 'store']);
     Route::get('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'show']);
-    // Waypoints/history for device detail page
+    // Device detail: single payload with latest position and trips
+    Route::get('/{deviceId}/detail', [\App\Http\Controllers\VehicleController::class, 'detail']);
+    // Split endpoints: device-only, latest position, trips-only, drivers list
+    Route::get('/{deviceId}/device', [\App\Http\Controllers\VehicleController::class, 'deviceRaw']);
+    Route::get('/{deviceId}/position', [\App\Http\Controllers\VehicleController::class, 'positionCurrent']);
+    Route::get('/{deviceId}/trips', [\App\Http\Controllers\VehicleController::class, 'trips']);
+    Route::get('/{deviceId}/drivers', [\App\Http\Controllers\VehicleController::class, 'driversList']);
+    // Positions for map/waypoints (time-window support)
     Route::get('/{deviceId}/positions', [\App\Http\Controllers\VehicleController::class, 'positions']);
-    // Add single current position via tc_devices.positionid
-    Route::get('/{deviceId}/position', [\App\Http\Controllers\VehicleController::class, 'position']);
     // Driver assigned to this vehicle
     Route::get('/{deviceId}/driver', [\App\Http\Controllers\VehicleController::class, 'driver']);
     // Rating metrics derived from reports
     Route::get('/{deviceId}/rating', [\App\Http\Controllers\VehicleController::class, 'rating']);
+    // Consolidated performance summary for dashboard (summary/events/maintenance)
+    Route::get('/{deviceId}/performance', [\App\Http\Controllers\VehicleController::class, 'performance']);
     Route::put('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'update']);
+    // Restore a soft-deleted (blocked) vehicle
+    Route::patch('/{deviceId}/restore', [\App\Http\Controllers\VehicleController::class, 'restore']);
     Route::delete('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'destroy']);
+
 });
 
 // NEW: Auth-protected Drivers CRUD & assignment
@@ -110,14 +121,16 @@ Route::middleware('auth')->prefix('/web/drivers')->group(function () {
     Route::get('/{driverId}', [\App\Http\Controllers\DriverController::class, 'show']);
     Route::post('/', [\App\Http\Controllers\DriverController::class, 'store']);
     Route::put('/{driverId}', [\App\Http\Controllers\DriverController::class, 'update']);
+    // Restore a soft-deleted (blocked) driver
+    Route::patch('/{driverId}/restore', [\App\Http\Controllers\DriverController::class, 'restore']);
     Route::delete('/{driverId}', [\App\Http\Controllers\DriverController::class, 'destroy']);
 
 });
 
 // Live Tracking: trigger a broadcast of current positions
 Route::middleware('auth')->get('/web/live/positions/broadcast', [\App\Http\Controllers\LiveTrackingController::class, 'broadcast']);
-// Live Tracking: HTTP fallback to fetch current positions
-Route::get('/web/live/positions/current', [\App\Http\Controllers\LiveTrackingController::class, 'current']);
+// Live Tracking: HTTP fallback to fetch current positions (auth-protected)
+Route::middleware('auth')->get('/web/live/positions/current', [\App\Http\Controllers\LiveTrackingController::class, 'current']);
 
 // NEW: Auth-protected Users CRUD
 Route::middleware('auth')->prefix('/web/users')->group(function () {
@@ -128,3 +141,17 @@ Route::middleware('auth')->prefix('/web/users')->group(function () {
     Route::put('/{userId}', [UserController::class, 'update']);
     Route::delete('/{userId}', [UserController::class, 'destroy']);
 });
+
+// NEW: Auth-protected Zones CRUD
+Route::middleware('auth')->prefix('/web/zones')->group(function () {
+    Route::get('/', [\App\Http\Controllers\ZoneController::class, 'index']);
+    Route::get('/{zoneId}', [\App\Http\Controllers\ZoneController::class, 'show']);
+    Route::post('/', [\App\Http\Controllers\ZoneController::class, 'store']);
+    Route::put('/{zoneId}', [\App\Http\Controllers\ZoneController::class, 'update']);
+    // Restore a soft-deleted (blocked) zone
+    Route::patch('/{zoneId}/restore', [\App\Http\Controllers\ZoneController::class, 'restore']);
+    Route::delete('/{zoneId}', [\App\Http\Controllers\ZoneController::class, 'destroy']);
+});
+
+// NEW: Auth-protected Geofence listing from Traccar DB (testing/util)
+Route::middleware('auth')->get('/web/traccar/geofences', [\App\Http\Controllers\ZoneController::class, 'geofencesDb']);

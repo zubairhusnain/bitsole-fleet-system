@@ -18,8 +18,8 @@ class VehicleController extends Controller
         $user = $request->user();
         $role = (int) ($user->role ?? User::ROLE_ADMIN);
 
-        // Eager load tcDevice and its current position
-        $query = Devices::query()->with(['tcDevice.position']);
+        // Eager load tcDevice and its current position; include soft-deleted (blocked) devices
+        $query = Devices::withTrashed()->with(['tcDevice.position']);
 
         // Optional: scope strictly to current user's assignment when requested
         if ($request->boolean('mine')) {
@@ -112,7 +112,7 @@ class VehicleController extends Controller
         }
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
-            'type','manufacturer','color','registration','plate','vin','odometer','fuelAverage','maxSpeed','speedLimit','photos'
+            'type','manufacturer','color','registration','plate','vin','odometer','fuelAverage','maxSpeed','speedLimit','photos','fuelTankCapacity','trackerModel'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
@@ -133,6 +133,12 @@ class VehicleController extends Controller
             $slStr = (string) $attributes['speedLimit'];
             if (!preg_match('/^\d+$/', $slStr)) {
                 return response()->json(['message' => 'Speed Limit must be numeric and >= 0'], 422);
+            }
+        }
+        if (array_key_exists('fuelTankCapacity', $attributes) && $attributes['fuelTankCapacity'] !== null && $attributes['fuelTankCapacity'] !== '') {
+            $capStr = (string) $attributes['fuelTankCapacity'];
+            if (!preg_match('/^\d+(?:\.\d+)?$/', $capStr)) {
+                return response()->json(['message' => 'Fuel Tank Capacity must be numeric and >= 0'], 422);
             }
         }
         if (array_key_exists('registration', $attributes) && $attributes['registration'] !== null && $attributes['registration'] !== '') {
@@ -262,7 +268,7 @@ class VehicleController extends Controller
         }
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
-            'type','manufacturer','color','registration','plate','vin','odometer','fuelAverage','maxSpeed','speedLimit','photos'
+            'type','manufacturer','color','registration','plate','vin','odometer','fuelAverage','maxSpeed','speedLimit','photos','fuelTankCapacity','trackerModel'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
@@ -401,70 +407,108 @@ class VehicleController extends Controller
 
     public function destroy(Request $request, int $deviceId)
     {
-        // Local-only soft delete; do not remove from tracking server
-        $device = Devices::withTrashed()->where('device_id', $deviceId)->first();
-        if (!$device) {
-            return response()->json(['message' => 'Vehicle not found'], 404);
-        }
+        // Soft delete by default (block). Use force=1 (or hard=1) to permanently delete remotely + locally.
+        $force = $request->boolean('force') || $request->boolean('hard');
 
-        if (method_exists($device, 'trashed') && $device->trashed()) {
-            return response()->json(['message' => 'Vehicle already soft-deleted'], 200);
-        }
-
-        try {
-            $device->delete();
-        } catch (\Throwable $e) {
-            Log::warning('Local device soft delete failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
-            return response()->json([
-                'message' => 'Failed to soft-delete vehicle locally',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-
-        return response()->json(['message' => 'Vehicle soft-deleted'], 200);
-    }
-
-    /**
-     * Return recent positions (waypoints) for a specific device from tc_positions.
-     * Scopes access based on local Devices mapping and user role.
-     */
-    public function position(\Illuminate\Http\Request $request, int $deviceId): \Illuminate\Http\JsonResponse
-    {
-        $user = $request->user();
-        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
-
-        $query = \App\Models\Devices::query()->with(['tcDevice.position'])->where('device_id', $deviceId);
-        if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
-        } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
-            $distId = $user->distributor_id ?? $user->id;
-            $query->where('distributor_id', $distId)->where('user_id', $user->id);
-        }
-        $mapping = $query->firstOrFail();
-
-        $tc = $mapping->tcDevice;
-        $pos = $tc ? $tc->position : null;
-
-        $position = null;
-        if ($pos) {
-            $attrs = [];
-            if (isset($pos->attributes)) {
-                $attrs = is_array($pos->attributes) ? $pos->attributes : (json_decode($pos->attributes, true) ?? []);
+        if (!$force) {
+            // SOFT DELETE (block): mark local record as deleted, do not delete on tracking server
+            $device = Devices::where('device_id', $deviceId)->first();
+            if (!$device) {
+                return response()->json(['message' => 'Vehicle not found'], 404);
             }
-            $position = [
-                'id' => (int) ($pos->id ?? 0),
-                'deviceId' => (int) ($tc->id ?? $deviceId),
-                'latitude' => $pos->latitude ?? null,
-                'longitude' => $pos->longitude ?? null,
-                'speed' => $pos->speed ?? null,
-                'address' => $pos->address ?? null,
-                'attributes' => $attrs,
-                'serverTime' => $pos->servertime ?? null,
-            ];
+            if (method_exists($device, 'trashed') && $device->trashed()) {
+                return response()->json(['message' => 'Vehicle already blocked'], 200);
+            }
+            try {
+                $device->delete();
+            } catch (\Throwable $e) {
+                Log::warning('Vehicle soft delete failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+                return response()->json([
+                    'message' => 'Failed to block vehicle',
+                    'error' => $e->getMessage(),
+                ], 500);
+            }
+            return response()->json(['message' => 'Vehicle blocked'], 200);
         }
 
-        return response()->json(['position' => $position]);
+        // HARD DELETE: delete device on tracking server (Traccar), permanently remove local record,
+        // and clean up any locally stored vehicle photos referenced in attributes
+
+        // Load existing photo paths from local attributes
+        $existingPhotos = [];
+        try {
+            $row = Devices::with(['tcDevice'])->where('device_id', $deviceId)->first();
+            $tc = $row ? $row->tcDevice : null;
+            if ($tc && isset($tc->attributes)) {
+                $attrs = is_array($tc->attributes)
+                    ? $tc->attributes
+                    : (json_decode($tc->attributes, true) ?? []);
+                $photos = $attrs['photos'] ?? [];
+                $existingPhotos = array_values(array_filter(is_array($photos) ? $photos : [$photos]));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to read existing vehicle photos before delete', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+        }
+
+        // 1) Attempt to delete on tracking server
+        try {
+            // DeviceService expects device_detail_id on the request
+            $request->merge(['device_detail_id' => $deviceId]);
+            $tracking = \App\Services\DeviceService::deviceDelete($request);
+        } catch (\Throwable $e) {
+            Log::warning('Tracking server delete call failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+            return response()->json([
+                'message' => 'Failed to delete device on tracking server',
+                'error' => $e->getMessage(),
+            ], 502);
+        }
+
+        // Accept 2xx as success; treat 404 (not found) as non-fatal (already deleted remotely)
+        $code = (int) ($tracking->responseCode ?? 0);
+        if (!($code >= 200 && $code < 300) && $code !== 404) {
+            return response()->json([
+                'message' => 'Failed to delete device on tracking server',
+                'code' => $code,
+            ], 502);
+        }
+
+        // 2) Clean up locally stored photos (ignore external URLs)
+        if (!empty($existingPhotos)) {
+            foreach ($existingPhotos as $p) {
+                try {
+                    $isExternal = is_string($p) && preg_match('/^https?:\/\//i', $p);
+                    if (!$isExternal && is_string($p) && trim($p) !== '') {
+                        Storage::disk('public')->delete($p);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to delete vehicle photo', ['path' => $p, 'device_id' => $deviceId, 'error' => $e->getMessage()]);
+                }
+            }
+        }
+
+        // 3) Permanently delete local record if present
+        $device = Devices::withTrashed()->where('device_id', $deviceId)->first();
+        if ($device) {
+            try {
+                // Ensure hard delete even if previously soft-deleted
+                $device->forceDelete();
+            } catch (\Throwable $e) {
+                Log::warning('Local device hard delete failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+                return response()->json([
+                    'message' => 'Deleted on tracking server, but failed to delete locally',
+                    'error' => $e->getMessage(),
+                ], 500);
+            }
+        }
+
+        return response()->json([
+            'message' => $code === 404
+                ? 'Vehicle deleted locally; not found on tracking server'
+                : 'Vehicle deleted from tracking server and locally',
+        ], 200);
     }
+
+
 
     /**
      * Return assigned driver details for a specific vehicle.
@@ -510,6 +554,125 @@ class VehicleController extends Controller
                 'avatarImageUrl' => $avatarImagePath ? \Illuminate\Support\Facades\Storage::url($avatarImagePath) : null,
             ],
         ]);
+    }
+
+    /**
+     * Device detail payload: latest position with device and drivers.
+     * Trips are fetched via the separate /trips endpoint to avoid delay.
+     */
+    public function detail(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        // Release session lock early to allow other concurrent requests (performance/trips)
+        try { if (PHP_SESSION_ACTIVE === session_status()) { @session_write_close(); } } catch (\Throwable $e) {}
+        // Simple timing instrumentation to help diagnose slow responses
+        $start = microtime(true);
+        $payload = app(\App\Services\DeviceService::class)->getDeviceDetailWithTrips($user, $deviceId, []);
+        $elapsedMs = (int) round((microtime(true) - $start) * 1000);
+        Log::info('Vehicle detail latency', ['deviceId' => $deviceId, 'ms' => $elapsedMs]);
+
+        return response()->json(['detail' => $payload, 'latencyMs' => $elapsedMs]);
+    }
+
+    /**
+     * Return raw device object from tracking server for this vehicle.
+     */
+    public function deviceRaw(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $device = app(\App\Services\DeviceService::class)->getDeviceRaw($user, $deviceId);
+        return response()->json(['device' => $device]);
+    }
+
+    /**
+     * Return the latest position for this vehicle using its current positionId.
+     */
+    public function positionCurrent(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $pos = app(\App\Services\DeviceService::class)->getCurrentPosition($user, $deviceId);
+        return response()->json(['position' => $pos]);
+    }
+
+    /**
+     * Return trips for a device over a time window.
+     * Query params: from, to
+     */
+    public function trips(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        // Release session lock early to allow concurrency with other endpoints
+        try { if (PHP_SESSION_ACTIVE === session_status()) { @session_write_close(); } } catch (\Throwable $e) {}
+        $start = microtime(true);
+        $options = [];
+        $from = $request->query('from');
+        $to = $request->query('to');
+        if ($from) { $options['from'] = $from; }
+        if ($to) { $options['to'] = $to; }
+        $trips = app(\App\Services\DeviceService::class)->getTrips($user, $deviceId, $options);
+        $elapsedMs = (int) round((microtime(true) - $start) * 1000);
+        Log::info('Vehicle trips latency', ['deviceId' => $deviceId, 'ms' => $elapsedMs]);
+        return response()->json(['trips' => $trips, 'latencyMs' => $elapsedMs]);
+    }
+
+    /**
+     * Return all drivers assigned to this device from tracking server.
+     */
+    public function driversList(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $drivers = app(\App\Services\DeviceService::class)->getDriversForDevice($user, $deviceId);
+        return response()->json(['drivers' => $drivers]);
+    }
+
+    /**
+     * Return positions for a specific vehicle over a time window.
+     * Accepts query params: from, to, hours (or hour), limit.
+     */
+    public function positions(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
+
+        // Authorize via local Devices mapping
+        $query = \App\Models\Devices::query()->with(['tcDevice'])->where('device_id', $deviceId);
+        if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
+            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
+        } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
+            $distId = $user->distributor_id ?? $user->id;
+            $query->where('distributor_id', $distId)->where('user_id', $user->id);
+        }
+        $mapping = $query->firstOrFail();
+
+        // Derive time window
+        $from = $request->query('from');
+        $to = $request->query('to');
+        $hoursRaw = $request->query('hours', $request->query('hour', 24));
+        $hours = is_numeric($hoursRaw) ? max(1, (int) $hoursRaw) : 24;
+        $nowUtc = \Carbon\Carbon::now('UTC');
+        $toIso = $to ? \Carbon\Carbon::parse($to)->timezone('UTC')->format('Y-m-d\TH:i:s\Z') : $nowUtc->format('Y-m-d\TH:i:s\Z');
+        $fromIso = $from ? \Carbon\Carbon::parse($from)->timezone('UTC')->format('Y-m-d\TH:i:s\Z') : $nowUtc->copy()->subHours($hours)->format('Y-m-d\TH:i:s\Z');
+
+        $sessionId = $user->traccarSession ?? session('cookie');
+        $resp = static::curl('/api/positions?deviceId=' . $deviceId . '&from=' . $fromIso . '&to=' . $toIso, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
+        if (!isset($resp->responseCode) || $resp->responseCode < 200 || $resp->responseCode >= 300) {
+            return response()->json([
+                'message' => 'Failed to fetch positions from tracking server',
+                'code' => $resp->responseCode ?? 0,
+                'error' => $resp->error ?? null,
+            ], 502);
+        }
+
+        $list = json_decode($resp->response, true) ?? [];
+        $limitRaw = $request->query('limit');
+        if (is_numeric($limitRaw)) {
+            $n = max(1, (int) $limitRaw);
+            if (count($list) > $n) {
+                $list = array_slice($list, count($list) - $n);
+            }
+        }
+
+        return response()->json(['positions' => $list]);
     }
 
     /**
@@ -571,5 +734,254 @@ class VehicleController extends Controller
                 'to' => $to,
             ],
         ]);
+    }
+
+    /**
+     * Consolidated performance payload for dashboard:
+     * - Summary metrics (/api/reports/summary)
+     * - Severe events counts (/api/reports/events)
+     * - Maintenance status derived from /api/maintenances and /api/permissions
+     * - Overall rating: 100 - (harshBraking * 5)
+     */
+    public function performance(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        // Release session lock early to allow concurrency with detail/trips
+        try { if (PHP_SESSION_ACTIVE === session_status()) { @session_write_close(); } } catch (\Throwable $e) {}
+        $start = microtime(true);
+        // Accept window; default last 7 days
+        $from = $request->query('from', now()->subDays(7)->toDateTimeString());
+        $to = $request->query('to', now()->toDateTimeString());
+
+        // Prepare payload for ReportService
+        $request->merge([
+            'device_id' => $deviceId,
+            'from_date' => $from,
+            'to_date' => $to,
+        ]);
+
+        // Summary/events/stops via ReportService
+        $first = null;
+        try {
+            $summaryList = $this->reportService->report_summary($request);
+            $first = is_iterable($summaryList) ? (collect($summaryList)->first() ?? null) : null;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Performance summary failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+        }
+
+        // Fallback when no summary
+        if (!$first) {
+            $first = [
+                'distance_km' => 0,
+                'spentFuel_litres' => 0,
+                'avgFuel_l_per_100km' => 0,
+                'engineHours' => 0,
+                'maxSpeed_kph' => 0,
+                'avgSpeed_kph' => 0,
+                'tripCount' => 0,
+                'stopCount' => 0,
+                'idleTime_minutes' => 0,
+                'harshBraking' => 0,
+                'harshAcceleration' => 0,
+                'overspeedEvents' => 0,
+            ];
+        }
+
+        // Current position attributes for maintenance math
+        $user = $request->user();
+        $position = null;
+        try {
+            $position = app(\App\Services\DeviceService::class)->getCurrentPosition($user, $deviceId);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Current position fetch failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+        }
+        $attrs = is_array($position) ? (is_array($position['attributes'] ?? null) ? $position['attributes'] : (json_decode($position['attributes'] ?? '[]', true) ?? [])) : [];
+        $odometerKm = $this->extractOdometerKm($attrs);
+        $engineHours = (float) ($first['engineHours'] ?? ($attrs['hours'] ?? 0));
+
+        // Maintenance status from /api/maintenances + /api/permissions
+        $maintenance = $this->computeMaintenanceStatus($request, $deviceId, $odometerKm, $engineHours);
+
+        // Overall rating per requirement
+        $harshBraking = (int) ($first['harshBraking'] ?? 0);
+        $overallRating = max(0, min(100, 100 - ($harshBraking * 5)));
+
+        return response()->json([
+            'performance' => [
+                'summary' => [
+                    'distance_km' => (float) ($first['distance_km'] ?? 0),
+                    'spentFuel_litres' => (float) ($first['spentFuel_litres'] ?? 0),
+                    'avgFuel_l_per_100km' => (float) ($first['avgFuel_l_per_100km'] ?? 0),
+                    'avgSpeed_kph' => (float) ($first['avgSpeed_kph'] ?? 0),
+                    'maxSpeed_kph' => (float) ($first['maxSpeed_kph'] ?? 0),
+                    'engineHours' => (float) ($first['engineHours'] ?? 0),
+                    'tripCount' => (int) ($first['tripCount'] ?? 0),
+                    'stopCount' => (int) ($first['stopCount'] ?? 0),
+                    'idleTime_minutes' => (float) ($first['idleTime_minutes'] ?? 0),
+                ],
+                'events' => [
+                    'harshBraking' => (int) ($first['harshBraking'] ?? 0),
+                    'harshAcceleration' => (int) ($first['harshAcceleration'] ?? 0),
+                    'overspeedEvents' => (int) ($first['overspeedEvents'] ?? 0),
+                ],
+                'maintenance' => $maintenance,
+                'rating' => [
+                    'overallScore' => $overallRating,
+                ],
+                'from' => $from,
+                'to' => $to,
+            ],
+            'latencyMs' => (int) round((microtime(true) - $start) * 1000),
+        ]);
+    }
+
+    private function extractOdometerKm(array $attrs): float
+    {
+        $metersKeys = ['totalDistance', 'distance', 'odometer_m', 'tripDistance'];
+        $kmKeys = ['odometerKm', 'mileage'];
+        $numeric = function($v) { return is_numeric($v) ? (float)$v : null; };
+
+        foreach ($kmKeys as $k) {
+            if (array_key_exists($k, $attrs)) {
+                $val = $numeric($attrs[$k]);
+                if ($val !== null) return round($val, 2);
+            }
+        }
+        foreach ($metersKeys as $k) {
+            if (array_key_exists($k, $attrs)) {
+                $val = $numeric($attrs[$k]);
+                if ($val !== null) return round($val / 1000.0, 2);
+            }
+        }
+        // Some trackers store odometer as km directly
+        if (array_key_exists('odometer', $attrs) && is_numeric($attrs['odometer'])) {
+            $odo = (float) $attrs['odometer'];
+            // Heuristic: values > 100000 likely meters
+            return round(($odo >= 100000 ? ($odo / 1000.0) : $odo), 2);
+        }
+        return 0.0;
+    }
+
+    private function computeMaintenanceStatus(Request $request, int $deviceId, float $odometerKm, float $engineHours): array
+    {
+        $sessionId = $request->user()->traccarSession ?? session('cookie');
+        $headers = ['Content-Type: application/json', 'Accept: application/json'];
+
+        // Fetch maintenances
+        $maintRaw = static::curl('/api/maintenances', 'GET', $sessionId, '', $headers);
+        $maint = json_decode($maintRaw->response ?? '[]', true) ?? [];
+        // Fetch permissions to map maintenance -> device
+        $permRaw = static::curl('/api/permissions', 'GET', $sessionId, '', $headers);
+        $perms = json_decode($permRaw->response ?? '[]', true) ?? [];
+
+        $assignedIds = collect($perms)
+            ->filter(function ($p) use ($deviceId) {
+                return (int) ($p['deviceId'] ?? 0) === (int) $deviceId && isset($p['maintenanceId']);
+            })
+            ->pluck('maintenanceId')
+            ->unique()
+            ->values();
+
+        $schedules = collect($maint)
+            ->filter(function ($m) use ($assignedIds, $deviceId) {
+                $matchAssigned = $assignedIds->contains($m['id'] ?? null);
+                $directDevice = (int)($m['deviceId'] ?? 0) === (int) $deviceId;
+                return $matchAssigned || $directDevice;
+            })
+            ->values();
+
+        if ($schedules->isEmpty()) {
+            return [
+                'statusPercent' => 100,
+                'remainingKm' => null,
+                'remainingHours' => null,
+                'nextDueDays' => null,
+                'scheduleName' => null,
+                'message' => 'No maintenance schedule assigned',
+            ];
+        }
+
+        // Prefer odometer-based schedule; then hours; then time
+        $picked = $schedules->first(function ($m) { return strtolower($m['type'] ?? '') === 'odometer' || strtolower($m['type'] ?? '') === 'distance'; })
+            ?? $schedules->first(function ($m) { return strtolower($m['type'] ?? '') === 'enginehours' || strtolower($m['type'] ?? '') === 'hours'; })
+            ?? $schedules->first();
+
+        $type = strtolower($picked['type'] ?? '');
+        $periodRaw = (float) ($picked['period'] ?? 0);
+        $startRaw = $picked['start'] ?? null;
+
+        $statusPercent = 100.0;
+        $remainingKm = null;
+        $remainingHours = null;
+        $nextDueDays = null;
+
+        if (in_array($type, ['odometer', 'distance'])) {
+            $periodKm = $periodRaw >= 1000 ? ($periodRaw / 1000.0) : $periodRaw; // meters → km heuristic
+            $periodKm = max(1.0, $periodKm);
+            $sinceCycle = $odometerKm > 0 ? fmod($odometerKm, $periodKm) : 0.0;
+            $remainingKm = round(max(0.0, $periodKm - $sinceCycle), 1);
+            $statusPercent = round(($remainingKm / $periodKm) * 100.0, 1);
+        } elseif (in_array($type, ['enginehours', 'hours'])) {
+            $periodHours = max(1.0, $periodRaw);
+            $sinceCycle = $engineHours > 0 ? fmod($engineHours, $periodHours) : 0.0;
+            $remainingHours = round(max(0.0, $periodHours - $sinceCycle), 1);
+            $statusPercent = round(($remainingHours / $periodHours) * 100.0, 1);
+        } else {
+            // time-based (ms or seconds). Approximate in days using start.
+            $now = \Carbon\Carbon::now('UTC');
+            $start = $startRaw ? \Carbon\Carbon::parse($startRaw)->timezone('UTC') : $now->copy()->subDays((int) $periodRaw);
+            // Guess unit: if very large, assume milliseconds
+            $periodSeconds = $periodRaw >= 86400 * 365 ? ($periodRaw / 1000.0) : $periodRaw; // ms → s heuristic
+            $periodDays = max(1.0, $periodSeconds / 86400.0);
+            $elapsedDays = max(0.0, $now->diffInDays($start));
+            $sinceCycle = fmod($elapsedDays, $periodDays);
+            $nextDueDays = round(max(0.0, $periodDays - $sinceCycle), 1);
+            $statusPercent = round(($nextDueDays / $periodDays) * 100.0, 1);
+        }
+
+        return [
+            'statusPercent' => max(0.0, min(100.0, $statusPercent)),
+            'remainingKm' => $remainingKm,
+            'remainingHours' => $remainingHours,
+            'nextDueDays' => $nextDueDays,
+            'scheduleName' => $picked['name'] ?? null,
+            'type' => $picked['type'] ?? null,
+        ];
+    }
+
+    /**
+     * Restore (activate) a soft-deleted vehicle.
+     */
+    public function restore(Request $request, int $deviceId)
+    {
+        $user = $request->user();
+        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
+
+        $query = \App\Models\Devices::withTrashed()->where('device_id', $deviceId);
+        if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
+            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
+        } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
+            $distId = $user->distributor_id ?? $user->id;
+            $query->where('distributor_id', $distId)->where('user_id', $user->id);
+        }
+
+        $device = $query->first();
+        if (!$device) {
+            return response()->json(['message' => 'Vehicle not found'], 404);
+        }
+        if (method_exists($device, 'trashed') && !$device->trashed()) {
+            return response()->json(['message' => 'Vehicle already active'], 200);
+        }
+
+        try {
+            $device->restore();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Vehicle restore failed', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
+            return response()->json([
+                'message' => 'Failed to activate vehicle',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json(['message' => 'Vehicle activated'], 200);
     }
 }

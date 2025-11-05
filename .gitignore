@@ -1,6 +1,7 @@
 *.log
-.DS_Store
+*.DS_Store
 .env
+/old-sample-project
 .env.backup
 .env.production
 .phpactor.json
@@ -23,3 +24,13 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+\n# Trae/Traccar analysis and generated data (do not commit)
+devices_all.json
+device_ids.txt
+positions_*.json
+positions_index.json
+positions_analysis.json
+positions_report.csv
+fuel_candidates_top.txt
+odometer_keys_top.txt
+cookies*.txt
