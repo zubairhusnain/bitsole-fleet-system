@@ -242,6 +242,10 @@ class GeofencesService
             "user_id" => $userId,
             "type"    => $type
         ];
+        // Follow driver pattern: include additional values as geofence attributes
+        $attributes["status"] = $request->status ?? null;
+        $attributes["speed"] = isset($request->speed) ? (float) $request->speed : null;
+        $attributes["distributor_id"] = $request->user()->distributor_id ?? null;
 
         $lat    = $request->lat;
         $lon    = $request->lng;
@@ -323,8 +327,9 @@ class GeofencesService
             "area"        => $wkt,
             "attributes"  => $attributes
         ];
-
         $data = json_encode($dataArray);
+
+
 
         // Make the API call using the static curl method.
         $response = static::curl(
@@ -342,6 +347,63 @@ class GeofencesService
     }
 
     /**
+     * Fetch a single geofence by ID from Traccar.
+     */
+    public function getGeofenceById($request, int $id)
+    {
+        $sessionId = $request->user()->traccarSession ?? session('cookie');
+        $resp = static::curl('/api/geofences/' . $id, 'GET', $sessionId, '', ['Accept: application/json']);
+        if (($resp->responseCode ?? 0) >= 200 && ($resp->responseCode ?? 0) < 300) {
+            $payload = json_decode($resp->response, true);
+            return $payload;
+        }
+        return null;
+    }
+
+    /**
+     * Compute WKT for a given type and coordinates.
+     * Type: circle|rectangle|polygon|route
+     */
+    public function computeWKT(string $type, array $coords = [], ?float $lat = null, ?float $lng = null, ?float $radius = null): string
+    {
+        if ($type === 'circle') {
+            return $this->createCircleWKT((float) $lat, (float) $lng, (float) $radius);
+        } elseif ($type === 'rectangle') {
+            if (count($coords) < 2) return '';
+            $p1 = $coords[0]; $p2 = $coords[1];
+            return "POLYGON(({$p1[1]} {$p1[0]}, {$p2[1]} {$p1[0]}, {$p2[1]} {$p2[0]}, {$p1[1]} {$p2[0]}, {$p1[1]} {$p1[0]}))";
+        } elseif ($type === 'polygon') {
+            if (count($coords) < 3) return '';
+            $wktPts = [];
+            foreach ($coords as $pt) { $wktPts[] = $pt[1] . ' ' . $pt[0]; }
+            if ($wktPts[0] !== end($wktPts)) { $wktPts[] = $wktPts[0]; }
+            return 'POLYGON((' . implode(', ', $wktPts) . '))';
+        } elseif ($type === 'route') {
+            if (count($coords) < 2) return '';
+            $wktPts = [];
+            foreach ($coords as $pt) { $wktPts[] = $pt[1] . ' ' . $pt[0]; }
+            return 'ROUTE(' . implode(', ', $wktPts) . ')';
+        }
+        return '';
+    }
+
+    /**
+     * Update an existing geofence in Traccar.
+     */
+    public function updateGeofence($request, int $id, string $name, string $description, string $wkt, array $attributes)
+    {
+        $sessionId = $request->user()->traccarSession ?? session('cookie');
+        $data = json_encode([
+            'id' => $id,
+            'name' => $name,
+            'description' => $description,
+            'area' => $wkt,
+            'attributes' => $attributes,
+        ]);
+        return static::curl('/api/geofences/' . $id, 'PUT', $sessionId, $data, ['Content-Type: application/json', 'Accept: application/json']);
+    }
+
+    /**
      * Helper function to create a circle approximation in WKT format.
      *
      * @param float $lat Center latitude
@@ -350,7 +412,7 @@ class GeofencesService
      * @param int   $numPoints Number of points to approximate the circle
      * @return string WKT polygon string representing the circle
      */
-    private function createCircleWKT($lat, $lon, $radius, $numPoints = 32)
+    public function createCircleWKT($lat, $lon, $radius, $numPoints = 32)
     {
         $earthRadius = 6378137; // Earth's radius in meters
         $points = [];

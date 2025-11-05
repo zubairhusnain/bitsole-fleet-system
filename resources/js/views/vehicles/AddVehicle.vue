@@ -22,12 +22,21 @@
         <div class="card-body">
           <div class="row g-3 align-items-start">
             <div class="col-12 col-md-4">
-              <label class="form-label small">Vehicle ID</label>
+              <label class="form-label small">Device ID ( IMEI )</label>
               <input v-model="form.uniqueId" type="text" class="form-control" placeholder="VHCL-1016" />
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label small">Vehicle Name</label>
-              <input v-model="form.name" type="text" class="form-control" placeholder="Vehicle Name" />
+              <label class="form-label small">Tracker Model</label>
+              <select v-model="form.attributes.trackerModel" class="form-select">
+                <option value="">-- Select Tracker Model --</option>
+                <option>Teltonika-FMC-003</option>
+                <option>Teltonika-FMC-150</option>
+                <option>Teltonika-FMC-130</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Device Name</label>
+              <input v-model="form.name" type="text" class="form-control" placeholder="Device Name" />
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Vehicle Type</label>
@@ -82,6 +91,10 @@
             <div class="col-12 col-md-4">
               <label class="form-label small">Max Speed</label>
               <input v-model="form.attributes.maxSpeed" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="Max Speed" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Fuel Tank Capacity (Liters)</label>
+              <input v-model.number="form.attributes.fuelTankCapacity" type="number" min="0" step="0.1" inputmode="decimal" class="form-control" placeholder="e.g. 60" />
             </div>
           </div>
         </div>
@@ -143,7 +156,9 @@ const form = reactive({
     vin: '',
     odometer: '',
     fuelAverage: '',
-    maxSpeed: ''
+    maxSpeed: '',
+    trackerModel: '',
+    fuelTankCapacity: ''
   },
 
 });

@@ -46,14 +46,17 @@
                                 <th class="fw-semibold py-2">Odometer</th>
                                 <th class="fw-semibold py-2">Ignition</th>
                                 <th class="fw-semibold py-2">Speed (Km/h)</th>
-                                <th class="fw-semibold py-2">Location</th>
+                                <th class="fw-semibold py-2">Fuel Level</th>
                                 <th class="fw-semibold py-2 text-end">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-for="row in pagedRows" :key="row.device_id" class="border-bottom">
                                 <td class="text-muted text-nowrap">{{ row.uniqueid ?? '—' }}</td>
-                                <td class="text-muted text-nowrap">{{ row.name ?? '—' }}</td>
+                                <td class="text-muted text-nowrap">
+                                    {{ row.name ?? '—' }}
+                                    <span v-if="row.blocked" class="badge rounded-pill bg-danger ms-2">Blocked</span>
+                                </td>
                                 <td class="text-muted text-nowrap">{{ row.vin ?? '—' }}</td>
                                 <td class="text-muted text-nowrap">{{ row.plate ?? '—' }}</td>
                                 <td class="text-muted text-nowrap">{{ row.odometer ?? '—' }}</td>
@@ -69,15 +72,23 @@
                                         {{ row.speed ?? '—' }}
                                     </span>
                                 </td>
-                                <td class="text-muted text-nowrap">{{ row.location ?? '—' }}</td>
+                                <td class="text-muted text-nowrap">{{ row.fuel ?? '—' }}</td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i
+                                        <button v-if="!row.blocked" class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i
                                                 class="bi bi-pencil"></i></button>
-                                        <button v-if="showDeviceDetailLink" class="btn btn-outline-primary" title="View" @click="toDetail(row)">
+                                        <button v-if="!row.blocked && hasLocation(row)" class="btn d-none btn-outline-primary" title="View" @click="toDetail(row)">
                                             <i class="bi bi-eye"></i>
                                         </button>
-                                        <button class="btn btn-outline-danger" title="Delete" @click="remove(row)"
+                                        <button v-if="!row.blocked" class="btn btn-outline-warning" title="Block" @click="block(row)"
+                                            :disabled="blocking[row.device_id] === true">
+                                            <i class="bi bi-slash-circle"></i>
+                                        </button>
+                                        <button v-if="row.blocked" class="btn btn-outline-success" title="Activate" @click="activate(row)"
+                                            :disabled="activating[row.device_id] === true">
+                                            <i class="bi bi-check-circle"></i>
+                                        </button>
+                                        <button v-if="row.blocked" class="btn btn-outline-danger" title="Permanent Delete" @click="permanentRemove(row)"
                                             :disabled="deleting[row.device_id] === true">
                                             <i class="bi bi-trash"></i>
                                         </button>
@@ -115,6 +126,7 @@ import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
 import Swal from 'sweetalert2';
 import UiAlert from '../../components/UiAlert.vue';
+import { formatTelemetry } from '../../utils/telemetry';
 
 const router = useRouter();
 const route = useRoute();
@@ -125,6 +137,8 @@ const loading = ref(false);
 const error = ref('');
 const rows = ref([]);
 const deleting = ref({});
+const blocking = ref({});
+const activating = ref({});
 const meta = ref({ total: 0, current_page: 1, per_page: 25 });
 
 // hide device detail link in production
@@ -177,6 +191,22 @@ function pickAttr(attrs, keys) {
     }
     return null;
 }
+// Helper to pick attribute value and also know which key matched
+function pickAttrWithKey(attrs, keys) {
+    for (const k of keys) {
+        const val = attrs?.[k];
+        if (val !== undefined && val !== null && val !== '') return { key: k, value: val };
+    }
+    return { key: null, value: null };
+}
+// Extract numeric value from a string or number (handles commas and unit suffixes)
+function extractNumber(raw) {
+    if (raw == null) return NaN;
+    if (typeof raw === 'number') return raw;
+    const s = String(raw);
+    const match = s.replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+    return match ? Number(match[0]) : NaN;
+}
 function deriveRow(r) {
     const tc = r?.tc_device ?? r?.tcDevice ?? {};
     const attrs = parseAttrs(tc.attributes);
@@ -186,8 +216,11 @@ function deriveRow(r) {
     const name = r.name ?? tc.name ?? pickAttr(attrs, ['name']);
     const vin = r.vin ?? pickAttr(attrs, ['vin', 'VIN']);
     const plate = r.plate ?? pickAttr(attrs, ['plate', 'licensePlate', 'registration', 'regNumber']);
-    const odometer = r.odometer ?? pickAttr(attrs, ['odometer', 'mileage', 'odometerKm', 'odometer_km']);
-
+    const model = r.model ?? tc.model ?? pickAttr(attrs, ['model']);
+    const capacity = attrs.fuelTankCapacity ?? attrs.FuelTankCapacity ?? attrs.fueltankcapacity ?? null;
+    // Odometer via shared telemetry formatter (position-first, protocol-aware)
+    const tel = formatTelemetry(pos.attributes, { protocol: pos.protocol, model, capacity });
+    const odometer = tel?.odometer?.display ?? null;
     // ignition: prefer tc.position.attributes.ignition, fallback to tc_device.attributes
     const ignRaw = posAttrs.ignition ?? (r.ignition ?? pickAttr(attrs, ['ignition', 'Ignition']));
     const ignition = ignRaw === true || ignRaw === 1 || String(ignRaw).toLowerCase() === 'on'
@@ -215,8 +248,98 @@ function deriveRow(r) {
         coords = `${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}`;
     }
     const location = pos.address ?? (r.location ?? pickAttr(attrs, ['address', 'location'])) ?? coords;
+    let fuel = null;
+    if (tel?.fuel) {
+        const liters = tel.fuel.liters;
+        const percent = tel.fuel.percent;
+        if (liters != null && percent != null) fuel = `${liters} L (${percent}%)`;
+        else if (liters != null) fuel = `${liters} L`;
+        else if (percent != null) fuel = `${percent}%`;
+    }
 
-    return { ...r, uniqueid, name, vin, plate, odometer, ignition, speed, location };
+    const blocked = !!(r?.deleted_at || r?.deletedAt || r?.blocked);
+    return { ...r, uniqueid, name, vin, plate, model, odometer, ignition, speed, location, fuel, blocked };
+}
+
+async function block(row) {
+    if (!row?.device_id && !row?.deviceId) return;
+    const id = row.device_id || row.deviceId;
+    const result = await Swal.fire({
+        title: `Block vehicle ${row.name || id}?`,
+        text: 'This will hide it and mark as blocked.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Block',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#f59f00',
+    });
+    if (!result.isConfirmed) return;
+    blocking.value[id] = true;
+    error.value = '';
+    try {
+        await axios.delete(`/web/vehicles/${id}`);
+        await Swal.fire({ title: 'Blocked', text: 'Vehicle has been blocked.', icon: 'success', timer: 1200, showConfirmButton: false });
+        refresh();
+    } catch (e) {
+        error.value = e?.response?.data?.message || 'Failed to block vehicle.';
+        await Swal.fire({ title: 'Block failed', text: error.value, icon: 'error' });
+    } finally {
+        blocking.value[id] = false;
+    }
+}
+
+async function permanentRemove(row) {
+    if (!row?.device_id && !row?.deviceId) return;
+    const id = row.device_id || row.deviceId;
+    const result = await Swal.fire({
+        title: `Permanently delete ${row.name || id}?`,
+        text: 'This action cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#d33',
+    });
+    if (!result.isConfirmed) return;
+    deleting.value[id] = true;
+    error.value = '';
+    try {
+        await axios.delete(`/web/vehicles/${id}`, { params: { force: 1 } });
+        rows.value = rows.value.filter(r => (r.device_id || r.deviceId) !== id);
+        await Swal.fire({ title: 'Deleted', text: 'Vehicle has been permanently deleted.', icon: 'success', timer: 1400, showConfirmButton: false });
+    } catch (e) {
+        error.value = e?.response?.data?.message || 'Failed to delete vehicle.';
+        await Swal.fire({ title: 'Delete failed', text: error.value, icon: 'error' });
+    } finally {
+        deleting.value[id] = false;
+    }
+}
+
+async function activate(row) {
+    if (!row?.device_id && !row?.deviceId) return;
+    const id = row.device_id || row.deviceId;
+    const result = await Swal.fire({
+        title: `Activate vehicle ${row.name || id}?`,
+        text: 'This will restore the vehicle and show it in the list.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Activate',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#28a745',
+    });
+    if (!result.isConfirmed) return;
+    activating.value[id] = true;
+    error.value = '';
+    try {
+        await axios.patch(`/web/vehicles/${id}/restore`);
+        await Swal.fire({ title: 'Activated', text: 'Vehicle has been activated.', icon: 'success', timer: 1200, showConfirmButton: false });
+        refresh();
+    } catch (e) {
+        error.value = e?.response?.data?.message || 'Failed to activate vehicle.';
+        await Swal.fire({ title: 'Activate failed', text: error.value, icon: 'error' });
+    } finally {
+        activating.value[id] = false;
+    }
 }
 
 const rowsHydrated = computed(() => rows.value.map(r => deriveRow(r)));
@@ -281,6 +404,21 @@ function stringifyAttr(v) {
 function goPage(n) { if (n >= 1 && n <= totalPages.value) { page.value = n; fetchPage(n); } }
 function prevPage() { goPage(page.value - 1); }
 function nextPage() { goPage(page.value + 1); }
+
+// Show "View" only for vehicles that have a known position
+function hasLocation(row) {
+    const tc = row?.tc_device ?? row?.tcDevice ?? {};
+    const pos = tc?.position || {};
+    const toNum = (v) => {
+        const n = typeof v === 'string' ? parseFloat(v) : v;
+        return Number.isFinite(n) ? n : null;
+    };
+    const lat = toNum(pos.latitude ?? pos.lat ?? null);
+    const lon = toNum(pos.longitude ?? pos.lon ?? null);
+    if (typeof lat === 'number' && typeof lon === 'number') return true;
+    const pid = row?.positionId ?? row?.positionid ?? tc?.positionId ?? tc?.positionid ?? null;
+    return pid != null;
+}
 
 async function remove(row) {
     if (!row?.device_id) return;

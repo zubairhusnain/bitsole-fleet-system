@@ -18,9 +18,11 @@
         "vue-router": "^4.6.2"
     },
     "dependencies": {
+        "@geoman-io/leaflet-geoman-free": "^2.18.3",
         "@vue-leaflet/vue-leaflet": "^0.10.1",
         "laravel-echo": "^2.2.4",
         "leaflet": "^1.9.4",
+        "leaflet-geosearch": "^4.2.2",
         "pusher-js": "^8.4.0",
         "sweetalert2": "^11.26.2",
         "vue-leaflet": "^0.1.0"
