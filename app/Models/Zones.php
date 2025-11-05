@@ -16,23 +16,12 @@ class Zones extends Model
         'user_id',
         'distributor_id',
         'geofence_id',
-        'name',
-        'description',
-        'status',
-        'speed',
-        'coordinates',
-        'radius',
-        'polygon',
     ];
 
     protected $casts = [
         'user_id' => 'integer',
         'distributor_id' => 'integer',
         'geofence_id' => 'integer',
-        'speed' => 'float',
-        'radius' => 'float',
-        'coordinates' => 'array',
-        'polygon' => 'array',
     ];
 
     public function user()

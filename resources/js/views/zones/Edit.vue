@@ -89,22 +89,6 @@
             <l-marker v-for="(p,i) in rectanglePoints" :key="'rect-'+i" :lat-lng="p" :draggable="true" @dragend="onDrawMarkerDragEnd('rectangle', i, $event)" />
             <l-marker v-if="searchMarkerLatLng" :lat-lng="searchMarkerLatLng" :draggable="true" @dragend="onSearchMarkerDragEnd" />
           </l-map>
-          <div class="map-controls">
-            <div class="btn-group btn-group-sm" role="group" aria-label="Basemap">
-              <button type="button" class="btn btn-light" :class="{active: basemap === 'map'}" @click="basemap = 'map'">Map</button>
-              <button type="button" class="btn btn-light" :class="{active: basemap === 'sat'}" @click="basemap = 'sat'">Satellite</button>
-            </div>
-            <div class="input-group input-group-sm ms-2" style="max-width: 340px;">
-              <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
-              <input type="text" class="form-control" placeholder="Search address" v-model="searchQuery" @keyup.enter="searchAddress" />
-              <button class="btn btn-light" @click="searchAddress">Search</button>
-            </div>
-            <div class="btn-group btn-group-sm ms-2" role="group" aria-label="Drawing" v-if="form.type !== 'circle'">
-              <button type="button" class="btn btn-light" :class="{active: drawing}" @click="toggleDrawing"><i class="bi bi-vector-pen me-1"></i> {{ drawing ? 'Drawing…' : 'Start Draw' }}</button>
-              <button type="button" class="btn btn-light" @click="finishDrawing" :disabled="!polygonPoints.length && form.type==='polygon' && !rectanglePoints.length">Finish</button>
-              <button type="button" class="btn btn-light" @click="clearShapes">Clear</button>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -136,7 +120,7 @@ import UiAlert from '../../components/UiAlert.vue';
 
 const route = useRoute();
 const router = useRouter();
-const zoneId = route.params.zoneId;
+const zoneId = ref(route.params.zoneId);
 
 const form = reactive({
   name: '',
@@ -173,6 +157,7 @@ const mapKey = ref(0);
 const tileAttribution = '© OpenStreetMap contributors';
 const mapOptions = { zoomControl: true };
 const mapRef = ref(null);
+const suppressTypeWatch = ref(false);
 
 const tileUrl = computed(() => {
   return basemap.value === 'sat'
@@ -186,6 +171,8 @@ const rectanglePoints = ref([]);
 const drawing = ref(false);
 const searchQuery = ref('');
 const searchMarkerLatLng = ref(null);
+// Persist the originally loaded shape so type switching can re-render exact geometry
+const loadedShape = ref({ type: null, coordinates: [], lat: null, lng: null, radius: null });
 
 // Sync basic form fields into geofenceInfo
 watch(() => form.name, (v) => { geofenceInfo.name = String(v || '').trim(); });
@@ -238,6 +225,148 @@ function setupGoogleAutocomplete(input, onPlaceSelected, clearSuggestionsCb) {
   } catch {}
 }
 
+// Helper: parse WKT area string from Traccar into a shape
+function parseWKTArea(area) {
+  try {
+    const s = String(area || '').trim();
+    if (!s) return null;
+    // Helper: haversine distance (meters)
+    const toRad = (deg) => deg * Math.PI / 180;
+    const haversine = (lat1, lon1, lat2, lon2) => {
+      const R = 6378137; // meters
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    };
+    const isApproxCircle = (ptsLatLng) => {
+      if (!Array.isArray(ptsLatLng) || ptsLatLng.length < 16) return null; // need enough points to test roundness
+      // compute centroid
+      let sumLat = 0, sumLng = 0; ptsLatLng.forEach(p => { sumLat += p[0]; sumLng += p[1]; });
+      const centLat = sumLat / ptsLatLng.length; const centLng = sumLng / ptsLatLng.length;
+      // distances
+      const dists = ptsLatLng.map(p => haversine(centLat, centLng, p[0], p[1]));
+      const mean = dists.reduce((a,b)=>a+b,0) / dists.length;
+      const varSum = dists.reduce((a,b)=> a + Math.pow(b-mean,2), 0) / dists.length;
+      const std = Math.sqrt(varSum);
+      const ratio = std / (mean || 1);
+      if (ratio < 0.05) { // within 5% -> circle-like
+        return { lat: centLat, lng: centLng, radius: Math.round(mean) };
+      }
+      return null;
+    };
+    if (s.startsWith('POLYGON')) {
+      const m = s.match(/\(\((.*)\)\)/);
+      const body = m ? m[1] : '';
+      const parts = body.split(',').map(p => p.trim()).filter(Boolean);
+      const pts = parts.map(pair => pair.split(/[\s]+/).map(Number)).filter(a => a.length === 2 && a.every(v => Number.isFinite(v))).map(([lon, lat]) => [lat, lon]);
+      // Remove closing duplicate if present
+      if (pts.length >= 2) {
+        const first = pts[0];
+        const last = pts[pts.length - 1];
+        if (first[0] === last[0] && first[1] === last[1]) pts.pop();
+      }
+      // Detect circle-like polygon and return circle
+      const circleLike = isApproxCircle(pts);
+      if (circleLike) {
+        return { type: 'circle', lat: circleLike.lat, lng: circleLike.lng, radius: circleLike.radius, coordinates: [[circleLike.lat, circleLike.lng]] };
+      }
+      return { type: 'polygon', coordinates: pts };
+    }
+    // Traccar may use LINESTRING for routes
+    if (s.startsWith('LINESTRING')) {
+      const m = s.match(/LINESTRING\s*\((.*)\)/);
+      const body = m ? m[1] : '';
+      const parts = body.split(',').map(p => p.trim()).filter(Boolean);
+      const pts = parts.map(pair => pair.split(/[\s]+/).map(Number)).filter(a => a.length === 2 && a.every(v => Number.isFinite(v))).map(([lon, lat]) => [lat, lon]);
+      return { type: 'route', coordinates: pts };
+    }
+    if (s.startsWith('CIRCLE')) {
+      // Example: CIRCLE (lat lon, radius)
+      const m = s.match(/CIRCLE\s*\(([-+]?\d+(?:\.\d+)?)\s+([-+]?\d+(?:\.\d+)?),\s*([-+]?\d+(?:\.\d+)?)\)/);
+      if (m) {
+        const lat = parseFloat(m[1]);
+        const lon = parseFloat(m[2]);
+        const radius = parseFloat(m[3]);
+        if (Number.isFinite(lat) && Number.isFinite(lon) && Number.isFinite(radius)) {
+          return { type: 'circle', lat, lng: lon, radius, coordinates: [[lat, lon]] };
+        }
+      }
+    }
+    if (s.startsWith('ROUTE')) {
+      const m = s.match(/ROUTE\s*\((.*)\)/);
+      const body = m ? m[1] : '';
+      const parts = body.split(',').map(p => p.trim()).filter(Boolean);
+      const pts = parts.map(pair => pair.split(/[\s]+/).map(Number)).filter(a => a.length === 2 && a.every(v => Number.isFinite(v))).map(([lon, lat]) => [lat, lon]);
+      return { type: 'route', coordinates: pts };
+    }
+  } catch {}
+  return null;
+}
+
+function fitMapToCurrentShape() {
+  const map = mapRef.value;
+  try {
+    if (!map) return;
+    if (Array.isArray(polygonPoints.value) && polygonPoints.value.length) {
+      const bounds = L.latLngBounds(polygonPoints.value.map(p => L.latLng(p[0], p[1])));
+      map.fitBounds(bounds, { padding: [24, 24] });
+      return;
+    }
+    if (Array.isArray(rectanglePoints.value) && rectanglePoints.value.length === 2) {
+      const [p1, p2] = rectanglePoints.value;
+      const minLat = Math.min(p1[0], p2[0]);
+      const maxLat = Math.max(p1[0], p2[0]);
+      const minLng = Math.min(p1[1], p2[1]);
+      const maxLng = Math.max(p1[1], p2[1]);
+      const bounds = L.latLngBounds(L.latLng(minLat, minLng), L.latLng(maxLat, maxLng));
+      map.fitBounds(bounds, { padding: [24, 24] });
+      return;
+    }
+    if (Array.isArray(circleCenter.value) && circleCenter.value.length === 2) {
+      map.setView(L.latLng(circleCenter.value[0], circleCenter.value[1]), Math.max(13, map.getZoom()));
+      return;
+    }
+    // Default: center marker
+    if (Array.isArray(center.value)) {
+      map.setView(L.latLng(center.value[0], center.value[1]), Math.max(13, map.getZoom()));
+    }
+  } catch {}
+}
+
+function renderLoadedShape() {
+  // Re-render the saved geometry regardless of current form.type
+  circleCenter.value = null; polygonPoints.value = []; rectanglePoints.value = []; form.coordinates = ''; form.polygon = '';
+  const s = loadedShape.value || {};
+  if (!s || !s.type) return;
+  if (s.type === 'circle' && s.lat != null && s.lng != null && Number.isFinite(s.radius)) {
+    form.type = 'circle'; geofenceInfo.type = 'circle';
+    circleCenter.value = [s.lat, s.lng];
+    geofenceInfo.lat = s.lat; geofenceInfo.lng = s.lng; geofenceInfo.radius = s.radius;
+    geofenceInfo.coordinates = [[s.lat, s.lng]];
+    form.coordinates = `${s.lat},${s.lng}`;
+    form.radius = s.radius;
+    center.value = [s.lat, s.lng];
+  } else if (s.type === 'polygon' && Array.isArray(s.coordinates) && s.coordinates.length >= 3) {
+    form.type = 'polygon'; geofenceInfo.type = 'polygon';
+    polygonPoints.value = s.coordinates.map(p => [p[0], p[1]]);
+    geofenceInfo.coordinates = polygonPoints.value.map(p => [p[0], p[1]]);
+    form.polygon = polygonPoints.value.map(p => `${p[0]},${p[1]}`).join('; ');
+    const c0 = polygonPoints.value[0]; center.value = [c0[0], c0[1]];
+  } else if (s.type === 'rectangle' && Array.isArray(s.coordinates) && s.coordinates.length === 2) {
+    form.type = 'rectangle'; geofenceInfo.type = 'rectangle';
+    const p1 = s.coordinates[0]; const p2 = s.coordinates[1];
+    rectanglePoints.value = [[p1[0], p1[1]], [p2[0], p2[1]]];
+    geofenceInfo.coordinates = [[p1[0], p1[1]], [p2[0], p2[1]]];
+    form.coordinates = `${p1[0]},${p1[1]}; ${p2[0]},${p2[1]}`;
+    const minLat = Math.min(p1[0], p2[0]); const maxLat = Math.max(p1[0], p2[0]); const minLng = Math.min(p1[1], p2[1]); const maxLng = Math.max(p1[1], p2[1]);
+    polygonPoints.value = [[minLat,minLng],[minLat,maxLng],[maxLat,maxLng],[maxLat,minLng]];
+    center.value = [ (p1[0]+p2[0])/2, (p1[1]+p2[1])/2 ];
+  }
+  updateGeomanControls();
+  setTimeout(() => { try { const m = mapRef.value; m && m.invalidateSize(true); fitMapToCurrentShape(); } catch {} }, 40);
+}
 function onMapReady(map) {
   mapRef.value = map;
   attachGeocoderControl(map);
@@ -302,6 +431,13 @@ onMounted(() => {
   loadZone();
 });
 
+// Reload when navigating between different edit URLs without component unmount
+watch(() => route.params.zoneId, (v) => {
+  if (!v || v === zoneId.value) return;
+  zoneId.value = v;
+  loadZone();
+});
+
 function toPolygonString(arr) {
   if (!Array.isArray(arr) || !arr.length) return '';
   return arr.map(p => Array.isArray(p) && p.length === 2 ? `${p[0]},${p[1]}` : '').filter(Boolean).join('; ');
@@ -310,44 +446,56 @@ function toPolygonString(arr) {
 async function loadZone() {
   error.value = '';
   try {
-    const { data } = await axios.get(`/web/zones/${zoneId}`);
+    suppressTypeWatch.value = true;
+    const { data } = await axios.get(`/web/zones/${zoneId.value}`);
     const z = data?.zone;
-    if (!z) throw new Error('Zone not found');
-    form.name = z.name || '';
-    form.speed = typeof z.speed === 'number' ? z.speed : undefined;
-    form.status = z.status || 'active';
-    form.description = z.description || '';
+    const remote = data?.geofence;
+    console.log('remote zone ',remote);
+    if (!z || !remote) throw new Error('Zone or geofence not found');
+    geofenceInfo.geofenceId = String(z.geofence_id || '');
+    // Read primary fields from remote geofence
+    form.name = String(remote?.name || '').trim();
+    form.description = String(remote?.description || '').trim();
+    // Attributes may be an object or a JSON string; normalize
+    let attrs = remote?.attributes || {};
+    if (typeof attrs === 'string') {
+      try { const parsed = JSON.parse(attrs); if (parsed && typeof parsed === 'object') attrs = parsed; } catch {}
+    }
+    form.status = String(attrs?.status || 'active');
+    form.speed = Number.isFinite(parseFloat(attrs?.speed)) ? parseFloat(attrs.speed) : undefined;
     geofenceInfo.name = form.name;
     geofenceInfo.address = form.description;
-    geofenceInfo.geofenceId = String(z.geofence_id || '');
-    // coordinates may be array or string; normalize to string input
-    if (Array.isArray(z.coordinates)) {
-      if (z.coordinates.length === 1 && Array.isArray(z.coordinates[0])) {
-        form.coordinates = `${z.coordinates[0][0]},${z.coordinates[0][1]}`;
-        geofenceInfo.lat = z.coordinates[0][0];
-        geofenceInfo.lng = z.coordinates[0][1];
-        geofenceInfo.coordinates = [[z.coordinates[0][0], z.coordinates[0][1]]];
-      } else if (z.coordinates.length >= 2) {
-        const p1 = z.coordinates[0]; const p2 = z.coordinates[1];
-        form.coordinates = `${p1[0]},${p1[1]}; ${p2[0]},${p2[1]}`;
-        geofenceInfo.coordinates = [[p1[0], p1[1]], [p2[0], p2[1]]];
-      }
+    // Reset map state
+    circleCenter.value = null; polygonPoints.value = []; rectanglePoints.value = []; form.coordinates = ''; form.polygon = '';
+    // Parse WKT area only (ignore attributes.coordinates per request)
+    const parsed = parseWKTArea(remote?.area || '');
+    if (parsed && parsed.type === 'circle' && parsed.lat != null && parsed.lng != null) {
+      form.type = 'circle'; geofenceInfo.type = 'circle';
+      circleCenter.value = [parsed.lat, parsed.lng];
+      geofenceInfo.lat = parsed.lat; geofenceInfo.lng = parsed.lng;
+      geofenceInfo.radius = Number.isFinite(parsed.radius) ? parsed.radius : (typeof attrs?.radius === 'number' ? attrs.radius : (form.radius || 1000));
+      geofenceInfo.coordinates = [[parsed.lat, parsed.lng]];
+      form.coordinates = `${parsed.lat},${parsed.lng}`;
+      form.radius = geofenceInfo.radius;
+      center.value = [parsed.lat, parsed.lng];
+      loadedShape.value = { type: 'circle', lat: parsed.lat, lng: parsed.lng, radius: geofenceInfo.radius };
+    } else if (parsed && (parsed.type === 'polygon' || parsed.type === 'route') && Array.isArray(parsed.coordinates) && parsed.coordinates.length >= (parsed.type === 'route' ? 2 : 3)) {
+      form.type = 'polygon'; geofenceInfo.type = 'polygon';
+      polygonPoints.value = parsed.coordinates;
+      geofenceInfo.coordinates = polygonPoints.value.map(p => [p[0], p[1]]);
+      form.polygon = polygonPoints.value.map(p => `${p[0]},${p[1]}`).join('; ');
+      const c0 = polygonPoints.value[0]; center.value = [c0[0], c0[1]];
+      loadedShape.value = { type: 'polygon', coordinates: polygonPoints.value.map(p => [p[0], p[1]]) };
     } else {
-      form.coordinates = String(z.coordinates || '');
+      // If area is missing or unparsable, leave demo fallback
     }
-    form.radius = typeof z.radius === 'number' ? z.radius : undefined;
-    if (typeof z.radius === 'number') geofenceInfo.radius = z.radius;
-    form.polygon = toPolygonString(z.polygon);
-    if (Array.isArray(z.polygon) && z.polygon.length) {
-      geofenceInfo.coordinates = z.polygon.map(p => [p[0], p[1]]);
-    } else if (typeof form.polygon === 'string' && form.polygon.length) {
-      const pts = form.polygon.split(';').map(s => s.trim()).map(p => p.split(',').map(Number)).filter(p => p.length === 2 && p.every(v => !Number.isNaN(v)));
-      if (pts.length >= 3) geofenceInfo.coordinates = pts;
-    }
-    form.type = z.type || (z.radius ? 'circle' : (form.coordinates && String(form.coordinates).includes(';') ? 'rectangle' : (form.polygon ? 'polygon' : 'polygon')));
-    geofenceInfo.type = form.type;
-    // draw on map from inputs
-    drawFromInputs();
+    // Ensure controls reflect type
+    updateGeomanControls();
+    // Fit map to current shape for visibility
+    setTimeout(() => { try { const m = mapRef.value; m && m.invalidateSize(true); fitMapToCurrentShape(); } catch {} }, 50);
+    suppressTypeWatch.value = false;
+    // Debug: log what was parsed to help diagnose if shape still missing
+    try { console.debug('[Edit] Geofence loaded', { remote, attrs, type: form.type, polygonPoints: polygonPoints.value, rectanglePoints: rectanglePoints.value, circleCenter: circleCenter.value, radius: form.radius }); } catch {}
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'Failed to load zone';
   }
@@ -358,6 +506,19 @@ async function submit() {
   error.value = '';
   submitting.value = true;
   try {
+    // Front-end validation
+    const errs = [];
+    const t = form.type;
+    if (!String(form.name || '').trim()) errs.push('Name is required');
+    if (t === 'circle') {
+      if (!(Array.isArray(geofenceInfo.coordinates) && geofenceInfo.coordinates.length===1)) errs.push('Select circle center');
+      if (!(typeof geofenceInfo.radius === 'number' && geofenceInfo.radius > 0)) errs.push('Radius must be greater than 0');
+    } else if (t === 'rectangle') {
+      if (!(Array.isArray(geofenceInfo.coordinates) && geofenceInfo.coordinates.length===2)) errs.push('Complete rectangle with two corners');
+    } else if (t === 'polygon') {
+      if (!(Array.isArray(geofenceInfo.coordinates) && geofenceInfo.coordinates.length>=3)) errs.push('Polygon requires at least 3 points');
+    }
+    if (errs.length) { error.value = errs.join('\n'); submitting.value = false; return; }
     // derive payload based on type
     if (form.type === 'circle') {
       form.polygon = '';
@@ -393,7 +554,7 @@ async function submit() {
       polygon: form.type === 'polygon' ? polyStr : null,
       type: geofenceInfo.type || form.type,
     };
-    const { data } = await axios.put(`/web/zones/${zoneId}`, payload);
+    const { data } = await axios.put(`/web/zones/${zoneId.value}`, payload);
     message.value = data?.message || 'Zone updated';
     setTimeout(() => router.push('/zones'), 400);
   } catch (e) {
@@ -804,16 +965,13 @@ function clearGeomanLayers() {
 }
 
 watch(() => form.type, () => {
-  clearShapes();
-  updateGeomanControls();
-  drawing.value = form.type !== 'circle';
-  searchMarkerLatLng.value = null;
-  mapKey.value++;
-  const map = mapRef.value; try { map && map.invalidateSize(true); } catch {}
   geofenceInfo.type = form.type;
-  geofenceInfo.coordinates = [];
-  geofenceInfo.lat = null;
-  geofenceInfo.lng = null;
+  if (suppressTypeWatch.value) {
+    updateGeomanControls();
+    const map = mapRef.value; try { map && map.invalidateSize(true); } catch {}
+    return;
+  }
+  renderLoadedShape();
 });
 
 async function searchAddress() {
@@ -873,7 +1031,7 @@ async function searchAddress() {
 <style scoped>
 .map-frame { position: relative; height: 380px; border-radius: 12px; overflow: hidden; }
 #zoneEditMap { height: 100%; width: 100%; }
-.map-controls { position: absolute; left: 8px; bottom: 8px; display: flex; align-items: center; }
+.map-controls { position: absolute; left: 8px; bottom: 8px; display: flex; align-items: center; z-index: 1000; }
 .map-controls .btn-group .btn { background: #fff; border-color: #ddd; }
 .map-controls .btn-group .btn.active { background: #0b0f28; color: #fff; }
 .btn-app-dark { background-color: #0b0f28; color: #fff; border-radius: 12px; padding: .5rem .75rem; }

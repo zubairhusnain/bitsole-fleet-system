@@ -89,7 +89,7 @@
             <l-marker v-for="(p,i) in rectanglePoints" :key="'rect-'+i" :lat-lng="p" :draggable="true" @dragend="onDrawMarkerDragEnd('rectangle', i, $event)" />
             <l-marker v-if="searchMarkerLatLng" :lat-lng="searchMarkerLatLng" :draggable="true" @dragend="onSearchMarkerDragEnd" />
           </l-map>
-          <div class="map-controls">
+          <!-- map-controls removed
             <div class="btn-group btn-group-sm" role="group" aria-label="Basemap">
               <button type="button" class="btn btn-light" :class="{active: basemap === 'map'}" @click="basemap = 'map'">Map</button>
               <button type="button" class="btn btn-light" :class="{active: basemap === 'sat'}" @click="basemap = 'sat'">Satellite</button>
@@ -104,7 +104,7 @@
               <button type="button" class="btn btn-light" @click="finishDrawing" :disabled="!polygonPoints.length && form.type==='polygon' && !rectanglePoints.length">Finish</button>
               <button type="button" class="btn btn-light" @click="clearShapes">Clear</button>
             </div>
-          </div>
+          -->
         </div>
       </div>
 
@@ -152,7 +152,7 @@ const form = reactive({
 const geofenceInfo = reactive({
   lat: null,
   lng: null,
-  radius: 200,
+  radius: null,
   name: '',
   address: '',
   user_id: '',
@@ -190,7 +190,13 @@ const searchMarkerLatLng = ref(null);
 watch(() => form.name, (v) => { geofenceInfo.name = String(v || '').trim(); });
 watch(() => form.description, (v) => { geofenceInfo.address = String(v || '').trim(); });
 watch(() => form.radius, (v) => { geofenceInfo.radius = typeof v === 'number' ? v : geofenceInfo.radius; });
-watch(() => form.type, (v) => { geofenceInfo.type = v; geofenceInfo.coordinates = []; geofenceInfo.lat = null; geofenceInfo.lng = null; });
+watch(() => form.type, (v) => {
+  geofenceInfo.type = v;
+  geofenceInfo.coordinates = [];
+  geofenceInfo.lat = null;
+  geofenceInfo.lng = null;
+  if (v !== 'circle') { geofenceInfo.radius = null; form.radius = undefined; }
+});
 
 // Google Places loader (optional, used if API key provided)
 let googlePlacesPromise = null;
@@ -816,7 +822,7 @@ async function submit() {
       status: form.status || 'active',
       speed: typeof form.speed === 'number' ? form.speed : null,
       coordinates: form.type === 'circle' ? coordsStringCircle : (form.type === 'rectangle' ? coordsStringRect : null),
-      radius: typeof geofenceInfo.radius === 'number' ? geofenceInfo.radius : (typeof form.radius === 'number' ? form.radius : null),
+      radius: form.type === 'circle' ? (typeof geofenceInfo.radius === 'number' ? geofenceInfo.radius : (typeof form.radius === 'number' ? form.radius : null)) : null,
       polygon: form.type === 'polygon' ? polygonString : null,
       type: geofenceInfo.type || form.type,
     };
@@ -836,6 +842,7 @@ async function submit() {
 .map-frame { position: relative; height: 380px; border-radius: 12px; overflow: hidden; }
 #zoneAddMap { height: 100%; width: 100%; }
 .map-controls { position: absolute; left: 8px; bottom: 8px; display: flex; align-items: center; }
+.map-controls { z-index: 1000; }
 .map-controls .btn-group .btn { background: #fff; border-color: #ddd; }
 .map-controls .btn-group .btn.active { background: #0b0f28; color: #fff; }
 .btn-app-dark { background-color: #0b0f28; color: #fff; border-radius: 12px; padding: .5rem .75rem; }

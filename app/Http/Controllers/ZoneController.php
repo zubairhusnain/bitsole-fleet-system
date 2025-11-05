@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Zones;
 use App\Models\User;
+use App\Models\TcGeofence;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -19,6 +20,14 @@ class ZoneController extends Controller
         // Optional: include soft-deleted (blocked) zones
         $query = $request->boolean('withDeleted') ? Zones::withTrashed() : Zones::query();
 
+        // Filter by specific remote geofence id when provided
+        if ($request->filled('geofenceId')) {
+            $gfId = (int) $request->query('geofenceId');
+            if ($gfId > 0) {
+                $query->where('geofence_id', $gfId);
+            }
+        }
+
         if ($request->boolean('mine')) {
             $query->where('user_id', $user->id);
         } else {
@@ -33,36 +42,73 @@ class ZoneController extends Controller
             // Admin sees all zones
         }
 
-        // Optional search by name
-        if ($name = $request->query('name')) {
-            $query->where('name', 'like', "%{$name}%");
-        }
+        // Name-based search removed; local table no longer stores name
 
-        $zones = $query->orderByDesc('id')->paginate(25);
+        // Include creator user relation so UI can show creator username
+        $zones = $query->with('user')->orderByDesc('id')->paginate(25);
+        // Enrich with Traccar geofence name/description/status/speed following driver pattern
+        try {
+            $ids = collect($zones->items())->map(fn($z) => (int) ($z->geofence_id ?? 0))->filter(fn($id) => $id > 0)->unique()->values();
+            if ($ids->count()) {
+                $remotes = TcGeofence::query()->whereIn('id', $ids)->get()->keyBy('id');
+                $zones->getCollection()->transform(function ($z) use ($remotes) {
+                    $gf = $remotes->get((int) ($z->geofence_id ?? 0));
+                    if ($gf) {
+                        // Traccar columns: name, description, area, attributes (JSON)
+                        $z->setAttribute('name', $gf->name ?? null);
+                        $z->setAttribute('description', $gf->description ?? null);
+                        // Extract status/speed from attributes JSON if present
+                        $attrs = null;
+                        try { $attrs = is_array($gf->attributes) ? $gf->attributes : (json_decode($gf->attributes, true) ?: null); } catch (\Throwable $e) { $attrs = null; }
+                        if (is_array($attrs)) {
+                            $z->setAttribute('status', ($attrs['status'] ?? null) ?: $z->status ?? null);
+                            $z->setAttribute('speed', isset($attrs['speed']) ? (float) $attrs['speed'] : ($z->speed ?? null));
+                        }
+                    }
+                    return $z;
+                });
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to enrich zones with Traccar geofences', ['error' => $e->getMessage()]);
+        }
         return response()->json($zones);
     }
 
     /**
      * Show a single zone with remote geofence details.
      */
-    public function show(Request $request, int $zoneId)
+    public function show(Request $request, int $zoneParam)
     {
-        $zone = Zones::findOrFail($zoneId);
-
-        $sessionId = $request->user()->traccarSession ?? session('cookie');
-        $geoId = (int) ($zone->geofence_id ?? 0);
-        $remote = null;
-        if ($geoId > 0) {
-            $resp = static::curl('/api/geofences?id=' . $geoId, 'GET', $sessionId, '', ['Accept: application/json']);
-            if (($resp->responseCode ?? 0) >= 200 && ($resp->responseCode ?? 0) < 300) {
-                $payload = json_decode($resp->response, true);
-                $remote = is_array($payload) && count($payload) ? $payload[0] : null;
-            } else {
-                Log::warning('Failed to fetch geofence for zone', ['zone_id' => $zoneId, 'geofence_id' => $geoId, 'code' => $resp->responseCode ?? null, 'error' => $resp->error ?? null]);
-            }
-        }
-
+        // Prefer geofence_id for lookups; fall back to local id for backward compatibility
+        $zone = Zones::where('geofence_id', $zoneParam)->first();
+        if (!$zone) { $zone = Zones::findOrFail($zoneParam); }
+        Log::info('Zones.show called', ['zone_param' => $zoneParam, 'zone_found_id' => $zone->id, 'geofence_id' => $zone->geofence_id]);
+        $geoId = (int) ($zoneParam ?? $zone->geofence_id ?? 0);
+        $remote = $geoId > 0 ? ($this->geofencesService->getGeofenceById($request, $geoId) ?: null) : null;
         return response()->json(['zone' => $zone, 'geofence' => $remote]);
+    }
+
+    /**
+     * List geofences directly from Traccar DB (tc_geofences) to aid testing.
+     */
+    public function geofencesDb(Request $request)
+    {
+        $pageSize = max(1, min((int) ($request->query('pageSize', 25)), 100));
+        $query = TcGeofence::query()->orderByDesc('id');
+        if ($name = $request->query('name')) {
+            $query->where('name', 'like', "%{$name}%");
+        }
+        $list = $query->paginate($pageSize);
+        // Normalize attributes to arrays for frontend
+        $list->getCollection()->transform(function ($row) {
+            $attrs = $row->attributes;
+            if (is_string($attrs)) {
+                try { $parsed = json_decode($attrs, true); if (is_array($parsed)) $attrs = $parsed; } catch (\Throwable $e) {}
+            }
+            $row->attributes = $attrs;
+            return $row;
+        });
+        return response()->json($list);
     }
 
     /**
@@ -125,13 +171,6 @@ class ZoneController extends Controller
             'user_id' => $userIdLocal,
             'distributor_id' => $distributorIdLocal,
             'geofence_id' => (int) $payload->id,
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'status' => $validated['status'] ?? 'active',
-            'speed' => isset($validated['speed']) ? (float) $validated['speed'] : null,
-            'coordinates' => $coords,
-            'radius' => $radius,
-            'polygon' => $this->polygonToArray($validated['polygon'] ?? null),
         ]);
 
         return response()->json([
@@ -144,7 +183,7 @@ class ZoneController extends Controller
     /**
      * Update a zone and its remote geofence.
      */
-    public function update(Request $request, int $zoneId)
+    public function update(Request $request, int $zoneParam)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -156,7 +195,8 @@ class ZoneController extends Controller
             'polygon' => 'nullable|string',
         ]);
 
-        $zone = Zones::findOrFail($zoneId);
+        $zone = Zones::where('geofence_id', $zoneParam)->first();
+        if (!$zone) { $zone = Zones::findOrFail($zoneParam); }
         $geoId = (int) ($zone->geofence_id ?? 0);
 
         [$type, $coords, $lat, $lng, $radius] = $this->deriveShape($validated['coordinates'] ?? null, $validated['radius'] ?? null, $validated['polygon'] ?? null);
@@ -173,26 +213,8 @@ class ZoneController extends Controller
             'radius' => $radius,
         ]);
 
-        // Rebuild the same WKT as addGeofence would generate
-        $sessionId = $request->user()->traccarSession ?? session('cookie');
-        // Invoke service to compute WKT by piggybacking on addGeofence's logic without posting
-        // We duplicate the WKT construction here to avoid a new service method
-        $wkt = '';
-        if ($type === 'circle') {
-            $wkt = $this->geofencesService->createCircleWKT($lat, $lng, $radius);
-        } elseif ($type === 'rectangle') {
-            $p1 = $coords[0]; $p2 = $coords[1];
-            $wkt = "POLYGON(({$p1[1]} {$p1[0]}, {$p2[1]} {$p1[0]}, {$p2[1]} {$p2[0]}, {$p1[1]} {$p2[0]}, {$p1[1]} {$p1[0]}))";
-        } elseif ($type === 'polygon') {
-            $wktPts = [];
-            foreach ($coords as $pt) { $wktPts[] = $pt[1] . ' ' . $pt[0]; }
-            if ($wktPts[0] !== end($wktPts)) { $wktPts[] = $wktPts[0]; }
-            $wkt = 'POLYGON((' . implode(', ', $wktPts) . '))';
-        } elseif ($type === 'route') {
-            $wktPts = [];
-            foreach ($coords as $pt) { $wktPts[] = $pt[1] . ' ' . $pt[0]; }
-            $wkt = 'ROUTE(' . implode(', ', $wktPts) . ')';
-        }
+        // Compute WKT via service
+        $wkt = $this->geofencesService->computeWKT($type, $coords, $lat, $lng, $radius);
 
         // Include other values as geofence attributes (driver pattern)
         $attributes = [
@@ -202,20 +224,20 @@ class ZoneController extends Controller
             'long' => $lng,
             'radius' => $radius,
             'coordinates' => $coords,
-            'status' => $validated['status'] ?? $zone->status,
-            'speed' => isset($validated['speed']) ? (float) $validated['speed'] : $zone->speed,
+            'status' => $validated['status'] ?? null,
+            'speed' => isset($validated['speed']) ? (float) $validated['speed'] : null,
             'distributor_id' => $request->user()->distributor_id ?? null,
         ];
 
-        $data = json_encode([
-            'id' => $geoId,
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? '',
-            'area' => $wkt,
-            'attributes' => $attributes,
-        ]);
-
-        $resp = static::curl('/api/geofences/' . $geoId, 'PUT', $sessionId, $data, ['Content-Type: application/json', 'Accept: application/json']);
+        // Update via service
+        $resp = $this->geofencesService->updateGeofence(
+            $request,
+            $geoId,
+            $validated['name'],
+            $validated['description'] ?? '',
+            $wkt,
+            $attributes
+        );
         if (!isset($resp->responseCode) || $resp->responseCode < 200 || $resp->responseCode >= 300) {
             return response()->json([
                 'message' => 'Failed to update geofence on tracking server',
@@ -224,16 +246,7 @@ class ZoneController extends Controller
             ], 502);
         }
 
-        // Update local zone
-        $zone->update([
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'status' => $validated['status'] ?? $zone->status,
-            'speed' => isset($validated['speed']) ? (float) $validated['speed'] : $zone->speed,
-            'coordinates' => $coords,
-            'radius' => $radius,
-            'polygon' => $this->polygonToArray($validated['polygon'] ?? null),
-        ]);
+        // No local metadata update; attributes are stored remotely in Traccar
 
         $payload = json_decode($resp->response, false);
         return response()->json([
@@ -246,14 +259,15 @@ class ZoneController extends Controller
     /**
      * Delete a zone and its remote geofence.
      */
-    public function destroy(Request $request, int $zoneId)
+    public function destroy(Request $request, int $zoneParam)
     {
         // Soft delete by default (block). Use force=1 (or hard=1) to permanently delete remotely + locally.
         $force = $request->boolean('force') || $request->boolean('hard');
 
         if (!$force) {
             // SOFT DELETE (block): mark local record as deleted, do not delete on tracking server
-            $zone = Zones::find($zoneId);
+            $zone = Zones::where('geofence_id', $zoneParam)->first();
+            if (!$zone) { $zone = Zones::find($zoneParam); }
             if (!$zone) {
                 return response()->json(['message' => 'Zone not found'], 404);
             }
@@ -263,17 +277,18 @@ class ZoneController extends Controller
             try {
                 $zone->delete();
             } catch (\Throwable $e) {
-                Log::warning('Zone soft delete failed', ['zone_id' => $zoneId, 'error' => $e->getMessage()]);
-                return response()->json([
-                    'message' => 'Failed to block zone',
-                    'error' => $e->getMessage(),
-                ], 500);
+            Log::warning('Zone soft delete failed', ['zone_param' => $zoneParam, 'error' => $e->getMessage()]);
+            return response()->json([
+                'message' => 'Failed to block zone',
+                'error' => $e->getMessage(),
+            ], 500);
             }
             return response()->json(['message' => 'Zone blocked'], 200);
         }
 
         // HARD DELETE: delete geofence on tracking server (Traccar), permanently remove local record
-        $zone = Zones::withTrashed()->find($zoneId);
+        $zone = Zones::withTrashed()->where('geofence_id', $zoneParam)->first();
+        if (!$zone) { $zone = Zones::withTrashed()->find($zoneParam); }
         if (!$zone) {
             return response()->json(['message' => 'Zone not found'], 404);
         }
@@ -293,13 +308,13 @@ class ZoneController extends Controller
                 ], 502);
             }
         } catch (\Throwable $e) {
-            Log::warning('Tracking server geofence delete failed', ['zone_id' => $zoneId, 'geofence_id' => $geoId, 'error' => $e->getMessage()]);
+            Log::warning('Tracking server geofence delete failed', ['zone_param' => $zoneParam, 'geofence_id' => $geoId, 'error' => $e->getMessage()]);
         }
 
         try {
             $zone->forceDelete();
         } catch (\Throwable $e) {
-            Log::warning('Zone hard delete failed', ['zone_id' => $zoneId, 'error' => $e->getMessage()]);
+            Log::warning('Zone hard delete failed', ['zone_param' => $zoneParam, 'error' => $e->getMessage()]);
             return response()->json([
                 'message' => 'Failed to permanently delete zone',
                 'error' => $e->getMessage(),
@@ -312,12 +327,14 @@ class ZoneController extends Controller
     /**
      * Restore (activate) a soft-deleted zone.
      */
-    public function restore(Request $request, int $zoneId)
+    public function restore(Request $request, int $zoneParam)
     {
         $user = $request->user();
         $role = (int) ($user->role ?? User::ROLE_ADMIN);
 
-        $query = Zones::withTrashed()->where('id', $zoneId);
+        // Prefer geofence_id for lookups
+        $query = Zones::withTrashed()->where('geofence_id', $zoneParam);
+        if (!$query->count()) { $query = Zones::withTrashed()->where('id', $zoneParam); }
         if ($role === User::ROLE_DISTRIBUTOR) {
             $query->where('user_id', $user->id)->where('distributor_id', $user->id);
         } elseif ($role !== User::ROLE_ADMIN) {
@@ -336,7 +353,7 @@ class ZoneController extends Controller
         try {
             $zone->restore();
         } catch (\Throwable $e) {
-            Log::warning('Zone restore failed', ['zone_id' => $zoneId, 'error' => $e->getMessage()]);
+            Log::warning('Zone restore failed', ['zone_param' => $zoneParam, 'error' => $e->getMessage()]);
             return response()->json([
                 'message' => 'Failed to activate zone',
                 'error' => $e->getMessage(),

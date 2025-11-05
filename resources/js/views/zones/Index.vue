@@ -105,11 +105,11 @@
                 </td>
                 <td class="text-end">
                   <div class="btn-group btn-group-sm">
-                    <button class="btn btn-outline-primary" title="View" @click="goView(row.id)"><i class="bi bi-eye"></i></button>
-                    <button class="btn btn-outline-secondary" title="Edit" @click="goEdit(row.id)" :disabled="row.deletedAt"><i class="bi bi-pencil"></i></button>
-                    <button v-if="!row.deletedAt" class="btn btn-outline-warning" title="Block" @click="confirmBlock(row.id)"><i class="bi bi-slash-circle"></i></button>
-                    <button v-if="row.deletedAt" class="btn btn-outline-success" title="Restore" @click="restoreZone(row.id)"><i class="bi bi-arrow-counterclockwise"></i></button>
-                    <button class="btn btn-outline-danger" title="Delete" @click="confirmDelete(row.id)"><i class="bi bi-trash"></i></button>
+                    <button class="btn btn-outline-primary" title="View" @click="goView(row.id, row.geofenceId)"><i class="bi bi-eye"></i></button>
+                    <button class="btn btn-outline-secondary" title="Edit" @click="goEdit(row.id, row.geofenceId)" :disabled="row.deletedAt"><i class="bi bi-pencil"></i></button>
+                    <button v-if="!row.deletedAt" class="btn btn-outline-warning" title="Block" @click="confirmBlock(row.id, row.geofenceId)"><i class="bi bi-slash-circle"></i></button>
+                    <button v-if="row.deletedAt" class="btn btn-outline-success" title="Restore" @click="restoreZone(row.id, row.geofenceId)"><i class="bi bi-arrow-counterclockwise"></i></button>
+                    <button class="btn btn-outline-danger" title="Delete" @click="confirmDelete(row.id, row.geofenceId)"><i class="bi bi-trash"></i></button>
                   </div>
                 </td>
               </tr>
@@ -195,10 +195,11 @@ function formatDateTime(iso) {
 }
 
 function mapRow(z) {
-  const owner = z.distributor_id ? `Distributor #${z.distributor_id}` : (z.user_id ? `User #${z.user_id}` : '-');
+  const owner = (z.user && z.user.name) ? z.user.name : (z.user_id ? `User #${z.user_id}` : '-');
   const status = z.deleted_at ? 'Blocked' : ((z.status || '').toLowerCase() === 'inactive' ? 'Inactive' : 'Active');
   return {
     id: z.id,
+    geofenceId: z.geofence_id,
     zoneName: z.name || '-',
     owner,
     description: z.description || '-',
@@ -221,6 +222,7 @@ async function fetchZones() {
     const { data } = await axios.get('/web/zones', { params });
     const list = Array.isArray(data?.data) ? data.data : [];
     rows.value = list.map(mapRow);
+    console.log('rows list ',rows);
     totalCount.value = Number(data?.total || list.length);
     const serverTotalPages = Number(data?.last_page || 1);
     // Mirror UI pagination count to show enough pages
@@ -237,14 +239,14 @@ async function fetchZones() {
   }
 }
 
-function goEdit(id) { router.push(`/zones/${id}/edit`); }
-function goView(id) { router.push(`/zones/${id}/edit`); }
-async function confirmDelete(id) {
+function goEdit(id, geofenceId) { router.push(`/zones/${geofenceId ?? id}/edit`); }
+function goView(id, geofenceId) { router.push(`/zones/${geofenceId ?? id}/edit`); }
+async function confirmDelete(id, geofenceId) {
   if (!confirm('Permanently delete this zone? This removes the remote geofence.')) return;
   error.value = '';
   message.value = '';
   try {
-    const { data } = await axios.delete(`/web/zones/${id}`, { params: { force: 1 } });
+    const { data } = await axios.delete(`/web/zones/${geofenceId ?? id}`, { params: { force: 1 } });
     message.value = data?.message || 'Zone deleted';
     // Refresh current page
     fetchZones();
@@ -253,12 +255,12 @@ async function confirmDelete(id) {
   }
 }
 
-async function confirmBlock(id) {
+async function confirmBlock(id, geofenceId) {
   if (!confirm('Block this zone? It will be hidden but not removed from Traccar.')) return;
   error.value = '';
   message.value = '';
   try {
-    const { data } = await axios.delete(`/web/zones/${id}`); // soft delete (block)
+    const { data } = await axios.delete(`/web/zones/${geofenceId ?? id}`); // soft delete (block)
     message.value = data?.message || 'Zone blocked';
     fetchZones();
   } catch (e) {
@@ -266,11 +268,11 @@ async function confirmBlock(id) {
   }
 }
 
-async function restoreZone(id) {
+async function restoreZone(id, geofenceId) {
   error.value = '';
   message.value = '';
   try {
-    const { data } = await axios.patch(`/web/zones/${id}/restore`);
+    const { data } = await axios.patch(`/web/zones/${geofenceId ?? id}/restore`);
     message.value = data?.message || 'Zone restored';
     fetchZones();
   } catch (e) {

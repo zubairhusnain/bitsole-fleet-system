@@ -152,3 +152,6 @@ Route::middleware('auth')->prefix('/web/zones')->group(function () {
     Route::patch('/{zoneId}/restore', [\App\Http\Controllers\ZoneController::class, 'restore']);
     Route::delete('/{zoneId}', [\App\Http\Controllers\ZoneController::class, 'destroy']);
 });
+
+// NEW: Auth-protected Geofence listing from Traccar DB (testing/util)
+Route::middleware('auth')->get('/web/traccar/geofences', [\App\Http\Controllers\ZoneController::class, 'geofencesDb']);
