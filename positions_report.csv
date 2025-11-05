@@ -1,0 +1,6 @@
+deviceId,deviceName,positionTime,predOdometerKey,predOdometerValue,predFuelKey,predFuelValue,has_totalDistance,has_distance,has_16,has_io16,has_389,has_io389
+19,Testing,,,,,,0,0,0,0,0,0
+20,"BMW - IM7111",2025-10-31T11:46:24.831+00:00,odometer,115987,io200,0,1,1,0,0,0,0
+21,"BMW - DDY15",2025-10-31T11:55:51.731+00:00,odometer,116842000,io37,5,1,1,0,0,0,1
+22,"ALPHARD FMC130 - PQP73",2025-10-31T11:39:51.624+00:00,totalDistance,22934687.073909,io81,0,1,1,0,0,0,0
+9,"Testing Car",2025-10-30T20:05:57.300+00:00,odometer,785598,io113,100,1,1,0,0,0,0
