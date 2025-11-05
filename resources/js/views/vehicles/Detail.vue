@@ -1364,11 +1364,23 @@ const odometerDisplay = computed(() => {
 });
 
 // Fuel display via shared telemetry formatter
-const fuelLevelDisplay = computed(() => {
+const fuelInfo = computed(() => {
     const pos = detailPayload.value?.position || {};
-    const tel = formatTelemetry(pos?.attributes, { protocol: pos?.protocol, model: model.value });
-    return tel?.fuel?.display ?? '-';
+    const devAttrs = detailPayload.value?.device?.attributes || {};
+    const capacity = devAttrs?.fuelTankCapacity ?? devAttrs?.FuelTankCapacity ?? devAttrs?.fueltankcapacity;
+    return formatTelemetry(pos?.attributes, { protocol: pos?.protocol, model: model.value, capacity });
 });
+const fuelLevelDisplay = computed(() => {
+    const f = fuelInfo.value?.fuel;
+    if (!f) return '-';
+    const liters = f.liters;
+    const percent = f.percent;
+    if (liters != null && percent != null) return `${liters} L (${percent}%)`;
+    if (liters != null) return `${liters} L`;
+    if (percent != null) return `${percent}%`;
+    return '-';
+});
+const fuelBadgeVariant = computed(() => fuelInfo.value?.fuel?.variant ?? null);
 // Total Distance from position attributes, prioritize totalDistance and related keys
 const totalDistanceInfo = computed(() => positionPickAttrWithKey([
     'totalDistance', 'distance', 'odometer_m', 'tripDistance'

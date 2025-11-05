@@ -241,7 +241,7 @@
                     </div>
                     <div class="row g-2 align-items-center">
                       <dt class="col-4 text-muted xsmall">Fuel</dt>
-                      <dd class="col-8 small mb-0">{{ fmtLitresUpper(tracking.fuelLiters) || '—' }}</dd>
+                      <dd class="col-8 small mb-0">{{ fuelDisplayCombined }}</dd>
                     </div>
                     <div class="row g-2 align-items-center">
                       <dt class="col-4 text-muted xsmall">Location</dt>
@@ -269,6 +269,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { formatTelemetry } from '../utils/telemetry';
 import axios from 'axios';
 import { RouterLink } from 'vue-router';
 
@@ -551,3 +552,20 @@ const vehicleChipDate = computed(() => vehicle.value?.cardChipDate || fmtDateHum
 .section-list dd { overflow-wrap: break-word; word-break: normal; }
 .section-list .row { align-items: flex-start !important; }
 </style>
+const fuelDisplayCombined = computed(() => {
+  const liters = tracking.value?.fuelLiters;
+  const percent = tracking.value?.fuelPercent;
+  if (liters != null && percent != null) return `${Math.round(liters*10)/10} L (${Math.round(percent)}%)`;
+  const attrs = tracking.value?.positionAttributes || tracking.value?.attributes || null;
+  const capacity = tracking.value?.fuelTankCapacity || tracking.value?.fuel_capacity || null;
+  if (attrs) {
+    const tel = formatTelemetry(attrs, { capacity });
+    const f = tel?.fuel;
+    if (f) {
+      if (f.liters != null && f.percent != null) return `${f.liters} L (${f.percent}%)`;
+      if (f.liters != null) return `${f.liters} L`;
+      if (f.percent != null) return `${f.percent}%`;
+    }
+  }
+  return typeof liters === 'number' ? `${Math.round(liters*10)/10} L` : '—';
+});

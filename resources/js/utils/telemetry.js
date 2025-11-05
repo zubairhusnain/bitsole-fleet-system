@@ -31,12 +31,17 @@ export function formatOdometer(rawAttrs, ctx = {}) {
   const distanceKeys = ['totalDistance', 'distance', 'tripDistance'];
   const primary = ['odometer', 'mileage', 'odometerKm', 'odometer_km'];
   // Teltonika: prefer io389, then named odometer/mileage, then distance fallbacks
-  const teltonikaOrder = ['389', ...primary, ...distanceKeys];
-  const genericOrder = [...primary, ...distanceKeys];
+  const teltonikaOrder = ['87', '50', '389', ...primary, ...distanceKeys];
+  const genericOrder = ['87', '50', ...primary, ...distanceKeys];
   const orderedKeys = protocol === 'teltonika' ? teltonikaOrder : genericOrder;
   let keyFound = null;
   for (const k of orderedKeys) {
-    const exists = (k === '389') ? (attrs['389'] != null || attrs['io389'] != null) : (attrs[k] != null && attrs[k] !== '');
+    // For numeric IO keys, check both raw and io-prefixed variants
+    const val = (k === '389' || k === '87' || k === '50')
+      ? (Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k]
+         : (Object.prototype.hasOwnProperty.call(attrs, 'io' + k) ? attrs['io' + k] : undefined))
+      : attrs[k];
+    const exists = val != null && val !== '';
     if (exists) { keyFound = k; break; }
   }
   const parseNum = (val) => {
@@ -64,7 +69,7 @@ export function formatOdometer(rawAttrs, ctx = {}) {
     if (specialKey) { keyFound = specialKey; }
   }
   if (!keyFound) return null;
-  const rawVal = (keyFound === '389') ? getAttrVal('389') : attrs[keyFound];
+  const rawVal = (keyFound === '389' || keyFound === '87' || keyFound === '50') ? getAttrVal(keyFound) : attrs[keyFound];
   const num = typeof rawVal === 'string' ? parseFloat(rawVal) : (typeof rawVal === 'number' ? rawVal : null);
   if (!Number.isFinite(num)) return null;
   const keyLower = String(keyFound).toLowerCase();
@@ -76,6 +81,10 @@ export function formatOdometer(rawAttrs, ctx = {}) {
     || ((keyLower === 'odometer' || keyLower === 'mileage') && protocol === 'teltonika')
   );
   if (looksMeters) km = num / 1000;
+  // Heuristic for numeric IO keys (io87/io50): values typically in meters if very large
+  if ((keyFound === '87' || keyFound === '50' || keyFound === '389' || keyFound === '16') && !looksMeters) {
+    km = num >= 100000 ? (num / 1000) : num; // >=100,000 assumed meters → km
+  }
   return {
     key: keyFound,
     raw: rawVal,
@@ -87,54 +96,50 @@ export function formatOdometer(rawAttrs, ctx = {}) {
 export function formatFuel(rawAttrs, ctx = {}) {
   const attrs = parseAttrs(rawAttrs);
   const model = String(ctx?.model || '').trim();
-  // Model override takes precedence when present and numeric
-  if (model && MODEL_FUEL_MAPPINGS[model]) {
-    const map = MODEL_FUEL_MAPPINGS[model];
-    const val = attrs[map.key];
-    const num = typeof val === 'string' ? parseFloat(val) : (typeof val === 'number' ? val : null);
-    if (Number.isFinite(num)) {
-      if (map.type === 'percent') {
-        const pct = Math.max(0, Math.min(100, Math.round(num)));
-        return { key: map.key, raw: val, isPercent: true, percent: pct, display: `${pct}%` };
-      } else if (map.type === 'liters') {
-        const liters = Math.round(num * 10) / 10;
-        return { key: map.key, raw: val, isPercent: false, liters, display: `${liters} L` };
-      }
-    }
+  const lower = Object.fromEntries(Object.entries(attrs).map(([k,v]) => [String(k).toLowerCase(), v]));
+  const capacity = ctx?.capacity ?? ctx?.fuelTankCapacity ?? (lower['fueltankcapacity'] ?? null);
+
+  // Preferred named keys
+  const percentNamed = lower['fuellevel'] ?? attrs['fuelLevel'] ?? attrs['FuelLevel'];
+  const litersNamed = lower['fuel'];
+  // IO fallbacks
+  const io89 = attrs['io89'] ?? attrs['89'];
+  const io48 = attrs['io48'] ?? attrs['48'];
+  const io84 = attrs['io84'] ?? attrs['84'];
+
+  // Resolve percent
+  let percent = null;
+  for (const v of [percentNamed, io89, io48]) {
+    const n = typeof v === 'string' ? parseFloat(v) : (typeof v === 'number' ? v : null);
+    if (Number.isFinite(n)) { percent = Math.max(0, Math.min(100, Math.round(n))); break; }
   }
-  const namedCandidates = [
-    'fuel', 'fuelLevel', 'fuel_level', 'fuellevel', 'fuelPercent', 'fuel_percent', 'fuelPercentage', 'fuelPct', 'fuel_ratio',
-    'fuelLiters', 'fuelLitres', 'fuelVolume', 'fuel_l', 'fuelL', 'fuel1', 'fuel2'
-  ];
-  let keyFound = null;
-  for (const k of namedCandidates) {
-    if (attrs[k] != null && attrs[k] !== '') { keyFound = k; break; }
+
+  // Resolve liters
+  let liters = null;
+  for (const v of [litersNamed, io84]) {
+    const n = typeof v === 'string' ? parseFloat(v) : (typeof v === 'number' ? v : null);
+    if (Number.isFinite(n)) { liters = Math.round(n * 10) / 10; break; }
   }
-  // Teltonika CAN/BLE fuel percent fallback: io113 (strict)
-  if (!keyFound) {
-    for (const k of ['io113','113']) { if (attrs[k] != null && attrs[k] !== '') { keyFound = k; break; } }
+
+  // If capacity provided and percent available, prefer computed liters
+  let computedLiters = null;
+  if (Number.isFinite(parseFloat(capacity)) && percent != null) {
+    const cap = parseFloat(capacity);
+    computedLiters = Math.round((cap * percent / 100) * 10) / 10;
   }
-  // As a safe fallback, only consider keys containing 'fuel' by name (avoid arbitrary io* keys)
-  if (!keyFound) {
-    for (const k in attrs) {
-      const s = String(k).toLowerCase();
-      if (s.includes('fuel')) { if (attrs[k] != null && attrs[k] !== '') { keyFound = k; break; } }
-    }
-  }
-  if (!keyFound) return null;
-  const val = attrs[keyFound];
-  const num = typeof val === 'string' ? parseFloat(val) : (typeof val === 'number' ? val : null);
-  if (!Number.isFinite(num)) return null;
-  const keyLower = String(keyFound).toLowerCase();
-  const isPercentName = keyLower.includes('percent') || keyLower.includes('pct') || keyLower.includes('ratio') || keyLower.includes('level');
-  const isPercentIo = keyFound === 'io113' || keyFound === '113';
-  const isPercent = isPercentName || isPercentIo;
-  if (isPercent) {
-    const pct = Math.max(0, Math.min(100, Math.round(num)));
-    return { key: keyFound, raw: val, isPercent: true, percent: pct, display: `${pct}%` };
-  }
-  const liters = Math.round(num * 10) / 10;
-  return { key: keyFound, raw: val, isPercent: false, liters, display: `${liters} L` };
+
+  const badgeVariant = percent == null ? null : (percent >= 60 ? 'success' : (percent >= 30 ? 'warning' : 'danger'));
+  const finalLiters = computedLiters != null ? computedLiters : liters;
+  const display = finalLiters != null ? `${finalLiters} L` : (percent != null ? `${percent}%` : null);
+  if (display == null) return null;
+  return {
+    isPercent: percent != null && finalLiters == null,
+    percent,
+    liters: finalLiters,
+    capacity: Number.isFinite(parseFloat(capacity)) ? parseFloat(capacity) : null,
+    variant: badgeVariant,
+    display,
+  };
 }
 
 export function formatTelemetry(rawAttrs, ctx = {}) {

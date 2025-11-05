@@ -217,8 +217,9 @@ function deriveRow(r) {
     const vin = r.vin ?? pickAttr(attrs, ['vin', 'VIN']);
     const plate = r.plate ?? pickAttr(attrs, ['plate', 'licensePlate', 'registration', 'regNumber']);
     const model = r.model ?? tc.model ?? pickAttr(attrs, ['model']);
+    const capacity = attrs.fuelTankCapacity ?? attrs.FuelTankCapacity ?? attrs.fueltankcapacity ?? null;
     // Odometer via shared telemetry formatter (position-first, protocol-aware)
-    const tel = formatTelemetry(pos.attributes, { protocol: pos.protocol, model });
+    const tel = formatTelemetry(pos.attributes, { protocol: pos.protocol, model, capacity });
     const odometer = tel?.odometer?.display ?? null;
     // ignition: prefer tc.position.attributes.ignition, fallback to tc_device.attributes
     const ignRaw = posAttrs.ignition ?? (r.ignition ?? pickAttr(attrs, ['ignition', 'Ignition']));
@@ -247,7 +248,14 @@ function deriveRow(r) {
         coords = `${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}`;
     }
     const location = pos.address ?? (r.location ?? pickAttr(attrs, ['address', 'location'])) ?? coords;
-    const fuel = tel?.fuel?.display ?? null;
+    let fuel = null;
+    if (tel?.fuel) {
+        const liters = tel.fuel.liters;
+        const percent = tel.fuel.percent;
+        if (liters != null && percent != null) fuel = `${liters} L (${percent}%)`;
+        else if (liters != null) fuel = `${liters} L`;
+        else if (percent != null) fuel = `${percent}%`;
+    }
 
     const blocked = !!(r?.deleted_at || r?.deletedAt || r?.blocked);
     return { ...r, uniqueid, name, vin, plate, model, odometer, ignition, speed, location, fuel, blocked };

@@ -112,7 +112,7 @@ class VehicleController extends Controller
         }
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
-            'type','manufacturer','color','registration','plate','vin','odometer','fuelAverage','maxSpeed','speedLimit','photos'
+            'type','manufacturer','color','registration','plate','vin','odometer','fuelAverage','maxSpeed','speedLimit','photos','fuelTankCapacity','trackerModel'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
@@ -133,6 +133,12 @@ class VehicleController extends Controller
             $slStr = (string) $attributes['speedLimit'];
             if (!preg_match('/^\d+$/', $slStr)) {
                 return response()->json(['message' => 'Speed Limit must be numeric and >= 0'], 422);
+            }
+        }
+        if (array_key_exists('fuelTankCapacity', $attributes) && $attributes['fuelTankCapacity'] !== null && $attributes['fuelTankCapacity'] !== '') {
+            $capStr = (string) $attributes['fuelTankCapacity'];
+            if (!preg_match('/^\d+(?:\.\d+)?$/', $capStr)) {
+                return response()->json(['message' => 'Fuel Tank Capacity must be numeric and >= 0'], 422);
             }
         }
         if (array_key_exists('registration', $attributes) && $attributes['registration'] !== null && $attributes['registration'] !== '') {
@@ -262,7 +268,7 @@ class VehicleController extends Controller
         }
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
-            'type','manufacturer','color','registration','plate','vin','odometer','fuelAverage','maxSpeed','speedLimit','photos'
+            'type','manufacturer','color','registration','plate','vin','odometer','fuelAverage','maxSpeed','speedLimit','photos','fuelTankCapacity','trackerModel'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 

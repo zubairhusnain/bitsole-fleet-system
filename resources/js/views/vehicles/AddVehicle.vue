@@ -92,6 +92,10 @@
               <label class="form-label small">Max Speed</label>
               <input v-model="form.attributes.maxSpeed" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="Max Speed" />
             </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Fuel Tank Capacity (Liters)</label>
+              <input v-model.number="form.attributes.fuelTankCapacity" type="number" min="0" step="0.1" inputmode="decimal" class="form-control" placeholder="e.g. 60" />
+            </div>
           </div>
         </div>
       </div>
@@ -153,7 +157,8 @@ const form = reactive({
     odometer: '',
     fuelAverage: '',
     maxSpeed: '',
-    trackerModel: ''
+    trackerModel: '',
+    fuelTankCapacity: ''
   },
 
 });

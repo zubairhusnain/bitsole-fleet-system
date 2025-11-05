@@ -514,8 +514,15 @@ function statusLabel(v) {
 function fuelDisplay(v) {
     const pos = getPosition(v).raw || {};
     const model = v.model || null;
-    const tel = formatTelemetry(pos.attributes, { protocol: pos.protocol, model });
-    return tel.fuel ? tel.fuel.display : null;
+    const cap = (v.attributes && (v.attributes.fuelTankCapacity || v.attributes.FuelTankCapacity || v.attributes.fueltankcapacity)) || null;
+    const tel = formatTelemetry(pos.attributes, { protocol: pos.protocol, model, capacity: cap });
+    if (!tel.fuel) return null;
+    const liters = tel.fuel.liters;
+    const percent = tel.fuel.percent;
+    if (liters != null && percent != null) return `${liters} L (${percent}%)`;
+    if (liters != null) return `${liters} L`;
+    if (percent != null) return `${percent}%`;
+    return null;
 }
 
 // Extract odometer from position attributes and format in km
