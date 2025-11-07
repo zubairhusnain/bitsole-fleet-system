@@ -1,0 +1,39 @@
+[
+    {
+        "id": 78945,
+        "attributes": {
+            "priority": 0,
+            "sat": 4,
+            "event": 0,
+            "ignition": true,
+            "motion": true,
+            "io37": 5,
+            "io48": 87,
+            "power": 13.758000000000001,
+            "battery": 4.104,
+            "io36": 839,
+            "odometer": 116842000,
+            "io389": 116842,
+            "io390": 581,
+            "vin": "PM1JR38090WE75630",
+            "distance": 0.18895722138980042,
+            "totalDistance": 314066.4318424664,
+            "hours": 70692060
+        },
+        "deviceId": 21,
+        "protocol": "teltonika",
+        "serverTime": "2025-10-31T11:55:51.731+00:00",
+        "deviceTime": "2025-10-31T11:55:47.000+00:00",
+        "fixTime": "2025-10-31T11:55:47.000+00:00",
+        "valid": true,
+        "latitude": 3.1499166,
+        "longitude": 101.7085683,
+        "altitude": 79,
+        "speed": 0.539957,
+        "course": 253,
+        "address": null,
+        "accuracy": 0,
+        "network": null,
+        "geofenceIds": null
+    }
+]

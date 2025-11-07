@@ -1,0 +1,3 @@
+totalDistance: 4
+distance: 4
+odometer: 3
