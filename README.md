@@ -6,9 +6,6 @@ Omayer Fleet System is a Laravel + Vue application for fleet tracking, geofencin
 Key capabilities
 - Real‑time tracking via WebSocket (Laravel Reverb) with Echo/Pusher‑compatible client
 - Zone management with canonical WKT saved to Traccar; Edit renders WKT and auto‑fits the map
-- Telemetry decoding:
-  - Fuel: percent from keys 89 → 48; liters from key 84; converts percent to liters using Fuel Tank Capacity
-  - Odometer: prioritizes io87 → io50 → named odometer/mileage → distance fallbacks; normalized to kilometers
 - Database: PostgreSQL shared with Traccar (recommended) or MySQL/MariaDB; migrations create app tables alongside Traccar’s
 - Frontend: Vite dev server for local development; optimized production build
 
@@ -19,13 +16,12 @@ This guide shows how to configure `.env`, start the WebSocket server, connect to
 - Node.js 18+ and npm
 - PostgreSQL (or MySQL/MariaDB). Project supports PostgreSQL and can share a DB with Traccar.
 - A running Traccar server (URL + user/password or API token)
-- Web server pointing to `backend/public` (Apache/Nginx). XAMPP works on macOS.
+- Web server pointing to `public` (Apache/Nginx). XAMPP works on macOS.
 
 ## 2) Clone and install
-From the project root:
+From this folder:
 
 ```bash
-cd backend
 cp .env.example .env
 composer install
 php artisan key:generate
@@ -34,7 +30,7 @@ php artisan storage:link
 npm install
 ```
 
-## 3) Configure `.env` (backend/.env)
+## 3) Configure `.env`
 Set these keys; adjust values for your environment.
 
 ### App
@@ -104,6 +100,7 @@ REVERB_SCALING_ENABLED=false   # enable only with Redis
 ```bash
 npm run dev            # Vite dev server (http://localhost:5174/)
 php artisan serve     # or use Apache/Nginx pointing to backend/public
+php artisan serve     # or use Apache/Nginx pointing to public
 php artisan reverb:start  # WebSocket server; keep running during tests
 ```
 
@@ -125,8 +122,8 @@ In production, terminate TLS at your proxy and ensure Echo uses `wss` (`REVERB_S
   npm ci --omit=dev
   npm run build
   ```
-- Web server: Apache/Nginx root must be `backend/public`
-- Permissions: ensure `backend/storage` and `backend/bootstrap/cache` are writable
+- Web server: Apache/Nginx root must be `public`
+- Permissions: ensure `storage` and `bootstrap/cache` are writable
 - WebSocket daemon: run `php artisan reverb:start` under Supervisor/systemd; auto‑restart on failure
 - Optional cache:
   ```bash
@@ -144,12 +141,6 @@ In production, terminate TLS at your proxy and ensure Echo uses `wss` (`REVERB_S
 - Do not drop/rename Traccar tables from app migrations.
 - If you later separate DBs, define a second connection in `config/database.php` and point Traccar models to it.
 
-## Traccar tips
-- Provide base URL + credentials or token in `.env`.
-- Geofences: the app saves canonical WKT to Traccar; the Edit page parses WKT and auto‑fits the map.
-- Telemetry:
-  - Fuel: percent from keys 89 → 48; liters from key 84. Set Fuel Tank Capacity to convert percent into liters.
-  - Odometer: prioritize io87 → io50 → named odometer/mileage → distance fallbacks; units normalized to km.
 
 ## Troubleshooting
 - Vite not reachable: `npm run dev` then open `http://localhost:5174/`.
