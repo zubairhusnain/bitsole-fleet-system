@@ -1,7 +1,6 @@
 <template>
     <div class="live-tracking-view">
         <!-- Breadcrumbs removed per request -->
-
         <div class="map-wrap">
             <div v-if="isMobile && showMobileTopbar" class="mobile-topbar">
               <button class="mobile-btn btn btn-dark btn-sm" @click="toggleSidebar" aria-label="Toggle sidebar">
