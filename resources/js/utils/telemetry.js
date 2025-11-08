@@ -28,12 +28,17 @@ function formatNumberKm(km) {
 export function formatOdometer(rawAttrs, ctx = {}) {
   const attrs = parseAttrs(rawAttrs);
   const protocol = String(ctx?.protocol || '').toLowerCase();
+  const preferNamed = !!ctx?.preferNamedOdometer;
   const distanceKeys = ['totalDistance', 'distance', 'tripDistance'];
   const primary = ['odometer', 'mileage', 'odometerKm', 'odometer_km'];
   // Teltonika: prefer io389, then named odometer/mileage, then distance fallbacks
-  const teltonikaOrder = ['87', '50', '389', ...primary, ...distanceKeys];
-  const genericOrder = ['87', '50', ...primary, ...distanceKeys];
-  const orderedKeys = protocol === 'teltonika' ? teltonikaOrder : genericOrder;
+  const teltonikaOrderIoFirst = ['87', '50', '389', ...primary, ...distanceKeys];
+  const teltonikaOrderNamedFirst = [...primary, ...distanceKeys, '87', '50', '389'];
+  const genericOrderIoFirst = ['87', '50', ...primary, ...distanceKeys];
+  const genericOrderNamedFirst = [...primary, ...distanceKeys, '87', '50'];
+  const orderedKeys = protocol === 'teltonika'
+    ? (preferNamed ? teltonikaOrderNamedFirst : teltonikaOrderIoFirst)
+    : (preferNamed ? genericOrderNamedFirst : genericOrderIoFirst);
   let keyFound = null;
   for (const k of orderedKeys) {
     // For numeric IO keys, check both raw and io-prefixed variants

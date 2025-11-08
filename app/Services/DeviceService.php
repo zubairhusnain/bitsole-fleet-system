@@ -289,7 +289,6 @@ class DeviceService
             })
             ->values()
             ->all();
-
         return $positionsPayload;
     }
 

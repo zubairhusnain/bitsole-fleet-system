@@ -150,6 +150,7 @@ async function fetchPage(n = 1) {
         const { data } = await axios.get('/web/vehicles', { params: { page: n } });
         const list = Array.isArray(data) ? data : (data.data ?? []);
         rows.value = list;
+        console.log('res row ',rows.value);
         meta.value = {
             total: data.total ?? (data.meta?.total ?? list.length),
             current_page: data.current_page ?? (data.meta?.current_page ?? n),
@@ -218,8 +219,9 @@ function deriveRow(r) {
     const plate = r.plate ?? pickAttr(attrs, ['plate', 'licensePlate', 'registration', 'regNumber']);
     const model = r.model ?? tc.model ?? pickAttr(attrs, ['model']);
     const capacity = attrs.fuelTankCapacity ?? attrs.FuelTankCapacity ?? attrs.fueltankcapacity ?? null;
-    // Odometer via shared telemetry formatter (position-first, protocol-aware)
-    const tel = formatTelemetry(pos.attributes, { protocol: pos.protocol, model, capacity });
+    // Odometer via shared telemetry formatter (merge device + position attrs for consistency)
+    const mergedAttrs = { ...attrs, ...posAttrs };
+    const tel = formatTelemetry(mergedAttrs, { protocol: pos.protocol, model, capacity, preferNamedOdometer: true });
     const odometer = tel?.odometer?.display ?? null;
     // ignition: prefer tc.position.attributes.ignition, fallback to tc_device.attributes
     const ignRaw = posAttrs.ignition ?? (r.ignition ?? pickAttr(attrs, ['ignition', 'Ignition']));
@@ -360,6 +362,7 @@ const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / meta.
 const startIndex = computed(() => (page.value - 1) * meta.value.per_page);
 const pagedRows = computed(() => filtered.value.slice(startIndex.value, startIndex.value + meta.value.per_page));
 
+console.log('pagedRows ',pagedRows);
 function ignitionClass(val) {
     const v = String(val || '').toLowerCase();
     if (v === 'on') return 'is-on';

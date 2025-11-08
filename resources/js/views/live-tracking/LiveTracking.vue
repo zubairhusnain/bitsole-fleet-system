@@ -513,9 +513,19 @@ function statusLabel(v) {
 // Extract fuel value from position attributes
 function fuelDisplay(v) {
     const pos = getPosition(v).raw || {};
-    const model = v.model || null;
-    const cap = (v.attributes && (v.attributes.fuelTankCapacity || v.attributes.FuelTankCapacity || v.attributes.fueltankcapacity)) || null;
-    const tel = formatTelemetry(pos.attributes, { protocol: pos.protocol, model, capacity: cap });
+    const model = v.model || (v.tc_device?.model ?? v.tcDevice?.model) || null;
+    const devRaw = (v.tc_device?.attributes ?? v.tcDevice?.attributes ?? v.attributes) || {};
+    const devAttrs = parseAttrs(devRaw);
+    const capKeys = ['fuelTankCapacity','FuelTankCapacity','fueltankcapacity','fuel_capacity','fuelCapacity','tankCapacity','fuel_tank_capacity'];
+    let cap = null;
+    for (const k of capKeys) {
+        const val = devAttrs?.[k];
+        if (val !== undefined && val !== null && val !== '') { cap = val; break; }
+    }
+    const capNum = (typeof cap === 'string') ? parseFloat(cap) : (typeof cap === 'number' ? cap : null);
+    const posAttrs = parseAttrs(pos.attributes);
+    const mergedAttrs = { ...devAttrs, ...posAttrs };
+    const tel = formatTelemetry(mergedAttrs, { protocol: pos.protocol, model, capacity: capNum, preferNamedOdometer: true });
     if (!tel.fuel) return null;
     const liters = tel.fuel.liters;
     const percent = tel.fuel.percent;
@@ -528,8 +538,12 @@ function fuelDisplay(v) {
 // Extract odometer from position attributes and format in km
 function odometerDisplay(v) {
     const pos = getPosition(v).raw || {};
-    const model = v.model || null;
-    const tel = formatTelemetry(pos.attributes, { protocol: pos.protocol, model });
+    const model = v.model || (v.tc_device?.model ?? v.tcDevice?.model) || null;
+    const devRaw = (v.tc_device?.attributes ?? v.tcDevice?.attributes ?? v.attributes) || {};
+    const devAttrs = parseAttrs(devRaw);
+    const posAttrs = parseAttrs(pos.attributes);
+    const mergedAttrs = { ...devAttrs, ...posAttrs };
+    const tel = formatTelemetry(mergedAttrs, { protocol: pos.protocol, model, preferNamedOdometer: true });
     return tel.odometer ? tel.odometer.display : null;
 }
 
