@@ -33,7 +33,7 @@ const ZonesAdd = () => import('../views/zones/AddZone.vue');
 const ZonesEdit = () => import('../views/zones/Edit.vue');
 
 const routes = [
-  { path: '/', name: 'home', component: HomeView },
+  { path: '/', name: 'home', component: LiveTracking, meta: { requiresAuth: true } },
   { path: '/about', name: 'about', component: AboutView },
   { path: '/login', name: 'login', component: LoginView, meta: { guestOnly: true } },
   { path: '/register', name: 'register', component: RegisterView, meta: { guestOnly: true } },
@@ -90,7 +90,7 @@ router.beforeEach(async (to, from, next) => {
 
   // Block guest-only pages when authenticated
   if (to.meta?.guestOnly && isAuthed) {
-    return next({ name: 'dashboard' });
+    return next({ name: 'live-tracking' });
   }
 
   // Role-based gating if route defines allowed roles
