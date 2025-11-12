@@ -151,7 +151,7 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item" v-if="!isProd">
+                        <li class="nav-item">
                             <RouterLink to="/zones" class="nav-link" :class="{ active: route.name === 'zones' }">
                                 <i class="nav-icon bi bi-grid-3x3"></i>
                                 <p>Zone Management</p>
@@ -179,7 +179,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" v-if="!isProd">
+                        <li class="nav-item">
                             <RouterLink to="/users" class="nav-link"
                                 :class="{ active: route.path.startsWith('/users') }">
                                 <i class="nav-icon bi bi-people-fill"></i>

@@ -21,6 +21,7 @@
 /storage/*.key
 /storage/pail
 /vendor
+/backend/config/constants.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
