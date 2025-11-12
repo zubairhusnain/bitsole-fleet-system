@@ -91,7 +91,7 @@ REVERB_APP_SECRET=local
 REVERB_HOST=127.0.0.1          # set your domain in production
 REVERB_PORT=6001
 REVERB_SCHEME=http             # use https on live
-
+# then run php artisan reverb:start --host=127.0.0.1 --port=6001
 # Scaling (optional)
 REVERB_SCALING_ENABLED=false   # enable only with Redis
 ```
