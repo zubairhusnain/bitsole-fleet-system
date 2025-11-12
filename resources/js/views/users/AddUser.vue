@@ -91,6 +91,7 @@ async function submit() {
     const payload = {
       name: `${form.firstName} ${form.lastName}`.trim(),
       email: form.email,
+      phone: form.phone,
       password: form.password,
       password_confirmation: form.password_confirmation,
     };

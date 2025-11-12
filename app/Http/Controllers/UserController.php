@@ -88,6 +88,7 @@ class UserController extends Controller
                 'id' => $u->id,
                 'name' => $u->name,
                 'email' => $u->email,
+                'phone' => $u->phone,
                 'role' => $u->role,
                 'roleLabel' => $this->roleLabel((int)$u->role),
                 'distributor_id' => $u->distributor_id,
@@ -113,6 +114,7 @@ class UserController extends Controller
             'id' => $u->id,
             'name' => $u->name,
             'email' => $u->email,
+            'phone' => $u->phone,
             'role' => $u->role,
             'roleLabel' => $this->roleLabel((int)$u->role),
             'distributor_id' => $u->distributor_id,
@@ -131,6 +133,7 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', Rule::unique('users', 'email')],
+            'phone' => ['nullable', 'string', 'max:30'],
             'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
         ]);
 
@@ -152,6 +155,7 @@ class UserController extends Controller
         $payload = [
             'name' => $data['name'],
             'email' => $data['email'],
+            'phone' => $request->input('phone'),
             'password' => Hash::make($data['password']),
             'role' => $role,
             'distributor_id' => $distributorId,
@@ -164,6 +168,7 @@ class UserController extends Controller
                 'id' => $u->id,
                 'name' => $u->name,
                 'email' => $u->email,
+                'phone' => $u->phone,
                 'role' => $u->role,
                 'roleLabel' => $this->roleLabel((int)$u->role),
                 'distributor_id' => $u->distributor_id,
@@ -190,6 +195,7 @@ class UserController extends Controller
         $rules = [
             'name' => ['sometimes', 'string', 'max:120'],
             'email' => ['sometimes', 'email', Rule::unique('users', 'email')->ignore($target->id)],
+            'phone' => ['sometimes', 'string', 'max:30'],
             'password' => ['sometimes', 'string', 'min:8'],
         ];
         if ($isManager) {
@@ -219,6 +225,7 @@ class UserController extends Controller
                 'id' => $target->id,
                 'name' => $target->name,
                 'email' => $target->email,
+                'phone' => $target->phone,
                 'role' => $target->role,
                 'roleLabel' => $this->roleLabel((int)$target->role),
                 'distributor_id' => $target->distributor_id,
