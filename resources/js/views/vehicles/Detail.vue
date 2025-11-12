@@ -1357,9 +1357,11 @@ function pickAttrWithKey(keys) {
 const plate = computed(() => pickAttr(['plate', 'registration', 'regNumber']));
 const vin = computed(() => pickAttr(['vin', 'VIN']));
 // Odometer display via shared telemetry formatter
+// Use merged device + position attributes and prefer named odometer keys for consistency with listing
 const odometerDisplay = computed(() => {
     const pos = detailPayload.value?.position || {};
-    const tel = formatTelemetry(pos?.attributes, { protocol: pos?.protocol, model: model.value });
+    const mergedAttrs = tcAttrs.value || {};
+    const tel = formatTelemetry(mergedAttrs, { protocol: pos?.protocol, model: model.value, preferNamedOdometer: true });
     return tel?.odometer?.display ?? '-';
 });
 
