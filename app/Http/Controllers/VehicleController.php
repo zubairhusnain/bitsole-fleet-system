@@ -680,6 +680,8 @@ class VehicleController extends Controller
      */
     public function rating(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
+        // Release session lock early to allow other concurrent requests (detail/performance)
+        try { if (PHP_SESSION_ACTIVE === session_status()) { @session_write_close(); } } catch (\Throwable $e) {}
         // Default window: last 7 days, overrideable via query
         $from = $request->query('from', now()->subDays(7)->toDateTimeString());
         $to = $request->query('to', now()->toDateTimeString());
@@ -689,6 +691,8 @@ class VehicleController extends Controller
             'device_id' => $deviceId,
             'from_date' => $from,
             'to_date' => $to,
+            // Filter event types to reduce payload size and improve latency
+            'event_types' => 'harshBraking,harshAcceleration,overspeed',
         ]);
 
         try {
