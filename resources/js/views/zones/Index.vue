@@ -55,10 +55,11 @@
           </div>
           <div class="col-sm-12 col-md-6 col-lg-4">
             <label class="form-label small">Status</label>
-            <select class="form-select">
+            <select class="form-select" v-model="searchStatus">
               <option value="">-- Select Status --</option>
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
+              <option value="Blocked">Blocked</option>
             </select>
           </div>
           <div class="col-sm-12 col-md-6 col-lg-4">
@@ -67,8 +68,8 @@
               <label class="form-check-label small" for="showBlocked">Include Blocked Zones</label>
             </div>
           </div>
-          <div class="col-sm-12 col-md-6 col-lg-4">
-            <button class="btn btn-primary mt-3 mt-md-0" @click="fetchZones">Submit</button>
+          <div class="col-sm-12 col-md-6 col-lg-4 d-flex align-items-end">
+            <button class="btn btn-primary w-auto" @click="fetchZones">Submit</button>
           </div>
         </div>
       </div>
@@ -143,6 +144,8 @@ import UiAlert from '../../components/UiAlert.vue';
 
 // Search input (static for now)
 const searchName = ref('');
+const searchStatus = ref('');
+const showBlocked = ref(false);
 
 // Summary metrics (dynamic counts from listing)
 const summaryCards = ref([
@@ -168,7 +171,23 @@ const error = ref('');
 const router = useRouter();
 
 const startIndex = computed(() => (page.value - 1) * pageSize.value);
-const pagedRows = computed(() => rows.value.slice(startIndex.value, startIndex.value + pageSize.value));
+const filteredRows = computed(() => {
+  // Text filter by zone name
+  const nameQ = (searchName.value || '').toLowerCase().trim();
+  const statusQ = (searchStatus.value || '').trim();
+  let list = rows.value;
+  if (nameQ) {
+    list = list.filter(r => String(r.zoneName || '').toLowerCase().includes(nameQ));
+  }
+  if (statusQ) {
+    list = list.filter(r => String(r.status || '') === statusQ);
+  }
+  if (!showBlocked.value) {
+    list = list.filter(r => r.status !== 'Blocked');
+  }
+  return list;
+});
+const pagedRows = computed(() => filteredRows.value.slice(startIndex.value, startIndex.value + pageSize.value));
 
 function goPage(n) {
   page.value = n;
@@ -216,20 +235,20 @@ async function fetchZones() {
   try {
     // Backend uses page size 25; we page client-side at 16 to fit UI.
     const params = {};
-    if (searchName.value) params.name = searchName.value;
     params.page = page.value;
     if (showBlocked.value) params.withDeleted = 1;
     const { data } = await axios.get('/web/zones', { params });
     const list = Array.isArray(data?.data) ? data.data : [];
     rows.value = list.map(mapRow);
-    console.log('rows list ',rows);
-    totalCount.value = Number(data?.total || list.length);
+    // Apply client-side filters to align with UI when backend name filter is unavailable
+    const filtered = filteredRows.value;
+    totalCount.value = filtered.length;
     const serverTotalPages = Number(data?.last_page || 1);
     // Mirror UI pagination count to show enough pages
     totalPages.value = Math.max(1, Math.ceil(totalCount.value / pageSize.value));
     // Summary cards
     summaryCards.value[0].value = totalCount.value;
-    const activeCount = list.filter(z => !z.deleted_at && (z.status || '').toLowerCase() !== 'inactive').length;
+    const activeCount = filtered.filter(r => r.status === 'Active').length;
     summaryCards.value[1].value = activeCount;
     summaryCards.value[2].value = totalCount.value - activeCount;
   } catch (e) {
@@ -286,4 +305,3 @@ onMounted(fetchZones);
 <style scoped>
 /* Reuse global app.css styles for tables, badges, and pagination */
 </style>
-const showBlocked = ref(false);
