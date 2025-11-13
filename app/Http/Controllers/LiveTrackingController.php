@@ -12,6 +12,7 @@ class LiveTrackingController extends Controller
     {
         // Emit positions for the authenticated user; client listens via private WebSocket channel
         $user = $request->user();
+        if (!$user->canRead('live-tracking')) { return response()->json(['message' => 'Forbidden'], 403); }
         event(new \App\Events\PositionsUpdated($user));
         return response()->json(['ok' => true]);
     }
@@ -19,6 +20,7 @@ class LiveTrackingController extends Controller
     public function current(\Illuminate\Http\Request $request): JsonResponse
     {
         $user = $request->user();
+        if (!$user->canRead('live-tracking')) { return response()->json(['positions' => []]); }
         $mine = $request->boolean('mine');
         $deviceIdParam = $request->input('deviceId');
 

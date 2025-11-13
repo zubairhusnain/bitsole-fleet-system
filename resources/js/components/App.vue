@@ -59,8 +59,8 @@
                 <nav class="mt-2">
                     <!--begin::Sidebar Menu-->
                     <ul class="nav sidebar-menu flex-column" role="navigation" aria-label="Main navigation"
-                        data-accordion="false" id="navigation">
-                        <li class="nav-item">
+                        data-lte-toggle="treeview" data-accordion="false" id="navigation">
+                        <li class="nav-item" v-if="hasPerm('live-tracking','read')">
                             <RouterLink to="/live-tracking" class="nav-link"
                                 :class="{ active: route.name === 'live-tracking' }">
                                 <i class="nav-icon bi bi-broadcast"></i>
@@ -76,7 +76,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item">
+                        <li class="nav-item" v-if="hasPerm('drivers','read')">
                             <RouterLink to="/drivers" class="nav-link"
                                 :class="{ active: route.path.startsWith('/drivers') }">
                                 <i class="nav-icon bi bi-people"></i>
@@ -84,31 +84,30 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item">
-                            <RouterLink to="/vehicles" class="nav-link"
-                                :class="{ active: route.path.startsWith('/vehicles') }">
+                        <li class="nav-item" v-if="hasPerm('vehicles','read')">
+                            <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/vehicles') }">
                                 <i class="nav-icon bi bi-car-front"></i>
                                 <p>
                                     Vehicle Management
-                                    <i class="bi bi-chevron-right right"></i>
+                                    <i class="nav-arrow bi bi-chevron-right"></i>
                                 </p>
-                            </RouterLink>
+                            </a>
                             <ul class="nav nav-treeview">
-                                <li class="nav-item">
+                                <li class="nav-item" v-if="hasPerm('vehicles','read')">
                                     <RouterLink to="/vehicles" class="nav-link"
                                         :class="{ active: route.path === '/vehicles' }">
                                         <i class="nav-icon bi bi-list-ul"></i>
                                         <p>All Vehicles</p>
                                     </RouterLink>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item" v-if="hasPerm('vehicles','read')">
                                     <RouterLink to="/vehicles/maintenance" class="nav-link"
                                         :class="{ active: route.path.startsWith('/vehicles/maintenance') }">
                                         <i class="nav-icon bi bi-tools"></i>
                                         <p>Vehicle Maintenance</p>
                                     </RouterLink>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item" v-if="hasPerm('vehicles','read')">
                                     <RouterLink to="/vehicles/overview" class="nav-link"
                                         :class="{ active: route.path.startsWith('/vehicles/overview') }">
                                         <i class="nav-icon bi bi-clipboard-data"></i>
@@ -151,7 +150,7 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item">
+                        <li class="nav-item" v-if="hasPerm('zones','read')">
                             <RouterLink to="/zones" class="nav-link" :class="{ active: route.name === 'zones' }">
                                 <i class="nav-icon bi bi-grid-3x3"></i>
                                 <p>Zone Management</p>
@@ -179,12 +178,30 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item">
-                            <RouterLink to="/users" class="nav-link"
-                                :class="{ active: route.path.startsWith('/users') }">
+                        <li class="nav-item" v-if="hasPerm('users','read')">
+                            <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/users') }">
                                 <i class="nav-icon bi bi-people-fill"></i>
-                                <p>User Management</p>
-                            </RouterLink>
+                                <p>
+                                    User Management
+                                    <i class="nav-arrow bi bi-chevron-right"></i>
+                                </p>
+                            </a>
+                            <ul class="nav nav-treeview">
+    <li class="nav-item" v-if="hasPerm('users','read')">
+        <RouterLink to="/users" class="nav-link"
+            :class="{ active: route.path === '/users' }">
+            <i class="nav-icon bi bi-list-ul"></i>
+            <p>User List</p>
+        </RouterLink>
+    </li>
+    <li class="nav-item" v-if="(role === 1 || role === 2 || role === 3) && hasPerm('users.permissions','read')">
+        <RouterLink to="/users/permissions" class="nav-link"
+            :class="{ active: route.path.startsWith('/users/permissions') }">
+            <i class="nav-icon bi bi-shield-lock"></i>
+            <p>User Permission</p>
+        </RouterLink>
+    </li>
+</ul>
                         </li>
                     </ul>
                     <!--end::Sidebar Menu-->
@@ -221,10 +238,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted, watch, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
-import { authState, clearAuthCache } from '../auth';
+import { authState, clearAuthCache, hasPermission } from '../auth';
 
 // Resolve assets from Laravel backend in dev; use current origin in prod
 const assetBase = import.meta.env.DEV ? (import.meta.env.VITE_BACKEND_PROXY_TARGET || 'http://127.0.0.1:8001') : window.location.origin;
@@ -238,6 +255,52 @@ const year = new Date().getFullYear();
 const isAuthed = computed(() => !!authState.user);
 const isGuestPage = computed(() => route.meta?.guestOnly === true);
 const pageTitle = computed(() => route.meta?.title || (route.name ? String(route.name).charAt(0).toUpperCase() + String(route.name).slice(1) : 'Dashboard'));
+const role = computed(() => Number(authState?.user?.role ?? 3));
+const hasPerm = (key, action) => hasPermission(key, action);
+
+// Ensure AdminLTE Treeview binds after Vue renders the sidebar (post-login)
+function initTreeview() {
+    const toggles = document.querySelectorAll('[data-lte-toggle="treeview"]');
+    const Treeview = window?.adminlte?.Treeview;
+    if (!toggles.length || !Treeview) return;
+    toggles.forEach((toggle) => {
+        // Avoid duplicate bindings across route changes
+        if (toggle.dataset.treeviewBound === '1') return;
+        toggle.addEventListener('click', (event) => {
+            const target = event.target;
+            const targetItem = target.closest('.nav-item');
+            const targetLink = target.closest('.nav-link');
+            if (target?.getAttribute('href') === '#' || targetLink?.getAttribute('href') === '#') {
+                event.preventDefault();
+            }
+            if (targetItem) {
+                const accordionAttr = toggle.dataset.accordion;
+                const animationSpeedAttr = toggle.dataset.animationSpeed;
+                const config = {
+                    accordion: accordionAttr === undefined ? true : accordionAttr === 'true',
+                    animationSpeed: animationSpeedAttr === undefined ? 300 : Number(animationSpeedAttr),
+                };
+                const tv = new Treeview(targetItem, config);
+                tv.toggle();
+            }
+        });
+        toggle.dataset.treeviewBound = '1';
+    });
+}
+
+onMounted(async () => {
+    if (!isGuestPage.value) {
+        await nextTick();
+        initTreeview();
+    }
+});
+
+watch(() => isGuestPage.value, async (isGuest) => {
+    if (!isGuest) {
+        await nextTick();
+        initTreeview();
+    }
+});
 
 async function logout() {
     try {

@@ -1,13 +1,14 @@
 import axios from 'axios';
 import { reactive } from 'vue';
 
-export const authState = reactive({ user: null, fetched: false });
+export const authState = reactive({ user: null, permissions: {}, fetched: false });
 
 export async function getCurrentUser() {
   if (authState.fetched) return authState.user;
   try {
     const { data } = await axios.get('/web/auth/me');
     authState.user = data?.user ?? null;
+    authState.permissions = data?.permissions ?? {};
   } catch (e) {
     authState.user = null;
   } finally {
@@ -29,6 +30,21 @@ export function clearAuthCache() {
 export function setAuthenticatedUser(user) {
   authState.user = user ?? null;
   authState.fetched = true;
+}
+
+export function hasPermission(moduleKey, action) {
+  const perms = authState.permissions || {};
+  const mod = perms[moduleKey] || {};
+  const role = Number(authState?.user?.role ?? 0);
+  if (role === 3 || role === 2) return true;
+  if (!action) return !!mod.read;
+  switch (action) {
+    case 'read': return !!mod.read;
+    case 'create': return !!mod.create;
+    case 'update': return !!mod.update;
+    case 'delete': return !!mod.delete;
+    default: return false;
+  }
 }
 
 // Refresh CSRF cookie and header after auth changes to prevent first POST mismatch

@@ -137,8 +137,12 @@ Route::middleware('auth')->prefix('/web/users')->group(function () {
     Route::get('/', [UserController::class, 'index']);
     Route::get('/options', [UserController::class, 'options']);
     Route::get('/{userId}', [UserController::class, 'show']);
+    Route::get('/{userId}/permissions', [UserController::class, 'permissions']);
+    Route::put('/{userId}/permissions', [UserController::class, 'updatePermissions']);
     Route::post('/', [UserController::class, 'store']);
     Route::put('/{userId}', [UserController::class, 'update']);
+    // Restore a soft-deleted (blocked) user
+    Route::patch('/{userId}/restore', [UserController::class, 'restore']);
     Route::delete('/{userId}', [UserController::class, 'destroy']);
 });
 

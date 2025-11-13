@@ -37,6 +37,7 @@ class User extends Authenticatable
         'password',
         'traccarSession',
         'distributor_id',
+        'manager_id',
         'role',
     ];
 
@@ -62,6 +63,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'role' => 'integer',
             'distributor_id' => 'integer',
+            'manager_id' => 'integer',
         ];
     }
 
@@ -69,4 +71,19 @@ class User extends Authenticatable
     public function isAdmin(): bool { return (int)($this->role ?? self::ROLE_ADMIN) === self::ROLE_ADMIN; }
     public function isDistributor(): bool { return (int)($this->role ?? self::ROLE_ADMIN) === self::ROLE_DISTRIBUTOR; }
     public function isFleetManager(): bool { return (int)($this->role ?? self::ROLE_ADMIN) === self::ROLE_FLEET_MANAGER; }
+
+    // Relations for manager hierarchy
+    public function manager()
+    {
+        return $this->belongsTo(User::class, 'manager_id');
+    }
+    public function managedUsers()
+    {
+        return $this->hasMany(User::class, 'manager_id');
+    }
+
+    public function canRead(string $moduleKey): bool { return \App\Support\Permissions::check($this, $moduleKey, 'read'); }
+    public function canCreate(string $moduleKey): bool { return \App\Support\Permissions::check($this, $moduleKey, 'create'); }
+    public function canUpdate(string $moduleKey): bool { return \App\Support\Permissions::check($this, $moduleKey, 'update'); }
+    public function canDelete(string $moduleKey): bool { return \App\Support\Permissions::check($this, $moduleKey, 'delete'); }
 }

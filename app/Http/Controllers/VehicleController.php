@@ -16,6 +16,7 @@ class VehicleController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        if (!$user->canRead('vehicles')) { return response()->json(['message' => 'Forbidden'], 403); }
         $role = (int) ($user->role ?? User::ROLE_ADMIN);
 
         // Eager load tcDevice and its current position; include soft-deleted (blocked) devices
@@ -49,6 +50,7 @@ class VehicleController extends Controller
     public function options(Request $request)
     {
         $user = $request->user();
+        if (!$user->canRead('vehicles')) { return response()->json(['options' => []]); }
         $role = (int) ($user->role ?? User::ROLE_ADMIN);
 
         $query = \App\Models\Devices::query()->with(['tcDevice']);
@@ -95,6 +97,8 @@ class VehicleController extends Controller
      */
     public function store(Request $request)
     {
+        $user = $request->user();
+        if (!$user->canCreate('vehicles')) { return response()->json(['message' => 'Forbidden'], 403); }
         // Minimal validation for tracking server device creation
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -242,6 +246,7 @@ class VehicleController extends Controller
      */
     public function show(Request $request, int $deviceId)
     {
+        if (!$request->user()->canRead('vehicles')) { return response()->json(['message' => 'Forbidden'], 403); }
         // Include tracking server device join for edit prefill
         $device = Devices::with('tcDevice')->where('device_id', $deviceId)->firstOrFail();
         return response()->json($device);
@@ -252,6 +257,7 @@ class VehicleController extends Controller
      */
     public function update(Request $request, int $deviceId)
     {
+        if (!$request->user()->canUpdate('vehicles')) { return response()->json(['message' => 'Forbidden'], 403); }
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'uniqueId' => ['required', 'string'],
@@ -407,6 +413,7 @@ class VehicleController extends Controller
 
     public function destroy(Request $request, int $deviceId)
     {
+        if (!$request->user()->canDelete('vehicles')) { return response()->json(['message' => 'Forbidden'], 403); }
         // Soft delete by default (block). Use force=1 (or hard=1) to permanently delete remotely + locally.
         $force = $request->boolean('force') || $request->boolean('hard');
 
@@ -516,6 +523,7 @@ class VehicleController extends Controller
     public function driver(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
         $user = $request->user();
+        if (!$user->canRead('vehicles')) { return response()->json(['driver' => null]); }
         $role = (int) ($user->role ?? User::ROLE_ADMIN);
 
         $query = \App\Models\Drivers::query()->with(['tcDriver','tcDevice'])->where('device_id', $deviceId);
@@ -562,6 +570,7 @@ class VehicleController extends Controller
      */
     public function detail(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
+        if (!$request->user()->canRead('vehicles')) { return response()->json(['detail' => null, 'latencyMs' => 0]); }
         $user = $request->user();
         // Release session lock early to allow other concurrent requests (performance/trips)
         try { if (PHP_SESSION_ACTIVE === session_status()) { @session_write_close(); } } catch (\Throwable $e) {}
@@ -579,6 +588,7 @@ class VehicleController extends Controller
      */
     public function deviceRaw(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
+        if (!$request->user()->canRead('vehicles')) { return response()->json(['device' => null]); }
         $user = $request->user();
         $device = app(\App\Services\DeviceService::class)->getDeviceRaw($user, $deviceId);
         return response()->json(['device' => $device]);
@@ -589,6 +599,7 @@ class VehicleController extends Controller
      */
     public function positionCurrent(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
+        if (!$request->user()->canRead('vehicles')) { return response()->json(['position' => null]); }
         $user = $request->user();
         $pos = app(\App\Services\DeviceService::class)->getCurrentPosition($user, $deviceId);
         return response()->json(['position' => $pos]);
@@ -600,6 +611,7 @@ class VehicleController extends Controller
      */
     public function trips(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
+        if (!$request->user()->canRead('vehicles')) { return response()->json(['trips' => []]); }
         $user = $request->user();
         // Release session lock early to allow concurrency with other endpoints
         try { if (PHP_SESSION_ACTIVE === session_status()) { @session_write_close(); } } catch (\Throwable $e) {}
@@ -620,6 +632,7 @@ class VehicleController extends Controller
      */
     public function driversList(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
+        if (!$request->user()->canRead('vehicles')) { return response()->json(['drivers' => []]); }
         $user = $request->user();
         $drivers = app(\App\Services\DeviceService::class)->getDriversForDevice($user, $deviceId);
         return response()->json(['drivers' => $drivers]);
@@ -631,6 +644,7 @@ class VehicleController extends Controller
      */
     public function positions(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
+        if (!$request->user()->canRead('vehicles')) { return response()->json(['positions' => []]); }
         $user = $request->user();
         $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
 
@@ -680,6 +694,7 @@ class VehicleController extends Controller
      */
     public function rating(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
+        if (!$request->user()->canRead('vehicles')) { return response()->json(['rating' => null], 200); }
         // Default window: last 7 days, overrideable via query
         $from = $request->query('from', now()->subDays(7)->toDateTimeString());
         $to = $request->query('to', now()->toDateTimeString());

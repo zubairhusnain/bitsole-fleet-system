@@ -85,7 +85,23 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        return response()->json(['user' => $request->user()]);
+        $user = $request->user();
+        $modulesConfig = config('modules') ?? [];
+        if (empty($modulesConfig)) {
+            $modulesConfig = [
+                'live-tracking' => 'Live Tracking',
+                'drivers' => 'Driver Management',
+                'vehicles' => 'Vehicle Management',
+                'vehicles.maintenance' => 'Vehicle Maintenance',
+                'vehicles.overview' => 'Vehicle Overview',
+                'zones' => 'Zone Management',
+                'users' => 'User Management',
+                'users.permissions' => 'User Permission',
+            ];
+        }
+        $modules = array_keys($modulesConfig);
+        $perms = \App\Support\Permissions::effectiveMap($user, $modules);
+        return response()->json(['user' => $user, 'permissions' => $perms]);
     }
 
     public function logout(Request $request)
