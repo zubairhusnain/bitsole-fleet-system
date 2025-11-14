@@ -68,7 +68,9 @@ class VehicleController extends Controller
 
         $list = $query->get();
 
-        $filtered = $list->filter(function ($d) {
+        // Include all devices when explicitly requested; otherwise default to devices with current position
+        $includeAll = $request->boolean('includeAll') || $request->boolean('all');
+        $filtered = $includeAll ? $list : $list->filter(function ($d) {
             $tc = $d->tcDevice;
             return $tc && (int)($tc->positionid ?? 0) > 0;
         });
@@ -81,6 +83,7 @@ class VehicleController extends Controller
             if ($label === '') { $label = $name ?: (string) data_get($tc, 'id'); }
             return [
                 'id' => (int) data_get($tc, 'id'),
+                'deviceId' => (int) data_get($d, 'device_id'),
                 'name' => $name,
                 'uniqueId' => $unique,
                 'label' => $label,

@@ -8,7 +8,7 @@
             <label class="form-label small">Device</label>
             <select v-model="selectedDeviceId" class="form-select">
               <option value="" disabled>Select a device</option>
-              <option v-for="opt in deviceOptions" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
+              <option v-for="opt in deviceOptions" :key="opt.deviceId || opt.id" :value="opt.deviceId || opt.id">{{ opt.label }}</option>
             </select>
           </div>
           <div class="col-sm-6 col-md-3">
@@ -114,10 +114,10 @@ async function fetchLogs() {
 async function fetchDeviceOptions() {
   loadingOptions.value = true
   try {
-    const { data } = await axios.get('/web/vehicles/options')
+    const { data } = await axios.get('/web/vehicles/options', { params: { includeAll: 1 } })
     deviceOptions.value = Array.isArray(data?.options) ? data.options : []
     if (!selectedDeviceId.value && deviceOptions.value.length) {
-      selectedDeviceId.value = String(deviceOptions.value[0].id)
+      selectedDeviceId.value = deviceOptions.value[0].deviceId || deviceOptions.value[0].id
     }
   } catch (e) {
     error.value = e?.response?.data?.message || 'Failed to load devices'
