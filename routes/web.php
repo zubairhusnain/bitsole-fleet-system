@@ -102,6 +102,8 @@ Route::middleware('auth')->prefix('/web/vehicles')->group(function () {
     Route::get('/{deviceId}/drivers', [\App\Http\Controllers\VehicleController::class, 'driversList']);
     // Positions for map/waypoints (time-window support)
     Route::get('/{deviceId}/positions', [\App\Http\Controllers\VehicleController::class, 'positions']);
+    // Raw device logs for Codec8 decoding
+    Route::get('/{deviceId}/logs', [\App\Http\Controllers\VehicleController::class, 'logsRaw']);
     // Driver assigned to this vehicle
     Route::get('/{deviceId}/driver', [\App\Http\Controllers\VehicleController::class, 'driver']);
     // Rating metrics derived from reports

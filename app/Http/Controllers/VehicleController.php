@@ -676,6 +676,71 @@ class VehicleController extends Controller
     }
 
     /**
+     * Fetch raw device logs from tracking server for a time window.
+     * Attempts Traccar logs report API and returns raw entries for client-side decoding.
+     * Query params: from, to, hours (default 24)
+     */
+    public function logsRaw(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
+
+        // Authorization via local Devices mapping
+        $query = \App\Models\Devices::query()->with(['tcDevice'])->where('device_id', $deviceId);
+        if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
+            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
+        } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
+            $distId = $user->distributor_id ?? $user->id;
+            $query->where('distributor_id', $distId)->where('user_id', $user->id);
+        }
+        $mapping = $query->firstOrFail();
+
+        // Derive time window (UTC ISO)
+        $from = $request->query('from');
+        $to = $request->query('to');
+        $hoursRaw = $request->query('hours', 24);
+        $hours = is_numeric($hoursRaw) ? max(1, (int) $hoursRaw) : 24;
+        $nowUtc = \Carbon\Carbon::now('UTC');
+        $toIso = $to ? \Carbon\Carbon::parse($to)->timezone('UTC')->format('Y-m-d\TH:i:s\Z') : $nowUtc->format('Y-m-d\TH:i:s\Z');
+        $fromIso = $from ? \Carbon\Carbon::parse($from)->timezone('UTC')->format('Y-m-d\TH:i:s\Z') : $nowUtc->copy()->subHours($hours)->format('Y-m-d\TH:i:s\Z');
+
+        $sessionId = $user->traccarSession ?? session('cookie');
+        $headers = ['Content-Type: application/json', 'Accept: application/json'];
+
+        // Prefer POST reports API; fallback to GET if supported
+        $payload = json_encode(['deviceId' => $deviceId, 'from' => $fromIso, 'to' => $toIso]);
+        $resp = static::curl('/api/reports/logs', 'POST', $sessionId, $payload, $headers);
+        if (!isset($resp->responseCode) || $resp->responseCode < 200 || $resp->responseCode >= 300 || !trim($resp->response)) {
+            $resp = static::curl('/api/reports/logs?deviceId=' . $deviceId . '&from=' . $fromIso . '&to=' . $toIso, 'GET', $sessionId, '', $headers);
+        }
+
+        if (!isset($resp->responseCode) || $resp->responseCode < 200 || $resp->responseCode >= 300) {
+            return response()->json([
+                'message' => 'Failed to fetch logs from tracking server',
+                'code' => $resp->responseCode ?? 0,
+                'error' => $resp->error ?? null,
+            ], 502);
+        }
+
+        $raw = json_decode($resp->response ?? '[]', true);
+        $entries = [];
+        if (is_array($raw)) {
+            foreach ($raw as $row) {
+                // Normalize various possible shapes
+                $entries[] = [
+                    'time' => $row['time'] ?? ($row['timestamp'] ?? null),
+                    'protocol' => $row['protocol'] ?? null,
+                    'server' => $row['server'] ?? null,
+                    'remote' => $row['remote'] ?? null,
+                    'hex' => $row['hex'] ?? ($row['data'] ?? ($row['raw'] ?? null)),
+                ];
+            }
+        }
+
+        return response()->json(['logs' => $entries, 'from' => $fromIso, 'to' => $toIso]);
+    }
+
+    /**
      * Return rating metrics for a specific vehicle using ReportService summary.
      */
     public function rating(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
