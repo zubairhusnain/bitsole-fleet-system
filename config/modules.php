@@ -5,7 +5,7 @@ return [
     'live-tracking' => 'Live Tracking',
     'drivers' => 'Driver Management',
     'vehicles' => 'Vehicle Management',
-    'vehicles.maintenance' => 'Vehicle Maintenance',
+    'vehicles.maintenance' => 'Vehicle Maintenance UUUU',
     'vehicles.overview' => 'Vehicle Overview',
     'zones' => 'Zone Management',
     'users' => 'User Management',

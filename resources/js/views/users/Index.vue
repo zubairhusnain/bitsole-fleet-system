@@ -22,7 +22,7 @@
                 </div>
             </div>
             <div class="col-sm-12 col-md-6 col-xl-5">
-              <div class="d-flex align-items-center justify-content-xl-end gap-2">
+              <div class="d-flex align-items-center justify-content-xl-end gap-2" v-if="hasPerm('users','create')">
                 <RouterLink to="/users/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> New User</RouterLink>
               </div>
             </div>
@@ -60,10 +60,10 @@
                 <td class="text-muted text-nowrap">{{ row.phone || '-' }}</td>
                 <td class="text-end">
                   <div class="btn-group btn-group-sm">
-                    <button v-if="!row.blocked" class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)" :disabled="!canEdit(row)"><i class="bi bi-pencil"></i></button>
-                    <button v-if="!row.blocked" class="btn btn-outline-warning" title="Block" @click="blockUser(row.id, row.name)" :disabled="!canDelete || blocking[row.id] === true"><i class="bi bi-slash-circle"></i></button>
-                    <button v-if="row.blocked" class="btn btn-outline-success" title="Activate" @click="activateUser(row.id, row.name)" :disabled="!canDelete || activating[row.id] === true"><i class="bi bi-check-circle"></i></button>
-                    <button v-if="row.blocked" class="btn btn-outline-danger" title="Permanent Delete" @click="deleteUserPermanent(row.id, row.name)" :disabled="!canDelete || deleting[row.id] === true"><i class="bi bi-trash"></i></button>
+                    <button v-if="!row.blocked && hasPerm('users','update')" class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)" :disabled="!canEdit(row)"><i class="bi bi-pencil"></i></button>
+                    <button v-if="!row.blocked && hasPerm('users','update')" class="btn btn-outline-warning" title="Block" @click="blockUser(row.id, row.name)" :disabled="blocking[row.id] === true"><i class="bi bi-slash-circle"></i></button>
+                    <button v-if="row.blocked && hasPerm('users','update')" class="btn btn-outline-success" title="Activate" @click="activateUser(row.id, row.name)" :disabled="activating[row.id] === true"><i class="bi bi-check-circle"></i></button>
+                    <button v-if="row.blocked && hasPerm('users','delete')" class="btn btn-outline-danger" title="Permanent Delete" @click="deleteUserPermanent(row.id, row.name)" :disabled="deleting[row.id] === true"><i class="bi bi-trash"></i></button>
                   </div>
                 </td>
               </tr>
@@ -103,7 +103,7 @@ import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
 import Swal from 'sweetalert2';
 import { useRouter, useRoute } from 'vue-router';
-import { authState } from '../../auth';
+import { authState, hasPermission as _hasPermission } from '../../auth';
 
 const router = useRouter();
 const route = useRoute();
@@ -120,8 +120,9 @@ const activating = ref({});
 
 const currentRole = computed(() => (authState?.user?.role ?? 3));
 const canAccessUsers = computed(() => currentRole.value === 3 || currentRole.value === 2 || currentRole.value === 1);
-const canCreate = computed(() => currentRole.value === 3 || currentRole.value === 2 || currentRole.value === 1); // admin, distributor, fleet manager
-const canDelete = computed(() => currentRole.value === 3 || currentRole.value === 2 || currentRole.value === 1); // admin, distributor, fleet manager
+const hasPerm = (k, a) => _hasPermission(k, a);
+const canCreate = computed(() => hasPerm('users','create'));
+const canDelete = computed(() => hasPerm('users','delete'));
 function canEdit(row) {
   // Admin/distributor can edit anyone
   if (currentRole.value === 3 || currentRole.value === 2) return true;

@@ -1,6 +1,9 @@
 <template>
   <div class="permissions-view" v-if="canAccessPermissions">
-    <!-- Breadcrumb -->
+    <div v-if="pageLoading" class="d-flex justify-content-center py-5">
+      <div class="spinner-border text-secondary" role="status"></div>
+    </div>
+    <div v-else>
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
         <li class="breadcrumb-item"><RouterLink to="/">Dashboard</RouterLink></li>
@@ -37,7 +40,6 @@
       </div>
     </div>
 
-    <!-- Permissions Checklist -->
     <div class="card mb-3" v-if="selectedUserId">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h6 class="mb-0">Module Access</h6>
@@ -49,7 +51,10 @@
         </div>
       </div>
       <div class="card-body">
-        <div class="table-responsive">
+        <div v-if="loading" class="text-center py-4">
+          <div class="spinner-border text-secondary" role="status"></div>
+        </div>
+        <div v-else class="table-responsive">
           <table class="table table-sm align-middle">
             <thead>
               <tr>
@@ -74,6 +79,7 @@
         <p v-if="!modules.length" class="text-muted mb-0">No modules registered.</p>
       </div>
     </div>
+    </div>
   </div>
   <div v-else class="text-muted">You do not have access to permissions.</div>
 
@@ -89,6 +95,7 @@ import UiAlert from '../../components/UiAlert.vue';
 const router = useRouter();
 const loading = ref(false);
 const saving = ref(false);
+const pageLoading = ref(true);
 const error = ref('');
 const message = ref('');
 const selectedUserId = ref(0);
@@ -170,6 +177,7 @@ async function loadOptions() {
     selectedUserId.value = 0;
   } catch (e) {
     error.value = e?.response?.data?.message || 'Failed to load options';
+    pageLoading.value = false;
   }
 }
 
@@ -234,8 +242,10 @@ onMounted(async () => {
   if (list && list.length > 0) {
     selectedUserId.value = Number(list[0].id);
     await reloadPermissions();
+    pageLoading.value = false;
   } else {
     router.push({ path: '/users', query: { alert: 'No eligible users to assign permissions' } });
+    pageLoading.value = false;
   }
 });
 </script>

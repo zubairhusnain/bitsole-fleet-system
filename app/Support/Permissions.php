@@ -9,7 +9,7 @@ class Permissions
 {
     public static function check(User $user, string $moduleKey, string $action): bool
     {
-        if ($user->isAdmin()) return true;
+        if ($user->isAdmin() || $user->isDistributor()) return true;
         $row = UserPermission::query()->where('user_id', $user->id)->where('module_key', $moduleKey)->first();
         if ($row) {
             return match ($action) {
@@ -29,7 +29,7 @@ class Permissions
         $map = [];
         foreach ($modules as $key) {
             $row = $rows->get($key);
-            if ($user->isAdmin()) {
+            if ($user->isAdmin() || $user->isDistributor()) {
                 $map[$key] = ['read' => true, 'create' => true, 'update' => true, 'delete' => true];
                 continue;
             }
@@ -54,12 +54,6 @@ class Permissions
 
     protected static function fallbackCheck(User $user, string $moduleKey, string $action): bool
     {
-        if ($user->isDistributor()) {
-            return true;
-        }
-        if ($user->isFleetManager()) {
-            return false;
-        }
         return false;
     }
 }

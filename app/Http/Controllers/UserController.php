@@ -106,7 +106,6 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $me = $request->user();
-        if (!$me->canRead('users')) { return response()->json(['message' => 'Forbidden'], 403); }
 
         $q = trim((string)$request->query('q', ''));
         // Include blocked users if requested
@@ -175,7 +174,6 @@ class UserController extends Controller
     public function show(Request $request, int $userId)
     {
         $me = $request->user();
-        if (!$me->canRead('users')) { return response()->json(['message' => 'Forbidden'], 403); }
         $builder = $this->scopeUsersFor($me);
         $u = $builder->where('id', $userId)->first();
         if (!$u) {
@@ -320,7 +318,6 @@ class UserController extends Controller
     {
         $me = $request->user();
         if (!$me) { return response()->json(['message' => 'Unauthorized'], 401); }
-        if (!$me->canCreate('users')) { return response()->json(['message' => 'Forbidden'], 403); }
         // Admins, distributors, and fleet managers can create users
         if (!$me->isAdmin() && !$me->isDistributor() && !$me->isFleetManager()) {
             return response()->json(['message' => 'Forbidden'], 403);
@@ -381,7 +378,6 @@ class UserController extends Controller
     {
         $me = $request->user();
         if (!$me) { return response()->json(['message' => 'Unauthorized'], 401); }
-        if (!$me->canUpdate('users')) { return response()->json(['message' => 'Forbidden'], 403); }
 
         $target = User::query()->find($userId);
         if (!$target) { return response()->json(['message' => 'User not found'], 404); }
@@ -450,7 +446,6 @@ class UserController extends Controller
     {
         $me = $request->user();
         if (!$me) { return response()->json(['message' => 'Unauthorized'], 401); }
-        if (!$me->canDelete('users')) { return response()->json(['message' => 'Forbidden'], 403); }
         // Role flags
         $isAdmin = $me->isAdmin();
         $isDistributor = $me->isDistributor();

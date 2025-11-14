@@ -16,7 +16,6 @@ class ZoneController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        if (!$user->canRead('zones')) { return response()->json(["data" => []]); }
         $role = (int) ($user->role ?? User::ROLE_ADMIN);
         // Optional: include soft-deleted (blocked) zones
         $query = $request->boolean('withDeleted') ? Zones::withTrashed() : Zones::query();
@@ -80,7 +79,6 @@ class ZoneController extends Controller
      */
     public function show(Request $request, int $zoneParam)
     {
-        if (!$request->user()->canRead('zones')) { return response()->json(['zone' => null, 'geofence' => null]); }
         // Prefer geofence_id for lookups; fall back to local id for backward compatibility
         $zone = Zones::where('geofence_id', $zoneParam)->first();
         if (!$zone) { $zone = Zones::findOrFail($zoneParam); }
@@ -118,7 +116,6 @@ class ZoneController extends Controller
      */
     public function store(Request $request)
     {
-        if (!$request->user()->canCreate('zones')) { return response()->json(['message' => 'Forbidden'], 403); }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -188,7 +185,6 @@ class ZoneController extends Controller
      */
     public function update(Request $request, int $zoneParam)
     {
-        if (!$request->user()->canUpdate('zones')) { return response()->json(['message' => 'Forbidden'], 403); }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -265,7 +261,6 @@ class ZoneController extends Controller
      */
     public function destroy(Request $request, int $zoneParam)
     {
-        if (!$request->user()->canDelete('zones')) { return response()->json(['message' => 'Forbidden'], 403); }
         // Soft delete by default (block). Use force=1 (or hard=1) to permanently delete remotely + locally.
         $force = $request->boolean('force') || $request->boolean('hard');
 
@@ -335,7 +330,6 @@ class ZoneController extends Controller
     public function restore(Request $request, int $zoneParam)
     {
         $user = $request->user();
-        if (!$user->canDelete('zones')) { return response()->json(['message' => 'Forbidden'], 403); }
         $role = (int) ($user->role ?? User::ROLE_ADMIN);
 
         // Prefer geofence_id for lookups

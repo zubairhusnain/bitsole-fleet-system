@@ -15,7 +15,7 @@
       <div class="col-sm-12 col-md-12 col-xl-8">
         <h4 class="mb-0 fw-semibold">Zone Management</h4>
       </div>
-      <div class="col-sm-12 col-md-12 col-xl-4 d-flex justify-content-xl-end">
+      <div class="col-sm-12 col-md-12 col-xl-4 d-flex justify-content-xl-end" v-if="hasPerm('zones','create')">
         <RouterLink to="/zones/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> Add New Zone</RouterLink>
       </div>
     </div>
@@ -106,11 +106,11 @@
                 </td>
                 <td class="text-end">
                   <div class="btn-group btn-group-sm">
-                    <button class="btn btn-outline-primary" title="View" @click="goView(row.id, row.geofenceId)"><i class="bi bi-eye"></i></button>
-                    <button class="btn btn-outline-secondary" title="Edit" @click="goEdit(row.id, row.geofenceId)" :disabled="row.deletedAt"><i class="bi bi-pencil"></i></button>
-                    <button v-if="!row.deletedAt" class="btn btn-outline-warning" title="Block" @click="confirmBlock(row.id, row.geofenceId)"><i class="bi bi-slash-circle"></i></button>
-                    <button v-if="row.deletedAt" class="btn btn-outline-success" title="Restore" @click="restoreZone(row.id, row.geofenceId)"><i class="bi bi-arrow-counterclockwise"></i></button>
-                    <button class="btn btn-outline-danger" title="Delete" @click="confirmDelete(row.id, row.geofenceId)"><i class="bi bi-trash"></i></button>
+                    <button v-if="hasPerm('zones','read')" class="btn btn-outline-primary" title="View" @click="goView(row.id, row.geofenceId)"><i class="bi bi-eye"></i></button>
+                    <button v-if="hasPerm('zones','update')" class="btn btn-outline-secondary" title="Edit" @click="goEdit(row.id, row.geofenceId)" :disabled="row.deletedAt"><i class="bi bi-pencil"></i></button>
+                    <button v-if="!row.deletedAt && hasPerm('zones','delete')" class="btn btn-outline-warning" title="Block" @click="confirmBlock(row.id, row.geofenceId)"><i class="bi bi-slash-circle"></i></button>
+                    <button v-if="row.deletedAt && hasPerm('zones','update')" class="btn btn-outline-success" title="Restore" @click="restoreZone(row.id, row.geofenceId)"><i class="bi bi-arrow-counterclockwise"></i></button>
+                    <button v-if="hasPerm('zones','delete')" class="btn btn-outline-danger" title="Delete" @click="confirmDelete(row.id, row.geofenceId)"><i class="bi bi-trash"></i></button>
                   </div>
                 </td>
               </tr>
@@ -141,6 +141,7 @@ import { ref, computed, onMounted } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
+import { hasPermission as _hasPermission } from '../../auth';
 
 // Search input (static for now)
 const searchName = ref('');
@@ -305,3 +306,4 @@ onMounted(fetchZones);
 <style scoped>
 /* Reuse global app.css styles for tables, badges, and pagination */
 </style>
+const hasPerm = (k, a) => _hasPermission(k, a);

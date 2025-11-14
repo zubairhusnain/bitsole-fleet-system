@@ -88,7 +88,7 @@ Route::middleware('auth')->prefix('/web/admin')->group(function () {
 });
 
 // Auth-protected Vehicles CRUD
-Route::middleware('auth')->prefix('/web/vehicles')->group(function () {
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/vehicles')->group(function () {
     Route::get('/', [\App\Http\Controllers\VehicleController::class, 'index']);
     Route::get('/options', [\App\Http\Controllers\VehicleController::class, 'options']);
     Route::post('/', [\App\Http\Controllers\VehicleController::class, 'store']);
@@ -116,7 +116,7 @@ Route::middleware('auth')->prefix('/web/vehicles')->group(function () {
 });
 
 // NEW: Auth-protected Drivers CRUD & assignment
-Route::middleware('auth')->prefix('/web/drivers')->group(function () {
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/drivers')->group(function () {
     Route::get('/', [\App\Http\Controllers\DriverController::class, 'index']);
     Route::get('/{driverId}', [\App\Http\Controllers\DriverController::class, 'show']);
     Route::post('/', [\App\Http\Controllers\DriverController::class, 'store']);
@@ -128,12 +128,12 @@ Route::middleware('auth')->prefix('/web/drivers')->group(function () {
 });
 
 // Live Tracking: trigger a broadcast of current positions
-Route::middleware('auth')->get('/web/live/positions/broadcast', [\App\Http\Controllers\LiveTrackingController::class, 'broadcast']);
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('/web/live/positions/broadcast', [\App\Http\Controllers\LiveTrackingController::class, 'broadcast']);
 // Live Tracking: HTTP fallback to fetch current positions (auth-protected)
-Route::middleware('auth')->get('/web/live/positions/current', [\App\Http\Controllers\LiveTrackingController::class, 'current']);
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('/web/live/positions/current', [\App\Http\Controllers\LiveTrackingController::class, 'current']);
 
 // NEW: Auth-protected Users CRUD
-Route::middleware('auth')->prefix('/web/users')->group(function () {
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/users')->group(function () {
     Route::get('/', [UserController::class, 'index']);
     Route::get('/options', [UserController::class, 'options']);
     Route::get('/{userId}', [UserController::class, 'show']);
@@ -147,7 +147,7 @@ Route::middleware('auth')->prefix('/web/users')->group(function () {
 });
 
 // NEW: Auth-protected Zones CRUD
-Route::middleware('auth')->prefix('/web/zones')->group(function () {
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/zones')->group(function () {
     Route::get('/', [\App\Http\Controllers\ZoneController::class, 'index']);
     Route::get('/{zoneId}', [\App\Http\Controllers\ZoneController::class, 'show']);
     Route::post('/', [\App\Http\Controllers\ZoneController::class, 'store']);
@@ -158,4 +158,4 @@ Route::middleware('auth')->prefix('/web/zones')->group(function () {
 });
 
 // NEW: Auth-protected Geofence listing from Traccar DB (testing/util)
-Route::middleware('auth')->get('/web/traccar/geofences', [\App\Http\Controllers\ZoneController::class, 'geofencesDb']);
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('/web/traccar/geofences', [\App\Http\Controllers\ZoneController::class, 'geofencesDb']);

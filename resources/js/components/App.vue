@@ -24,13 +24,22 @@
                     </li>
                 </ul>
                 <!--end::Start Navbar Links-->
-                <!--begin::End Navbar Links-->
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item" v-if="isAuthed">
-                        <button @click="logout" class="btn btn-link nav-link text-danger">Logout</button>
+                    <li class="nav-item user-menu" v-if="isAuthed">
+                        <div class="nav-link d-flex align-items-center user-toggle">
+                            <img v-if="avatarSrc" :src="avatarSrc" alt="Avatar" class="avatar-img" />
+                            <span v-else class="avatar">{{ initials }}</span>
+                            <span class="d-flex align-items-center ms-2">
+                                <span class="fw-semibold name-text">{{ displayName }}</span>
+                                <i class="bi bi-chevron-down ms-2 chevron"></i>
+                            </span>
+                        </div>
+                        <div class="user-dropdown">
+                            <RouterLink to="/profile" class="dropdown-item">Profile</RouterLink>
+                            <button class="dropdown-item text-danger" @click="logout">Logout</button>
+                        </div>
                     </li>
                 </ul>
-                <!--end::End Navbar Links-->
             </div>
             <!--end::Container-->
         </nav>
@@ -84,7 +93,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" v-if="hasPerm('vehicles','read')">
+                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/vehicles') }" v-if="hasPerm('vehicles','read') || hasPerm('vehicles.overview','read') || hasPerm('vehicles.maintenance','read')">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/vehicles') }">
                                 <i class="nav-icon bi bi-car-front"></i>
                                 <p>
@@ -100,14 +109,14 @@
                                         <p>All Vehicles</p>
                                     </RouterLink>
                                 </li>
-                                <li class="nav-item" v-if="hasPerm('vehicles','read')">
+                                <li class="nav-item" v-if="hasPerm('vehicles.maintenance','read')">
                                     <RouterLink to="/vehicles/maintenance" class="nav-link"
                                         :class="{ active: route.path.startsWith('/vehicles/maintenance') }">
                                         <i class="nav-icon bi bi-tools"></i>
                                         <p>Vehicle Maintenance</p>
                                     </RouterLink>
                                 </li>
-                                <li class="nav-item" v-if="hasPerm('vehicles','read')">
+                                <li class="nav-item" v-if="hasPerm('vehicles.overview','read')">
                                     <RouterLink to="/vehicles/overview" class="nav-link"
                                         :class="{ active: route.path.startsWith('/vehicles/overview') }">
                                         <i class="nav-icon bi bi-clipboard-data"></i>
@@ -178,7 +187,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" v-if="hasPerm('users','read')">
+                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/users') }" v-if="hasPerm('users','read')">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/users') }">
                                 <i class="nav-icon bi bi-people-fill"></i>
                                 <p>
@@ -257,6 +266,27 @@ const isGuestPage = computed(() => route.meta?.guestOnly === true);
 const pageTitle = computed(() => route.meta?.title || (route.name ? String(route.name).charAt(0).toUpperCase() + String(route.name).slice(1) : 'Dashboard'));
 const role = computed(() => Number(authState?.user?.role ?? 3));
 const hasPerm = (key, action) => hasPermission(key, action);
+function roleLabel(r) {
+    switch (Number(r)) {
+        case 3: return 'admin';
+        case 2: return 'distributor';
+        case 1: return 'manager';
+        default: return 'user';
+    }
+}
+const displayName = computed(() => authState.user?.name || 'Profile');
+const initials = computed(() => {
+    const n = String(displayName.value || '').trim();
+    const first = n ? n[0] : '?';
+    return String(first).toUpperCase();
+});
+const avatarSrc = computed(() => {
+    const u = authState.user || {};
+    const src = u.avatar_url || u.avatar || '';
+    if (src && /^https?:\/\//i.test(src)) return src;
+    if (src) return src;
+    return '';
+});
 
 // Ensure AdminLTE Treeview binds after Vue renders the sidebar (post-login)
 function initTreeview() {
@@ -419,4 +449,14 @@ nav a.router-link-exact-active {
         height: 28px;
     }
 }
+.user-menu { position: relative; }
+.user-dropdown { position: absolute; right: 0; top: 100%; min-width: 160px; background: #fff; border: 1px solid #e5e7eb; box-shadow: 0 8px 24px rgba(0,0,0,0.12); display: none; z-index: 1050; border-radius: 6px; }
+.user-menu:hover .user-dropdown { display: block; }
+.user-dropdown .dropdown-item { display: block; padding: 8px 12px; color: #333; text-decoration: none; background: transparent; width: 100%; text-align: left; border: none; }
+.user-dropdown .dropdown-item:hover { background: #f7f7f7; }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: #e9ecef; color: #343a40; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; }
+.avatar-img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+.name-text { color: #0b0f28; }
+.chevron { color: #0b0f28; font-size: 18px; }
+.role-small { font-size: 11px; line-height: 1; }
 </style>

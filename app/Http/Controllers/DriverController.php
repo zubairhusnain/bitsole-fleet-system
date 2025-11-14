@@ -14,7 +14,6 @@ class DriverController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        if (!$user->canRead('drivers')) { return response()->json(['drivers' => []]); }
         $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
 
         $query = \App\Models\Drivers::withTrashed()->with(['tcDriver', 'tcDevice']);
@@ -78,7 +77,6 @@ class DriverController extends Controller
     public function show(Request $request, int $driverId)
     {
         $user = $request->user();
-        if (!$user->canRead('drivers')) { return response()->json(['message' => 'Forbidden'], 403); }
         $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
 
         $query = \App\Models\Drivers::query()->with(['tcDriver', 'tcDevice'])->where('driver_id', $driverId);
@@ -128,7 +126,6 @@ class DriverController extends Controller
      */
     public function store(Request $request)
     {
-        if (!$request->user()->canCreate('drivers')) { return response()->json(['message' => 'Forbidden'], 403); }
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'uniqueId' => ['required', 'string'],
@@ -334,7 +331,6 @@ class DriverController extends Controller
      */
     public function update(Request $request, int $driverId)
     {
-        if (!$request->user()->canUpdate('drivers')) { return response()->json(['message' => 'Forbidden'], 403); }
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'uniqueId' => ['required', 'string'],
@@ -538,7 +534,6 @@ class DriverController extends Controller
      */
     public function destroy(Request $request, int $driverId)
     {
-        if (!$request->user()->canDelete('drivers')) { return response()->json(['message' => 'Forbidden'], 403); }
         // Soft delete by default (block). Use force=1 (or hard=1) to permanently delete remotely + locally.
         $force = $request->boolean('force') || $request->boolean('hard');
 
@@ -642,7 +637,6 @@ class DriverController extends Controller
     public function restore(Request $request, int $driverId)
     {
         $user = $request->user();
-        if (!$user->canDelete('drivers')) { return response()->json(['message' => 'Forbidden'], 403); }
         $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
 
         $query = \App\Models\Drivers::withTrashed()->where('driver_id', $driverId);
