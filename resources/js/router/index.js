@@ -32,6 +32,7 @@ const Zones = () => import('../views/zones/Index.vue');
 // Zones add/edit
 const ZonesAdd = () => import('../views/zones/AddZone.vue');
 const ZonesEdit = () => import('../views/zones/Edit.vue');
+const NotFound = () => import('../views/NotFound.vue');
 
 const routes = [
   { path: '/', name: 'home', component: LiveTracking, meta: { requiresAuth: true, moduleKey: 'live-tracking', action: 'read' } },
@@ -72,6 +73,8 @@ const routes = [
   { path: '/zones', name: 'zones', component: Zones, meta: { requiresAuth: true, title: 'Zone Management', moduleKey: 'zones', action: 'read' } },
   { path: '/zones/new', name: 'zones-new', component: ZonesAdd, meta: { requiresAuth: true, title: 'Add New Zone', moduleKey: 'zones', action: 'create' } },
   { path: '/zones/:zoneId/edit', name: 'zones-edit', component: ZonesEdit, meta: { requiresAuth: true, title: 'Edit Zone', moduleKey: 'zones', action: 'update' } },
+  { path: '/404', name: 'not-found', component: NotFound, meta: { title: 'Not Found', guestOnly: true } },
+  { path: '/:pathMatch(.*)*', redirect: (to) => ({ path: '/404', query: { missing: to.fullPath || to.path || '' } }) },
 ];
 
 const router = createRouter({
@@ -90,8 +93,8 @@ router.beforeEach(async (to, from, next) => {
     return next({ name: 'login', query: { redirect: to.fullPath } });
   }
 
-  // Block guest-only pages when authenticated
-  if (to.meta?.guestOnly && isAuthed) {
+  // Block guest-only pages when authenticated, except 404 page
+  if (to.meta?.guestOnly && isAuthed && to.name !== 'not-found') {
     return next({ name: 'live-tracking' });
   }
 
