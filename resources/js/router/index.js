@@ -31,6 +31,7 @@ const Zones = () => import('../views/zones/Index.vue');
 // Zones add/edit
 const ZonesAdd = () => import('../views/zones/AddZone.vue');
 const ZonesEdit = () => import('../views/zones/Edit.vue');
+const TelemetryCodec8 = () => import('../views/telemetry/Codec8Tool.vue');
 
 const routes = [
   { path: '/', name: 'home', component: HomeView },
@@ -70,6 +71,8 @@ const routes = [
   { path: '/zones', name: 'zones', component: Zones, meta: { requiresAuth: true, title: 'Zone Management' } },
   { path: '/zones/new', name: 'zones-new', component: ZonesAdd, meta: { requiresAuth: true, title: 'Add New Zone' } },
   { path: '/zones/:zoneId/edit', name: 'zones-edit', component: ZonesEdit, meta: { requiresAuth: true, title: 'Edit Zone' } },
+
+    { path: '/telemetry/codec8', name: 'telemetry-codec8', component: TelemetryCodec8, meta: { requiresAuth: true, title: 'Codec 8E Decoder' } },
 ];
 
 const router = createRouter({
