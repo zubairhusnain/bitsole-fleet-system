@@ -77,13 +77,15 @@ class VehicleController extends Controller
 
         $options = $filtered->map(function ($d) {
             $tc = $d->tcDevice;
-            $unique = data_get($tc, 'uniqueId', data_get($tc, 'uniqueid', ''));
-            $name = data_get($tc, 'name', '');
-            $label = trim(($unique ? ($unique . ' - ') : '') . $name);
-            if ($label === '') { $label = $name ?: (string) data_get($tc, 'id'); }
+            $unique = data_get($tc, 'uniqueId', data_get($tc, 'uniqueid', data_get($d, 'uniqueid', data_get($d, 'uniqueId', ''))));
+            $name = data_get($tc, 'name', data_get($d, 'name', ''));
+            $idFallback = (int) data_get($d, 'device_id');
+            $tcId = (int) data_get($tc, 'id');
+            $labelBase = trim(($unique ? ($unique . ' - ') : '') . $name);
+            $label = $labelBase !== '' ? $labelBase : ('Device #' . ($idFallback ?: $tcId));
             return [
-                'id' => (int) data_get($tc, 'id'),
-                'deviceId' => (int) data_get($d, 'device_id'),
+                'id' => $tcId ?: $idFallback,
+                'deviceId' => $idFallback,
                 'name' => $name,
                 'uniqueId' => $unique,
                 'label' => $label,
