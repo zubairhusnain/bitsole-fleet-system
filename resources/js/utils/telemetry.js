@@ -40,6 +40,9 @@ export function formatOdometer(rawAttrs, ctx = {}) {
     ? teltonikaOrderIoFirst
     : genericOrderIoFirst;
   let keyFound = null;
+  const pre16 = (Object.prototype.hasOwnProperty.call(attrs, '16') ? attrs['16']
+    : (Object.prototype.hasOwnProperty.call(attrs, 'io16') ? attrs['io16'] : undefined));
+  if (pre16 != null && pre16 !== '') { keyFound = '16'; }
   for (const k of orderedKeys) {
     // For numeric IO keys, check both raw and io-prefixed variants
     const val = (k === '389' || k === '87' || k === '50' || k === '16')
@@ -47,7 +50,7 @@ export function formatOdometer(rawAttrs, ctx = {}) {
          : (Object.prototype.hasOwnProperty.call(attrs, 'io' + k) ? attrs['io' + k] : undefined))
       : attrs[k];
     const exists = val != null && val !== '';
-    if (exists) { keyFound = k; break; }
+    if (keyFound == null && exists) { keyFound = k; break; }
   }
   const parseNum = (val) => {
     const n = typeof val === 'string' ? parseFloat(val) : (typeof val === 'number' ? val : null);
