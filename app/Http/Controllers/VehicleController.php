@@ -67,7 +67,6 @@ class VehicleController extends Controller
         }
 
         $list = $query->get();
-
         // Include all devices when explicitly requested; otherwise default to devices with current position
         $includeAll = $request->boolean('includeAll') || $request->boolean('all');
         $filtered = $includeAll ? $list : $list->filter(function ($d) {
@@ -712,19 +711,18 @@ class VehicleController extends Controller
         $sessionId = $user->traccarSession ?? session('cookie');
         $headers = ['Content-Type: application/json', 'Accept: application/json'];
 
-        // Prefer POST reports API; fallback to GET if supported
+        // Prefer POST reports API; fallback to GET; if unavailable, return clear message
         $payload = json_encode(['deviceId' => $deviceId, 'from' => $fromIso, 'to' => $toIso]);
         $resp = static::curl('/api/reports/logs', 'POST', $sessionId, $payload, $headers);
-        if (!isset($resp->responseCode) || $resp->responseCode < 200 || $resp->responseCode >= 300 || !trim($resp->response)) {
+        if (!isset($resp->responseCode) || $resp->responseCode < 200 || $resp->responseCode >= 300 || !trim((string)($resp->response ?? ''))) {
             $resp = static::curl('/api/reports/logs?deviceId=' . $deviceId . '&from=' . $fromIso . '&to=' . $toIso, 'GET', $sessionId, '', $headers);
         }
 
         if (!isset($resp->responseCode) || $resp->responseCode < 200 || $resp->responseCode >= 300) {
-            return response()->json([
-                'message' => 'Failed to fetch logs from tracking server',
-                'code' => $resp->responseCode ?? 0,
-                'error' => $resp->error ?? null,
-            ], 502);
+            $code = (int) ($resp->responseCode ?? 0);
+            $notAvailable = in_array($code, [404, 405, 501]);
+            $msg = $notAvailable ? 'Logs API not available on this Traccar version' : 'Failed to fetch logs from tracking server';
+            return response()->json(['message' => $msg, 'code' => $code, 'error' => $resp->error ?? null], $notAvailable ? 404 : 502);
         }
 
         $raw = json_decode($resp->response ?? '[]', true);

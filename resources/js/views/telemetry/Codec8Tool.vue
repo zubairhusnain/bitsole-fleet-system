@@ -105,12 +105,6 @@ async function fetchLogs() {
     loading.value = false
   }
 }
-</script>
-
-<style scoped>
-.decoded-json { white-space: pre-wrap; background: #0b0f2810; padding: 12px; border-radius: 10px; }
-.btn-app-dark { background-color: #0b0f28; color: #fff; border-radius: 12px; padding: .5rem .75rem; }
-</style>
 async function fetchDeviceOptions() {
   loadingOptions.value = true
   try {
@@ -125,5 +119,10 @@ async function fetchDeviceOptions() {
     loadingOptions.value = false
   }
 }
-
 fetchDeviceOptions()
+</script>
+
+<style scoped>
+.decoded-json { white-space: pre-wrap; background: #0b0f2810; padding: 12px; border-radius: 10px; }
+.btn-app-dark { background-color: #0b0f28; color: #fff; border-radius: 12px; padding: .5rem .75rem; }
+</style>
