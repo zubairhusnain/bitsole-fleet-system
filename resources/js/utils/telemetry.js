@@ -27,6 +27,7 @@ function formatNumberKm(km) {
 
 export function formatOdometer(rawAttrs, ctx = {}) {
   const attrs = parseAttrs(rawAttrs);
+  console.log('device attrs ',attrs);
   const protocol = String(ctx?.protocol || '').toLowerCase();
   const preferNamed = !!ctx?.preferNamedOdometer;
   const distanceKeys = ['totalDistance', 'distance', 'tripDistance'];
@@ -39,16 +40,19 @@ export function formatOdometer(rawAttrs, ctx = {}) {
   const orderedKeys = protocol === 'teltonika'
     ? teltonikaOrderIoFirst
     : genericOrderIoFirst;
+  const getIoVal = (n) => {
+    const forms = [String(n), 'io' + String(n), 'io_' + String(n), 'io-' + String(n)];
+    for (const f of forms) {
+      if (Object.prototype.hasOwnProperty.call(attrs, f)) return attrs[f];
+    }
+    return undefined;
+  };
   let keyFound = null;
-  const pre16 = (Object.prototype.hasOwnProperty.call(attrs, '16') ? attrs['16']
-    : (Object.prototype.hasOwnProperty.call(attrs, 'io16') ? attrs['io16'] : undefined));
+  const pre16 = getIoVal(16);
   if (pre16 != null && pre16 !== '') { keyFound = '16'; }
   for (const k of orderedKeys) {
     // For numeric IO keys, check both raw and io-prefixed variants
-    const val = (k === '389' || k === '87' || k === '50' || k === '16')
-      ? (Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k]
-         : (Object.prototype.hasOwnProperty.call(attrs, 'io' + k) ? attrs['io' + k] : undefined))
-      : attrs[k];
+    const val = (k === '389' || k === '87' || k === '50' || k === '16') ? getIoVal(k) : attrs[k];
     const exists = val != null && val !== '';
     if (keyFound == null && exists) { keyFound = k; break; }
   }
@@ -56,12 +60,7 @@ export function formatOdometer(rawAttrs, ctx = {}) {
     const n = typeof val === 'string' ? parseFloat(val) : (typeof val === 'number' ? val : null);
     return Number.isFinite(n) ? n : null;
   };
-  const getAttrVal = (k) => {
-    if (Object.prototype.hasOwnProperty.call(attrs, k)) return attrs[k];
-    const ioKey = 'io' + k;
-    if (Object.prototype.hasOwnProperty.call(attrs, ioKey)) return attrs[ioKey];
-    return undefined;
-  };
+  const getAttrVal = (k) => ((k === '389' || k === '87' || k === '50' || k === '16') ? getIoVal(k) : attrs[k]);
   // Fallback scan
   if (!keyFound) {
     let specialKey = null;
@@ -77,7 +76,7 @@ export function formatOdometer(rawAttrs, ctx = {}) {
     if (specialKey) { keyFound = specialKey; }
   }
   if (!keyFound) return null;
-  const rawVal = (keyFound === '389' || keyFound === '87' || keyFound === '50' || keyFound === '16') ? getAttrVal(keyFound) : attrs[keyFound];
+  const rawVal = getAttrVal(keyFound);
   const num = typeof rawVal === 'string' ? parseFloat(rawVal) : (typeof rawVal === 'number' ? rawVal : null);
   if (!Number.isFinite(num)) return null;
   const keyLower = String(keyFound).toLowerCase();
