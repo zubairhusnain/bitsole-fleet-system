@@ -157,6 +157,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
   // Resolve liters
   let liters = null;
   let litersKeyUsed = null;
+  let litersWasMinusOne = false;
   {
     const candidates = [
       { key: 'fuelLiter', val: litersFuelLiter },
@@ -172,6 +173,8 @@ export function formatFuel(rawAttrs, ctx = {}) {
   if (liters == null) {
     // fallthrough remains null
   }
+
+  if (liters === -1) { litersWasMinusOne = true; liters = null; litersKeyUsed = null; }
 
   // Raw analog fallback
   let raw = null;
@@ -251,7 +254,9 @@ export function formatFuel(rawAttrs, ctx = {}) {
   let computedLiters = null;
   if (Number.isFinite(parseFloat(capacity)) && percent != null) {
     const cap = parseFloat(capacity);
-    computedLiters = Math.round((cap * percent / 100) * 10) / 10;
+    if (!litersWasMinusOne || percent > 0) {
+      computedLiters = Math.round((cap * percent / 100) * 10) / 10;
+    }
   }
 
   const badgeVariant = percent == null ? null : (percent >= 60 ? 'success' : (percent >= 30 ? 'warning' : 'danger'));
