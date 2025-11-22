@@ -39,7 +39,7 @@
                     <table class="table table-hover table-sm align-middle mb-0 table-grid-lines table-nowrap">
                         <thead class="thead-app-dark">
                             <tr>
-                                <th class="fw-semibold py-2">Vehi</th>
+                                <th class="fw-semibold py-2">Device IMEI No</th>
                                 <th class="fw-semibold py-2">Vehicles Name</th>
                                 <th class="fw-semibold py-2">Plate number</th>
                                 <th class="fw-semibold py-2">Ignition</th>
@@ -81,7 +81,7 @@
                                         <button v-if="showWholeDataButton" class="btn btn-outline-info" title="Whole Data (JSON)" @click="openWholeData(row)">
                                             <i class="bi bi-braces"></i>
                                         </button>
-                                        
+
                                         <button v-if="!row.blocked" class="btn btn-outline-warning" title="Block" @click="block(row)"
                                             :disabled="blocking[row.device_id] === true">
                                             <i class="bi bi-slash-circle"></i>
@@ -167,7 +167,7 @@ const showWholeDataButton = computed(() => String(route.query?.wholedata || '') 
 const jsonModalVisible = ref(false);
 const wholeJson = ref('');
 const jsonModalFuelKey = ref('');
- 
+
 function closeJsonModal() { jsonModalVisible.value = false; wholeJson.value = ''; }
 function openWholeData(row) {
     try {
@@ -197,7 +197,7 @@ function openWholeData(row) {
         }
 
         const payload = {
-            tc_device: { 
+            tc_device: {
                 ...tc,
                 attributes: attrs,
                 position: pos
@@ -255,7 +255,7 @@ const wholeJsonHtml = computed(() => {
     return out;
 });
 
- 
+
 
 async function fetchPage(n = 1) {
     loading.value = true;
