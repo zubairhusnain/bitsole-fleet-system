@@ -1457,7 +1457,14 @@ const totalHoursDisplay = computed(() => {
 const fuelAverage = computed(() => pickAttr(['fuelAverage']));
 const maxSpeed = computed(() => pickAttr(['maxSpeed']));
 const speedLimit = computed(() => pickAttr(['speedLimit']));
-const fuelType = computed(() => pickAttr(['fuelType']));
+function devicePickAttr(keys) {
+    const a = deviceAttrs.value || {};
+    for (const k of keys) {
+        if (a[k] != null && a[k] !== '') return a[k];
+    }
+    return null;
+}
+const fuelType = computed(() => devicePickAttr(['fuelType']));
 const type = computed(() => pickAttr(['type']));
 const manufacturer = computed(() => pickAttr(['manufacturer']));
 const color = computed(() => pickAttr(['color']));
