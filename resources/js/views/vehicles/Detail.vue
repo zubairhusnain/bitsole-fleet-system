@@ -567,6 +567,8 @@
 
                                 <dt class="col-5 text-muted small">Max Speed</dt>
                                 <dd class="col-7 small mb-2">{{ maxSpeed ? maxSpeed + ' km/h' : '-' }}</dd>
+                                <dt class="col-5 text-muted small">Fuel Type</dt>
+                                <dd class="col-7 small mb-2">{{ fuelType || '-' }}</dd>
                                 <dt class="col-5 text-muted small">Speed Limit</dt>
                                 <dd class="col-7 small mb-2">{{ speedLimit ? speedLimit + ' km/h' : '-' }}</dd>
                                 <dt class="col-5 text-muted small">Device Source</dt>
@@ -1455,6 +1457,7 @@ const totalHoursDisplay = computed(() => {
 const fuelAverage = computed(() => pickAttr(['fuelAverage']));
 const maxSpeed = computed(() => pickAttr(['maxSpeed']));
 const speedLimit = computed(() => pickAttr(['speedLimit']));
+const fuelType = computed(() => pickAttr(['fuelType']));
 const type = computed(() => pickAttr(['type']));
 const manufacturer = computed(() => pickAttr(['manufacturer']));
 const color = computed(() => pickAttr(['color']));
