@@ -598,6 +598,8 @@ function popupHtml(v) {
     const isOnline = statusIs(v, 'online');
     const fuel = fuelDisplay(v);
     const odo = odometerDisplay(v);
+    const id = trackingId(v);
+    const detailUrl = typeof id === 'number' || typeof id === 'string' ? `/vehicles/${id}` : null;
     return `
     <div class="popup-card">
       <div class="popup-title-row">
@@ -614,6 +616,7 @@ function popupHtml(v) {
       <div class="popup-row"><span>Odometer:</span> <strong>${odo ?? '—'}</strong></div>
       <div class="popup-row"><span>Fuel:</span> <strong>${fuel ?? '—'}</strong></div>
       <div class="popup-row"><span>Location:</span> <span>${locText}</span></div>
+      ${detailUrl ? `<div class="popup-row"><a href="${detailUrl}" class="text-primary text-decoration-underline">View Details</a></div>` : ''}
     </div>
   `;
 }
