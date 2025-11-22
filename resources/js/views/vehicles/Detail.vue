@@ -1458,9 +1458,13 @@ const fuelAverage = computed(() => pickAttr(['fuelAverage']));
 const maxSpeed = computed(() => pickAttr(['maxSpeed']));
 const speedLimit = computed(() => pickAttr(['speedLimit']));
 function devicePickAttr(keys) {
-    const a = deviceAttrsFromDevice.value || {};
+    const fromDetail = deviceAttrsFromDetail.value || {};
+    const fromDevice = deviceAttrsFromDevice.value || {};
     for (const k of keys) {
-        if (a[k] != null && a[k] !== '') return a[k];
+        const v1 = fromDetail[k];
+        if (v1 != null && v1 !== '') return v1;
+        const v2 = fromDevice[k];
+        if (v2 != null && v2 !== '') return v2;
     }
     return null;
 }
