@@ -26,6 +26,7 @@
             </div>
             <div class="col-auto text-end ms-auto" v-if="detailPayload">
                 <div class="d-flex align-items-center gap-3">
+                    <span class="badge" :class="motionBadgeClass">{{ motionLabel }}</span>
                     <span class="badge" :class="statusBadgeClass">{{ statusLabel }}</span>
                     <span class="fw-semibold">{{ deviceName || '-' }}</span>
                 </div>
@@ -107,12 +108,9 @@
                         <div class="widget-icon">
                             <div class="icon-bubble">
                                 <svg viewBox="0 0 48 48" class="icon-svg" aria-hidden="true">
-                                    <!-- Odometer: two pins -->
-                                    <path d="M16 22c0-3.314 2.686-6 6-6s6 2.686 6 6c0 4.5-6 12-6 12s-6-7.5-6-12z"
-                                        fill="#1c7ed6" />
+                                    <path d="M16 22c0-3.314 2.686-6 6-6s6 2.686 6 6c0 4.5-6 12-6 12s-6-7.5-6-12z" fill="#1c7ed6" />
                                     <circle cx="22" cy="22" r="2" fill="#fff" />
-                                    <path d="M32 16c0-2.761 2.239-5 5-5s5 2.239 5 5c0 3.75-5 10-5 10s-5-6.25-5-10z"
-                                        fill="#f76707" />
+                                    <path d="M32 16c0-2.761 2.239-5 5-5s5 2.239 5 5c0 3.75-5 10-5 10s-5-6.25-5-10z" fill="#f76707" />
                                     <circle cx="37" cy="16" r="1.8" fill="#fff" />
                                 </svg>
                             </div>
@@ -131,18 +129,16 @@
                         <div class="widget-icon">
                             <div class="icon-bubble">
                                 <svg viewBox="0 0 48 48" class="icon-svg" aria-hidden="true">
-                                    <!-- Thermometer + sun -->
-                                    <rect x="18" y="14" width="8" height="18" rx="4" fill="#dee2e6" stroke="#ff6b6b"
-                                        stroke-width="2" />
-                                    <circle cx="22" cy="34" r="6" fill="#ff6b6b" />
-                                    <circle cx="36" cy="14" r="4" fill="#fab005" />
-                                    <path d="M36 6v4M36 18v4M28 14h4M40 14h4M30 10l3 3M39 21l3 3M33 21l-3 3M39 11l3-3"
-                                        stroke="#fab005" stroke-width="2" stroke-linecap="round" />
+                                    <rect x="10" y="12" width="18" height="24" rx="3" fill="#1c7ed6" />
+                                    <rect x="13" y="16" width="12" height="8" rx="2" fill="#ffffff" />
+                                    <rect x="13" y="26" width="12" height="6" rx="2" fill="#74c0fc" />
+                                    <path d="M30 14h4l4 5v12a3 3 0 0 1-3 3h-5" fill="none" stroke="#f76707" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                    <circle cx="35" cy="14" r="2" fill="#f76707" />
                                 </svg>
                             </div>
                             <div>
-                                <div class="small text-muted">Device Temperature</div>
-                                <div class="fw-semibold">—</div>
+                                <div class="small text-muted">Fuel Level</div>
+                                <div class="fw-semibold">{{ fuelLevelDisplay }}</div>
                             </div>
                         </div>
                     </div>
@@ -218,10 +214,6 @@
                                 <div class="fw-semibold">{{ color || '-' }}</div>
                             </div>
                             <div class="col-12 col-md-4">
-                                <div class="text-muted small">VIN Number</div>
-                                <div class="fw-semibold">{{ vin || '-' }}</div>
-                            </div>
-                            <div class="col-12 col-md-4">
                                 <div class="text-muted small">Plate Number</div>
                                 <div class="fw-semibold">{{ plate || '-' }}</div>
                             </div>
@@ -254,10 +246,6 @@
                                 <div class="text-muted small">Map Link</div>
                                 <a v-if="liveLocationUrl" :href="liveLocationUrl" target="_blank" rel="noopener" class="fw-semibold text-primary text-decoration-underline">Live Location</a>
                                 <span v-else class="fw-semibold text-muted">Live Location</span>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="text-muted small">Fuel Level</div>
-                                <div class="fw-semibold">{{ fuelLevelDisplay }}</div>
                             </div>
                         </div>
                     </div>
@@ -533,10 +521,6 @@
                                         <div class="fw-semibold">{{ plate || '-' }}</div>
                                     </div>
                                     <div class="col-12 col-md-6">
-                                        <label class="form-label small text-muted mb-0">VIN Number</label>
-                                        <div class="fw-semibold">{{ vin || '-' }}</div>
-                                    </div>
-                                    <div class="col-12 col-md-6">
                                         <label class="form-label small text-muted mb-0">Model</label>
                                         <div class="fw-semibold">{{ model || '-' }}</div>
                                     </div>
@@ -575,16 +559,12 @@
                                 <dd class="col-7 small mb-2">{{ ignitionLabel }}</dd>
                                 <dt class="col-5 text-muted small">Speed</dt>
                                 <dd class="col-7 small mb-2">{{ speedDisplay }}</dd>
-                                <dt class="col-5 text-muted small">Device Temperature</dt>
-                                <dd class="col-7 small mb-2">{{ temperatureDisplay }}</dd>
                                 <dt class="col-5 text-muted small">Device Battery</dt>
                                 <dd class="col-7 small mb-2">{{ batteryDisplay }}</dd>
                                 <dt class="col-5 text-muted small">Odometer</dt>
                                 <dd class="col-7 small mb-2">{{ odometerDisplay }}</dd>
-                                <dt class="col-5 text-muted small">Fuel Level</dt>
-                                <dd class="col-7 small mb-2">{{ fuelLevelDisplay }}</dd>
-                                <dt class="col-5 text-muted small">Fuel Average</dt>
-                                <dd class="col-7 small mb-2">{{ fuelAverage ? fuelAverage + ' L/100km' : '-' }}</dd>
+                                
+
                                 <dt class="col-5 text-muted small">Max Speed</dt>
                                 <dd class="col-7 small mb-2">{{ maxSpeed ? maxSpeed + ' km/h' : '-' }}</dd>
                                 <dt class="col-5 text-muted small">Speed Limit</dt>
@@ -913,6 +893,15 @@ const statusBadgeClass = computed(() => {
         'text-bg-secondary': s !== 'online' && s !== 'offline'
     };
 });
+const motionBadgeClass = computed(() => {
+    const m = String(motionLabel.value || '').toLowerCase();
+    return {
+        'text-bg-success': m === 'moving',
+        'text-bg-warning': m === 'idle',
+        'text-bg-danger': m === 'stopped',
+        'text-bg-secondary': m !== 'moving' && m !== 'idle' && m !== 'stopped'
+    };
+});
 const lastUpdateDisplay = computed(() => {
     const t = detailPayload.value?.position?.serverTime
         || detailPayload.value?.position?.servertime
@@ -939,6 +928,22 @@ const speedDisplay = computed(() => {
     const kmh = Math.round(Number(s) * 1.852);
     return `${kmh} km/h`;
 });
+
+const motionLabel = computed(() => {
+    const ign = getIgnition();
+    const s = getSpeed();
+    const n = Number(s);
+    if (ign === true) {
+        return Number.isFinite(n) && n > 0 ? 'Moving' : 'Idle';
+    }
+    if (ign === false) return 'Stopped';
+    if (Number.isFinite(n)) {
+        return n > 0 ? 'Moving' : 'Idle';
+    }
+    return '-';
+});
+
+
 
 function getIgnition() {
     const p = positions.value.length ? positions.value[positions.value.length - 1] : null;
@@ -1356,8 +1361,6 @@ function pickAttrWithKey(keys) {
 
 const plate = computed(() => pickAttr(['plate', 'registration', 'regNumber']));
 const vin = computed(() => pickAttr(['vin', 'VIN']));
-// Odometer display via shared telemetry formatter
-// Use merged device + position attributes and prefer named odometer keys for consistency with listing
 const odometerDisplay = computed(() => {
     const pos = detailPayload.value?.position || {};
     const mergedAttrs = tcAttrs.value || {};
@@ -1365,12 +1368,18 @@ const odometerDisplay = computed(() => {
     return tel?.odometer?.display ?? '-';
 });
 
-// Fuel display via shared telemetry formatter
+// Fuel display via shared telemetry formatter (merge device + position attrs)
 const fuelInfo = computed(() => {
     const pos = detailPayload.value?.position || {};
     const devAttrs = detailPayload.value?.device?.attributes || {};
-    const capacity = devAttrs?.fuelTankCapacity ?? devAttrs?.FuelTankCapacity ?? devAttrs?.fueltankcapacity;
-    return formatTelemetry(pos?.attributes, { protocol: pos?.protocol, model: model.value, capacity });
+    const posAttrs = pos?.attributes || {};
+    const mergedAttrs = { ...(devAttrs || {}), ...(posAttrs || {}) };
+    const capacityRaw = devAttrs?.fuelTankCapacity ?? devAttrs?.FuelTankCapacity ?? devAttrs?.fueltankcapacity;
+    const keys = ['fuelLevel','fuel_percent','fuelpercentage','fuelPercent','fuelPercent','fuelLiter','fuelLiters','FuelLiters','fuel','io89','89','io48','48','io84','84','io67','67','io68','68','io69','69','io240','240','io241','241','io242','242','io243','243','fuelRaw','analog1','analog2','analog3','adc1','adc2','adc3'];
+    let has = false;
+    for (const k of keys) { const v = posAttrs?.[k]; if (v !== undefined && v !== null && v !== '') { has = true; break; } }
+    const capacity = has ? capacityRaw : null;
+    return formatTelemetry(posAttrs, { protocol: pos?.protocol, model: model.value, capacity });
 });
 const fuelLevelDisplay = computed(() => {
     const f = fuelInfo.value?.fuel;
@@ -1380,7 +1389,7 @@ const fuelLevelDisplay = computed(() => {
     if (liters != null && percent != null) return `${liters} L (${percent}%)`;
     if (liters != null) return `${liters} L`;
     if (percent != null) return `${percent}%`;
-    return '-';
+    return f.display ?? '-';
 });
 const fuelBadgeVariant = computed(() => fuelInfo.value?.fuel?.variant ?? null);
 // Total Distance from position attributes, prioritize totalDistance and related keys
@@ -1851,12 +1860,12 @@ const comparisons = computed(() => ([
     { label: 'Manufacturer', static: 'Toyota', dynamic: manufacturer.value || '-' },
     { label: 'Model', static: 'Camry SE', dynamic: model.value || '-' },
     { label: 'Color', static: 'Midnight Black', dynamic: color.value || '-' },
-    { label: 'VIN Number', static: 'WAUYGAF6CCN174200', dynamic: vin.value || '-' },
+
     { label: 'Plate Number', static: 'TXR-9283d', dynamic: plate.value || '-' },
     { label: 'Ignition', static: 'off', dynamic: ignitionLabel.value || '-' },
     { label: 'Speed', static: '0 km/h', dynamic: speedDisplay.value || '-' },
-    { label: 'Odometer', static: '211,644 km', dynamic: odometerDisplay.value || '-' },
-    { label: 'Fuel', static: '60 Litres', dynamic: fuelAverage.value ? (fuelAverage.value + ' L/100km') : '-' },
+    
+
     { label: 'Location', static: 'PLUS KM 426', dynamic: currentAddress.value || '-' },
     { label: 'Last Report', static: '14/08/25-15:39', dynamic: lastUpdateDisplay.value || '-' },
 ]));

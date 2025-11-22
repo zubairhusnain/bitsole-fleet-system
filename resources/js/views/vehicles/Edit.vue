@@ -77,15 +77,8 @@
               <label class="form-label small">Plate Number</label>
               <input v-model="form.attributes.plate" type="text" class="form-control" placeholder="Plate Number" />
             </div>
-            <div class="col-12 col-md-4">
-              <label class="form-label small">VIN Number</label>
-              <input v-model="form.attributes.vin" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="VIN Number" />
-            </div>
 
-            <div class="col-12 col-md-4">
-              <label class="form-label small">Odometer Reading</label>
-              <input v-model="form.attributes.odometer" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="Odometer Reading" />
-            </div>
+
             <div class="col-12 col-md-4">
               <label class="form-label small">Fuel Average</label>
               <select v-model="form.attributes.fuelAverage" class="form-select">
@@ -93,6 +86,14 @@
                 <option>5 km/l</option>
                 <option>10 km/l</option>
                 <option>15 km/l</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Fuel Type</label>
+              <select v-model="form.attributes.fuelType" class="form-select">
+                <option value="">-- Select Fuel Type --</option>
+                <option>Diesel</option>
+                <option>Petrol</option>
               </select>
             </div>
             <div class="col-12 col-md-4">
@@ -162,9 +163,9 @@ const form = reactive({
     color: '',
     registration: '',
     plate: '',
-    vin: '',
-    odometer: '',
+    
     fuelAverage: '',
+    fuelType: '',
     maxSpeed: '',
     trackerModel: ''
   }
@@ -235,9 +236,11 @@ function hydrateFormFromTc(tc) {
   form.attributes.color = attrs.color || '';
   form.attributes.registration = attrs.registration || '';
   form.attributes.plate = attrs.plate || attrs.licensePlate || attrs.plateNumber || '';
-  form.attributes.vin = attrs.vin || '';
-  form.attributes.odometer = attrs.odometer || attrs.totalDistance || '';
+  
   form.attributes.fuelAverage = attrs.fuelAverage || '';
+  form.attributes.fuelType = (
+    attrs.fuelType || attrs.fuel_type || attrs.FuelType || attrs.fueltype || ''
+  );
   form.attributes.maxSpeed = attrs.maxSpeed || attrs.speedLimit || '';
   form.attributes.trackerModel = attrs.trackerModel || attrs.deviceModel || attrs.gpsModel || attrs.teltonikaModel || tc.model || '';
   form.attributes.fuelTankCapacity = attrs.fuelTankCapacity || attrs.FuelTankCapacity || attrs.fueltankcapacity || '';
@@ -275,14 +278,7 @@ async function submit() {
   message.value = '';
   error.value = '';
 
-  // Validate numeric fields: odometer and maxSpeed
-  if (form.attributes.odometer !== '' && form.attributes.odometer !== null) {
-    const odStr = String(form.attributes.odometer);
-    if (!/^\d+$/.test(odStr)) {
-      error.value = 'Odometer Reading must be numeric and >= 0';
-      return;
-    }
-  }
+  // Validate numeric fields: maxSpeed
   if (form.attributes.maxSpeed !== '' && form.attributes.maxSpeed !== null) {
     const msStr = String(form.attributes.maxSpeed);
     if (!/^\d+$/.test(msStr)) {
@@ -291,18 +287,11 @@ async function submit() {
     }
   }
 
-  // Validate numeric fields: registration and vin
+  // Validate numeric fields: registration
   if (form.attributes.registration !== '' && form.attributes.registration !== null) {
     const regStr = String(form.attributes.registration);
     if (!/^\d+$/.test(regStr)) {
       error.value = 'Registration Number must be numeric and >= 0';
-      return;
-    }
-  }
-  if (form.attributes.vin !== '' && form.attributes.vin !== null) {
-    const vinStr = String(form.attributes.vin);
-    if (!/^\d+$/.test(vinStr)) {
-      error.value = 'VIN Number must be numeric and >= 0';
       return;
     }
   }
@@ -314,6 +303,7 @@ async function submit() {
     fd.append('uniqueId', form.uniqueId?.trim() || '');
     if (form.model) fd.append('model', form.model?.trim());
     const attrsOut = { ...form.attributes };
+    if (attrsOut.fuelType && !attrsOut.fuel_type) attrsOut.fuel_type = attrsOut.fuelType;
     const keptPhotos = existingPhotos.value.filter(Boolean);
     attrsOut.photos = keptPhotos;
     fd.append('attributes', JSON.stringify(attrsOut));
