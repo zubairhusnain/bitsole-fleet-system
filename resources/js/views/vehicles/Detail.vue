@@ -1237,9 +1237,7 @@ onMounted(async () => {
     pageLoading.value = true;
     mapReady.value = true;
     window.addEventListener('resize', handleResize);
-    // Start performance and trips in parallel (do not await for initial render)
     const perfPromise = fetchPerformance();
-    const tripsPromise = fetchTripsByFilter();
     // Load device options for switcher in background (do not await)
     try { fetchDeviceOptions(); } catch {}
     // Fetch core detail payload (device + position + drivers) and gate page render
@@ -1267,7 +1265,8 @@ onMounted(async () => {
         }
     } catch {}
     pageLoading.value = false;
-    // Allow perf/trips promises to settle in background; errors are handled internally
+    try { await nextTick(); } catch {}
+    const tripsPromise = fetchTripsByFilter();
     try { await Promise.allSettled([perfPromise, tripsPromise]); } catch {}
 });
 
@@ -1303,15 +1302,15 @@ watch(deviceId, async (newId, oldId) => {
     detailPayload.value = null;
     driver.value = null;
     rating.value = null;
-    // Start perf and trips in parallel for new device
     const perfPromise = fetchPerformance();
-    const tripsPromise = fetchTripsByFilter();
     // Fetch core detail payload and gate render completion
     try { await fetchDetail(); } catch {}
     // Reinit live updates and polling fallback
     try { await initWebsocket(); } catch {}
     armPollingFallback();
     pageLoading.value = false;
+    try { await nextTick(); } catch {}
+    const tripsPromise = fetchTripsByFilter();
     try { await Promise.allSettled([perfPromise, tripsPromise]); } catch {}
 });
 
