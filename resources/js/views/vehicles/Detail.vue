@@ -1242,6 +1242,8 @@ onMounted(async () => {
     try { fetchDeviceOptions(); } catch {}
     // Fetch core detail payload (device + position + drivers) and gate page render
     try { await fetchDetail(); } catch {}
+    // Also load tcDevice to access canonical device attributes (fuelType, etc.)
+    try { await fetchDevice(); } catch {}
     // Subscribe to websocket updates for live tracking
     try { await initWebsocket(); } catch {}
     // Arm polling fallback in case sockets are unavailable
@@ -1305,6 +1307,8 @@ watch(deviceId, async (newId, oldId) => {
     const perfPromise = fetchPerformance();
     // Fetch core detail payload and gate render completion
     try { await fetchDetail(); } catch {}
+    // Also refresh tcDevice for updated device attributes
+    try { await fetchDevice(); } catch {}
     // Reinit live updates and polling fallback
     try { await initWebsocket(); } catch {}
     armPollingFallback();
