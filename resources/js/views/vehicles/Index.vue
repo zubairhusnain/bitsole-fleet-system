@@ -69,10 +69,7 @@
                                     </span>
                                 </td>
                                 <td class="text-muted text-nowrap">
-                                    <span>
-                                        {{ row.fuel ?? '—' }}
-                                        <span v-if="showWholeDataButton && row.fuelKey" class="badge bg-info ms-2">{{ row.fuelKey }}</span>
-                                    </span>
+                                    <span>{{ row.fuel ?? '—' }}</span>
                                 </td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
@@ -385,22 +382,7 @@ function deriveRow(r) {
     }
 
     const blocked = !!(r?.deleted_at || r?.deletedAt || r?.blocked);
-    const fuelKeyResolved = tel?.fuel?.key ?? null;
-    let fuelKey = null;
-    if (fuelKeyResolved) {
-        const v0 = String(fuelKeyResolved);
-        const v1 = v0.toLowerCase();
-        const variants = [v0, v1];
-        if (v1.startsWith('io')) {
-            const num = v1.slice(2);
-            variants.push(num);
-        } else if (/^\d+$/.test(v0)) {
-            variants.push('io' + v0);
-        }
-        const posMatch = variants.find(v => Object.prototype.hasOwnProperty.call(posAttrs, v));
-        fuelKey = posMatch ?? null;
-    }
-    return { ...r, uniqueid, name, vin, plate, model, ignition, speed, location, fuel, fuelKey, blocked };
+    return { ...r, uniqueid, name, vin, plate, model, ignition, speed, location, fuel, blocked };
 }
 
 async function block(row) {
