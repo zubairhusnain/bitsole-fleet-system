@@ -538,6 +538,13 @@ function fuelDisplay(v) {
 }
 
 // Extract odometer from position attributes and format in km
+function odometerDisplay(v) {
+    const pos = getPosition(v).raw || {};
+    const model = v.model || (v.tc_device?.model ?? v.tcDevice?.model) || null;
+    const posAttrs = parseAttrs(pos.attributes);
+    const tel = formatTelemetry(posAttrs, { protocol: pos.protocol, model, preferNamedOdometer: true });
+    return tel?.odometer?.display ?? null;
+}
 
 
 function statusIs(v, value) {
@@ -590,6 +597,7 @@ function popupHtml(v) {
     const sLabel = statusLabel(v);
     const isOnline = statusIs(v, 'online');
     const fuel = fuelDisplay(v);
+    const odo = odometerDisplay(v);
     return `
     <div class="popup-card">
       <div class="popup-title-row">
@@ -603,6 +611,7 @@ function popupHtml(v) {
       <div class="popup-row"><span>Last Update:</span> <strong>${lu}</strong></div>
       <div class="popup-row"><span>Ignition:</span> <strong>${ign}</strong></div>
       <div class="popup-row"><span>Speed:</span> <strong>${sp ?? '-'} km/h</strong></div>
+      <div class="popup-row"><span>Odometer:</span> <strong>${odo ?? '—'}</strong></div>
       <div class="popup-row"><span>Fuel:</span> <strong>${fuel ?? '—'}</strong></div>
       <div class="popup-row"><span>Location:</span> <span>${locText}</span></div>
     </div>

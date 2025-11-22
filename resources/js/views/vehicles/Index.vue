@@ -44,6 +44,7 @@
                                 <th class="fw-semibold py-2">Plate number</th>
                                 <th class="fw-semibold py-2">Ignition</th>
                                 <th class="fw-semibold py-2">Speed (Km/h)</th>
+                                <th class="fw-semibold py-2">Odometer</th>
                                 <th class="fw-semibold py-2">Fuel Level</th>
                                 <th class="fw-semibold py-2 text-end">Actions</th>
                             </tr>
@@ -67,6 +68,9 @@
                                         <span class="dot"></span>
                                         {{ row.speed ?? '—' }}
                                     </span>
+                                </td>
+                                <td class="text-muted text-nowrap">
+                                    <span>{{ row.odometer ?? '—' }}</span>
                                 </td>
                                 <td class="text-muted text-nowrap">
                                     <span>{{ row.fuel ?? '—' }}</span>
@@ -380,9 +384,11 @@ function deriveRow(r) {
         else if (percent != null) fuel = `${percent}%`;
         else fuel = tel.fuel.display ?? null;
     }
+    let odometer = null;
+    if (tel?.odometer?.display) odometer = tel.odometer.display;
 
     const blocked = !!(r?.deleted_at || r?.deletedAt || r?.blocked);
-    return { ...r, uniqueid, name, vin, plate, model, ignition, speed, location, fuel, blocked };
+    return { ...r, uniqueid, name, vin, plate, model, ignition, speed, location, fuel, odometer, blocked };
 }
 
 async function block(row) {
