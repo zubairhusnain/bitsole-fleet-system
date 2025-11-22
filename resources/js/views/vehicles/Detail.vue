@@ -243,6 +243,10 @@
                                 <div class="fw-semibold">{{ totalHoursDisplay }}</div>
                             </div>
                             <div class="col-6 col-md-3">
+                                <div class="text-muted small">Fuel Type</div>
+                                <div class="fw-semibold">{{ fuelType || '-' }}</div>
+                            </div>
+                            <div class="col-6 col-md-3">
                                 <div class="text-muted small">Map Link</div>
                                 <a v-if="liveLocationUrl" :href="liveLocationUrl" target="_blank" rel="noopener" class="fw-semibold text-primary text-decoration-underline">Live Location</a>
                                 <span v-else class="fw-semibold text-muted">Live Location</span>
@@ -563,7 +567,7 @@
                                 <dd class="col-7 small mb-2">{{ batteryDisplay }}</dd>
                                 <dt class="col-5 text-muted small">Odometer</dt>
                                 <dd class="col-7 small mb-2">{{ odometerDisplay }}</dd>
-                                
+
 
                                 <dt class="col-5 text-muted small">Max Speed</dt>
                                 <dd class="col-7 small mb-2">{{ maxSpeed ? maxSpeed + ' km/h' : '-' }}</dd>
@@ -1472,6 +1476,7 @@ function devicePickAttr(keys) {
     return null;
 }
 const fuelType = computed(() => devicePickAttr(['fuelType']));
+console.log('fuelType ',fuelType);
 const type = computed(() => pickAttr(['type']));
 const manufacturer = computed(() => pickAttr(['manufacturer']));
 const color = computed(() => pickAttr(['color']));
@@ -1881,7 +1886,7 @@ const comparisons = computed(() => ([
     { label: 'Plate Number', static: 'TXR-9283d', dynamic: plate.value || '-' },
     { label: 'Ignition', static: 'off', dynamic: ignitionLabel.value || '-' },
     { label: 'Speed', static: '0 km/h', dynamic: speedDisplay.value || '-' },
-    
+
 
     { label: 'Location', static: 'PLUS KM 426', dynamic: currentAddress.value || '-' },
     { label: 'Last Report', static: '14/08/25-15:39', dynamic: lastUpdateDisplay.value || '-' },
