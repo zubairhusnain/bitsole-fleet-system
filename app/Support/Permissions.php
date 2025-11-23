@@ -54,6 +54,26 @@ class Permissions
 
     protected static function fallbackCheck(User $user, string $moduleKey, string $action): bool
     {
+        if ($user->isAdmin() || $user->isDistributor()) return true;
+        $tokens = preg_split('/[\._-]+/', strtolower($moduleKey), -1, PREG_SPLIT_NO_EMPTY);
+        if (!$tokens || !count($tokens)) return false;
+        $base = $tokens[0];
+        $candidates = [$base];
+        if (count($tokens) >= 2) {
+            $candidates[] = $base . '.' . $tokens[1];
+        }
+        foreach ($candidates as $cand) {
+            $row = UserPermission::query()->where('user_id', $user->id)->where('module_key', $cand)->first();
+            if ($row) {
+                return match ($action) {
+                    'read' => (bool)($row->can_read ?? $row->can_access ?? false),
+                    'create' => (bool)($row->can_create ?? false),
+                    'update' => (bool)($row->can_update ?? false),
+                    'delete' => (bool)($row->can_delete ?? false),
+                    default => false,
+                };
+            }
+        }
         return false;
     }
 }

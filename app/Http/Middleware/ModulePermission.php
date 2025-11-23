@@ -34,7 +34,18 @@ class ModulePermission
             }
             $userKeys = $request->session()->get('user_module_keys');
             if (!is_array($userKeys)) {
-                $userKeys = [];
+                try {
+                    $userKeys = \App\Models\UserPermission::query()
+                        ->where('user_id', $user->id)
+                        ->pluck('module_key')
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all();
+                    $request->session()->put('user_module_keys', $userKeys);
+                } catch (\Throwable $e) {
+                    $userKeys = [];
+                }
             }
             $candidates = [$base];
             foreach ($segTokens as $t1) {

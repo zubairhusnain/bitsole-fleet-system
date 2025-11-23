@@ -5,11 +5,18 @@ return [
     'live-tracking' => 'Live Tracking',
     'drivers' => 'Driver Management',
     'vehicles' => 'Vehicle Management',
-    'vehicles.maintenance' => 'Vehicle Maintenance UUUU',
+    'vehicles.maintenance' => 'Vehicle Maintenance',
     'vehicles.overview' => 'Vehicle Overview',
     'zones' => 'Zone Management',
     'users' => 'User Management',
     'users.permissions' => 'User Permission',
+
+    'admin' => 'Admin',
+    'reports' => 'Reports & Analytics',
+    'alerts' => 'Alerts & Notifications',
+    'fuel' => 'Fuel Management',
+    'settings' => 'Settings',
+    'tasks' => 'Tasks',
 
     // Optional/hidden modules (keep for future use)
     // 'dashboard' => 'Dashboard',

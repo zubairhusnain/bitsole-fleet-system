@@ -63,7 +63,7 @@ Route::prefix('/web/auth')->group(function () {
 });
 
 // Auth-protected admin APIs (session-based)
-Route::middleware('auth')->prefix('/web/admin')->group(function () {
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/admin')->group(function () {
     Route::get('/dashboard', function (Request $request) {
         return response()->json([
             'message' => 'Welcome to admin dashboard',

@@ -43,8 +43,8 @@ const routes = [
   { path: '/forgot-password', name: 'forgot-password', component: ForgotPassword, meta: { guestOnly: true, title: 'Forgot Password' } },
   { path: '/reset-password', name: 'reset-password', component: ResetPassword, meta: { guestOnly: true, title: 'Reset Password' } },
   { path: '/dashboard', name: 'dashboard', component: LiveTracking, meta: { requiresAuth: true, title: 'Overview', moduleKey: 'live-tracking', action: 'read' } },
-  { path: '/tasks', name: 'tasks', component: TasksView, meta: { requiresAuth: true } },
-  { path: '/settings', name: 'settings', component: SettingsView, meta: { requiresAuth: true } },
+  { path: '/tasks', name: 'tasks', component: TasksView, meta: { requiresAuth: true, title: 'Tasks', moduleKey: 'tasks', action: 'read' } },
+  { path: '/settings', name: 'settings', component: SettingsView, meta: { requiresAuth: true, title: 'Settings', moduleKey: 'settings', action: 'read' } },
   { path: '/profile', name: 'profile', component: Profile, meta: { requiresAuth: true, title: 'Profile' } },
   // Feature screens
   { path: '/monitoring/vehicles', name: 'monitoring-vehicles', component: MonitoringVehicles, meta: { requiresAuth: true, title: 'Vehicles Monitoring', moduleKey: 'vehicles', action: 'read' } },
@@ -69,9 +69,9 @@ const routes = [
   { path: '/vehicles/:deviceId', name: 'vehicles-detail', component: VehicleDetail, meta: { requiresAuth: true, title: 'Vehicle Detail', moduleKey: 'vehicles.overview', action: 'read' } },
   // Edit Vehicle route
   { path: '/vehicles/:deviceId/edit', name: 'vehicles-edit', component: () => import('../views/vehicles/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Vehicle', moduleKey: 'vehicles', action: 'update' } },
-  { path: '/reports', name: 'reports', component: Reports, meta: { requiresAuth: true, title: 'Reports & Analytics' } },
-  { path: '/alerts', name: 'alerts', component: Alerts, meta: { requiresAuth: true, title: 'Alerts & Notifications' } },
-  { path: '/fuel', name: 'fuel', component: Fuel, meta: { requiresAuth: true, title: 'Fuel Management' } },
+  { path: '/reports', name: 'reports', component: Reports, meta: { requiresAuth: true, title: 'Reports & Analytics', moduleKey: 'reports', action: 'read' } },
+  { path: '/alerts', name: 'alerts', component: Alerts, meta: { requiresAuth: true, title: 'Alerts & Notifications', moduleKey: 'alerts', action: 'read' } },
+  { path: '/fuel', name: 'fuel', component: Fuel, meta: { requiresAuth: true, title: 'Fuel Management', moduleKey: 'fuel', action: 'read' } },
   { path: '/zones', name: 'zones', component: Zones, meta: { requiresAuth: true, title: 'Zone Management', moduleKey: 'zones', action: 'read' } },
   { path: '/zones/new', name: 'zones-new', component: ZonesAdd, meta: { requiresAuth: true, title: 'Add New Zone', moduleKey: 'zones', action: 'create' } },
   { path: '/zones/:zoneId/edit', name: 'zones-edit', component: ZonesEdit, meta: { requiresAuth: true, title: 'Edit Zone', moduleKey: 'zones', action: 'update' } },
