@@ -85,7 +85,7 @@
                                         <button v-if="showWholeDataButton" class="btn btn-outline-info" title="Whole Data (JSON)" @click="openWholeData(row)">
                                             <i class="bi bi-braces"></i>
                                         </button>
-                                        <button v-if="!row.blocked && hasPerm('vehicles','update')" class="btn btn-outline-warning" title="Block" @click="block(row)"
+                                        <button v-if="!row.blocked && hasPerm('vehicles','delete')" class="btn btn-outline-warning" title="Block" @click="block(row)"
                                             :disabled="blocking[row.device_id] === true">
                                             <i class="bi bi-slash-circle"></i>
                                         </button>
