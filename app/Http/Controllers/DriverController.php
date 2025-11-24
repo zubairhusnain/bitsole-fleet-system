@@ -22,8 +22,7 @@ class DriverController extends Controller
             $query->where('user_id', $user->id);
         } else {
             if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-                $query->where('user_id', $user->id)
-                      ->where('distributor_id', $user->id);
+                $query->where('distributor_id', $user->id);
             } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
                 $distId = $user->distributor_id ?? $user->id;
                 $query->where('distributor_id', $distId)
@@ -85,8 +84,7 @@ class DriverController extends Controller
             $query->where('user_id', $user->id);
         } else {
             if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-                $query->where('user_id', $user->id)
-                      ->where('distributor_id', $user->id);
+                $query->where('distributor_id', $user->id);
             } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
                 $distId = $user->distributor_id ?? $user->id;
                 $query->where('distributor_id', $distId)
@@ -641,7 +639,7 @@ class DriverController extends Controller
 
         $query = \App\Models\Drivers::withTrashed()->where('driver_id', $driverId);
         if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
+            $query->where('distributor_id', $user->id);
         } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
             $distId = $user->distributor_id ?? $user->id;
             $query->where('distributor_id', $distId)->where('user_id', $user->id);

@@ -27,8 +27,7 @@ class VehicleController extends Controller
         } else {
             // Role-based scoping
             if ($role === User::ROLE_DISTRIBUTOR) {
-                $query->where('user_id', $user->id)
-                      ->where('distributor_id', $user->id);
+                $query->where('distributor_id', $user->id);
             } elseif ($role !== User::ROLE_ADMIN) {
                 $distId = $user->distributor_id ?? $user->id;
                 $query->where('distributor_id', $distId)
@@ -57,8 +56,7 @@ class VehicleController extends Controller
             $query->where('user_id', $user->id);
         } else {
             if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-                $query->where('user_id', $user->id)
-                      ->where('distributor_id', $user->id);
+                $query->where('distributor_id', $user->id);
             } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
                 $distId = $user->distributor_id ?? $user->id;
                 $query->where('distributor_id', $distId)
@@ -73,6 +71,9 @@ class VehicleController extends Controller
             $tc = $d->tcDevice;
             return $tc && (int)($tc->positionid ?? 0) > 0;
         });
+        if (!$includeAll && ($filtered->count() === 0)) {
+            $filtered = $list;
+        }
 
         $options = $filtered->map(function ($d) {
             $tc = $d->tcDevice;
@@ -147,7 +148,7 @@ class VehicleController extends Controller
                 return response()->json(['message' => 'Registration Number must be numeric and >= 0'], 422);
             }
         }
-        
+
 
         // Save uploaded photos and add paths to attributes.photos
         $savedImagePaths = [];
@@ -287,7 +288,7 @@ class VehicleController extends Controller
                 return response()->json(['message' => 'Registration Number must be numeric and >= 0'], 422);
             }
         }
-        
+
 
         // Load existing photos from tracking server attributes
         $existingPhotos = [];
@@ -508,7 +509,7 @@ class VehicleController extends Controller
             $query->where('user_id', $user->id);
         } else {
             if ($role === User::ROLE_DISTRIBUTOR) {
-                $query->where('user_id', $user->id)->where('distributor_id', $user->id);
+                $query->where('distributor_id', $user->id);
             } elseif ($role !== User::ROLE_ADMIN) {
                 $distId = $user->distributor_id ?? $user->id;
                 $query->where('distributor_id', $distId)->where('user_id', $user->id);

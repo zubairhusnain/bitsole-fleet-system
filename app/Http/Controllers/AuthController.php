@@ -117,20 +117,7 @@ class AuthController extends Controller
                 session(['user_module_keys' => $keys]);
             }
         } catch (\Throwable $e) { /* ignore seeding errors */ }
-        $modulesConfig = config('modules') ?? [];
-        if (empty($modulesConfig)) {
-            $modulesConfig = [
-                'live-tracking' => 'Live Tracking',
-                'drivers' => 'Driver Management',
-                'vehicles' => 'Vehicle Management',
-                'vehicles.maintenance' => 'Vehicle Maintenance',
-                'vehicles.overview' => 'Vehicle Overview',
-                'zones' => 'Zone Management',
-                'users' => 'User Management',
-                'users.permissions' => 'User Permission',
-            ];
-        }
-        $modules = array_keys($modulesConfig);
+        $modules = array_keys(\App\Http\Middleware\ModulePermission::modules());
         $perms = \App\Support\Permissions::effectiveMap($user, $modules);
         return response()->json(['user' => $user, 'permissions' => $perms]);
     }

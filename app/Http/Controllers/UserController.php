@@ -64,21 +64,8 @@ class UserController extends Controller
             ['value' => User::ROLE_ADMIN, 'label' => 'Admin'],
         ];
 
-        // Modules list for permissions assignment
-        $modulesConfig = config('modules') ?? [];
-        // Fallback if configuration is empty
-        if (empty($modulesConfig)) {
-            $modulesConfig = [
-                'live-tracking' => 'Live Tracking',
-                'drivers' => 'Driver Management',
-                'vehicles' => 'Vehicle Management',
-                'vehicles.maintenance' => 'Vehicle Maintenance',
-                'vehicles.overview' => 'Vehicle Overview',
-                'zones' => 'Zone Management',
-                'users' => 'User Management',
-                'users.permissions' => 'User Permission',
-            ];
-        }
+        // Modules list for permissions assignment (centralized in ModulePermission)
+        $modulesConfig = \App\Http\Middleware\ModulePermission::modules();
         $modules = collect($modulesConfig)->map(function($label, $key) {
             return ['key' => $key, 'label' => $label];
         })->values();
@@ -217,21 +204,8 @@ class UserController extends Controller
         else { $canView = ((int)$target->id === (int)$me->id); }
         if (!$canView) { return response()->json(['message' => 'Forbidden'], 403); }
 
-        // Ensure modules configuration is available (fallback to defaults if empty)
-        $modulesConfig = config('modules') ?? [];
-        if (empty($modulesConfig)) {
-            $modulesConfig = [
-                'live-tracking' => 'Live Tracking',
-                'drivers' => 'Driver Management',
-                'vehicles' => 'Vehicle Management',
-                'vehicles.maintenance' => 'Vehicle Maintenance',
-                'vehicles.overview' => 'Vehicle Overview',
-                'zones' => 'Zone Management',
-                'users' => 'User Management',
-                'users.permissions' => 'User Permission',
-            ];
-        }
-        $modules = collect($modulesConfig);
+        // Modules configuration (centralized)
+        $modules = collect(\App\Http\Middleware\ModulePermission::modules());
         $rows = UserPermission::query()->where('user_id', $target->id)->get();
         $map = $rows->keyBy('module_key');
         $payload = $modules->map(function($label, $key) use ($map) {
@@ -256,7 +230,6 @@ class UserController extends Controller
         $me = $request->user();
         $target = User::query()->find($userId);
         if (!$target) { return response()->json(['message' => 'User not found'], 404); }
-
         // Assignability: admin -> any; distributor -> managers/users they own; manager -> users they manage
         $canAssign = false;
         if ($me->isAdmin()) { $canAssign = true; }
@@ -272,21 +245,8 @@ class UserController extends Controller
             'permissions.*.can_update' => ['nullable', 'boolean'],
             'permissions.*.can_delete' => ['nullable', 'boolean'],
         ]);
-        // Validate incoming keys against configured modules (with fallback)
-        $modulesConfig = config('modules') ?? [];
-        if (empty($modulesConfig)) {
-            $modulesConfig = [
-                'live-tracking' => 'Live Tracking',
-                'drivers' => 'Driver Management',
-                'vehicles' => 'Vehicle Management',
-                'vehicles.maintenance' => 'Vehicle Maintenance',
-                'vehicles.overview' => 'Vehicle Overview',
-                'zones' => 'Zone Management',
-                'users' => 'User Management',
-                'users.permissions' => 'User Permission',
-            ];
-        }
-        $modules = array_keys($modulesConfig);
+        // Validate incoming keys against configured modules (centralized)
+        $modules = array_keys(\App\Http\Middleware\ModulePermission::modules());
         $incoming = collect($data['permissions'] ?? [])
             ->filter(fn($p) => in_array($p['key'], $modules, true))
             ->keyBy('key');

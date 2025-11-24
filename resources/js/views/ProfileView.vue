@@ -115,8 +115,12 @@ async function reload() {
 }
 
 onMounted(async () => {
-  await reload();
+  // Show cached auth data immediately (fast initial render)
+  user.value = authState.user || {};
+  permissions.value = authState.permissions || {};
   loading.value = false;
+  // Then refresh from server in the background for latest permissions
+  await reload();
 });
 </script>
 

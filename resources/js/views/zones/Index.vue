@@ -170,6 +170,7 @@ const loading = ref(false);
 const message = ref('');
 const error = ref('');
 const router = useRouter();
+const hasPerm = (k, a) => _hasPermission(k, a);
 
 const startIndex = computed(() => (page.value - 1) * pageSize.value);
 const filteredRows = computed(() => {
@@ -306,4 +307,3 @@ onMounted(fetchZones);
 <style scoped>
 /* Reuse global app.css styles for tables, badges, and pagination */
 </style>
-const hasPerm = (k, a) => _hasPermission(k, a);

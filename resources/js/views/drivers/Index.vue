@@ -119,6 +119,7 @@ import { hasPermission as _hasPermission } from '../../auth';
 
 const router = useRouter();
 const isProd = import.meta.env.PROD;
+const hasPerm = (k, a) => _hasPermission(k, a);
 const query = ref('');
 const page = ref(1);
 const pageSize = 16;
@@ -280,4 +281,3 @@ function toEdit(row) {
   router.push(`/drivers/${row.id}/edit`);
 }
 </script>
-const hasPerm = (k, a) => _hasPermission(k, a);
