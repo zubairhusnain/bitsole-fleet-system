@@ -334,7 +334,7 @@
                                 <i class="bi bi-fuel-pump me-2 metric-icon"></i>
                                 <div class="flex-grow-1">
                                     <div class="fw-semibold">Fuel Average</div>
-                                    <div class="small text-muted">{{ (perfSummary.avgSpeed_kph ?? 0) }} km/h</div>
+                                    <div class="small text-muted">{{ formatNumber(perfSummary.avgFuel_l_per_100km, 1) }} L/100km</div>
                                 </div>
                             </div>
                             <div class="progress progress-thin mt-2">
@@ -646,7 +646,7 @@
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <div>Fuel Average</div>
-                                    <div class="fw-semibold">{{ (rating?.avgFuel_l_per_100km ?? 0) }} L/100km</div>
+                                    <div class="fw-semibold">{{ formatNumber(rating?.avgFuel_l_per_100km, 1) }} L/100km</div>
                                 </div>
                                 <div class="progress mb-3" style="height: 6px;">
                                     <div class="progress-bar bg-info" role="progressbar"
@@ -654,7 +654,7 @@
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <div>Avg Speed</div>
-                                    <div class="fw-semibold">{{ (rating?.avgSpeed_kph ?? 0) }} km/h</div>
+                                    <div class="fw-semibold">{{ formatNumber(rating?.avgSpeed_kph, 1) }} km/h</div>
                                 </div>
                                 <div class="progress mb-3" style="height: 6px;">
                                     <div class="progress-bar bg-primary" role="progressbar"
@@ -1357,9 +1357,11 @@ function pickAttrWithKey(keys) {
 const plate = computed(() => pickAttr(['plate', 'registration', 'regNumber']));
 const vin = computed(() => pickAttr(['vin', 'VIN']));
 // Odometer display via shared telemetry formatter
+// Use merged device + position attributes and prefer named odometer keys for consistency with listing
 const odometerDisplay = computed(() => {
     const pos = detailPayload.value?.position || {};
-    const tel = formatTelemetry(pos?.attributes, { protocol: pos?.protocol, model: model.value });
+    const mergedAttrs = tcAttrs.value || {};
+    const tel = formatTelemetry(mergedAttrs, { protocol: pos?.protocol, model: model.value, preferNamedOdometer: true });
     return tel?.odometer?.display ?? '-';
 });
 
@@ -1891,6 +1893,11 @@ function formatSpeedKmh(s) {
     // Trips often report averageSpeed in knots; convert to km/h if reasonable
     const kmh = Math.round(n * 1.852);
     return `${kmh} km/h`;
+}
+function formatNumber(val, decimals = 1) {
+    const n = Number(val);
+    if (!Number.isFinite(n)) return '0';
+    return n.toFixed(decimals);
 }
 
 </script>

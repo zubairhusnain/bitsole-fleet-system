@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Helpers\Curl;
 use App\Helpers\Helpers;
 use App\Models\Devices;
+use Illuminate\Support\Facades\Cache;
 class ReportService
 {
     use Curl;
@@ -160,45 +161,54 @@ class ReportService
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
         $to = date('Y-m-d\TH:i:00\Z', strtotime($request->to_date));
 
+        // Allow filtering events to reduce payload; default to harsh + overspeed
+        $eventTypes = trim((string)($request->event_types ?? 'harshBraking,harshAcceleration,overspeed'));
+        if ($eventTypes === '') { $eventTypes = 'harshBraking,harshAcceleration,overspeed'; }
+
         $queryString = "deviceId={$deviceId}&from={$from}&to={$to}";
         $headers = ['Content-Type: application/json', 'Accept: application/json'];
 
-        // Trips Report
-        $tripsResponse = static::curl("/api/reports/trips?$queryString", 'GET', $sessionId, '', $headers);
-        $trips = json_decode($tripsResponse->response ?? '[]');
+        // Cache key per device and window; short TTL as data is near-real-time
+        $cacheKey = sprintf('report_summary:%s:%s:%s:%s', $deviceId, $from, $to, $eventTypes);
 
-        // Summary Report
-        $summaryResponse = static::curl("/api/reports/summary?$queryString", 'GET', $sessionId, '', $headers);
-        $summary = json_decode($summaryResponse->response ?? '[]');
+        return Cache::remember($cacheKey, now()->addSeconds(120), function () use ($sessionId, $queryString, $headers, $eventTypes) {
+            // Trips Report
+            $tripsResponse = static::curl("/api/reports/trips?$queryString", 'GET', $sessionId, '', $headers);
+            $trips = json_decode($tripsResponse->response ?? '[]');
 
-        // Events (for harsh driving)
-        $eventsResponse = static::curl("/api/reports/events?$queryString&type=allEvents", 'GET', $sessionId, '', $headers);
-        $events = json_decode($eventsResponse->response ?? '[]');
+            // Summary Report
+            $summaryResponse = static::curl("/api/reports/summary?$queryString", 'GET', $sessionId, '', $headers);
+            $summary = json_decode($summaryResponse->response ?? '[]');
 
-        // Stops Report
-        $stopsResponse = static::curl("/api/reports/stops?$queryString", 'GET', $sessionId, '', $headers);
-        $stops = json_decode($stopsResponse->response ?? '[]');
+            // Events (filtered types to reduce processing)
+            $eventsResponse = static::curl("/api/reports/events?$queryString&type=" . urlencode($eventTypes), 'GET', $sessionId, '', $headers);
+            $events = json_decode($eventsResponse->response ?? '[]');
 
-        // Result formatting
-        $reportData = collect($summary)->map(function ($item) use ($trips, $events, $stops) {
-            return [
-                'deviceName' => $item->deviceName ?? '',
-                'distance_km' => round(($item->distance ?? 0) / 1000, 2),
-                'spentFuel_litres' => round(optional($item->spentFuel)->value ?? 0, 1),
-                'avgFuel_l_per_100km' => $item->averageFuel ?? 0,
-                'engineHours' => round($item->engineHours ?? 0, 2),
-                'maxSpeed_kph' => collect($trips)->pluck('maxSpeed')->max(),
-                'avgSpeed_kph' => collect($trips)->avg('averageSpeed'),
-                'tripCount' => count($trips),
-                'stopCount' => count($stops),
-                'idleTime_minutes' => round(array_sum(array_map(fn($s) => $s->duration ?? 0, $stops)) / 60000, 1),
-                'harshBraking' => count(array_filter($events, fn($e) => $e->type === 'harshBraking')),
-                'harshAcceleration' => count(array_filter($events, fn($e) => $e->type === 'harshAcceleration')),
-                'overspeedEvents' => count(array_filter($events, fn($e) => $e->type === 'overspeed')),
-            ];
+            // Stops Report
+            $stopsResponse = static::curl("/api/reports/stops?$queryString", 'GET', $sessionId, '', $headers);
+            $stops = json_decode($stopsResponse->response ?? '[]');
+
+            // Result formatting
+            $reportData = collect($summary)->map(function ($item) use ($trips, $events, $stops) {
+                return [
+                    'deviceName' => $item->deviceName ?? '',
+                    'distance_km' => round(($item->distance ?? 0) / 1000, 2),
+                    'spentFuel_litres' => round(optional($item->spentFuel)->value ?? 0, 1),
+                    'avgFuel_l_per_100km' => $item->averageFuel ?? 0,
+                    'engineHours' => round($item->engineHours ?? 0, 2),
+                    'maxSpeed_kph' => collect($trips)->pluck('maxSpeed')->max(),
+                    'avgSpeed_kph' => collect($trips)->avg('averageSpeed'),
+                    'tripCount' => count($trips),
+                    'stopCount' => count($stops),
+                    'idleTime_minutes' => round(array_sum(array_map(fn($s) => $s->duration ?? 0, $stops)) / 60000, 1),
+                    'harshBraking' => count(array_filter($events, fn($e) => $e->type === 'harshBraking')),
+                    'harshAcceleration' => count(array_filter($events, fn($e) => $e->type === 'harshAcceleration')),
+                    'overspeedEvents' => count(array_filter($events, fn($e) => $e->type === 'overspeed')),
+                ];
+            });
+
+            return $reportData;
         });
-
-        return $reportData;
     }
 
     public function getDeviceEvents($request)

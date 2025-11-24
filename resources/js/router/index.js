@@ -34,6 +34,7 @@ const Zones = () => import('../views/zones/Index.vue');
 const ZonesAdd = () => import('../views/zones/AddZone.vue');
 const ZonesEdit = () => import('../views/zones/Edit.vue');
 const NotFound = () => import('../views/NotFound.vue');
+const TelemetryCodec8 = () => import('../views/telemetry/Codec8Tool.vue');
 
 const routes = [
   { path: '/', name: 'home', component: LiveTracking, meta: { requiresAuth: true, moduleKey: 'live-tracking', action: 'read' } },
@@ -75,6 +76,7 @@ const routes = [
   { path: '/zones', name: 'zones', component: Zones, meta: { requiresAuth: true, title: 'Zone Management', moduleKey: 'zones', action: 'read' } },
   { path: '/zones/new', name: 'zones-new', component: ZonesAdd, meta: { requiresAuth: true, title: 'Add New Zone', moduleKey: 'zones', action: 'create' } },
   { path: '/zones/:zoneId/edit', name: 'zones-edit', component: ZonesEdit, meta: { requiresAuth: true, title: 'Edit Zone', moduleKey: 'zones', action: 'update' } },
+  { path: '/telemetry/codec8', name: 'telemetry-codec8', component: TelemetryCodec8, meta: { requiresAuth: true, title: 'Codec 8E Decoder' } },
   { path: '/404', name: 'not-found', component: NotFound, meta: { title: 'Not Found', guestOnly: true } },
   { path: '/:pathMatch(.*)*', redirect: (to) => ({ path: '/404', query: { missing: to.fullPath || to.path || '' } }) },
 ];

@@ -27,38 +27,40 @@ function formatNumberKm(km) {
 
 export function formatOdometer(rawAttrs, ctx = {}) {
   const attrs = parseAttrs(rawAttrs);
+  console.log('device attrs ',attrs);
   const protocol = String(ctx?.protocol || '').toLowerCase();
   const preferNamed = !!ctx?.preferNamedOdometer;
   const distanceKeys = ['totalDistance', 'distance', 'tripDistance'];
   const primary = ['odometer', 'mileage', 'odometerKm', 'odometer_km'];
   // Teltonika: prefer io389, then named odometer/mileage, then distance fallbacks
-  const teltonikaOrderIoFirst = ['87', '50', '389', ...primary, ...distanceKeys];
-  const teltonikaOrderNamedFirst = [...primary, ...distanceKeys, '87', '50', '389'];
-  const genericOrderIoFirst = ['87', '50', ...primary, ...distanceKeys];
-  const genericOrderNamedFirst = [...primary, ...distanceKeys, '87', '50'];
+  const teltonikaOrderIoFirst = ['16', '87', '50', '389', ...primary, ...distanceKeys];
+  const teltonikaOrderNamedFirst = [...primary, ...distanceKeys, '16', '87', '50', '389'];
+  const genericOrderIoFirst = ['16', '87', '50', ...primary, ...distanceKeys];
+  const genericOrderNamedFirst = [...primary, ...distanceKeys, '16', '87', '50'];
   const orderedKeys = protocol === 'teltonika'
-    ? (preferNamed ? teltonikaOrderNamedFirst : teltonikaOrderIoFirst)
-    : (preferNamed ? genericOrderNamedFirst : genericOrderIoFirst);
+    ? teltonikaOrderIoFirst
+    : genericOrderIoFirst;
+  const getIoVal = (n) => {
+    const forms = [String(n), 'io' + String(n), 'io_' + String(n), 'io-' + String(n)];
+    for (const f of forms) {
+      if (Object.prototype.hasOwnProperty.call(attrs, f)) return attrs[f];
+    }
+    return undefined;
+  };
   let keyFound = null;
+  const pre16 = getIoVal(16);
+  if (pre16 != null && pre16 !== '') { keyFound = '16'; }
   for (const k of orderedKeys) {
     // For numeric IO keys, check both raw and io-prefixed variants
-    const val = (k === '389' || k === '87' || k === '50')
-      ? (Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k]
-         : (Object.prototype.hasOwnProperty.call(attrs, 'io' + k) ? attrs['io' + k] : undefined))
-      : attrs[k];
+    const val = (k === '389' || k === '87' || k === '50' || k === '16') ? getIoVal(k) : attrs[k];
     const exists = val != null && val !== '';
-    if (exists) { keyFound = k; break; }
+    if (keyFound == null && exists) { keyFound = k; break; }
   }
   const parseNum = (val) => {
     const n = typeof val === 'string' ? parseFloat(val) : (typeof val === 'number' ? val : null);
     return Number.isFinite(n) ? n : null;
   };
-  const getAttrVal = (k) => {
-    if (Object.prototype.hasOwnProperty.call(attrs, k)) return attrs[k];
-    const ioKey = 'io' + k;
-    if (Object.prototype.hasOwnProperty.call(attrs, ioKey)) return attrs[ioKey];
-    return undefined;
-  };
+  const getAttrVal = (k) => ((k === '389' || k === '87' || k === '50' || k === '16') ? getIoVal(k) : attrs[k]);
   // Fallback scan
   if (!keyFound) {
     let specialKey = null;
@@ -74,7 +76,7 @@ export function formatOdometer(rawAttrs, ctx = {}) {
     if (specialKey) { keyFound = specialKey; }
   }
   if (!keyFound) return null;
-  const rawVal = (keyFound === '389' || keyFound === '87' || keyFound === '50') ? getAttrVal(keyFound) : attrs[keyFound];
+  const rawVal = getAttrVal(keyFound);
   const num = typeof rawVal === 'string' ? parseFloat(rawVal) : (typeof rawVal === 'number' ? rawVal : null);
   if (!Number.isFinite(num)) return null;
   const keyLower = String(keyFound).toLowerCase();
