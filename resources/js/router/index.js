@@ -1,14 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
 // Views
-import HomeView from '../views/HomeView.vue';
 import AboutView from '../views/AboutView.vue';
 import LoginView from '../views/LoginView.vue';
 import RegisterView from '../views/RegisterView.vue';
 // Auth views
 const ForgotPassword = () => import('../views/auth/ForgotPassword.vue');
 const ResetPassword = () => import('../views/auth/ResetPassword.vue');
-import DashboardView from '../views/DashboardView.vue';
+// Dashboard now renders LiveTracking component
 import TasksView from '../views/TasksView.vue';
 import SettingsView from '../views/SettingsView.vue';
 import { ensureAuthenticated } from '../auth';

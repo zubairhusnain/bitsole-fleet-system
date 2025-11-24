@@ -117,17 +117,12 @@ class VehicleController extends Controller
         }
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
-            'type','manufacturer','color','registration','plate','vin','odometer','fuelAverage','maxSpeed','speedLimit','photos','fuelTankCapacity','trackerModel'
+            'type','manufacturer','color','registration','plate','odometer','fuelAverage','maxSpeed','speedLimit','photos','fuelTankCapacity','trackerModel',
+            'fuelType','fuel_type'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
         // Validate numeric attributes
-        if (array_key_exists('odometer', $attributes) && $attributes['odometer'] !== null && $attributes['odometer'] !== '') {
-            $odoStr = (string) $attributes['odometer'];
-            if (!preg_match('/^\d+$/', $odoStr)) {
-                return response()->json(['message' => 'Odometer Reading must be numeric and >= 0'], 422);
-            }
-        }
         if (array_key_exists('maxSpeed', $attributes) && $attributes['maxSpeed'] !== null && $attributes['maxSpeed'] !== '') {
             $msStr = (string) $attributes['maxSpeed'];
             if (!preg_match('/^\d+$/', $msStr)) {
@@ -152,12 +147,7 @@ class VehicleController extends Controller
                 return response()->json(['message' => 'Registration Number must be numeric and >= 0'], 422);
             }
         }
-        if (array_key_exists('vin', $attributes) && $attributes['vin'] !== null && $attributes['vin'] !== '') {
-            $vinStr = (string) $attributes['vin'];
-            if (!preg_match('/^\d+$/', $vinStr)) {
-                return response()->json(['message' => 'VIN Number must be numeric and >= 0'], 422);
-            }
-        }
+        
 
         // Save uploaded photos and add paths to attributes.photos
         $savedImagePaths = [];
@@ -273,17 +263,12 @@ class VehicleController extends Controller
         }
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
-            'type','manufacturer','color','registration','plate','vin','odometer','fuelAverage','maxSpeed','speedLimit','photos','fuelTankCapacity','trackerModel'
+            'type','manufacturer','color','registration','plate','odometer','fuelAverage','maxSpeed','speedLimit','photos','fuelTankCapacity','trackerModel',
+            'fuelType','fuel_type'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
         // Validate numeric attributes
-        if (array_key_exists('odometer', $attributes) && $attributes['odometer'] !== null && $attributes['odometer'] !== '') {
-            $odoStr = (string) $attributes['odometer'];
-            if (!preg_match('/^\d+$/', $odoStr)) {
-                return response()->json(['message' => 'Odometer Reading must be numeric and >= 0'], 422);
-            }
-        }
         if (array_key_exists('maxSpeed', $attributes) && $attributes['maxSpeed'] !== null && $attributes['maxSpeed'] !== '') {
             $msStr = (string) $attributes['maxSpeed'];
             if (!preg_match('/^\d+$/', $msStr)) {
@@ -302,12 +287,7 @@ class VehicleController extends Controller
                 return response()->json(['message' => 'Registration Number must be numeric and >= 0'], 422);
             }
         }
-        if (array_key_exists('vin', $attributes) && $attributes['vin'] !== null && $attributes['vin'] !== '') {
-            $vinStr = (string) $attributes['vin'];
-            if (!preg_match('/^\d+$/', $vinStr)) {
-                return response()->json(['message' => 'VIN Number must be numeric and >= 0'], 422);
-            }
-        }
+        
 
         // Load existing photos from tracking server attributes
         $existingPhotos = [];
