@@ -13,13 +13,8 @@
                 <!--begin::Start Navbar Links-->
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link" href="#" role="button" @click.stop.prevent="toggleSidebar($event)" @touchend.stop.prevent="toggleSidebar($event)" aria-label="Toggle sidebar">
-                            <svg class="menu-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                                <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="none" stroke="currentColor" stroke-width="1.8"/>
-                                <line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                <line x1="8" y1="15" x2="16" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                            </svg>
+                        <a class="nav-link toggle-btn" href="#" role="button" @click.stop.prevent="toggleSidebar($event)" @touchend.stop.prevent="toggleSidebar($event)" aria-label="Toggle sidebar">
+                            <i class="bi caret-toggle" :class="sidebarOpen ? 'bi-caret-left-fill' : 'bi-caret-right-fill'"></i>
                         </a>
                     </li>
                 </ul>
@@ -29,10 +24,13 @@
                         <div class="nav-link d-flex align-items-center user-toggle">
                             <img v-if="avatarSrc" :src="avatarSrc" alt="Avatar" class="avatar-img" />
                             <span v-else class="avatar">{{ initials }}</span>
-                            <span class="d-flex align-items-center ms-2">
-                                <span class="fw-semibold name-text">{{ displayName }}</span>
+                            <div class="d-flex align-items-center ms-2">
+                                <div class="d-flex flex-column align-items-start">
+                                    <span class="fw-semibold name-text">{{ displayName }}</span>
+                                    <span class="role-badge mt-1">{{ roleLabel(role) }}</span>
+                                </div>
                                 <i class="bi bi-chevron-down ms-2 chevron"></i>
-                            </span>
+                            </div>
                         </div>
                         <div class="user-dropdown">
                             <RouterLink to="/profile" class="dropdown-item">Profile</RouterLink>
@@ -93,7 +91,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/vehicles') }" v-if="hasPerm('vehicles','read') || hasPerm('vehicles.overview','read') || hasPerm('vehicles.maintenance','read')">
+                        <li class="nav-item" ref="vehiclesNav" v-if="hasPerm('vehicles','read') || hasPerm('vehicles.overview','read') || hasPerm('vehicles.maintenance','read')">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/vehicles') }">
                                 <i class="nav-icon bi bi-car-front"></i>
                                 <p>
@@ -247,7 +245,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
 import { authState, clearAuthCache, hasPermission } from '../auth';
@@ -258,19 +256,28 @@ const logoSrc = assetBase + '/images/logo.png';
 
 const router = useRouter();
 const route = useRoute();
+const sidebarOpen = ref(false);
+const vehiclesNav = ref(null);
 const isProd = import.meta.env.PROD;
 const appName = document.title || 'Omayer Fleet System';
 const year = new Date().getFullYear();
 const isAuthed = computed(() => !!authState.user);
 const isGuestPage = computed(() => route.meta?.guestOnly === true);
 const pageTitle = computed(() => route.meta?.title || (route.name ? String(route.name).charAt(0).toUpperCase() + String(route.name).slice(1) : 'Dashboard'));
-const role = computed(() => Number(authState?.user?.role ?? 3));
+const role = computed(() => authState?.user?.role ?? 3);
 const hasPerm = (key, action) => hasPermission(key, action);
 function roleLabel(r) {
+    if (typeof r === 'string') {
+        const v = r.trim().toLowerCase();
+        if (v === 'admin' || v === 'administrator') return 'admin';
+        if (v === 'distributor') return 'distributor';
+        if (v === 'manager' || v === 'fleet manager') return 'fleet manager';
+        return 'user';
+    }
     switch (Number(r)) {
         case 3: return 'admin';
         case 2: return 'distributor';
-        case 1: return 'manager';
+        case 1: return 'fleet manager';
         default: return 'user';
     }
 }
@@ -323,12 +330,25 @@ onMounted(async () => {
         await nextTick();
         initTreeview();
     }
+    document.body.classList.add('sidebar-open');
+    document.body.classList.remove('sidebar-collapse');
+    sidebarOpen.value = true;
+    const p = route.path || '';
+    document.querySelectorAll('.app-sidebar .nav-item.menu-open').forEach(el => el.classList.remove('menu-open'));
+    if (p.startsWith('/vehicles') && vehiclesNav.value) vehiclesNav.value.classList.add('menu-open');
 });
 
 watch(() => isGuestPage.value, async (isGuest) => {
     if (!isGuest) {
         await nextTick();
         initTreeview();
+    }
+});
+
+watch(() => route.path, (p) => {
+    document.querySelectorAll('.app-sidebar .nav-item.menu-open').forEach(el => el.classList.remove('menu-open'));
+    if ((p || '').startsWith('/vehicles') && vehiclesNav.value) {
+        vehiclesNav.value.classList.add('menu-open');
     }
 });
 
@@ -362,9 +382,11 @@ function toggleSidebar(ev) {
     if (isOpen) {
         body.classList.remove('sidebar-open');
         body.classList.add('sidebar-collapse');
+        sidebarOpen.value = false;
     } else {
         body.classList.add('sidebar-open');
         body.classList.remove('sidebar-collapse');
+        sidebarOpen.value = true;
     }
 }
 </script>
@@ -434,10 +456,10 @@ nav a.router-link-exact-active {
         height: 28px;
     }
 }
-.app-header .nav-link .menu-icon {
-    display: inline-block;
-    color: #4a4a4a; /* dark grey close to screenshot */
-}
+.app-header .nav-link .caret-toggle { display: inline-block; color: #4a4a4a; font-size: 22px; }
+.app-header { position: relative; padding-left: 0 !important; }
+.app-header .container-fluid { padding-left: 0 !important; }
+.app-header .toggle-btn { position: absolute; left: 0; top: 50%; transform: translateY(-50%); padding: 0; z-index: 1051; display: flex; align-items: center; }
 
 /* Improve tap target spacing on mobile */
 @media (max-width: 576px) {
@@ -454,9 +476,11 @@ nav a.router-link-exact-active {
 .user-menu:hover .user-dropdown { display: block; }
 .user-dropdown .dropdown-item { display: block; padding: 8px 12px; color: #333; text-decoration: none; background: transparent; width: 100%; text-align: left; border: none; }
 .user-dropdown .dropdown-item:hover { background: #f7f7f7; }
-.avatar { width: 28px; height: 28px; border-radius: 50%; background: #e9ecef; color: #343a40; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; }
-.avatar-img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; background: #e9ecef; color: #343a40; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; }
+.avatar-img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
 .name-text { color: #0b0f28; }
 .chevron { color: #0b0f28; font-size: 18px; }
-.role-small { font-size: 11px; line-height: 1; }
+.role-badge { font-size: 10px; line-height: 1; color: #6b7280; border: 1px solid #e5e7eb; border-radius: 999px; padding: 1px 6px; text-transform: capitalize; }
 </style>
+import { ref } from 'vue';
+const sidebarOpen = ref(false);

@@ -5,6 +5,9 @@
         <div class="col-12 col-md-10 col-lg-7 d-flex justify-content-center">
           <div class="auth-card card">
             <div class="card-body">
+              <div v-if="submitting" class="loading-overlay">
+                <div class="spinner-border" role="status"><span class="visually-hidden">Processing…</span></div>
+              </div>
               <div class="text-center mb-3">
                 <img :src="logoSrc" alt="Logo" class="auth-logo" />
               </div>
@@ -14,21 +17,27 @@
               <form @submit.prevent="submit">
                 <div class="mb-3">
                   <label class="form-label">Email/Phone Number</label>
-                  <input v-model="form.email" type="text" class="form-control" placeholder="Email/Phone Number" required />
+                  <input v-model="form.email" type="text" class="form-control" placeholder="Email/Phone Number" required :disabled="submitting" />
                 </div>
                 <div class="mb-1">
                   <label class="form-label mb-2">Password</label>
-                  <input v-model="form.password" type="password" class="form-control" placeholder="Password" required />
+                  <input v-model="form.password" type="password" class="form-control" placeholder="Password" required :disabled="submitting" />
                 </div>
                 <div class="auth-actions">
                   <div class="auth-remember">
-                    <input v-model="form.remember" class="form-check-input" type="checkbox" id="remember" />
+                    <input v-model="form.remember" class="form-check-input" type="checkbox" id="remember" :disabled="submitting" />
                     <label class="form-check-label text-muted" for="remember">Remember me</label>
                   </div>
                   <RouterLink to="/forgot-password" class="small forgot-link">Forget Password</RouterLink>
                 </div>
                 <div class="d-grid gap-2">
-                  <button type="submit" class="btn btn-primary">Login</button>
+                  <button type="submit" class="btn btn-primary" :disabled="submitting">
+                    <span v-if="submitting" class="d-inline-flex align-items-center">
+                      <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Logging in…
+                    </span>
+                    <span v-else>Login</span>
+                  </button>
                 </div>
               </form>
               <div class="mt-3 text-center auth-footer">
@@ -57,10 +66,12 @@ const logoSrc = assetBase + '/images/login-page-logo.png';
 const router = useRouter();
 const appName = document.title || 'Omayer Fleet System';
 const error = ref('');
+const submitting = ref(false);
 const form = reactive({ email: '', password: '', remember: false });
 
 async function submit() {
   error.value = '';
+  submitting.value = true;
   try {
     const { data } = await axios.post('/web/auth/login', form);
     // Update auth state so guards and UI reflect logged-in status
@@ -73,6 +84,8 @@ async function submit() {
     router.push(redirect || '/profile');
   } catch (e) {
     error.value = e?.response?.data?.message || 'Login failed';
+  } finally {
+    submitting.value = false;
   }
 }
 </script>
@@ -80,4 +93,6 @@ async function submit() {
 <style scoped>
 .forgot-link { color: #E74C3C; }
 .auth-logo { display: block; margin: 0 auto; height: 32px; }
+.auth-card { position: relative; }
+.loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 1050; }
 </style>

@@ -11,7 +11,7 @@ const ResetPassword = () => import('../views/auth/ResetPassword.vue');
 import TasksView from '../views/TasksView.vue';
 import SettingsView from '../views/SettingsView.vue';
 import { ensureAuthenticated } from '../auth';
-import { authState, hasPermission } from '../auth';
+import { authState, hasPermission, roleToNumber } from '../auth';
 // Feature screens
 const Profile = () => import('../views/ProfileView.vue');
 const MonitoringVehicles = () => import('../views/monitoring/Vehicles.vue');
@@ -104,7 +104,7 @@ router.beforeEach(async (to, from, next) => {
   // Role-based gating if route defines allowed roles
   const role = authState?.user?.role ?? 3;
   const allowed = Array.isArray(to.meta?.roles) ? to.meta.roles : null;
-  if (allowed && !allowed.includes(Number(role))) {
+  if (allowed && !allowed.includes(roleToNumber(role))) {
     return next({ name: 'not-found', query: { error: 'forbidden', missing: to.fullPath } });
   }
 
