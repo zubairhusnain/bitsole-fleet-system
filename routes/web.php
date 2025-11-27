@@ -3,6 +3,7 @@
 use App\Models\TcUser;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VehicleModelController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -91,6 +92,8 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
 Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/vehicles')->group(function () {
     Route::get('/', [\App\Http\Controllers\VehicleController::class, 'index']);
     Route::get('/options', [\App\Http\Controllers\VehicleController::class, 'options']);
+    // Tracker models options for vehicle form (not admin-only)
+    Route::get('/models/options', [VehicleModelController::class, 'options']);
     Route::post('/', [\App\Http\Controllers\VehicleController::class, 'store']);
     Route::get('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'show']);
     // Device detail: single payload with latest position and trips
@@ -146,6 +149,14 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     // Restore a soft-deleted (blocked) user
     Route::patch('/{userId}/restore', [UserController::class, 'restore']);
     Route::delete('/{userId}', [UserController::class, 'destroy']);
+});
+
+// Admin-only Settings: Vehicle Models IOIDs
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/settings')->group(function () {
+    Route::get('/vehicle-models', [VehicleModelController::class, 'index']);
+    Route::post('/vehicle-models', [VehicleModelController::class, 'store']);
+    Route::put('/vehicle-models/{id}', [VehicleModelController::class, 'update']);
+    Route::delete('/vehicle-models/{id}', [VehicleModelController::class, 'destroy']);
 });
 
 // NEW: Auth-protected Zones CRUD

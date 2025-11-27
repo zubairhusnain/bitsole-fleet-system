@@ -44,7 +44,7 @@ const routes = [
   { path: '/reset-password', name: 'reset-password', component: ResetPassword, meta: { guestOnly: true, title: 'Reset Password' } },
   { path: '/dashboard', name: 'dashboard', component: LiveTracking, meta: { requiresAuth: true, title: 'Overview', moduleKey: 'live-tracking', action: 'read' } },
   { path: '/tasks', name: 'tasks', component: TasksView, meta: { requiresAuth: true, title: 'Tasks', moduleKey: 'tasks', action: 'read' } },
-  { path: '/settings', name: 'settings', component: SettingsView, meta: { requiresAuth: true, title: 'Settings', moduleKey: 'settings', action: 'read' } },
+  { path: '/settings', name: 'settings', component: SettingsView, meta: { requiresAuth: true, title: 'Settings', roles: [3], moduleKey: 'settings', action: 'read' } },
   { path: '/profile', name: 'profile', component: Profile, meta: { requiresAuth: true, title: 'Profile' } },
   // Feature screens
   { path: '/monitoring/vehicles', name: 'monitoring-vehicles', component: MonitoringVehicles, meta: { requiresAuth: true, title: 'Vehicles Monitoring', moduleKey: 'vehicles', action: 'read' } },

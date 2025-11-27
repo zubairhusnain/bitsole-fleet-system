@@ -34,6 +34,7 @@
                         </div>
                         <div class="user-dropdown">
                             <RouterLink to="/profile" class="dropdown-item">Profile</RouterLink>
+                            <RouterLink v-if="role === 3" to="/settings" class="dropdown-item">Settings</RouterLink>
                             <button class="dropdown-item text-danger" @click="logout">Logout</button>
                         </div>
                     </li>
@@ -178,12 +179,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item  d-none">
-                            <RouterLink to="/settings" class="nav-link" :class="{ active: route.name === 'settings' }">
-                                <i class="nav-icon bi bi-gear"></i>
-                                <p>Settings</p>
-                            </RouterLink>
-                        </li>
+
 
                         <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/users') }" v-if="hasPerm('users','read')">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/users') }">

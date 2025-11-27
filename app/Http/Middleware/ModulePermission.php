@@ -20,6 +20,7 @@ class ModulePermission
             'zones' => 'Zone Management',
             'users' => 'User Management',
             'users.permissions' => 'User Permission',
+            'settings' => 'Settings',
             // 'admin' => 'Admin',
             // 'reports' => 'Reports & Analytics',
             // 'alerts' => 'Alerts & Notifications',
@@ -50,10 +51,18 @@ class ModulePermission
         if (count($parts) >= 2 && $parts[0] === 'web') {
             $base = strtolower($parts[1] ?? '');
             $specialAllow = false;
+            // Admin-only settings
+            if ($base === 'settings' && !$user->isAdmin()) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
             if ($action === 'read' && $base === 'vehicles' && count($parts) >= 3) {
                 for ($i = 2; $i < count($parts); $i++) {
                     if (strtolower($parts[$i]) === 'options') {
                         if (Permissions::check($user, 'drivers', 'read') || Permissions::check($user, 'drivers', 'create') || Permissions::check($user, 'drivers', 'update')) { $specialAllow = true; }
+                        break;
+                    }
+                    if (strtolower($parts[$i]) === 'models' && strtolower($parts[$i+1] ?? '') === 'options') {
+                        $specialAllow = true;
                         break;
                     }
                 }
