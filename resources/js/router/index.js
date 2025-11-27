@@ -66,9 +66,19 @@ const routes = [
   // Add Vehicle route
   { path: '/vehicles/new', name: 'vehicles-new', component: () => import('../views/vehicles/AddVehicle.vue'), meta: { requiresAuth: true, title: 'Add New Vehicle', moduleKey: 'vehicles', action: 'create' } },
   // Vehicle Detail route
-  { path: '/vehicles/:deviceId', name: 'vehicles-detail', component: VehicleDetail, meta: { requiresAuth: true, title: 'Vehicle Detail', moduleKey: 'vehicles.overview', action: 'read' } },
+  { path: '/vehicles/:deviceId', name: 'vehicles-detail', component: VehicleDetail, meta: { requiresAuth: true, title: 'Vehicle Detail', moduleKey: 'vehicles.overview', action: 'read' },
+    beforeEnter: (to) => {
+      const id = Number.parseInt(String(to.params.deviceId));
+      if (!Number.isFinite(id) || id <= 0) return { name: 'profile' };
+    }
+  },
   // Edit Vehicle route
-  { path: '/vehicles/:deviceId/edit', name: 'vehicles-edit', component: () => import('../views/vehicles/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Vehicle', moduleKey: 'vehicles', action: 'update' } },
+  { path: '/vehicles/:deviceId/edit', name: 'vehicles-edit', component: () => import('../views/vehicles/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Vehicle', moduleKey: 'vehicles', action: 'update' },
+    beforeEnter: (to) => {
+      const id = Number.parseInt(String(to.params.deviceId));
+      if (!Number.isFinite(id) || id <= 0) return { name: 'profile' };
+    }
+  },
   { path: '/reports', name: 'reports', component: Reports, meta: { requiresAuth: true, title: 'Reports & Analytics', moduleKey: 'reports', action: 'read' } },
   { path: '/alerts', name: 'alerts', component: Alerts, meta: { requiresAuth: true, title: 'Alerts & Notifications', moduleKey: 'alerts', action: 'read' } },
   { path: '/fuel', name: 'fuel', component: Fuel, meta: { requiresAuth: true, title: 'Fuel Management', moduleKey: 'fuel', action: 'read' } },
@@ -96,8 +106,8 @@ router.beforeEach(async (to, from, next) => {
     return next({ name: 'login', query: { redirect: to.fullPath } });
   }
 
-  // Block guest-only pages when authenticated, except 404 page
-  if (to.meta?.guestOnly && isAuthed && to.name !== 'not-found') {
+  // Block guest-only pages when authenticated (including 404)
+  if (to.meta?.guestOnly && isAuthed) {
     return next({ name: 'profile' });
   }
 
