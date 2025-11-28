@@ -80,8 +80,7 @@ async function submit() {
     await refreshCsrf();
     await clearAuthCache();
     await getCurrentUser();
-    const redirect = router.currentRoute.value.query?.redirect;
-    router.push(redirect || '/profile');
+    window.location.reload();
   } catch (e) {
     error.value = e?.response?.data?.message || 'Login failed';
   } finally {

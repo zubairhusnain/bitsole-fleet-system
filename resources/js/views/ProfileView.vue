@@ -12,6 +12,7 @@
       </div>
       <h4 class="mb-3 fw-semibold">My Profile</h4>
       <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="error = ''" />
+      <UiAlert :show="!!success" :message="success" variant="success" dismissible @dismiss="success = ''" />
       <div class="row g-3">
         <div class="col-12 col-lg-4">
           <div class="card">
@@ -22,8 +23,34 @@
             </div>
           </div>
         </div>
-        <div class="col-12 col-lg-8" v-if="role === 1 || role === 0">
-          <div class="card">
+        <div class="col-12 col-lg-8">
+          <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h6 class="mb-0">Update Profile</h6>
+              <button class="btn btn-primary btn-sm" :disabled="saving" @click="saveProfile">{{ saving ? 'Saving…' : 'Save Changes' }}</button>
+            </div>
+            <div class="card-body">
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Name</label>
+                  <input type="text" class="form-control" v-model.trim="edit.name" />
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Email</label>
+                  <input type="email" class="form-control" v-model="edit.email" disabled />
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Phone</label>
+                  <input type="text" class="form-control" v-model.trim="edit.phone" />
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Password</label>
+                  <input type="password" class="form-control" v-model="edit.password" placeholder="Leave blank to keep current" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card" v-if="role === 1 || role === 0">
             <div class="card-header d-flex justify-content-between align-items-center">
               <h6 class="mb-0">Assigned Permissions</h6>
               <button class="btn btn-outline-secondary btn-sm" @click="reload">Reload</button>
@@ -67,17 +94,21 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { RouterLink, useRouter } from 'vue-router';
+import { RouterLink, useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
 import UiAlert from '../components/UiAlert.vue';
 import { authState } from '../auth';
 
 const router = useRouter();
+const route = useRoute();
 const loading = ref(true);
 const permLoading = ref(false);
 const error = ref('');
+const success = ref('');
 const user = ref({});
 const permissions = ref({});
+const saving = ref(false);
+const edit = ref({ name: '', email: '', phone: '', password: '' });
 
 const role = computed(() => Number(user.value?.role ?? 0));
 
@@ -99,7 +130,6 @@ const permRows = computed(() => {
 });
 
 async function reload() {
-  error.value = '';
   permLoading.value = true;
   try {
     const { data } = await axios.get('/web/auth/me');
@@ -107,6 +137,7 @@ async function reload() {
     permissions.value = data?.permissions || {};
     authState.user = user.value;
     authState.permissions = permissions.value;
+    edit.value = { name: user.value?.name || '', email: user.value?.email || '', phone: user.value?.phone || '', password: '' };
   } catch (e) {
     error.value = e?.response?.data?.message || 'Failed to load profile';
   } finally {
@@ -114,11 +145,46 @@ async function reload() {
   }
 }
 
+async function saveProfile() {
+  error.value = '';
+  success.value = '';
+  saving.value = true;
+  try {
+    const uid = Number(user.value?.id);
+    const payload = {
+      name: edit.value.name,
+      phone: edit.value.phone,
+    };
+    const pw = String(edit.value.password || '').trim();
+    if (pw.length > 0) {
+      payload.password = pw;
+    }
+    const { data } = await axios.put(`/web/users/${uid}`, payload);
+    user.value = data?.user || user.value;
+    authState.user = user.value;
+    success.value = 'Profile updated successfully';
+    edit.value.password = '';
+  } catch (e) {
+    error.value = e?.response?.data?.message || 'Failed to update profile';
+  } finally {
+    saving.value = false;
+  }
+}
+
 onMounted(async () => {
+  const qErr = route.query?.error;
+  if (qErr) {
+    const missing = route.query?.missing ? String(route.query.missing) : '';
+    error.value = qErr === 'route_not_exist'
+      ? (missing ? ('Requested page not found: ' + missing) : 'Requested page does not exist')
+      : String(qErr);
+    router.replace('/profile');
+  }
   // Show cached auth data immediately (fast initial render)
   user.value = authState.user || {};
   permissions.value = authState.permissions || {};
   loading.value = false;
+  edit.value = { name: user.value?.name || '', email: user.value?.email || '', phone: user.value?.phone || '', password: '' };
   // Then refresh from server in the background for latest permissions
   await reload();
 });

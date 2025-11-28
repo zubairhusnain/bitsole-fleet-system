@@ -10,6 +10,7 @@
             </ol>
         </div>
         <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="dismissError" />
+        <div v-if="loading" class="text-muted small mb-2">Loading vehicles…</div>
         <!-- Page Title and Actions -->
         <div class="row mb-3">
             <div class="col-sm-12 col-md-12 col-xl-8">

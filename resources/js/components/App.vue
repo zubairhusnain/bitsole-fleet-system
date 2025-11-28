@@ -67,7 +67,7 @@
                 <nav class="mt-2">
                     <!--begin::Sidebar Menu-->
                     <ul class="nav sidebar-menu flex-column" role="navigation" aria-label="Main navigation"
-                        data-lte-toggle="treeview" data-accordion="false" id="navigation">
+                        data-lte-toggle="treeview" data-accordion="true" id="navigation">
                         <li class="nav-item" v-if="hasPerm('live-tracking','read')">
                             <RouterLink to="/live-tracking" class="nav-link"
                                 :class="{ active: route.name === 'live-tracking' }">
@@ -92,7 +92,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" ref="vehiclesNav" v-if="hasPerm('vehicles','read') || hasPerm('vehicles.overview','read') || hasPerm('vehicles.maintenance','read')">
+                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/vehicles') }" v-if="hasPerm('vehicles','read') || hasPerm('vehicles.overview','read') || hasPerm('vehicles.maintenance','read')">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/vehicles') }">
                                 <i class="nav-icon bi bi-car-front"></i>
                                 <p>
@@ -190,21 +190,21 @@
                                 </p>
                             </a>
                             <ul class="nav nav-treeview">
-    <li class="nav-item" v-if="hasPerm('users','read')">
-        <RouterLink to="/users" class="nav-link"
-            :class="{ active: route.path === '/users' }">
-            <i class="nav-icon bi bi-list-ul"></i>
-            <p>User List</p>
-        </RouterLink>
-    </li>
-    <li class="nav-item" v-if="(role === 1 || role === 2 || role === 3) && hasPerm('users.permissions','read')">
-        <RouterLink to="/users/permissions" class="nav-link"
-            :class="{ active: route.path.startsWith('/users/permissions') }">
-            <i class="nav-icon bi bi-shield-lock"></i>
-            <p>User Permission</p>
-        </RouterLink>
-    </li>
-</ul>
+                                <li class="nav-item" v-if="hasPerm('users','read')">
+                                    <RouterLink to="/users" class="nav-link"
+                                        :class="{ active: route.path === '/users' }">
+                                        <i class="nav-icon bi bi-list-ul"></i>
+                                        <p>User List</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item" v-if="(role === 1 || role === 2 || role === 3) && hasPerm('users.permissions','read')">
+                                    <RouterLink to="/users/permissions" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/users/permissions') }">
+                                        <i class="nav-icon bi bi-shield-lock"></i>
+                                        <p>User Permission</p>
+                                    </RouterLink>
+                                </li>
+                            </ul>
                         </li>
                     </ul>
                     <!--end::Sidebar Menu-->
@@ -253,7 +253,6 @@ const logoSrc = assetBase + '/images/logo.png';
 const router = useRouter();
 const route = useRoute();
 const sidebarOpen = ref(false);
-const vehiclesNav = ref(null);
 const isProd = import.meta.env.PROD;
 const appName = document.title || 'Omayer Fleet System';
 const year = new Date().getFullYear();
@@ -326,12 +325,7 @@ onMounted(async () => {
         await nextTick();
         initTreeview();
     }
-    document.body.classList.add('sidebar-open');
-    document.body.classList.remove('sidebar-collapse');
-    sidebarOpen.value = true;
     const p = route.path || '';
-    document.querySelectorAll('.app-sidebar .nav-item.menu-open').forEach(el => el.classList.remove('menu-open'));
-    if (p.startsWith('/vehicles') && vehiclesNav.value) vehiclesNav.value.classList.add('menu-open');
 });
 
 watch(() => isGuestPage.value, async (isGuest) => {
@@ -341,12 +335,7 @@ watch(() => isGuestPage.value, async (isGuest) => {
     }
 });
 
-watch(() => route.path, (p) => {
-    document.querySelectorAll('.app-sidebar .nav-item.menu-open').forEach(el => el.classList.remove('menu-open'));
-    if ((p || '').startsWith('/vehicles') && vehiclesNav.value) {
-        vehiclesNav.value.classList.add('menu-open');
-    }
-});
+// No manual menu-open manipulation; AdminLTE handles accordion via data attributes
 
 async function logout() {
     try {
@@ -359,11 +348,7 @@ async function logout() {
 }
 
 function closeSidebar() {
-    const body = document.body;
-    if (body.classList.contains('sidebar-open')) {
-        body.classList.remove('sidebar-open');
-        body.classList.add('sidebar-collapse');
-    }
+    sidebarOpen.value = false;
 }
 
 let lastToggleTs = 0;
@@ -372,18 +357,7 @@ function toggleSidebar(ev) {
     // Dedup rapid click+touch sequences on mobile
     if (now - lastToggleTs < 300) return;
     lastToggleTs = now;
-
-    const body = document.body;
-    const isOpen = body.classList.contains('sidebar-open');
-    if (isOpen) {
-        body.classList.remove('sidebar-open');
-        body.classList.add('sidebar-collapse');
-        sidebarOpen.value = false;
-    } else {
-        body.classList.add('sidebar-open');
-        body.classList.remove('sidebar-collapse');
-        sidebarOpen.value = true;
-    }
+    sidebarOpen.value = !sidebarOpen.value;
 }
 </script>
 
@@ -478,5 +452,3 @@ nav a.router-link-exact-active {
 .chevron { color: #0b0f28; font-size: 18px; }
 .role-badge { font-size: 10px; line-height: 1; color: #6b7280; border: 1px solid #e5e7eb; border-radius: 999px; padding: 1px 6px; text-transform: capitalize; }
 </style>
-import { ref } from 'vue';
-const sidebarOpen = ref(false);

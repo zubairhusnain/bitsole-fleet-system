@@ -34,6 +34,24 @@ class ModulePermission
     {
         return [];
     }
+    /**
+     * Dynamically detect "self" user resource access, without hardcoding positions.
+     * Allows a signed-in user to read or update their own user record regardless of module permission.
+     */
+    private static function isSelfUserAccess(array $parts, $user, string $action): bool
+    {
+        if (!$user) return false;
+        if (!in_array($action, ['read', 'update'], true)) return false;
+        // Find the first occurrence of "users" and check the next segment for a numeric id equal to the current user.
+        $idx = null;
+        foreach ($parts as $i => $p) {
+            if (strtolower($p) === 'users') { $idx = $i; break; }
+        }
+        if ($idx === null) return false;
+        $idSeg = $parts[$idx + 1] ?? null;
+        if ($idSeg === null) return false;
+        return is_numeric($idSeg) && ((int)$idSeg === (int)$user->id);
+    }
     public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
@@ -55,6 +73,8 @@ class ModulePermission
             if ($base === 'settings' && !$user->isAdmin()) {
                 return response()->json(['message' => 'Forbidden'], 403);
             }
+            // Dynamically allow self user read/update (no module permission required)
+            if (static::isSelfUserAccess($parts, $user, $action)) { $specialAllow = true; }
             if ($action === 'read' && $base === 'vehicles' && count($parts) >= 3) {
                 for ($i = 2; $i < count($parts); $i++) {
                     if (strtolower($parts[$i]) === 'options') {

@@ -23,6 +23,7 @@
     <!-- Status Messages -->
     <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="error = ''" />
     <UiAlert :show="!!message" :message="message" variant="success" dismissible @dismiss="message = ''" />
+    <div v-if="loading" class="text-muted small mb-2">Loading zones…</div>
 
     <!-- Summary Cards -->
     <div class="row g-3 mb-3">
@@ -92,6 +93,9 @@
               </tr>
             </thead>
             <tbody>
+              <tr v-if="!loading && filteredRows.length === 0">
+                <td colspan="7" class="text-center text-muted py-3">No zones found</td>
+              </tr>
               <tr v-for="row in pagedRows" :key="row.id" class="border-bottom">
                 <td class="text-muted text-nowrap">{{ row.zoneName }}</td>
                 <td class="text-muted text-nowrap">{{ row.owner }}</td>
@@ -119,8 +123,7 @@
         </div>
       </div>
       <div class="card-footer d-flex align-items-center py-2">
-        <div class="text-muted small me-auto">Showing {{ startIndex + 1 }} to {{ Math.min(startIndex + pageSize,
-          totalCount) }} of {{ totalCount }} results</div>
+        <div class="text-muted small me-auto">Showing {{ totalCount === 0 ? 0 : (startIndex + 1) }} to {{ totalCount === 0 ? 0 : Math.min(startIndex + pageSize, totalCount) }} of {{ totalCount }} results</div>
         <nav aria-label="Pagination" class="ms-auto">
           <ul class="pagination pagination-sm mb-0 pagination-app">
             <li class="page-item" :class="{ disabled: page === 1 }"><button class="page-link"

@@ -53,38 +53,30 @@ const routes = [
   { path: '/drivers', name: 'drivers', component: Drivers, meta: { requiresAuth: true, title: 'Driver Management', moduleKey: 'drivers', action: 'read' } },
   // Add Driver route
   { path: '/drivers/new', name: 'drivers-new', component: () => import('../views/drivers/AddDriver.vue'), meta: { requiresAuth: true, title: 'Add New Driver', moduleKey: 'drivers', action: 'create' } },
-  // Edit Driver route
-  { path: '/drivers/:driverId/edit', name: 'drivers-edit', component: () => import('../views/drivers/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Driver', moduleKey: 'drivers', action: 'update' } },
+  // Edit Driver route (numeric id only)
+  { path: '/drivers/:driverId(\\d+)/edit', name: 'drivers-edit', component: () => import('../views/drivers/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Driver', moduleKey: 'drivers', action: 'update' } },
   // Users routes
   { path: '/users', name: 'users', component: Users, meta: { requiresAuth: true, title: 'User Management', moduleKey: 'users', action: 'read' } },
   { path: '/users/permissions', name: 'users-permissions', component: UsersPermissions, meta: { requiresAuth: true, title: 'User Permissions', roles: [1, 2, 3], moduleKey: 'users.permissions', action: 'update' } },
   { path: '/users/new', name: 'users-new', component: () => import('../views/users/AddUser.vue'), meta: { requiresAuth: true, title: 'Add New User', moduleKey: 'users', action: 'create' } },
-  { path: '/users/:userId/edit', name: 'users-edit', component: () => import('../views/users/Edit.vue'), meta: { requiresAuth: true, title: 'Edit User', moduleKey: 'users', action: 'update' } },
+  // Edit User route (numeric id only)
+  { path: '/users/:userId(\\d+)/edit', name: 'users-edit', component: () => import('../views/users/Edit.vue'), meta: { requiresAuth: true, title: 'Edit User', moduleKey: 'users', action: 'update' } },
   { path: '/vehicles', name: 'vehicles', component: Vehicles, meta: { requiresAuth: true, title: 'Vehicle Management', moduleKey: 'vehicles', action: 'read' } },
   { path: '/vehicles/maintenance', name: 'vehicles-maintenance', component: VehiclesMaintenance, meta: { requiresAuth: true, title: 'Vehicle Maintenance', moduleKey: 'vehicles.maintenance', action: 'read' } },
   { path: '/vehicles/overview', name: 'vehicles-overview', component: VehiclesOverview, meta: { requiresAuth: true, title: 'Vehicle Overview', moduleKey: 'vehicles.overview', action: 'read' } },
   // Add Vehicle route
   { path: '/vehicles/new', name: 'vehicles-new', component: () => import('../views/vehicles/AddVehicle.vue'), meta: { requiresAuth: true, title: 'Add New Vehicle', moduleKey: 'vehicles', action: 'create' } },
-  // Vehicle Detail route
-  { path: '/vehicles/:deviceId', name: 'vehicles-detail', component: VehicleDetail, meta: { requiresAuth: true, title: 'Vehicle Detail', moduleKey: 'vehicles.overview', action: 'read' },
-    beforeEnter: (to) => {
-      const id = Number.parseInt(String(to.params.deviceId));
-      if (!Number.isFinite(id) || id <= 0) return { name: 'profile' };
-    }
-  },
-  // Edit Vehicle route
-  { path: '/vehicles/:deviceId/edit', name: 'vehicles-edit', component: () => import('../views/vehicles/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Vehicle', moduleKey: 'vehicles', action: 'update' },
-    beforeEnter: (to) => {
-      const id = Number.parseInt(String(to.params.deviceId));
-      if (!Number.isFinite(id) || id <= 0) return { name: 'profile' };
-    }
-  },
+  // Vehicle Detail route (numeric id only)
+  { path: '/vehicles/:deviceId(\\d+)', name: 'vehicles-detail', component: VehicleDetail, meta: { requiresAuth: true, title: 'Vehicle Detail', moduleKey: 'vehicles.overview', action: 'read' } },
+  // Edit Vehicle route (numeric id only)
+  { path: '/vehicles/:deviceId(\\d+)/edit', name: 'vehicles-edit', component: () => import('../views/vehicles/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Vehicle', moduleKey: 'vehicles', action: 'update' } },
   { path: '/reports', name: 'reports', component: Reports, meta: { requiresAuth: true, title: 'Reports & Analytics', moduleKey: 'reports', action: 'read' } },
   { path: '/alerts', name: 'alerts', component: Alerts, meta: { requiresAuth: true, title: 'Alerts & Notifications', moduleKey: 'alerts', action: 'read' } },
   { path: '/fuel', name: 'fuel', component: Fuel, meta: { requiresAuth: true, title: 'Fuel Management', moduleKey: 'fuel', action: 'read' } },
   { path: '/zones', name: 'zones', component: Zones, meta: { requiresAuth: true, title: 'Zone Management', moduleKey: 'zones', action: 'read' } },
   { path: '/zones/new', name: 'zones-new', component: ZonesAdd, meta: { requiresAuth: true, title: 'Add New Zone', moduleKey: 'zones', action: 'create' } },
-  { path: '/zones/:zoneId/edit', name: 'zones-edit', component: ZonesEdit, meta: { requiresAuth: true, title: 'Edit Zone', moduleKey: 'zones', action: 'update' } },
+  // Edit Zone route (numeric id only)
+  { path: '/zones/:zoneId(\\d+)/edit', name: 'zones-edit', component: ZonesEdit, meta: { requiresAuth: true, title: 'Edit Zone', moduleKey: 'zones', action: 'update' } },
   { path: '/telemetry/codec8', name: 'telemetry-codec8', component: TelemetryCodec8, meta: { requiresAuth: true, title: 'Codec 8E Decoder' } },
   { path: '/404', name: 'not-found', component: NotFound, meta: { title: 'Not Found', guestOnly: true } },
   { path: '/:pathMatch(.*)*', redirect: (to) => ({ path: '/404', query: { missing: to.fullPath || to.path || '' } }) },
@@ -106,9 +98,13 @@ router.beforeEach(async (to, from, next) => {
     return next({ name: 'login', query: { redirect: to.fullPath } });
   }
 
-  // Block guest-only pages when authenticated (including 404)
+  // Block guest-only pages when authenticated (login/register) → go to home, not profile
   if (to.meta?.guestOnly && isAuthed) {
-    return next({ name: 'profile' });
+    if (to.name === 'not-found') {
+      const missing = to.query?.missing || to.fullPath || to.path || '';
+      return next({ name: 'profile', query: { error: 'route_not_exist', missing } });
+    }
+    return next({ path: '/' });
   }
 
   // Role-based gating if route defines allowed roles
@@ -125,4 +121,24 @@ router.beforeEach(async (to, from, next) => {
   }
 
   return next();
+});
+
+// Handle dynamic import (chunk) load failures globally
+router.onError((err, to) => {
+  const msg = String(err?.message || '');
+  const isChunkError =
+    msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes('ChunkLoadError') ||
+    /Loading chunk .* failed/i.test(msg);
+  if (!isChunkError) return;
+  try {
+    const already = sessionStorage.getItem('chunkReloaded');
+    if (already !== '1') {
+      sessionStorage.setItem('chunkReloaded', '1');
+      window.location.reload();
+      return;
+    }
+  } catch {}
+  const missing = to?.fullPath || to?.path || '';
+  router.replace({ name: 'profile', query: { error: 'chunk_load_failed', missing } }).catch(() => {});
 });
