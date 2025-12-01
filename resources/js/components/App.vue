@@ -348,16 +348,34 @@ async function logout() {
 }
 
 function closeSidebar() {
-    sidebarOpen.value = false;
+    try {
+        const body = document.body;
+        body.classList.remove('sidebar-open');
+        body.classList.add('sidebar-collapse');
+        sidebarOpen.value = false;
+    } catch {}
 }
 
 let lastToggleTs = 0;
 function toggleSidebar(ev) {
     const now = Date.now();
-    // Dedup rapid click+touch sequences on mobile
     if (now - lastToggleTs < 300) return;
     lastToggleTs = now;
-    sidebarOpen.value = !sidebarOpen.value;
+    try {
+        const body = document.body;
+        const isOpen = body.classList.contains('sidebar-open');
+        if (isOpen) {
+            body.classList.remove('sidebar-open');
+            body.classList.add('sidebar-collapse');
+            sidebarOpen.value = false;
+        } else {
+            body.classList.add('sidebar-open');
+            body.classList.remove('sidebar-collapse');
+            sidebarOpen.value = true;
+        }
+    } catch {
+        sidebarOpen.value = !sidebarOpen.value;
+    }
 }
 </script>
 
