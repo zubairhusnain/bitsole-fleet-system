@@ -36,20 +36,20 @@ const NotFound = () => import('../views/NotFound.vue');
 const TelemetryCodec8 = () => import('../views/telemetry/Codec8Tool.vue');
 
 const routes = [
-  { path: '/', name: 'home', component: LiveTracking, meta: { requiresAuth: true, moduleKey: 'live-tracking', action: 'read' } },
+  { path: '/', name: 'home', component: LiveTracking, meta: { requiresAuth: true, title: 'Home' } },
   { path: '/about', name: 'about', component: AboutView },
   { path: '/login', name: 'login', component: LoginView, meta: { guestOnly: true } },
   { path: '/register', name: 'register', component: RegisterView, meta: { guestOnly: true } },
   { path: '/forgot-password', name: 'forgot-password', component: ForgotPassword, meta: { guestOnly: true, title: 'Forgot Password' } },
   { path: '/reset-password', name: 'reset-password', component: ResetPassword, meta: { guestOnly: true, title: 'Reset Password' } },
-  { path: '/dashboard', name: 'dashboard', component: LiveTracking, meta: { requiresAuth: true, title: 'Overview', moduleKey: 'live-tracking', action: 'read' } },
+  { path: '/dashboard', name: 'dashboard', component: LiveTracking, meta: { requiresAuth: true, title: 'Overview' } },
   { path: '/tasks', name: 'tasks', component: TasksView, meta: { requiresAuth: true, title: 'Tasks', moduleKey: 'tasks', action: 'read' } },
   { path: '/settings', name: 'settings', component: SettingsView, meta: { requiresAuth: true, title: 'Settings', roles: [3], moduleKey: 'settings', action: 'read' } },
   { path: '/profile', name: 'profile', component: Profile, meta: { requiresAuth: true, title: 'Profile' } },
   // Feature screens
   { path: '/monitoring/vehicles', name: 'monitoring-vehicles', component: MonitoringVehicles, meta: { requiresAuth: true, title: 'Vehicles Monitoring', moduleKey: 'vehicles', action: 'read' } },
   { path: '/monitoring/zones', name: 'monitoring-zones', component: MonitoringZones, meta: { requiresAuth: true, title: 'Zone Monitoring', moduleKey: 'zones', action: 'read' } },
-  { path: '/live-tracking', name: 'live-tracking', component: LiveTracking, meta: { requiresAuth: true, title: 'Live Tracking', roles: [1, 2, 3], moduleKey: 'live-tracking', action: 'read' } },
+  { path: '/live-tracking', name: 'live-tracking', component: LiveTracking, meta: { requiresAuth: true, title: 'Live Tracking' } },
   { path: '/drivers', name: 'drivers', component: Drivers, meta: { requiresAuth: true, title: 'Driver Management', moduleKey: 'drivers', action: 'read' } },
   // Add Driver route
   { path: '/drivers/new', name: 'drivers-new', component: () => import('../views/drivers/AddDriver.vue'), meta: { requiresAuth: true, title: 'Add New Driver', moduleKey: 'drivers', action: 'create' } },

@@ -12,7 +12,6 @@ class ModulePermission
     public static function modules(): array
     {
         return [
-            'live-tracking' => 'Live Tracking',
             'drivers' => 'Driver Management',
             'vehicles' => 'Vehicle Management',
             'vehicles.maintenance' => 'Vehicle Maintenance',
@@ -73,8 +72,8 @@ class ModulePermission
             if ($base === 'settings' && !$user->isAdmin()) {
                 return response()->json(['message' => 'Forbidden'], 403);
             }
-            // Dynamically allow self user read/update (no module permission required)
             if (static::isSelfUserAccess($parts, $user, $action)) { $specialAllow = true; }
+            if ($action === 'read' && $base === 'live') { $specialAllow = true; }
             if ($action === 'read' && $base === 'vehicles' && count($parts) >= 3) {
                 for ($i = 2; $i < count($parts); $i++) {
                     if (strtolower($parts[$i]) === 'options') {
