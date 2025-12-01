@@ -19,7 +19,7 @@
             <div class="card-body">
               <div class="mb-2 fw-semibold">{{ user.name }}</div>
               <div class="text-muted small">{{ user.email }}</div>
-              <div class="mt-2 badge bg-secondary text-uppercase">{{ roleLabel(role) }}</div>
+              <div class="mt-2 badge bg-secondary text-uppercase">{{ displayRoleLabel }}</div>
             </div>
           </div>
         </div>
@@ -120,6 +120,10 @@ function roleLabel(r) {
     default: return 'user';
   }
 }
+const displayRoleLabel = computed(() => {
+  const lbl = String(user.value?.role_label || '').trim();
+  return lbl ? lbl : roleLabel(role.value);
+});
 
 const permRows = computed(() => {
   const map = permissions.value || {};

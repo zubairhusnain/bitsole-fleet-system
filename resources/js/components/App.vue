@@ -27,7 +27,7 @@
                             <div class="d-flex align-items-center ms-2">
                                 <div class="d-flex flex-column align-items-start">
                                     <span class="fw-semibold name-text">{{ displayName }}</span>
-                                    <span class="role-badge mt-1">{{ roleLabel(role) }}</span>
+                                    <span class="role-badge mt-1">{{ displayRoleLabel }}</span>
                                 </div>
                                 <i class="bi bi-chevron-down ms-2 chevron"></i>
                             </div>
@@ -276,6 +276,11 @@ function roleLabel(r) {
         default: return 'user';
     }
 }
+const displayRoleLabel = computed(() => {
+    const u = authState?.user || {};
+    const lbl = u.role_label;
+    return typeof lbl === 'string' && lbl.trim() ? lbl : roleLabel(role.value);
+});
 const displayName = computed(() => authState.user?.name || 'Profile');
 const initials = computed(() => {
     const n = String(displayName.value || '').trim();

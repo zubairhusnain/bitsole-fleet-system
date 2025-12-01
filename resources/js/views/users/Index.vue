@@ -23,7 +23,7 @@
             </div>
             <div class="col-sm-12 col-md-6 col-xl-5">
               <div class="d-flex align-items-center justify-content-xl-end gap-2" v-if="hasPerm('users','create')">
-                <RouterLink to="/users/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> New User</RouterLink>
+                <RouterLink to="/users/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> Add {{ createTargetLabel }}</RouterLink>
               </div>
             </div>
         </div>
@@ -55,7 +55,7 @@
                 <td class="text-muted text-nowrap">{{ row.id }}</td>
                 <td class="text-nowrap">{{ row.name }} <span v-if="row.blocked" class="badge rounded-pill bg-danger ms-2">Blocked</span></td>
                 <td class="text-muted text-nowrap">{{ row.email }}</td>
-                <td class="text-nowrap"><span class="badge rounded-pill badge-app bg-secondary">{{ roleLabel(row.role) }}</span></td>
+                <td class="text-nowrap"><span class="badge rounded-pill badge-app bg-secondary">{{ row.role_label || roleLabel(row.role) }}</span></td>
                 <td class="text-muted text-nowrap">{{ row.distributorName || '-' }}</td>
                 <td class="text-muted text-nowrap">{{ row.phone || '-' }}</td>
                 <td class="text-end">
@@ -123,6 +123,15 @@ const canAccessUsers = computed(() => currentRole.value === 3 || currentRole.val
 const hasPerm = (k, a) => _hasPermission(k, a);
 const canCreate = computed(() => hasPerm('users','create'));
 const canDelete = computed(() => hasPerm('users','delete'));
+const createTargetLabel = computed(() => {
+  const r = Number(currentRole.value);
+  switch (r) {
+    case 3: return 'Distributor';
+    case 2: return 'Fleet Manager';
+    case 1: return 'Fleet Viewer';
+    default: return 'User';
+  }
+});
 function canEdit(row) {
   // Admin/distributor can edit anyone
   if (currentRole.value === 3 || currentRole.value === 2) return true;

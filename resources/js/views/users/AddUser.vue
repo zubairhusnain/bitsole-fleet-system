@@ -5,11 +5,11 @@
       <ol class="breadcrumb mb-0 small text-muted">
         <li class="breadcrumb-item"><RouterLink to="/">Dashboard</RouterLink></li>
         <li class="breadcrumb-item"><RouterLink to="/users">User Management</RouterLink></li>
-        <li class="breadcrumb-item active" aria-current="page">Add New User</li>
+        <li class="breadcrumb-item active" aria-current="page">Add {{ createTargetLabel }}</li>
       </ol>
     </div>
 
-    <h4 class="mb-3 fw-semibold">Add New User</h4>
+    <h4 class="mb-3 fw-semibold">Add {{ createTargetLabel }}</h4>
 
     <!-- Status Messages -->
     <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="error = ''" />
@@ -54,17 +54,18 @@
       <!-- Actions -->
       <div class="d-flex align-items-center justify-content-end gap-2">
         <RouterLink to="/users" class="btn btn-outline-secondary">Cancel</RouterLink>
-        <button type="submit" class="btn btn-app-dark" :disabled="submitting">{{ submitting ? 'Adding…' : 'Add User' }}</button>
+        <button type="submit" class="btn btn-app-dark" :disabled="submitting">{{ submitting ? 'Adding…' : ('Add ' + createTargetLabel) }}</button>
       </div>
     </form>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue';
+import { reactive, ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
+import { authState } from '../../auth';
 
 const router = useRouter();
 
@@ -82,6 +83,16 @@ const error = ref('');
 const submitting = ref(false);
 
 // Role selection removed; options no longer needed.
+
+const currentRole = computed(() => Number(authState?.user?.role ?? 0));
+const createTargetLabel = computed(() => {
+  switch (currentRole.value) {
+    case 3: return 'Distributor';
+    case 2: return 'Fleet Manager';
+    case 1: return 'Fleet Viewer';
+    default: return 'User';
+  }
+});
 
 async function submit() {
   message.value = '';

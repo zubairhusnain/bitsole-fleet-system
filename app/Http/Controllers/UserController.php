@@ -144,6 +144,7 @@ class UserController extends Controller
                 'phone' => $u->phone,
                 'role' => $u->role,
                 'roleLabel' => $this->roleLabel((int)$u->role),
+                'role_label' => $u->role_label ?? $this->roleLabel((int)$u->role),
                 'distributor_id' => $u->distributor_id,
                 'distributorName' => isset($GLOBALS['__distMap']) && is_array($GLOBALS['__distMap']) && array_key_exists($u->distributor_id, $GLOBALS['__distMap'])
                     ? $GLOBALS['__distMap'][$u->distributor_id]
@@ -181,6 +182,7 @@ class UserController extends Controller
             'phone' => $u->phone,
             'role' => $u->role,
             'roleLabel' => $this->roleLabel((int)$u->role),
+            'role_label' => $u->role_label ?? $this->roleLabel((int)$u->role),
             'distributor_id' => $u->distributor_id,
             'distributorName' => $distName,
             'manager_id' => $u->manager_id,
@@ -329,6 +331,7 @@ class UserController extends Controller
                 'phone' => $u->phone,
                 'role' => $u->role,
                 'roleLabel' => $this->roleLabel((int)$u->role),
+                'role_label' => $u->role_label ?? $this->roleLabel((int)$u->role),
                 'distributor_id' => $u->distributor_id,
             ],
         ], 201);
@@ -397,6 +400,7 @@ class UserController extends Controller
                 'phone' => $target->phone,
                 'role' => $target->role,
                 'roleLabel' => $this->roleLabel((int)$target->role),
+                'role_label' => $target->role_label ?? $this->roleLabel((int)$target->role),
                 'distributor_id' => $target->distributor_id,
             ],
         ]);

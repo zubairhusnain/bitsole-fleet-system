@@ -67,6 +67,19 @@ class User extends Authenticatable
         ];
     }
 
+    protected $appends = ['role_label'];
+
+    public function getRoleLabelAttribute(): string
+    {
+        $r = (int)($this->role ?? self::ROLE_USER);
+        return match ($r) {
+            self::ROLE_ADMIN => 'super admin',
+            self::ROLE_DISTRIBUTOR => 'distributor',
+            self::ROLE_FLEET_MANAGER => 'fleet manager',
+            default => 'fleet viewer',
+        };
+    }
+
     // Convenience helpers (default to admin when role is null)
     public function isAdmin(): bool { return (int)($this->role ?? self::ROLE_ADMIN) === self::ROLE_ADMIN; }
     public function isDistributor(): bool { return (int)($this->role ?? self::ROLE_ADMIN) === self::ROLE_DISTRIBUTOR; }

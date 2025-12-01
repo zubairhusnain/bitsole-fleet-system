@@ -28,7 +28,7 @@
             <select class="form-select" v-model.number="selectedUserId" @change="onSelectUser">
               <option :value="0" disabled>Select a user…</option>
               <option v-for="u in filteredUserOptions" :key="u.id" :value="u.id">
-                {{ u.name }} ({{ u.email }}) — {{ roleLabel(u.role) }}
+                {{ u.name }} ({{ u.email }}) — {{ u.role_label || roleLabel(u.role) }}
               </option>
             </select>
           </div>
@@ -169,6 +169,7 @@ async function loadOptions() {
       name: u.name,
       email: u.email,
       role: u.role,
+      role_label: u.role_label,
       distributor_id: u.distributor_id,
       manager_id: u.manager_id,
     }));
