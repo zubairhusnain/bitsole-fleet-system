@@ -157,3 +157,7 @@ Route::middleware('auth')->prefix('/web/zones')->group(function () {
 
 // NEW: Auth-protected Geofence listing from Traccar DB (testing/util)
 Route::middleware('auth')->get('/web/traccar/geofences', [\App\Http\Controllers\ZoneController::class, 'geofencesDb']);
+Route::middleware('auth')->get('/web/traccar/assign-computed-attributes', function (\Illuminate\Http\Request $request) {
+    $summary = app(\App\Services\PermissionService::class)->assignComputedAttributesToAllDevices($request);
+    return response()->json($summary);
+});
