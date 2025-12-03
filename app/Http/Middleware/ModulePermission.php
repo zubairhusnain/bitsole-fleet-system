@@ -19,7 +19,6 @@ class ModulePermission
             'zones' => 'Zone Management',
             'users' => 'User Management',
             'users.permissions' => 'User Permission',
-            'settings' => 'Settings',
             // 'admin' => 'Admin',
             // 'reports' => 'Reports & Analytics',
             // 'alerts' => 'Alerts & Notifications',
@@ -102,7 +101,11 @@ class ModulePermission
             $key = $canonical ?: $base;
         }
         if ($key && Permissions::check($user, $key, $action)) { return $next($request); }
-        if ($user->isAdmin() || $user->isDistributor()) { return $next($request); }
+        if ($user->isAdmin() || $user->isDistributor()) {
+            $k = strtolower((string)$key);
+            if ($k === 'users' || $k === 'users.permissions' || str_starts_with($k, 'users')) { return $next($request); }
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
         return response()->json(['message' => 'Forbidden'], 403);
     }
 }

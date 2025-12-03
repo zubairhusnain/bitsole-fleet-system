@@ -76,7 +76,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item d-none">
+                        <li class="nav-item" v-if="role === 3 || role === 2">
                             <RouterLink to="/dashboard" class="nav-link"
                                 :class="{ active: route.name === 'dashboard' }">
                                 <i class="nav-icon bi bi-speedometer"></i>

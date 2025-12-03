@@ -50,7 +50,11 @@ export function hasPermission(moduleKey, action) {
   const perms = authState.permissions || {};
   const mod = perms[moduleKey] || {};
   const role = roleToNumber(authState?.user?.role ?? 0);
-  if (role === 3 || role === 2) return true;
+  if (role === 3 || role === 2) {
+    const k = String(moduleKey || '').toLowerCase();
+    if (k === 'users' || k === 'users.permissions' || k.startsWith('users')) return true;
+    return false;
+  }
   if (!action) return !!mod.read;
   switch (action) {
     case 'read': return !!mod.read;

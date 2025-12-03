@@ -17,6 +17,7 @@ const Profile = () => import('../views/ProfileView.vue');
 const MonitoringVehicles = () => import('../views/monitoring/Vehicles.vue');
 const MonitoringZones = () => import('../views/monitoring/Zones.vue');
 const LiveTracking = () => import('../views/live-tracking/LiveTracking.vue');
+const Dashboard = () => import('../views/Dashboard.vue');
 const Drivers = () => import('../views/drivers/Index.vue');
 const Users = () => import('../views/users/Index.vue');
 const UsersPermissions = () => import('../views/users/Permissions.vue');
@@ -36,20 +37,20 @@ const NotFound = () => import('../views/NotFound.vue');
 const TelemetryCodec8 = () => import('../views/telemetry/Codec8Tool.vue');
 
 const routes = [
-  { path: '/', name: 'home', component: LiveTracking, meta: { requiresAuth: true, title: 'Home' } },
+  { path: '/', name: 'home', component: LiveTracking, meta: { requiresAuth: true, title: 'Home', moduleKey: 'live-tracking', action: 'read', roles: [0, 1] } },
   { path: '/about', name: 'about', component: AboutView },
   { path: '/login', name: 'login', component: LoginView, meta: { guestOnly: true } },
   { path: '/register', name: 'register', component: RegisterView, meta: { guestOnly: true } },
   { path: '/forgot-password', name: 'forgot-password', component: ForgotPassword, meta: { guestOnly: true, title: 'Forgot Password' } },
   { path: '/reset-password', name: 'reset-password', component: ResetPassword, meta: { guestOnly: true, title: 'Reset Password' } },
-  { path: '/dashboard', name: 'dashboard', component: LiveTracking, meta: { requiresAuth: true, title: 'Overview' } },
+  { path: '/dashboard', name: 'dashboard', component: Dashboard, meta: { requiresAuth: true, title: 'Dashboard', roles: [2, 3] } },
   { path: '/tasks', name: 'tasks', component: TasksView, meta: { requiresAuth: true, title: 'Tasks', moduleKey: 'tasks', action: 'read' } },
   { path: '/settings', name: 'settings', component: SettingsView, meta: { requiresAuth: true, title: 'Settings', roles: [3], moduleKey: 'settings', action: 'read' } },
   { path: '/profile', name: 'profile', component: Profile, meta: { requiresAuth: true, title: 'Profile' } },
   // Feature screens
   { path: '/monitoring/vehicles', name: 'monitoring-vehicles', component: MonitoringVehicles, meta: { requiresAuth: true, title: 'Vehicles Monitoring', moduleKey: 'vehicles', action: 'read' } },
   { path: '/monitoring/zones', name: 'monitoring-zones', component: MonitoringZones, meta: { requiresAuth: true, title: 'Zone Monitoring', moduleKey: 'zones', action: 'read' } },
-  { path: '/live-tracking', name: 'live-tracking', component: LiveTracking, meta: { requiresAuth: true, title: 'Live Tracking' } },
+  { path: '/live-tracking', name: 'live-tracking', component: LiveTracking, meta: { requiresAuth: true, title: 'Live Tracking', moduleKey: 'live-tracking', action: 'read', roles: [0, 1] } },
   { path: '/drivers', name: 'drivers', component: Drivers, meta: { requiresAuth: true, title: 'Driver Management', moduleKey: 'drivers', action: 'read' } },
   // Add Driver route
   { path: '/drivers/new', name: 'drivers-new', component: () => import('../views/drivers/AddDriver.vue'), meta: { requiresAuth: true, title: 'Add New Driver', moduleKey: 'drivers', action: 'create' } },
@@ -107,8 +108,12 @@ router.beforeEach(async (to, from, next) => {
     return next({ path: '/' });
   }
 
-  // Role-based gating if route defines allowed roles
+  // Role-based gating and redirects
   const role = authState?.user?.role ?? 3;
+  if ((role === 3 || role === 2) && (to.name === 'home' || to.name === 'live-tracking')) {
+    return next({ name: 'dashboard' });
+  }
+  // Role-based gating if route defines allowed roles
   const allowed = Array.isArray(to.meta?.roles) ? to.meta.roles : null;
   if (allowed && !allowed.includes(roleToNumber(role))) {
     return next({ name: 'not-found', query: { error: 'forbidden', missing: to.fullPath } });

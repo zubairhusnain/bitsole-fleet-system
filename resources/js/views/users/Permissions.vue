@@ -45,6 +45,8 @@
         <h6 class="mb-0">Module Access</h6>
         <div class="d-flex align-items-center gap-2">
           <button class="btn btn-outline-secondary" @click="reloadPermissions" :disabled="loading">Reload</button>
+          <button class="btn btn-outline-secondary" @click="toggleAllModules(true)" :disabled="loading">Check All</button>
+          <button class="btn btn-outline-secondary" @click="toggleAllModules(false)" :disabled="loading">Uncheck All</button>
           <button class="btn btn-app-dark" @click="save" :disabled="!canAssignToSelected || saving">
             {{ saving ? 'Saving…' : 'Save Permissions' }}
           </button>
@@ -59,19 +61,31 @@
             <thead>
               <tr>
                 <th>Module</th>
-                <th class="text-center">Read</th>
-                <th class="text-center">Create</th>
-                <th class="text-center">Update</th>
-                <th class="text-center">Delete</th>
+                <th>
+                  <input type="checkbox" :checked="isColAll('read')" @change="toggleColumn('read', $event.target.checked)" />
+                  <span class="ms-1">Read</span>
+                </th>
+                <th>
+                  <input type="checkbox" :checked="isColAll('write')" @change="toggleColumn('write', $event.target.checked)" />
+                  <span class="ms-1">Write</span>
+                </th>
+                <th>
+                  <input type="checkbox" :checked="isColAll('update')" @change="toggleColumn('update', $event.target.checked)" />
+                  <span class="ms-1">Update</span>
+                </th>
+                <th>
+                  <input type="checkbox" :checked="isColAll('delete')" @change="toggleColumn('delete', $event.target.checked)" />
+                  <span class="ms-1">Delete</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="m in modules" :key="m.key">
                 <td>{{ m.label }}</td>
-                <td class="text-center"><input type="checkbox" v-model="permissionsMap[m.key].read" /></td>
-                <td class="text-center"><input type="checkbox" v-model="permissionsMap[m.key].create" /></td>
-                <td class="text-center"><input type="checkbox" v-model="permissionsMap[m.key].update" /></td>
-                <td class="text-center"><input type="checkbox" v-model="permissionsMap[m.key].delete" /></td>
+                <td><input type="checkbox" v-model="permissionsMap[m.key].read" /></td>
+                <td><input type="checkbox" v-model="permissionsMap[m.key].create" /></td>
+                <td><input type="checkbox" v-model="permissionsMap[m.key].update" /></td>
+                <td><input type="checkbox" v-model="permissionsMap[m.key].delete" /></td>
               </tr>
             </tbody>
           </table>
@@ -101,7 +115,7 @@ const message = ref('');
 const selectedUserId = ref(0);
 const userOptions = ref([]);
 const modules = ref([]);
-const permissionsMap = reactive({});
+  const permissionsMap = reactive({});
 
 const currentUser = computed(() => authState?.user || {});
 const currentRole = computed(() => Number(currentUser.value?.role ?? 0));
@@ -182,7 +196,7 @@ async function loadOptions() {
   }
 }
 
-async function reloadPermissions() {
+  async function reloadPermissions() {
   error.value = '';
   if (!selectedUserId.value) return;
   loading.value = true;
@@ -209,12 +223,45 @@ async function reloadPermissions() {
 
 function onSelectUser() { reloadPermissions(); }
 
-async function save() {
+  function toggleAllModules(val) {
+    const v = !!val;
+    for (const m of modules.value) {
+      const key = m.key;
+      if (!permissionsMap[key]) continue;
+      permissionsMap[key].read = v;
+      permissionsMap[key].create = v;
+      permissionsMap[key].update = v;
+      permissionsMap[key].delete = v;
+    }
+  }
+
+  function isColAll(col) {
+    const prop = col === 'write' ? 'create' : col;
+    if (!modules.value.length) return false;
+    for (const m of modules.value) {
+      const key = m.key;
+      const p = permissionsMap[key] || {};
+      if (!p[prop]) return false;
+    }
+    return true;
+  }
+  function toggleColumn(col, checked) {
+    const prop = col === 'write' ? 'create' : col;
+    const v = !!checked;
+    for (const m of modules.value) {
+      const key = m.key;
+      if (!permissionsMap[key]) continue;
+      permissionsMap[key][prop] = v;
+    }
+  }
+
+  async function save() {
   if (!selectedUserId.value) return;
   if (!canAssignToSelected.value) {
     error.value = 'You are not allowed to assign permissions to this user.';
     return;
   }
+
   saving.value = true;
   error.value = '';
   message.value = '';
