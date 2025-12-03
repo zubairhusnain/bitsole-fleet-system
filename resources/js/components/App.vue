@@ -68,7 +68,7 @@
                     <!--begin::Sidebar Menu-->
                     <ul class="nav sidebar-menu flex-column" role="navigation" aria-label="Main navigation"
                         data-lte-toggle="treeview" data-accordion="true" id="navigation">
-                        <li class="nav-item" v-if="hasPerm('live-tracking','read')">
+                        <li class="nav-item" v-if="role === 0 || role === 1">
                             <RouterLink to="/live-tracking" class="nav-link"
                                 :class="{ active: route.name === 'live-tracking' }">
                                 <i class="nav-icon bi bi-broadcast"></i>
