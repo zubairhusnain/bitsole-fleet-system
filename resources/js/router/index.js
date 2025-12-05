@@ -26,6 +26,7 @@ const VehiclesMaintenance = () => import('../views/vehicles/Maintenance.vue');
 const VehiclesOverview = () => import('../views/vehicles/Overview.vue');
 // Add Vehicle Detail route
 const VehicleDetail = () => import('../views/vehicles/Detail.vue');
+const VehicleSettings = () => import('../views/vehicles/Settings.vue');
 const Alerts = () => import('../views/alerts/Index.vue');
 const Reports = () => import('../views/reports/Analytics.vue');
 const Fuel = () => import('../views/fuel/Index.vue');
@@ -52,6 +53,7 @@ const routes = [
   { path: '/monitoring/zones', name: 'monitoring-zones', component: MonitoringZones, meta: { requiresAuth: true, title: 'Zone Monitoring', moduleKey: 'zones', action: 'read' } },
   { path: '/live-tracking', name: 'live-tracking', component: LiveTracking, meta: { requiresAuth: true, title: 'Live Tracking', roles: [0, 1] } },
   { path: '/drivers', name: 'drivers', component: Drivers, meta: { requiresAuth: true, title: 'Driver Management', moduleKey: 'drivers', action: 'read' } },
+  { path: '/vehicles/:deviceId(\\d+)/settings', name: 'vehicle-settings', component: VehicleSettings, meta: { requiresAuth: true, title: 'Vehicle Settings', moduleKey: 'vehicles', action: 'read' } },
   // Add Driver route
   { path: '/drivers/new', name: 'drivers-new', component: () => import('../views/drivers/AddDriver.vue'), meta: { requiresAuth: true, title: 'Add New Driver', moduleKey: 'drivers', action: 'create' } },
   // Edit Driver route (numeric id only)
@@ -72,7 +74,7 @@ const routes = [
   // Edit Vehicle route (numeric id only)
   { path: '/vehicles/:deviceId(\\d+)/edit', name: 'vehicles-edit', component: () => import('../views/vehicles/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Vehicle', moduleKey: 'vehicles', action: 'update' } },
   { path: '/reports', name: 'reports', component: Reports, meta: { requiresAuth: true, title: 'Reports & Analytics', moduleKey: 'reports', action: 'read' } },
-  { path: '/alerts', name: 'alerts', component: Alerts, meta: { requiresAuth: true, title: 'Alerts & Notifications', moduleKey: 'alerts', action: 'read' } },
+  { path: '/alerts', name: 'alerts', component: Alerts, meta: { requiresAuth: true, title: 'Alerts & Notifications' } },
   { path: '/fuel', name: 'fuel', component: Fuel, meta: { requiresAuth: true, title: 'Fuel Management', moduleKey: 'fuel', action: 'read' } },
   { path: '/zones', name: 'zones', component: Zones, meta: { requiresAuth: true, title: 'Zone Management', moduleKey: 'zones', action: 'read' } },
   { path: '/zones/new', name: 'zones-new', component: ZonesAdd, meta: { requiresAuth: true, title: 'Add New Zone', moduleKey: 'zones', action: 'create' } },
@@ -109,13 +111,18 @@ router.beforeEach(async (to, from, next) => {
   }
 
   // Role-based gating and redirects
-  const role = authState?.user?.role ?? 3;
-  if ((role === 3 || role === 2) && (to.name === 'home' || to.name === 'live-tracking')) {
+  const role = authState?.user?.role ?? 0;
+  const roleNum = roleToNumber(role);
+  if ((roleNum === 3 || roleNum === 2) && (to.name === 'home' || to.name === 'live-tracking')) {
     return next({ name: 'dashboard' });
+  }
+  // Redirect non-admin/distributor away from dashboard
+  if ((to.name === 'dashboard') && (roleNum !== 3 && roleNum !== 2)) {
+    return next({ name: 'live-tracking' });
   }
   // Role-based gating if route defines allowed roles
   const allowed = Array.isArray(to.meta?.roles) ? to.meta.roles : null;
-  if (allowed && !allowed.includes(roleToNumber(role))) {
+  if (allowed && !allowed.includes(roleNum)) {
     return next({ name: 'not-found', query: { error: 'forbidden', missing: to.fullPath } });
   }
 

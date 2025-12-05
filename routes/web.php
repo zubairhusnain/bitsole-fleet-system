@@ -72,15 +72,6 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
         ]);
     });
 
-    Route::get('/stats', function () {
-        return response()->json([
-            'stats' => [
-                'users' => \App\Models\User::count(),
-                'time' => now()->toDateTimeString(),
-            ],
-        ]);
-    });
-
     Route::get('/profile', function (Request $request) {
         return response()->json([
             'profile' => $request->user(),
@@ -103,6 +94,11 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/{deviceId}/position', [\App\Http\Controllers\VehicleController::class, 'positionCurrent']);
     Route::get('/{deviceId}/trips', [\App\Http\Controllers\VehicleController::class, 'trips']);
     Route::get('/{deviceId}/drivers', [\App\Http\Controllers\VehicleController::class, 'driversList']);
+    // Drivers/Zones options under vehicles namespace
+    Route::get('/drivers/options', [\App\Http\Controllers\VehicleController::class, 'driversOptions']);
+    // Geofences assigned to this vehicle
+    Route::get('/{deviceId}/geofences', [\App\Http\Controllers\VehicleController::class, 'geofences']);
+    Route::get('/geofences/options', [\App\Http\Controllers\VehicleController::class, 'geofencesOptions']);
     // Positions for map/waypoints (time-window support)
     Route::get('/{deviceId}/positions', [\App\Http\Controllers\VehicleController::class, 'positions']);
     // Raw device logs for Codec8 decoding
@@ -117,6 +113,16 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     // Restore a soft-deleted (blocked) vehicle
     Route::patch('/{deviceId}/restore', [\App\Http\Controllers\VehicleController::class, 'restore']);
     Route::delete('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'destroy']);
+
+    // Assign/unassign drivers
+    Route::post('/{deviceId}/drivers/assign', [\App\Http\Controllers\VehicleController::class, 'assignDrivers']);
+    Route::post('/{deviceId}/drivers/unassign', [\App\Http\Controllers\VehicleController::class, 'unassignDrivers']);
+    // Assign/unassign zones (geofences)
+    Route::post('/{deviceId}/zones/assign', [\App\Http\Controllers\VehicleController::class, 'assignZones']);
+    Route::post('/{deviceId}/zones/unassign', [\App\Http\Controllers\VehicleController::class, 'unassignZones']);
+    // Notifications under vehicles namespace
+    Route::get('/{deviceId}/notifications', [\App\Http\Controllers\VehicleController::class, 'notificationsDevice']);
+    Route::post('/{deviceId}/notifications/assign', [\App\Http\Controllers\VehicleController::class, 'notificationsAssign']);
 
 });
 
@@ -172,3 +178,11 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
 
 // NEW: Auth-protected Geofence listing from Traccar DB (testing/util)
 Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('/web/traccar/geofences', [\App\Http\Controllers\ZoneController::class, 'geofencesDb']);
+
+// Auth-protected Notifications APIs (publicly accessible to all roles)
+Route::middleware(['auth'])->prefix('/web/notifications')->group(function () {
+    Route::get('/', [\App\Http\Controllers\NotificationController::class, 'index']);
+    Route::get('/device/{deviceId}', [\App\Http\Controllers\NotificationController::class, 'device']);
+    Route::post('/', [\App\Http\Controllers\NotificationController::class, 'store']);
+    Route::post('/assign', [\App\Http\Controllers\NotificationController::class, 'assign']);
+});

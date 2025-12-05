@@ -80,6 +80,9 @@
                                     <div class="btn-group btn-group-sm">
                                         <button v-if="!row.blocked && hasPerm('vehicles','update')" class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i
                                                 class="bi bi-pencil"></i></button>
+                                        <button v-if="!row.blocked && hasPerm('vehicles','update')" class="btn btn-outline-secondary" title="Settings" @click="toSettings(row)">
+                                            <i class="bi bi-gear"></i>
+                                        </button>
                                         <button v-if="(hasPerm('vehicles','read') || hasPerm('vehicles.overview','read')) && !row.blocked && hasLocation(row)" class="btn btn-outline-primary" title="View" @click="toDetail(row)">
                                             <i class="bi bi-eye"></i>
                                         </button>
@@ -582,5 +585,10 @@ function toEdit(row) {
 function toDetail(row) {
     if (!row?.device_id) return;
     router.push(`/vehicles/${row.device_id}`);
+}
+
+function toSettings(row) {
+    if (!row?.device_id) return;
+    router.push(`/vehicles/${row.device_id}/settings`);
 }
 </script>

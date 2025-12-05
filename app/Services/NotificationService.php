@@ -8,6 +8,7 @@ use App\Models\DeviceGroup;
 use App\Services\PermissionService;
 use App\Jobs\AssignNotificationToDevices;
 use Illuminate\Support\Facades\DB;
+use App\Models\TcDeviceNotification;
 class NotificationService
 {
     use Curl;
@@ -29,7 +30,7 @@ class NotificationService
         $notificationTypeList = [];
         $alarmdata = [];
         // Example usage
-        $removeValue = array('media','textMessage','maintenance','commandResult','alarm');
+        $removeValue = array('media','textMessage','maintenance','commandResult');
         $alarmTypes = array('general','sos','lowBattery','powerOff','vibration','accident','geoFenceEnter','geoFenceExit','overSpeed');
         if(!empty($types)){
             foreach($types as $key=>$value){
@@ -37,14 +38,8 @@ class NotificationService
                     unset($value['type']);
                 }
                 if(isset($value['type'])){
-                    $exist = false;
-                    $id = 0;
-                    if ($this->stringExistsInNestedArray($value['type'], $notification)){
-                        $exist = true;
-                    }
-                    if($this->findArrayIndex($value['type'], $notification)  !== null ){
-                        $id = $this->findArrayIndex($value['type'], $notification);
-                    }
+                    $id = $this->notificationIdForType($notification, $value['type']);
+                    $exist = $id > 0;
                     $data = array(
                         "id"=> $id,
                         "type"=> $value['type'],
@@ -65,14 +60,8 @@ class NotificationService
             foreach($alarmTypes as $key=>$value){
 
                 if(isset($value)){
-                    $exist = false;
-                    $id = 0;
-                    if ($this->stringExistsInNestedArray($value, $notification)){
-                        $exist = true;
-                    }
-                    if($this->findArrayIndex($value, $notification) !== null ){
-                        $id = $this->findArrayIndex($value, $notification);
-                    }
+                    $id = $this->notificationIdForType($notification, 'alarm', $value);
+                    $exist = $id > 0;
                     $data2 = array(
                         "id"=> $id,
                         "type"=> 'alarm',
@@ -111,9 +100,16 @@ class NotificationService
         $notificationTypeList = [];
         $alarmdata = [];
         // Example usage
-        $removeValue = array('media','textMessage','maintenance','commandResult','alarm');
+        $removeValue = array();
         $alarmTypes = array('general','sos','lowBattery','powerOff','vibration','accident','geoFenceEnter','geoFenceExit','overSpeed');
         $idsData = [];
+        $deviceId = (int) ($request->device_detail_id ?? 0);
+        $deviceNotificationIds = $deviceId > 0
+            ? TcDeviceNotification::query()
+                ->where('deviceid', $deviceId)
+                ->pluck('notificationid')
+                ->all()
+            : [];
 
         if(!empty($types)){
             foreach($types as $key=>$value){
@@ -121,21 +117,9 @@ class NotificationService
                     unset($value['type']);
                 }
                 if(isset($value['type'])){
-                    $id = 0;
-                    if($this->findArrayIndex($value['type'], $notification)  !== null ){
-                        $id = $this->findArrayIndex($value['type'], $notification);
-                    }
+                    $id = $this->notificationIdForType($notification, $value['type']);
                     if($id > 0){
-                        $exist = true;
-                        $deviceNotifications = DB::connection('mysqlTraccar')
-                        ->table('tc_device_notification')
-                        ->where('deviceid', $request->device_detail_id)
-                        ->where('notificationid', $id)
-                        ->first(); // Returns a collection
-                        if(empty($deviceNotifications)){
-                            $exist = false;
-                            array_push($idsData,array($deviceNotifications,$exist));
-                        }
+                        $exist = in_array($id, $deviceNotificationIds, true);
                         $data = array(
                             "id"=> $id,
                             "type"=> $value['type'],
@@ -157,21 +141,9 @@ class NotificationService
             foreach($alarmTypes as $key=>$value){
 
                 if(isset($value)){
-                    $id = 0;
-                    if($this->findArrayIndex($value, $notification) !== null ){
-                        $id = $this->findArrayIndex($value, $notification);
-                    }
+                    $id = $this->notificationIdForType($notification, 'alarm', $value);
                     if($id > 0){
-                        $exist = true;
-                        $deviceNotifications = DB::connection('mysqlTraccar')
-                        ->table('tc_device_notification')
-                        ->where('deviceid', $request->device_detail_id)
-                        ->where('notificationid', $id)
-                        ->first(); // Returns a collection
-                        if(empty($deviceNotifications)){
-                            $exist = false;
-                            array_push($idsData,array($deviceNotifications,$exist));
-                        }
+                        $exist = in_array($id, $deviceNotificationIds, true);
                         $data2 = array(
                             "id"=> $id,
                             "type"=> 'alarm',
@@ -223,6 +195,25 @@ class NotificationService
         return false;
     }
 
+    private function notificationIdForType(array $notifications, string $type, ?string $alarmName = null): int
+    {
+        foreach ($notifications as $n) {
+            if (!is_array($n)) { continue; }
+            $nid = isset($n['id']) ? (int)$n['id'] : 0;
+            $ntype = isset($n['type']) ? (string)$n['type'] : '';
+            if ($type === 'alarm') {
+                if ($ntype === 'alarm') {
+                    $attrs = isset($n['attributes']) && is_array($n['attributes']) ? $n['attributes'] : [];
+                    $alarms = isset($attrs['alarms']) ? (string)$attrs['alarms'] : '';
+                    if ($alarmName !== null && $alarms === $alarmName) { return $nid; }
+                }
+            } else {
+                if ($ntype === $type) { return $nid; }
+            }
+        }
+        return 0;
+    }
+
     public function addNotification($request)
     {
         $sessionId = $request->user()->traccarSession ?? session('cookie');
@@ -240,14 +231,13 @@ class NotificationService
                 $notificators = $value['web'] ? "web,":"";
                 $notificators.= $value['mail'] ? "mail,":"";
                 $notificators.= $value['sms'] ? "firebase":"";
+                $notificators = rtrim($notificators, ',');
                 $value['notificators'] = $notificators;
                 $attributes = [];
-                $attributes = (!empty($value['attributes'])) ? json_encode($value['attributes']): json_encode([]);
+                $attributes = (!empty($value['attributes'])) ? json_encode($value['attributes']): json_encode(new \stdClass());
 
                 $data = '{"id": '.$value['id'].',"type": "'.$value['type'].'","always": true,"calendarId": 0,"attributes": '.$attributes.',"notificators": "'.$notificators.'"}';
-                if(empty($value['attributes'])){
-                    $data = '{"id": '.$value['id'].',"type": "'.$value['type'].'","always": true,"calendarId": 0,"attributes":{},"notificators": "'.$notificators.'"}';
-                }
+
                 if(isset($value['id']) && $value['id'] !==0 && $already_xist == false){
                     $type = "DELETE";
                     $id = '/'.$value['id'];
@@ -255,9 +245,10 @@ class NotificationService
                 }
 
                 $response = static::curl('/api/notifications'.$id, $type, $sessionId, $data, array('Content-Type: application/json', 'Accept: application/json'));
-                if($response->responseCode!==200 && $type == 'POST'){
+                if(($type == 'POST' || $type == 'PUT') && ($response->responseCode < 200 || $response->responseCode >= 300)){
                     array_push($error,$response);
                 }else if($type == 'DELETE' && $response->responseCode!==204){
+                    // Traccar returns 204 for successful delete
                     array_push($error,['error'=>$response->error,'data'=>$data]);
                 }
             }

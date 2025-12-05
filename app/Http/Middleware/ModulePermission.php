@@ -19,11 +19,10 @@ class ModulePermission
             'zones' => 'Zone Management',
             'users' => 'User Management',
             'users.permissions' => 'User Permission',
+            // Admin-only areas are not part of assignable modules
             // 'admin' => 'Admin',
             // 'reports' => 'Reports & Analytics',
-            // 'alerts' => 'Alerts & Notifications',
             // 'fuel' => 'Fuel Management',
-            // 'settings' => 'Settings',
             // 'tasks' => 'Tasks',
             // 'telemetry' => 'Telemetry Tools',
         ];

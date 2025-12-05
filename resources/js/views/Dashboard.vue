@@ -48,28 +48,11 @@
         <div class="card-header"><h6 class="mb-0">Fleet Managers</h6></div>
         <div class="card-body">
           <div v-if="myManagers.length === 0" class="text-muted small">No fleet managers found.</div>
-          <div class="accordion" id="mgrAccordionSelf">
-            <div class="accordion-item" v-for="m in myManagers" :key="'mgr-self-'+m.id">
-              <h2 class="accordion-header">
-                <button class="accordion-button" type="button" :class="{ collapsed: !expandedMgr.has(m.id) }" @click="toggleMgr(m.id)">
-                  {{ m.name }} — <span class="text-muted">{{ m.email }}</span>
-                </button>
-              </h2>
-              <Transition @before-enter="beforeEnter" @enter="enter" @after-enter="afterEnter" @before-leave="beforeLeave" @leave="leave" @after-leave="afterLeave">
-                <div class="accordion-collapse" v-show="expandedMgr.has(m.id)">
-                  <div class="accordion-body">
-                    <h6 class="mb-2">Fleet Viewers</h6>
-                    <ul class="list-group list-group-flush">
-                      <li v-for="u in viewersByManager(m.id)" :key="'usr-self-'+u.id" class="list-group-item">
-                        {{ u.name }} — <span class="text-muted">{{ u.email }}</span>
-                      </li>
-                      <li v-if="viewersByManager(m.id).length === 0" class="list-group-item text-muted small">No fleet viewers.</li>
-                    </ul>
-                  </div>
-                </div>
-              </Transition>
-            </div>
-          </div>
+          <ul class="list-group list-group-flush">
+            <li v-for="m in myManagers" :key="'mgr-self-'+m.id" class="list-group-item">
+              {{ m.name }} — <span class="text-muted">{{ m.email }}</span>
+            </li>
+          </ul>
         </div>
       </div>
     </div>

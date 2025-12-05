@@ -6,6 +6,7 @@ export const authState = reactive({ user: null, permissions: {}, fetched: false 
 export function roleToNumber(r) {
   if (typeof r === 'string') {
     const v = r.trim().toLowerCase();
+    if (v === 'superadmin' || v === 'super admin' || v === 'super-admin') return 3;
     if (v === 'admin' || v === 'administrator') return 3;
     if (v === 'distributor') return 2;
     if (v === 'manager' || v === 'fleet manager') return 1;
@@ -51,9 +52,7 @@ export function hasPermission(moduleKey, action) {
   const mod = perms[moduleKey] || {};
   const role = roleToNumber(authState?.user?.role ?? 0);
   if (role === 3 || role === 2) {
-    const k = String(moduleKey || '').toLowerCase();
-    if (k === 'users' || k === 'users.permissions' || k.startsWith('users')) return true;
-    return false;
+    return true;
   }
   if (!action) return !!mod.read;
   switch (action) {

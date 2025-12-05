@@ -64,6 +64,10 @@ class UserController extends Controller
             ['value' => User::ROLE_ADMIN, 'label' => 'Admin'],
         ];
 
+        if ($me->isAdmin() || $me->isDistributor()) {
+            $roles = array_values(array_filter($roles, fn($r) => $r['value'] !== User::ROLE_USER));
+        }
+
         // Modules list for permissions assignment (centralized in ModulePermission)
         $modulesConfig = \App\Http\Middleware\ModulePermission::modules();
         $modules = collect($modulesConfig)->map(function($label, $key) {
@@ -98,6 +102,11 @@ class UserController extends Controller
         // Include blocked users if requested
         $withDeleted = $request->boolean('withDeleted');
         $builder = $withDeleted ? $this->scopeUsersFor($me)->withTrashed() : $this->scopeUsersFor($me);
+
+        if ($me->isAdmin() || $me->isDistributor()) {
+            $builder->where('role', '!=', User::ROLE_USER);
+        }
+
         // Admin: exclude own account from the list
         if ($me->isAdmin()) {
             $builder->where('id', '!=', $me->id);
@@ -445,8 +454,15 @@ class UserController extends Controller
                         ->whereNull('deleted_at')
                         ->get();
                     foreach ($children as $child) {
-                        try { $child->delete(); } catch (\Throwable $e) { /* skip child on error */ }
-                    }
+                    try {
+                        if (!($child instanceof User)) {
+                            $child = User::query()->find($child->id);
+                        }
+                        if ($child) {
+                            $child->delete();
+                        }
+                    } catch (\Throwable $e) { /* skip child on error */ }
+                }
                 }
             }
             catch (\Throwable $e) {
@@ -503,7 +519,14 @@ class UserController extends Controller
                     ->whereNotNull('deleted_at')
                     ->get();
                 foreach ($children as $child) {
-                    try { $child->restore(); } catch (\Throwable $e) { /* skip child on error */ }
+                    try {
+                        if (!($child instanceof User)) {
+                            $child = User::withTrashed()->find($child->id);
+                        }
+                        if ($child) {
+                            $child->restore();
+                        }
+                    } catch (\Throwable $e) { /* skip child on error */ }
                 }
             }
         }

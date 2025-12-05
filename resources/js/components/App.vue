@@ -34,7 +34,7 @@
                         </div>
                         <div class="user-dropdown">
                             <RouterLink to="/profile" class="dropdown-item">Profile</RouterLink>
-                            <RouterLink v-if="role === 3" to="/settings" class="dropdown-item">Settings</RouterLink>
+                            <RouterLink v-if="roleToNumber(authState?.user?.role ?? 0) === 3" to="/settings" class="dropdown-item">Settings</RouterLink>
                             <button class="dropdown-item text-danger" @click="logout">Logout</button>
                         </div>
                     </li>
@@ -68,7 +68,7 @@
                     <!--begin::Sidebar Menu-->
                     <ul class="nav sidebar-menu flex-column" role="navigation" aria-label="Main navigation"
                         data-lte-toggle="treeview" data-accordion="true" id="navigation">
-                        <li class="nav-item" v-if="role === 0 || role === 1">
+                        <li class="nav-item" v-if="showLiveTracking">
                             <RouterLink to="/live-tracking" class="nav-link"
                                 :class="{ active: route.name === 'live-tracking' }">
                                 <i class="nav-icon bi bi-broadcast"></i>
@@ -76,7 +76,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" v-if="role === 3 || role === 2">
+                        <li class="nav-item" v-if="showDashboard">
                             <RouterLink to="/dashboard" class="nav-link"
                                 :class="{ active: route.name === 'dashboard' }">
                                 <i class="nav-icon bi bi-speedometer"></i>
@@ -84,7 +84,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" v-if="hasPerm('drivers','read')">
+                        <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('drivers','read')">
                             <RouterLink to="/drivers" class="nav-link"
                                 :class="{ active: route.path.startsWith('/drivers') }">
                                 <i class="nav-icon bi bi-people"></i>
@@ -92,7 +92,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/vehicles') }" v-if="hasPerm('vehicles','read') || hasPerm('vehicles.overview','read') || hasPerm('vehicles.maintenance','read')">
+                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/vehicles') }" v-if="!isAdminOrDistributor && (hasPerm('vehicles','read') || hasPerm('vehicles.overview','read') || hasPerm('vehicles.maintenance','read'))">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/vehicles') }">
                                 <i class="nav-icon bi bi-car-front"></i>
                                 <p>
@@ -101,21 +101,21 @@
                                 </p>
                             </a>
                             <ul class="nav nav-treeview">
-                                <li class="nav-item" v-if="hasPerm('vehicles','read')">
+                                <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('vehicles','read')">
                                     <RouterLink to="/vehicles" class="nav-link"
                                         :class="{ active: route.path === '/vehicles' }">
                                         <i class="nav-icon bi bi-list-ul"></i>
                                         <p>All Vehicles</p>
                                     </RouterLink>
                                 </li>
-                                <li class="nav-item" v-if="hasPerm('vehicles.maintenance','read')">
+                                <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('vehicles.maintenance','read')">
                                     <RouterLink to="/vehicles/maintenance" class="nav-link"
                                         :class="{ active: route.path.startsWith('/vehicles/maintenance') }">
                                         <i class="nav-icon bi bi-tools"></i>
                                         <p>Vehicle Maintenance</p>
                                     </RouterLink>
                                 </li>
-                                <li class="nav-item" v-if="hasPerm('vehicles.overview','read')">
+                                <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('vehicles.overview','read')">
                                     <RouterLink to="/vehicles/overview" class="nav-link"
                                         :class="{ active: route.path.startsWith('/vehicles/overview') }">
                                         <i class="nav-icon bi bi-clipboard-data"></i>
@@ -158,7 +158,7 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item" v-if="hasPerm('zones','read')">
+                        <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('zones','read')">
                             <RouterLink to="/zones" class="nav-link" :class="{ active: route.name === 'zones' }">
                                 <i class="nav-icon bi bi-grid-3x3"></i>
                                 <p>Zone Management</p>
@@ -172,7 +172,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item  d-none">
+                        <li class="nav-item" v-if="isAuthed">
                             <RouterLink to="/alerts" class="nav-link" :class="{ active: route.name === 'alerts' }">
                                 <i class="nav-icon bi bi-bell"></i>
                                 <p>Alerts & Notifications</p>
@@ -197,7 +197,7 @@
                                         <p>User List</p>
                                     </RouterLink>
                                 </li>
-                                <li class="nav-item" v-if="(role === 1 || role === 2 || role === 3) && hasPerm('users.permissions','read')">
+                                <li class="nav-item" v-if="(roleToNumber(authState?.user?.role ?? 0) === 1 || roleToNumber(authState?.user?.role ?? 0) === 2 || roleToNumber(authState?.user?.role ?? 0) === 3) && hasPerm('users.permissions','read')">
                                     <RouterLink to="/users/permissions" class="nav-link"
                                         :class="{ active: route.path.startsWith('/users/permissions') }">
                                         <i class="nav-icon bi bi-shield-lock"></i>
@@ -244,7 +244,7 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
-import { authState, clearAuthCache, hasPermission } from '../auth';
+import { authState, clearAuthCache, hasPermission, roleToNumber } from '../auth';
 
 // Resolve assets from Laravel backend in dev; use current origin in prod
 const assetBase = import.meta.env.DEV ? (import.meta.env.VITE_BACKEND_PROXY_TARGET || 'http://127.0.0.1:8001') : window.location.origin;
@@ -257,9 +257,13 @@ const isProd = import.meta.env.PROD;
 const appName = document.title || 'Omayer Fleet System';
 const year = new Date().getFullYear();
 const isAuthed = computed(() => !!authState.user);
+const isAdminOrDistributor = computed(() => {
+  const rn = roleToNumber(authState?.user?.role ?? 0);
+  return rn === 3 || rn === 2;
+});
 const isGuestPage = computed(() => route.meta?.guestOnly === true);
 const pageTitle = computed(() => route.meta?.title || (route.name ? String(route.name).charAt(0).toUpperCase() + String(route.name).slice(1) : 'Dashboard'));
-const role = computed(() => authState?.user?.role ?? 3);
+const role = computed(() => authState?.user?.role ?? 0);
 const hasPerm = (key, action) => hasPermission(key, action);
 function roleLabel(r) {
     if (typeof r === 'string') {
@@ -287,6 +291,9 @@ const initials = computed(() => {
     const first = n ? n[0] : '?';
     return String(first).toUpperCase();
 });
+// Ensure sidebar items render only after auth has been fetched
+const showLiveTracking = computed(() => authState.fetched && (roleToNumber(authState?.user?.role ?? 0) === 0 || roleToNumber(authState?.user?.role ?? 0) === 1));
+const showDashboard = computed(() => authState.fetched && (roleToNumber(authState?.user?.role ?? 0) === 3 || roleToNumber(authState?.user?.role ?? 0) === 2));
 const avatarSrc = computed(() => {
     const u = authState.user || {};
     const src = u.avatar_url || u.avatar || '';

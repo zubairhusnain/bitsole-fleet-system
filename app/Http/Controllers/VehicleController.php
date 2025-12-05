@@ -7,6 +7,8 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use App\Models\Drivers;
+use App\Models\TcGeofence;
 
 class VehicleController extends Controller
 {
@@ -609,6 +611,225 @@ class VehicleController extends Controller
         $user = $request->user();
         $drivers = app(\App\Services\DeviceService::class)->getDriversForDevice($user, $deviceId);
         return response()->json(['drivers' => $drivers]);
+    }
+
+    /**
+     * List geofences currently assigned to the device from tracking server.
+     */
+    public function geofences(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $geofences = $this->geofencesService->deviceGeofences($request, $deviceId);
+        return response()->json(['geofences' => $geofences]);
+    }
+
+    /**
+     * Assign one or more drivers to a device.
+     */
+    public function assignDrivers(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $ids = $request->input('driverIds', []);
+        $ids = is_array($ids) ? $ids : [$ids];
+        $ids = array_values(array_filter(array_map('intval', $ids), fn($v) => $v > 0));
+        $results = [];
+        foreach ($ids as $driverId) {
+            try {
+                $resp = $this->permissionService->assignDriver($request, $deviceId, $driverId);
+                $results[] = ['driverId' => $driverId, 'ok' => true, 'response' => $resp];
+            } catch (\Throwable $e) {
+                $results[] = ['driverId' => $driverId, 'ok' => false, 'error' => $e->getMessage()];
+            }
+        }
+        return response()->json(['assigned' => $results]);
+    }
+
+    /**
+     * Unassign one or more drivers from a device.
+     */
+    public function unassignDrivers(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $ids = $request->input('driverIds', []);
+        $ids = is_array($ids) ? $ids : [$ids];
+        $ids = array_values(array_filter(array_map('intval', $ids), fn($v) => $v > 0));
+        $results = [];
+        foreach ($ids as $driverId) {
+            try {
+                $resp = $this->permissionService->unassignDriver($request, $deviceId, $driverId);
+                $results[] = ['driverId' => $driverId, 'ok' => true, 'response' => $resp];
+            } catch (\Throwable $e) {
+                $results[] = ['driverId' => $driverId, 'ok' => false, 'error' => $e->getMessage()];
+            }
+        }
+        return response()->json(['unassigned' => $results]);
+    }
+
+    /**
+     * Assign one or more geofences to a device.
+     */
+    public function assignZones(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $ids = $request->input('geofenceIds', []);
+        $ids = is_array($ids) ? $ids : [$ids];
+        $ids = array_values(array_filter(array_map('intval', $ids), fn($v) => $v > 0));
+        $results = [];
+        foreach ($ids as $geoId) {
+            try {
+                $resp = $this->permissionService->assignGeofence($request, $deviceId, $geoId, 'POST');
+                $results[] = ['geofenceId' => $geoId, 'ok' => true, 'response' => $resp->response ?? null];
+            } catch (\Throwable $e) {
+                $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $e->getMessage()];
+            }
+        }
+        return response()->json(['assigned' => $results]);
+    }
+
+    /**
+     * Unassign one or more geofences from a device.
+     */
+    public function unassignZones(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $ids = $request->input('geofenceIds', []);
+        $ids = is_array($ids) ? $ids : [$ids];
+        $ids = array_values(array_filter(array_map('intval', $ids), fn($v) => $v > 0));
+        $results = [];
+        foreach ($ids as $geoId) {
+            try {
+                $resp = $this->permissionService->assignGeofence($request, $deviceId, $geoId, 'DELETE');
+                $results[] = ['geofenceId' => $geoId, 'ok' => true, 'response' => $resp->response ?? null];
+            } catch (\Throwable $e) {
+                $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $e->getMessage()];
+            }
+        }
+        return response()->json(['unassigned' => $results]);
+    }
+
+    /**
+     * List driver options (id, label) under vehicles namespace.
+     */
+    public function driversOptions(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $role = (int) ($user->role ?? User::ROLE_ADMIN);
+        $query = Drivers::withTrashed()->with(['tcDriver']);
+        if ($request->boolean('mine')) {
+            $query->where('user_id', $user->id);
+        } else {
+            if ($role === User::ROLE_DISTRIBUTOR) {
+                $query->where('distributor_id', $user->id);
+            } elseif ($role !== User::ROLE_ADMIN) {
+                $distId = $user->distributor_id ?? $user->id;
+                $query->where('distributor_id', $distId)->where('user_id', $user->id);
+            }
+        }
+        $rows = $query->orderByDesc('id')->limit(500)->get();
+        $options = $rows->map(function ($row) {
+            $tc = $row->tcDriver;
+            $id = (int) ($tc->id ?? $row->id ?? 0);
+            $name = $tc->name ?? $row->name ?? ('Driver #' . $id);
+            return ['id' => $id, 'label' => $name];
+        })->filter(fn($o) => $o['id'] > 0)->values();
+        return response()->json(['options' => $options]);
+    }
+
+    /**
+     * List geofence options under vehicles namespace.
+     * Role-aware: filters geofences based on local Zones ownership for non-admins.
+     */
+    public function geofencesOptions(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $role = (int) ($user->role ?? User::ROLE_ADMIN);
+        $pageSize = max(1, min((int) ($request->query('pageSize', 100)), 500));
+
+        // 1. Determine allowed geofence IDs based on role (via local Zones table)
+        $allowedIds = null;
+        if ($role !== User::ROLE_ADMIN) {
+            $zoneQuery = \App\Models\Zones::query();
+            if ($request->boolean('mine')) {
+                $zoneQuery->where('user_id', $user->id);
+            } else {
+                if ($role === User::ROLE_DISTRIBUTOR) {
+                    $zoneQuery->where('distributor_id', $user->id);
+                } else {
+                    $distId = $user->distributor_id ?? $user->id;
+                    $zoneQuery->where('distributor_id', $distId)
+                          ->where('user_id', $user->id);
+                }
+            }
+            $allowedIds = $zoneQuery->pluck('geofence_id')->filter()->unique();
+            // If user has no assigned zones, return empty immediately
+            if ($allowedIds->isEmpty()) {
+                return response()->json(['data' => [], 'current_page' => 1, 'total' => 0]);
+            }
+        }
+
+        // 2. Query Traccar geofences
+        $query = TcGeofence::query()->orderByDesc('id');
+        if ($allowedIds !== null) {
+            $query->whereIn('id', $allowedIds);
+        }
+        if ($name = $request->query('name')) {
+            $query->where('name', 'like', "%{$name}%");
+        }
+
+        $list = $query->paginate($pageSize);
+        $list->getCollection()->transform(function ($row) {
+            $attrs = $row->attributes;
+            if (is_string($attrs)) {
+                try { $parsed = json_decode($attrs, true); if (is_array($parsed)) $attrs = $parsed; } catch (\Throwable $e) {}
+            }
+            $row->attributes = $attrs;
+            return $row;
+        });
+        return response()->json($list);
+    }
+
+    /**
+     * Device-specific notifications list via NotificationService.
+     */
+    public function notificationsDevice(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        $req = new Request(array_merge($request->all(), ['device_detail_id' => $deviceId]));
+        $payload = $this->notificationService->deviceNotification($req);
+        return response()->json($payload);
+    }
+
+    /**
+     * Assign/unassign notification for a device (already_xist true=assign, false=unassign).
+     * Supports bulk updates if 'items' array is provided.
+     */
+    public function notificationsAssign(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        // Handle bulk assignment
+        if ($request->has('items') && is_array($request->input('items'))) {
+            $items = $request->input('items');
+            $results = [];
+            foreach ($items as $item) {
+                $notificationId = (int) ($item['notificationId'] ?? 0);
+                if (!$notificationId) continue;
+
+                // Create a new request instance with merged data for this item
+                $itemReq = $request->duplicate(array_merge($request->all(), $item));
+
+                // assignNotification relies on $request->user()
+                $itemReq->setUserResolver(fn () => $request->user());
+
+                try {
+                    $resp = $this->permissionService->assignNotification($itemReq, $deviceId, $notificationId);
+                    $results[] = ['notificationId' => $notificationId, 'ok' => true, 'response' => $resp];
+                } catch (\Throwable $e) {
+                    $results[] = ['notificationId' => $notificationId, 'ok' => false, 'error' => $e->getMessage()];
+                }
+            }
+            return response()->json(['results' => $results]);
+        }
+
+        // Single assignment
+        $notificationId = (int) $request->input('notificationId');
+        if (!$notificationId) {
+            return response()->json(['message' => 'notificationId is required'], 422);
+        }
+        $resp = $this->permissionService->assignNotification($request, $deviceId, $notificationId);
+        return response()->json(['response' => $resp]);
     }
 
     /**
