@@ -120,7 +120,6 @@ import { LMap, LTileLayer, LPolygon, LCircle, LCircleMarker, LMarker } from '@vu
 import { GeoSearchControl, OpenStreetMapProvider } from 'leaflet-geosearch';
 import 'leaflet-geosearch/dist/geosearch.css';
 import 'leaflet/dist/leaflet.css';
-import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import * as L from 'leaflet';
 import { RouterLink } from 'vue-router';
@@ -482,7 +481,15 @@ function drawFromInputs() {
   circleCenter.value = null;
 }
 
-onMounted(() => {
+onMounted(async () => {
+  if (typeof window !== 'undefined') {
+    window.L = L;
+    try {
+      await import('@geoman-io/leaflet-geoman-free');
+    } catch (e) {
+      console.error('Failed to load geoman', e);
+    }
+  }
   loadZone();
 });
 
