@@ -256,7 +256,19 @@ function setupGoogleAutocomplete(input, onPlaceSelected, clearSuggestionsCb) {
 function onMapReady(map) {
   mapRef.value = map;
   attachGeocoderControl(map);
-  setupGeoman(map);
+
+  // Wait for geoman to load before setting it up
+  if (typeof window !== 'undefined' && window.L && window.L.PM) {
+      setupGeoman(map);
+  } else {
+      const checkGeoman = setInterval(() => {
+          if (window.L && window.L.PM) {
+              clearInterval(checkGeoman);
+              setupGeoman(map);
+          }
+      }, 100);
+  }
+
   // Also bind native Leaflet click to ensure we capture clicks
   try { map.on('click', onMapClick); } catch {}
 }
