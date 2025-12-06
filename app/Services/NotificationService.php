@@ -30,7 +30,7 @@ class NotificationService
         $notificationTypeList = [];
         $alarmdata = [];
         // Example usage
-        $removeValue = array('media','textMessage','maintenance','commandResult');
+        $removeValue = array();
         $alarmTypes = array('general','sos','lowBattery','powerOff','vibration','accident','geoFenceEnter','geoFenceExit','overSpeed');
         if(!empty($types)){
             foreach($types as $key=>$value){
@@ -218,38 +218,59 @@ class NotificationService
     {
         $sessionId = $request->user()->traccarSession ?? session('cookie');
         $data = $request->all();
-        // dd($data);
         $error = [];
-        $devices = static::curl('/api/devices', 'GET', $sessionId, '', array('Content-Type: application/json', 'Accept: application/json'));
-        $userDevices = json_decode($devices->response);
+
         if(!empty($data)){
             foreach($data as $key=>$value){
                 $type = 'POST';
-                // dd($value);
                 $id = '';
                 $already_xist = $value['already_xist'] ? true : false;
                 $notificators = $value['web'] ? "web,":"";
                 $notificators.= $value['mail'] ? "mail,":"";
                 $notificators.= $value['sms'] ? "firebase":"";
                 $notificators = rtrim($notificators, ',');
-                $value['notificators'] = $notificators;
-                $attributes = [];
-                $attributes = (!empty($value['attributes'])) ? json_encode($value['attributes']): json_encode(new \stdClass());
 
-                $data = '{"id": '.$value['id'].',"type": "'.$value['type'].'","always": true,"calendarId": 0,"attributes": '.$attributes.',"notificators": "'.$notificators.'"}';
-
+                // If disabling (already_xist=false) AND we have an ID, we delete it.
                 if(isset($value['id']) && $value['id'] !==0 && $already_xist == false){
                     $type = "DELETE";
                     $id = '/'.$value['id'];
-                    $data = '';
+                    // DELETE request body is usually empty or ignored by some APIs,
+                    // but Traccar expects empty body for DELETE usually.
+                    $payloadData = '';
+                } else {
+                    // Creating or Updating (POST/PUT)
+                    // If it has an ID > 0, it's an update (PUT)
+                    if (isset($value['id']) && $value['id'] !== 0) {
+                        $type = "PUT";
+                        $id = '/'.$value['id'];
+                    } else {
+                        // Create new (POST)
+                        // If we are "disabling" a non-existent notification, just skip it.
+                        if ($already_xist == false) {
+                            continue;
+                        }
+                        $type = "POST";
+                        $id = '';
+                    }
+
+                    $attributes = (!empty($value['attributes'])) ? json_encode($value['attributes']): json_encode(new \stdClass());
+                    $payloadData = '{"id": '.$value['id'].',"type": "'.$value['type'].'","always": true,"calendarId": 0,"attributes": '.$attributes.',"notificators": "'.$notificators.'"}';
+
+                    // For new creation (POST), remove ID from payload if it's 0 or just let Traccar handle it (usually ignore ID in POST)
+                    if ($type === 'POST') {
+                         $payloadData = '{"type": "'.$value['type'].'","always": true,"calendarId": 0,"attributes": '.$attributes.',"notificators": "'.$notificators.'"}';
+                    }
                 }
 
-                $response = static::curl('/api/notifications'.$id, $type, $sessionId, $data, array('Content-Type: application/json', 'Accept: application/json'));
+                $response = static::curl('/api/notifications'.$id, $type, $sessionId, $payloadData, array('Content-Type: application/json', 'Accept: application/json'));
+
                 if(($type == 'POST' || $type == 'PUT') && ($response->responseCode < 200 || $response->responseCode >= 300)){
                     array_push($error,$response);
                 }else if($type == 'DELETE' && $response->responseCode!==204){
-                    // Traccar returns 204 for successful delete
-                    array_push($error,['error'=>$response->error,'data'=>$data]);
+                     // Traccar returns 204 for successful delete. 404 means already gone (safe to ignore?)
+                     if ($response->responseCode !== 404) {
+                        array_push($error,['error'=>$response->error,'data'=>$value]);
+                     }
                 }
             }
         }

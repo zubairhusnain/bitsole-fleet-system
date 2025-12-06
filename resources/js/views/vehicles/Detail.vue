@@ -172,10 +172,26 @@
             <div class="col-12">
                 <div class="card panel rounded-4 shadow-sm">
                     <div class="card-body p-0">
-                        <div ref="mapContainer" style="height: calc(60vh - 16px); min-height: 320px;">
-                            <LMap v-if="mapReady" :zoom="zoom" :center="mapCenter" style="height: 100%; width: 100%;">
+                        <div ref="mapContainer" style="height: calc(60vh - 16px); min-height: 320px; position: relative;">
+                            <div class="zone-toggle-control" style="position: absolute; top: 10px; right: 10px; z-index: 1000; background: white; padding: 8px 12px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" id="showZonesCheck" v-model="showZones" :disabled="loadingGeofences">
+                                    <label class="form-check-label fw-semibold" for="showZonesCheck">Show Zones</label>
+                                    <span v-if="loadingGeofences" class="spinner-border spinner-border-sm ms-2" role="status"></span>
+                                </div>
+                            </div>
+                            <LMap v-if="mapReady" :zoom="zoom" :center="mapCenter" @ready="onMapReady" style="height: 100%; width: 100%;">
                                 <LTileLayer :url="tileUrl" :attribution="tileAttribution" />
                                 <LMarker :lat-lng="currentLatLng || mapCenter" ref="markerRef" />
+
+                                <template v-for="zone in visibleZones" :key="zone.id">
+                                    <LMarker :lat-lng="zone.center" :icon="redIcon">
+                                        <LPopup>
+                                            <div class="fw-bold">{{ zone.name }}</div>
+                                            <div class="small text-muted" v-if="zone.description">{{ zone.description }}</div>
+                                        </LPopup>
+                                    </LMarker>
+                                </template>
 
                             </LMap>
                             <div v-else class="placeholder-glow" style="height: 100%">
@@ -748,8 +764,9 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
-import { LMap, LTileLayer, LMarker, LPolyline, LPopup } from '@vue-leaflet/vue-leaflet';
+import { LMap, LTileLayer, LMarker, LPolyline, LPopup, LCircle, LPolygon } from '@vue-leaflet/vue-leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import L from 'leaflet';
 import { formatTelemetry } from '../../utils/telemetry';
 import { getCurrentUser } from '../../auth';
@@ -796,14 +813,69 @@ const perfOverallScoreRef = ref(0);
 
 // Removed demo placeholders; card now uses dynamic perfSummary/perfEvents/perfMaintenance
 
-const mapContainer = ref(null);
-const mapReady = ref(false);
-const zoom = ref(13);
-const mapCenter = ref([3.139, 101.6869]); // default center (Kuala Lumpur)
-const markerRef = ref(null);
-const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const tileAttribution = '&copy; OpenStreetMap contributors';
-const polylineColor = '#007bff';
+// Geofences state
+const showZones = ref(false);
+const geofences = ref([]);
+const loadingGeofences = ref(false);
+
+async function fetchGeofences() {
+    if (geofences.value.length > 0) return;
+    loadingGeofences.value = true;
+    try {
+        const res = await axios.get(`/web/vehicles/${deviceId.value}/geofences`);
+        geofences.value = res.data.geofences || [];
+    } catch (e) {
+        console.error('Failed to load geofences', e);
+    } finally {
+        loadingGeofences.value = false;
+    }
+}
+
+watch(showZones, (val) => {
+    if (val) fetchGeofences();
+});
+
+const visibleZones = computed(() => {
+    if (!showZones.value) return [];
+    return geofences.value.map(z => {
+        const attr = z.attributes || {};
+        let center = null;
+
+        // Try to get center from circle attributes
+        if (attr.type === 'circle' && attr.lat && attr.long) {
+            center = [parseFloat(attr.lat), parseFloat(attr.long)];
+        }
+        // Or calculate centroid for polygon/rectangle
+        else if (attr.coordinates && (attr.type === 'polygon' || attr.type === 'rectangle')) {
+            const lats = attr.coordinates.map(p => p[0]);
+            const lngs = attr.coordinates.map(p => p[1]);
+            center = [(Math.min(...lats) + Math.max(...lats)) / 2, (Math.min(...lngs) + Math.max(...lngs)) / 2];
+        }
+        // Fallback to WKT parsing
+        else if (z.area && z.area.startsWith('POLYGON')) {
+             try {
+                 const raw = z.area.replace('POLYGON((', '').replace('))', '');
+                 const points = raw.split(',').map(p => {
+                     const [lng, lat] = p.trim().split(' ');
+                     return [parseFloat(lat), parseFloat(lng)];
+                 });
+                 const lats = points.map(p => p[0]);
+                 const lngs = points.map(p => p[1]);
+                 center = [(Math.min(...lats) + Math.max(...lats)) / 2, (Math.min(...lngs) + Math.max(...lngs)) / 2];
+             } catch(e) {}
+        }
+
+        if (center) {
+            return {
+                id: z.id,
+                center: center,
+                name: z.name,
+                description: z.description
+            };
+        }
+        return null;
+    }).filter(z => z);
+});
 
 const polyline = computed(() => positions.value.map(p => [p.latitude, p.longitude]));
 const currentLatLng = computed(() => {
@@ -818,6 +890,91 @@ const currentAddress = computed(() => {
     if (!positions.value.length) return null;
     return positions.value[positions.value.length - 1]?.address || null;
 });
+
+const redIcon = new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+});
+
+// Route handling with Leaflet Routing Machine
+const routingControl = ref(null);
+const mapInstance = ref(null);
+
+function initRouting() {
+    // Ensure we have map, library, and haven't initialized yet
+    if (!mapInstance.value || typeof L === 'undefined' || !L.Routing || routingControl.value) {
+        return;
+    }
+
+    try {
+        routingControl.value = L.Routing.control({
+            waypoints: [],
+            routeWhileDragging: false,
+            showAlternatives: false,
+            fitSelectedRoutes: false,
+            serviceUrl: 'https://router.project-osrm.org/route/v1',
+            lineOptions: {
+                styles: [{ color: '#6610f2', weight: 4, opacity: 0.7 }]
+            },
+            createMarker: function() { return null; } // Hide default routing markers
+        }).addTo(mapInstance.value);
+
+        // Hide the instructions container (itinerary)
+        const container = routingControl.value.getContainer();
+        if (container) {
+            container.style.display = 'none';
+        }
+
+        updateRouting();
+    } catch (e) {
+        console.error('Failed to initialize routing control', e);
+    }
+}
+
+function onMapReady(map) {
+    mapInstance.value = map;
+    initRouting();
+}
+
+function updateRouting() {
+    if (!routingControl.value || !currentLatLng.value) return;
+
+    const waypoints = [];
+    if (showZones.value && visibleZones.value.length > 0) {
+        const deviceLoc = L.latLng(currentLatLng.value[0], currentLatLng.value[1]);
+
+        // Logic from backup file: Device -> Device -> Zone1 -> Device -> Zone2 ...
+        // This ensures every segment starts from the device location.
+        waypoints.push(deviceLoc);
+
+        visibleZones.value.forEach(zone => {
+            const zoneLoc = L.latLng(zone.center[0], zone.center[1]);
+            waypoints.push(deviceLoc);
+            waypoints.push(zoneLoc);
+        });
+
+        routingControl.value.setWaypoints(waypoints);
+    } else {
+        routingControl.value.setWaypoints([]);
+    }
+}
+
+watch([visibleZones, currentLatLng, showZones], () => {
+    updateRouting();
+}, { deep: true });
+
+const mapContainer = ref(null);
+const mapReady = ref(false);
+const zoom = ref(13);
+const mapCenter = ref([3.139, 101.6869]); // default center (Kuala Lumpur)
+const markerRef = ref(null);
+const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const tileAttribution = '&copy; OpenStreetMap contributors';
+const polylineColor = '#007bff';
 
 // Device switcher state and helpers
 const deviceOptions = ref([]);
@@ -962,6 +1119,7 @@ function getIgnition() {
 }
 function getSpeed() {
     const p = positions.value.length ? positions.value[positions.value.length - 1] : null;
+    console.log('speed or motion ',p);
     return p?.speed ?? null;
 }
 
@@ -1238,6 +1396,17 @@ function armPollingFallback() {
 
 // Static view enhanced: fetch detail for dynamic content and weekly trips
 onMounted(async () => {
+    // Fix for Leaflet Routing Machine relying on global L
+    if (typeof window !== 'undefined') {
+        window.L = L;
+        try {
+            await import('leaflet-routing-machine');
+            initRouting();
+        } catch (e) {
+            console.error('Failed to load routing machine', e);
+        }
+    }
+
     pageLoading.value = true;
     mapReady.value = true;
     window.addEventListener('resize', handleResize);

@@ -168,9 +168,12 @@ async function enableAll(list, enabled) {
     return {
       ...orig,
       already_xist: !!enabled,
-      web: !!orig.web,
-      mail: !!orig.mail,
-      sms: !!orig.sms
+      // Preserve existing channels if we are just enabling/disabling existence
+      // OR force them to match the global toggle?
+      // User expects "Enable All" to probably set them to the checked channels.
+      web: !!notificationChannel.value.web,
+      mail: !!notificationChannel.value.mail,
+      sms: !!notificationChannel.value.mobile
     };
   });
 
