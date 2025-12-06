@@ -137,6 +137,7 @@ import { LMap, LTileLayer, LPolygon, LCircle, LCircleMarker, LMarker } from '@vu
 import { GeoSearchControl, OpenStreetMapProvider } from 'leaflet-geosearch';
 import 'leaflet-geosearch/dist/geosearch.css';
 import 'leaflet/dist/leaflet.css';
+import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import * as L from 'leaflet';
 import { RouterLink } from 'vue-router';
@@ -256,19 +257,7 @@ function setupGoogleAutocomplete(input, onPlaceSelected, clearSuggestionsCb) {
 function onMapReady(map) {
   mapRef.value = map;
   attachGeocoderControl(map);
-
-  // Wait for geoman to load before setting it up
-  if (typeof window !== 'undefined' && window.L && window.L.PM) {
-      setupGeoman(map);
-  } else {
-      const checkGeoman = setInterval(() => {
-          if (window.L && window.L.PM) {
-              clearInterval(checkGeoman);
-              setupGeoman(map);
-          }
-      }, 100);
-  }
-
+  setupGeoman(map);
   // Also bind native Leaflet click to ensure we capture clicks
   try { map.on('click', onMapClick); } catch {}
 }
@@ -304,16 +293,7 @@ function drawDemo() {
   circleCenter.value = null;
 }
 
-onMounted(async () => {
-  if (typeof window !== 'undefined') {
-    window.L = L;
-    try {
-      await import('@geoman-io/leaflet-geoman-free');
-    } catch (e) {
-      console.error('Failed to load geoman', e);
-    }
-  }
-
+onMounted(() => {
   // Pre-render demo polygon so the map doesn’t look empty
   drawDemo();
   // Capture initial shape after demo draw

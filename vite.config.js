@@ -14,16 +14,6 @@ export default defineConfig({
     ],
     build: {
         emptyOutDir: true,
-        chunkSizeWarningLimit: 1000,
-        rollupOptions: {
-            output: {
-                manualChunks(id) {
-                    if (id.includes('node_modules')) {
-                        return id.toString().split('node_modules/')[1].split('/')[0].toString();
-                    }
-                }
-            }
-        }
     },
     // Dev proxy forwards app routes to Laravel backend. Target can be overridden via VITE_BACKEND_PROXY_TARGET
     server: {
