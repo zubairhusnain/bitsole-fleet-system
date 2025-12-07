@@ -513,37 +513,37 @@ function statusLabel(v) {
 function fuelDisplay(v) {
     const pos = getPosition(v).raw || {};
     const model = v.model || (v.tc_device?.model ?? v.tcDevice?.model) || null;
-    const devRaw = (v.tc_device?.attributes ?? v.tcDevice?.attributes ?? v.attributes) || {};
-    const devAttrs = parseAttrs(devRaw);
-    const capKeys = ['fuelTankCapacity','FuelTankCapacity','fueltankcapacity','fuel_capacity','fuelCapacity','tankCapacity','fuel_tank_capacity'];
-    let cap = null;
-    for (const k of capKeys) {
-        const val = devAttrs?.[k];
-        if (val !== undefined && val !== null && val !== '') { cap = val; break; }
-    }
-    const capNum = (typeof cap === 'string') ? parseFloat(cap) : (typeof cap === 'number' ? cap : null);
-    const posAttrs = parseAttrs(pos.attributes);
-    const mergedAttrs = { ...devAttrs, ...posAttrs };
-    const tel = formatTelemetry(mergedAttrs, { protocol: pos.protocol, model, capacity: capNum, preferNamedOdometer: true });
+  const devRaw = (v.tc_device?.attributes ?? v.tcDevice?.attributes ?? v.attributes) || {};
+  const devAttrs = parseAttrs(devRaw);
+  const capKeys = ['fuelTankCapacity','FuelTankCapacity','fueltankcapacity','fuel_capacity','fuelCapacity','tankCapacity','fuel_tank_capacity'];
+  let cap = null;
+  for (const k of capKeys) {
+    const val = devAttrs?.[k];
+    if (val !== undefined && val !== null && val !== '') { cap = val; break; }
+  }
+  const capNum = (typeof cap === 'string') ? parseFloat(cap) : (typeof cap === 'number' ? cap : null);
+  const posAttrs = parseAttrs(pos.attributes);
+  const mergedAttrs = { ...devAttrs, ...posAttrs };
+  const keys = ['fuelLevel','fuel_percent','fuelpercentage','fuelPercent','fuelPercent','fuelLiter','fuelLiters','FuelLiters','fuel','io89','89','io48','48','io84','84','io67','67','io68','68','io69','69','io240','240','io241','241','io242','242','io243','243','fuelRaw','analog1','analog2','analog3','adc1','adc2','adc3'];
+  let has = false;
+  for (const k of keys) { const v = posAttrs?.[k]; if (v !== undefined && v !== null && v !== '') { has = true; break; } }
+  const tel = formatTelemetry(posAttrs, { protocol: pos.protocol, model, capacity: (has ? capNum : null), preferNamedOdometer: true });
     if (!tel.fuel) return null;
     const liters = tel.fuel.liters;
     const percent = tel.fuel.percent;
     if (liters != null && percent != null) return `${liters} L (${percent}%)`;
     if (liters != null) return `${liters} L`;
     if (percent != null) return `${percent}%`;
-    return null;
+    return tel.fuel.display ?? null;
 }
 
 // Extract odometer from position attributes and format in km
 function odometerDisplay(v) {
     const pos = getPosition(v).raw || {};
     const model = v.model || (v.tc_device?.model ?? v.tcDevice?.model) || null;
-    const devRaw = (v.tc_device?.attributes ?? v.tcDevice?.attributes ?? v.attributes) || {};
-    const devAttrs = parseAttrs(devRaw);
     const posAttrs = parseAttrs(pos.attributes);
-    const mergedAttrs = { ...devAttrs, ...posAttrs };
-    const tel = formatTelemetry(mergedAttrs, { protocol: pos.protocol, model, preferNamedOdometer: true });
-    return tel.odometer ? tel.odometer.display : null;
+    const tel = formatTelemetry(posAttrs, { protocol: pos.protocol, model, preferNamedOdometer: true });
+    return tel?.odometer?.display ?? null;
 }
 
 
@@ -598,6 +598,8 @@ function popupHtml(v) {
     const isOnline = statusIs(v, 'online');
     const fuel = fuelDisplay(v);
     const odo = odometerDisplay(v);
+    const id = trackingId(v);
+    const detailUrl = typeof id === 'number' || typeof id === 'string' ? `/vehicles/${id}` : null;
     return `
     <div class="popup-card">
       <div class="popup-title-row">
@@ -611,9 +613,10 @@ function popupHtml(v) {
       <div class="popup-row"><span>Last Update:</span> <strong>${lu}</strong></div>
       <div class="popup-row"><span>Ignition:</span> <strong>${ign}</strong></div>
       <div class="popup-row"><span>Speed:</span> <strong>${sp ?? '-'} km/h</strong></div>
-      <div class="popup-row"><span>Fuel:</span> <strong>${fuel ?? '—'}</strong></div>
       <div class="popup-row"><span>Odometer:</span> <strong>${odo ?? '—'}</strong></div>
+      <div class="popup-row"><span>Fuel:</span> <strong>${fuel ?? '—'}</strong></div>
       <div class="popup-row"><span>Location:</span> <span>${locText}</span></div>
+      ${detailUrl ? `<div class="popup-row"><a href="${detailUrl}" class="text-primary text-decoration-underline">View Details</a></div>` : ''}
     </div>
   `;
 }

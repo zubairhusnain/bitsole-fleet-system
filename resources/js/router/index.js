@@ -1,14 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
 // Views
-import HomeView from '../views/HomeView.vue';
 import AboutView from '../views/AboutView.vue';
 import LoginView from '../views/LoginView.vue';
 import RegisterView from '../views/RegisterView.vue';
 // Auth views
 const ForgotPassword = () => import('../views/auth/ForgotPassword.vue');
 const ResetPassword = () => import('../views/auth/ResetPassword.vue');
-import DashboardView from '../views/DashboardView.vue';
+// Dashboard now renders LiveTracking component
 import TasksView from '../views/TasksView.vue';
 import SettingsView from '../views/SettingsView.vue';
 import { ensureAuthenticated } from '../auth';
@@ -34,13 +33,13 @@ const ZonesEdit = () => import('../views/zones/Edit.vue');
 const TelemetryCodec8 = () => import('../views/telemetry/Codec8Tool.vue');
 
 const routes = [
-  { path: '/', name: 'home', component: HomeView },
+  { path: '/', redirect: '/dashboard' },
   { path: '/about', name: 'about', component: AboutView },
   { path: '/login', name: 'login', component: LoginView, meta: { guestOnly: true } },
   { path: '/register', name: 'register', component: RegisterView, meta: { guestOnly: true } },
   { path: '/forgot-password', name: 'forgot-password', component: ForgotPassword, meta: { guestOnly: true, title: 'Forgot Password' } },
   { path: '/reset-password', name: 'reset-password', component: ResetPassword, meta: { guestOnly: true, title: 'Reset Password' } },
-  { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { requiresAuth: true, title: 'Overview' } },
+  { path: '/dashboard', name: 'dashboard', component: LiveTracking, meta: { requiresAuth: true, title: 'Overview' } },
   { path: '/tasks', name: 'tasks', component: TasksView, meta: { requiresAuth: true } },
   { path: '/settings', name: 'settings', component: SettingsView, meta: { requiresAuth: true } },
   // Feature screens

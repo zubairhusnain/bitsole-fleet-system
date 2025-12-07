@@ -39,13 +39,12 @@
                     <table class="table table-hover table-sm align-middle mb-0 table-grid-lines table-nowrap">
                         <thead class="thead-app-dark">
                             <tr>
-                                <th class="fw-semibold py-2">Vehicle ID</th>
+                                <th class="fw-semibold py-2">Device IMEI No</th>
                                 <th class="fw-semibold py-2">Vehicles Name</th>
-                                <th class="fw-semibold py-2">VIN Number</th>
                                 <th class="fw-semibold py-2">Plate number</th>
-                                <th class="fw-semibold py-2">Odometer</th>
                                 <th class="fw-semibold py-2">Ignition</th>
                                 <th class="fw-semibold py-2">Speed (Km/h)</th>
+                                <th class="fw-semibold py-2">Odometer</th>
                                 <th class="fw-semibold py-2">Fuel Level</th>
                                 <th class="fw-semibold py-2 text-end">Actions</th>
                             </tr>
@@ -57,9 +56,7 @@
                                     {{ row.name ?? '—' }}
                                     <span v-if="row.blocked" class="badge rounded-pill bg-danger ms-2">Blocked</span>
                                 </td>
-                                <td class="text-muted text-nowrap">{{ row.vin ?? '—' }}</td>
                                 <td class="text-muted text-nowrap">{{ row.plate ?? '—' }}</td>
-                                <td class="text-muted text-nowrap">{{ row.odometer ?? '—' }}</td>
                                 <td class="text-nowrap">
                                     <span :class="['status-badge', ignitionClass(row.ignition)]">
                                         <span class="dot"></span>
@@ -72,7 +69,12 @@
                                         {{ row.speed ?? '—' }}
                                     </span>
                                 </td>
-                                <td class="text-muted text-nowrap">{{ row.fuel ?? '—' }}</td>
+                                <td class="text-muted text-nowrap">
+                                    <span>{{ row.odometer ?? '—' }}</span>
+                                </td>
+                                <td class="text-muted text-nowrap">
+                                    <span>{{ row.fuel ?? '—' }}</span>
+                                </td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
                                         <button v-if="!row.blocked" class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i
@@ -80,6 +82,10 @@
                                         <button v-if="!row.blocked && hasLocation(row)" class="btn btn-outline-primary" title="View" @click="toDetail(row)">
                                             <i class="bi bi-eye"></i>
                                         </button>
+                                        <button v-if="showWholeDataButton" class="btn btn-outline-info" title="Whole Data (JSON)" @click="openWholeData(row)">
+                                            <i class="bi bi-braces"></i>
+                                        </button>
+
                                         <button v-if="!row.blocked" class="btn btn-outline-warning" title="Block" @click="block(row)"
                                             :disabled="blocking[row.device_id] === true">
                                             <i class="bi bi-slash-circle"></i>
@@ -96,7 +102,7 @@
                                 </td>
                             </tr>
                             <tr v-if="pagedRows.length === 0 && !loading">
-                                <td colspan="9" class="text-center text-muted py-3">No vehicles found.</td>
+                                <td colspan="8" class="text-center text-muted py-3">No vehicles found.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -115,6 +121,23 @@
                                 @click="nextPage">›</button></li>
                     </ul>
                 </nav>
+            </div>
+            <!-- Whole Data Modal -->
+            <div v-if="jsonModalVisible" class="modal d-block" tabindex="-1" role="dialog" aria-modal="true">
+                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h6 class="modal-title">Device Whole Data</h6>
+                            <button type="button" class="btn-close" @click="closeJsonModal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <pre class="small mb-0" v-html="wholeJsonHtml"></pre>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" @click="closeJsonModal">Close</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -143,6 +166,100 @@ const meta = ref({ total: 0, current_page: 1, per_page: 25 });
 
 // hide device detail link in production
 const showDeviceDetailLink = !import.meta.env.PROD;
+
+const showWholeDataButton = computed(() => String(route.query?.wholedata || '') === '1');
+const jsonModalVisible = ref(false);
+const wholeJson = ref('');
+const jsonModalFuelKey = ref('');
+
+function closeJsonModal() { jsonModalVisible.value = false; wholeJson.value = ''; }
+function openWholeData(row) {
+    try {
+        const tc = row?.tc_device ?? row?.tcDevice ?? {};
+        const attrs = parseAttrs(tc.attributes);
+        const posRaw = tc?.position || {};
+        const pos = { ...posRaw, attributes: parseAttrs(posRaw.attributes) };
+        const mergedAttrs = { ...(attrs || {}), ...(pos.attributes || {}) };
+        const capacityRaw = attrs?.fuelTankCapacity ?? attrs?.FuelTankCapacity ?? attrs?.fueltankcapacity ?? null;
+        const capacity = hasFuelKey(pos.attributes) ? capacityRaw : null;
+        const tel = formatTelemetry(mergedAttrs, { protocol: pos?.protocol, model: (row.model ?? tc.model ?? null), capacity });
+        const fuelKey = tel?.fuel?.key ?? '';
+        jsonModalFuelKey.value = fuelKey;
+        const fuelSource = tel?.fuel?.source ?? '';
+        let fuelFrom = '';
+        if (fuelKey) {
+            const variants = [fuelKey, String(fuelKey).toLowerCase()];
+            if (String(fuelKey).toLowerCase().startsWith('io')) {
+                const num = String(fuelKey).toLowerCase().slice(2);
+                variants.push(num);
+            } else if (/^\d+$/.test(String(fuelKey))) {
+                variants.push('io' + String(fuelKey));
+            }
+            const posHas = variants.some(v => Object.prototype.hasOwnProperty.call(pos.attributes || {}, v));
+            const devHas = variants.some(v => Object.prototype.hasOwnProperty.call(attrs || {}, v));
+            fuelFrom = posHas ? 'position' : (devHas ? 'device' : 'merged');
+        }
+
+        const payload = {
+            tc_device: {
+                ...tc,
+                attributes: attrs,
+                position: pos
+            },
+            fuel_key: fuelKey,
+            fuel_source: fuelSource,
+            fuel_from: fuelFrom
+        };
+        wholeJson.value = JSON.stringify(payload, null, 2);
+        jsonModalVisible.value = true;
+    } catch (e) {
+        wholeJson.value = 'Error preparing JSON: ' + String(e?.message || e);
+        jsonModalVisible.value = true;
+    }
+}
+
+const wholeJsonHtml = computed(() => {
+    const s = String(wholeJson.value || '');
+    const key = String(jsonModalFuelKey.value || '').trim();
+    const escapeHtml = (t) => t
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;');
+    if (!key) return escapeHtml(s);
+    const pats = [key];
+    const kLower = key.toLowerCase();
+    if (/^\d+$/.test(key)) pats.push('io' + key);
+    if (kLower.startsWith('io') && /^\d+$/.test(kLower.slice(2))) pats.push(key.slice(2));
+    const header = '"attributes": {';
+    let i = 0;
+    let out = '';
+    while (true) {
+        const idx = s.indexOf(header, i);
+        if (idx === -1) break;
+        out += escapeHtml(s.slice(i, idx + header.length));
+        let j = idx + header.length;
+        let depth = 1;
+        while (j < s.length && depth > 0) {
+            const ch = s[j];
+            if (ch === '{') depth++;
+            else if (ch === '}') depth--;
+            j++;
+        }
+        const attrContent = s.slice(idx + header.length, j - 1);
+        let attrHtml = escapeHtml(attrContent);
+        for (const p of pats) {
+            const token = '&quot;' + p.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') + '&quot;';
+            const re = new RegExp(token, 'g');
+            attrHtml = attrHtml.replace(re, '<mark class="bg-warning text-dark">' + token + '</mark>');
+        }
+        out += attrHtml + escapeHtml('}');
+        i = j;
+    }
+    out += escapeHtml(s.slice(i));
+    return out;
+});
+
+
 
 async function fetchPage(n = 1) {
     loading.value = true;
@@ -200,6 +317,15 @@ function pickAttrWithKey(attrs, keys) {
     }
     return { key: null, value: null };
 }
+function hasFuelKey(attrs) {
+    if (!attrs) return false;
+    const keys = ['fuelLevel','fuel_percent','fuelpercentage','fuelPercent','fuelPercent','fuelLiter','fuelLiters','FuelLiters','fuel','io89','89','io48','48','io84','84','io67','67','io68','68','io69','69','io240','240','io241','241','io242','242','io243','243','fuelRaw','analog1','analog2','analog3','adc1','adc2','adc3'];
+    for (const k of keys) {
+        const v = attrs[k];
+        if (v !== undefined && v !== null && v !== '') return true;
+    }
+    return false;
+}
 // Extract numeric value from a string or number (handles commas and unit suffixes)
 function extractNumber(raw) {
     if (raw == null) return NaN;
@@ -218,11 +344,8 @@ function deriveRow(r) {
     const vin = r.vin ?? pickAttr(attrs, ['vin', 'VIN']);
     const plate = r.plate ?? pickAttr(attrs, ['plate', 'licensePlate', 'registration', 'regNumber']);
     const model = r.model ?? tc.model ?? pickAttr(attrs, ['model']);
-    const capacity = attrs.fuelTankCapacity ?? attrs.FuelTankCapacity ?? attrs.fueltankcapacity ?? null;
-    // Odometer via shared telemetry formatter (merge device + position attrs for consistency)
+    const capacityRaw = attrs.fuelTankCapacity ?? attrs.FuelTankCapacity ?? attrs.fueltankcapacity ?? null;
     const mergedAttrs = { ...attrs, ...posAttrs };
-    const tel = formatTelemetry(mergedAttrs, { protocol: pos.protocol, model, capacity, preferNamedOdometer: true });
-    const odometer = tel?.odometer?.display ?? null;
     // ignition: prefer tc.position.attributes.ignition, fallback to tc_device.attributes
     const ignRaw = posAttrs.ignition ?? (r.ignition ?? pickAttr(attrs, ['ignition', 'Ignition']));
     const ignition = ignRaw === true || ignRaw === 1 || String(ignRaw).toLowerCase() === 'on'
@@ -251,16 +374,21 @@ function deriveRow(r) {
     }
     const location = pos.address ?? (r.location ?? pickAttr(attrs, ['address', 'location'])) ?? coords;
     let fuel = null;
+    const capacity = hasFuelKey(posAttrs) ? capacityRaw : null;
+    const tel = formatTelemetry(posAttrs, { protocol: pos.protocol, model, capacity });
     if (tel?.fuel) {
         const liters = tel.fuel.liters;
         const percent = tel.fuel.percent;
         if (liters != null && percent != null) fuel = `${liters} L (${percent}%)`;
         else if (liters != null) fuel = `${liters} L`;
         else if (percent != null) fuel = `${percent}%`;
+        else fuel = tel.fuel.display ?? null;
     }
+    let odometer = null;
+    if (tel?.odometer?.display) odometer = tel.odometer.display;
 
     const blocked = !!(r?.deleted_at || r?.deletedAt || r?.blocked);
-    return { ...r, uniqueid, name, vin, plate, model, odometer, ignition, speed, location, fuel, blocked };
+    return { ...r, uniqueid, name, vin, plate, model, ignition, speed, location, fuel, odometer, blocked };
 }
 
 async function block(row) {
@@ -353,7 +481,6 @@ const filtered = computed(() => {
     return base.filter(r => String(r.device_id).toLowerCase().includes(q)
         || String(r.uniqueid || '').toLowerCase().includes(q)
         || String(r.name || '').toLowerCase().includes(q)
-        || String(r.vin || '').toLowerCase().includes(q)
         || String(r.plate || '').toLowerCase().includes(q));
 });
 
@@ -379,22 +506,6 @@ function speedClass(val) {
     if (s >= 80) return 'is-high';
     if (s >= 40) return 'is-medium';
     return 'is-low';
-}
-
-// Format tc_device.attributes (string or object) into key: value pairs
-function formatTcAttributes(attrs) {
-    if (attrs == null) return '—';
-    try {
-        const obj = typeof attrs === 'string' ? JSON.parse(attrs) : attrs;
-        if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
-            const entries = Object.entries(obj);
-            if (entries.length === 0) return '—';
-            return entries.map(([k, v]) => `${k}: ${stringifyAttr(v)}`).join(', ');
-        }
-        return String(attrs);
-    } catch {
-        return String(attrs);
-    }
 }
 
 function stringifyAttr(v) {
