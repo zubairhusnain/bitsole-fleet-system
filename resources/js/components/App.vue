@@ -20,6 +20,15 @@
                 </ul>
                 <!--end::Start Navbar Links-->
                 <ul class="navbar-nav ms-auto">
+                    <li class="nav-item" v-if="isAuthed">
+                        <RouterLink to="/alerts" class="nav-link position-relative" style="padding-top: 0.5rem;">
+                            <i class="bi bi-bell" style="font-size: 1.2rem;"></i>
+                            <span v-if="unreadCount > 0" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem; transform: translate(-50%, 50%) !important;">
+                                {{ unreadCount > 99 ? '99+' : unreadCount }}
+                                <span class="visually-hidden">unread messages</span>
+                            </span>
+                        </RouterLink>
+                    </li>
                     <li class="nav-item user-menu" v-if="isAuthed">
                         <div class="nav-link d-flex align-items-center user-toggle">
                             <img v-if="avatarSrc" :src="avatarSrc" alt="Avatar" class="avatar-img" />
@@ -241,7 +250,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
 import { authState, clearAuthCache, hasPermission, roleToNumber } from '../auth';
@@ -256,7 +265,103 @@ const sidebarOpen = ref(false);
 const isProd = import.meta.env.PROD;
 const appName = document.title || 'Omayer Fleet System';
 const year = new Date().getFullYear();
+const unreadCount = ref(0);
+const myDeviceIds = ref([]);
+let echoChannel = null;
+
 const isAuthed = computed(() => !!authState.user);
+
+const fetchMyDeviceIds = async () => {
+    if (!isAuthed.value) return;
+    try {
+        const { data } = await axios.get('/web/notifications/my-device-ids');
+        myDeviceIds.value = data;
+    } catch (e) {
+        console.error('Failed to fetch device IDs', e);
+    }
+};
+
+const fetchUnreadCount = async () => {
+    if (!isAuthed.value) return;
+    try {
+        const { data } = await axios.get('/web/notifications/events');
+        if (Array.isArray(data) && data.length > 0) {
+            if (route.path === '/alerts') {
+                const latest = data[0].eventtime;
+                localStorage.setItem('lastSeenTime', latest);
+                unreadCount.value = 0;
+                return;
+            }
+
+            const lastSeen = localStorage.getItem('lastSeenTime');
+            if (!lastSeen) {
+                unreadCount.value = data.length;
+            } else {
+                const newEvents = data.filter(e => e.eventtime > lastSeen);
+                unreadCount.value = newEvents.length;
+            }
+        } else {
+             unreadCount.value = 0;
+        }
+    } catch (e) {
+        console.error('Failed to fetch unread count', e);
+    }
+};
+
+const listenForAlerts = () => {
+    if (echoChannel) return;
+    if (!window.echo) return;
+
+    echoChannel = window.echo.channel('alerts')
+        .listen('.NewAlertEvent', (payload) => {
+            console.log('New Alert Received:', payload);
+            const e = payload.event;
+            // Check if event exists and belongs to user's devices
+            if (e && e.deviceid && myDeviceIds.value.includes(e.deviceid)) {
+                if (route.path !== '/alerts') {
+                    unreadCount.value++;
+                }
+            }
+        });
+};
+
+const markAsRead = async () => {
+    if (!isAuthed.value) return;
+     try {
+        const { data } = await axios.get('/web/notifications/events');
+        if (Array.isArray(data) && data.length > 0) {
+            const latest = data[0].eventtime;
+            localStorage.setItem('lastSeenTime', latest);
+            unreadCount.value = 0;
+        }
+    } catch (e) {}
+};
+
+watch(() => route.path, (newPath) => {
+    if (newPath === '/alerts') {
+        markAsRead();
+    }
+});
+
+watch(isAuthed, (val) => {
+    if (val) {
+        fetchMyDeviceIds().then(() => {
+            fetchUnreadCount();
+            listenForAlerts();
+        });
+    } else {
+        if (echoChannel) {
+            window.echo.leave('alerts');
+            echoChannel = null;
+        }
+    }
+});
+
+onUnmounted(() => {
+    if (echoChannel) {
+        window.echo.leave('alerts');
+    }
+});
 const isAdminOrDistributor = computed(() => {
   const rn = roleToNumber(authState?.user?.role ?? 0);
   return rn === 3 || rn === 2;
@@ -333,6 +438,11 @@ function initTreeview() {
 }
 
 onMounted(async () => {
+    if (isAuthed.value) {
+        await fetchMyDeviceIds();
+        fetchUnreadCount();
+        listenForAlerts();
+    }
     if (!isGuestPage.value) {
         await nextTick();
         initTreeview();

@@ -181,6 +181,9 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('
 
 // Auth-protected Notifications APIs (publicly accessible to all roles)
 Route::middleware(['auth'])->prefix('/web/notifications')->group(function () {
+    Route::get('/events', [\App\Http\Controllers\NotificationController::class, 'events']);
+    Route::get('/my-device-ids', [\App\Http\Controllers\NotificationController::class, 'myDeviceIds']);
+    Route::delete('/events/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy']);
     Route::get('/', [\App\Http\Controllers\NotificationController::class, 'index']);
     Route::get('/device/{deviceId}', [\App\Http\Controllers\NotificationController::class, 'device']);
     Route::post('/', [\App\Http\Controllers\NotificationController::class, 'store']);
