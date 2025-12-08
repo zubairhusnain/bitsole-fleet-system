@@ -43,7 +43,7 @@
                         </div>
                         <div class="user-dropdown">
                             <RouterLink to="/profile" class="dropdown-item">Profile</RouterLink>
-                            <RouterLink v-if="roleToNumber(authState?.user?.role ?? 0) === 3" to="/settings" class="dropdown-item d-none">Settings</RouterLink>
+                            <RouterLink v-if="roleToNumber(authState?.user?.role ?? 0) === 3" to="/settings" class="dropdown-item">Settings</RouterLink>
                             <button class="dropdown-item text-danger" @click="logout">Logout</button>
                         </div>
                     </li>
@@ -167,7 +167,7 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item d-none" v-if="!isAdminOrDistributor && hasPerm('zones','read')">
+                        <li class="nav-item " v-if="!isAdminOrDistributor && hasPerm('zones','read')">
                             <RouterLink to="/zones" class="nav-link" :class="{ active: route.name === 'zones' }">
                                 <i class="nav-icon bi bi-grid-3x3"></i>
                                 <p>Zone Management</p>
@@ -181,7 +181,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item d-none" v-if="isAuthed">
+                        <li class="nav-item" v-if="isAuthed">
                             <RouterLink to="/alerts" class="nav-link" :class="{ active: route.name === 'alerts' }">
                                 <i class="nav-icon bi bi-bell"></i>
                                 <p>Alerts & Notifications</p>

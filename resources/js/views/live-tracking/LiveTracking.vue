@@ -680,7 +680,7 @@ function focusVehicle(v) {
 onMounted(() => {
     // Preload icons to avoid delay on first click
     const img = new Image();
-    img.src = '/images/markers/focus-marker.png';
+    img.src = '/images/markers/focus-marker.svg';
 
     // Map is created declaratively via <l-map/>; load data and listeners
     fetchVehicles();
