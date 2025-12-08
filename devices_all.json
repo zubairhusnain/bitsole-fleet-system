@@ -1,0 +1,152 @@
+[
+    {
+        "id": 22,
+        "attributes": {
+            "type": "SUV",
+            "manufacturer": "TOYOTA",
+            "color": "WHITE",
+            "registration": "",
+            "plate": "PQP73",
+            "vin": "",
+            "odometer": "",
+            "fuelAverage": "",
+            "maxSpeed": "",
+            "photos": [
+                "vehicle-images\/g07LVPFJWoZsRleWqKzhxWEsJ5jvHslNBZvUMft0.jpg"
+            ]
+        },
+        "groupId": 0,
+        "calendarId": 0,
+        "name": "ALPHARD FMC130 - PQP73",
+        "uniqueId": "863719069197524",
+        "status": "online",
+        "lastUpdate": "2025-10-31T11:55:53.513+00:00",
+        "positionId": 78782,
+        "phone": null,
+        "model": "ALPHARD",
+        "contact": null,
+        "category": null,
+        "disabled": false,
+        "expirationTime": null
+    },
+    {
+        "id": 21,
+        "attributes": {
+            "type": "Sedan",
+            "manufacturer": "BMW",
+            "color": "WHITE",
+            "registration": "",
+            "plate": "DDY 15",
+            "vin": "",
+            "odometer": "",
+            "fuelAverage": "",
+            "maxSpeed": "",
+            "photos": [
+                "vehicle-images\/A7CgrsxhLPK400VEvR6EGSZKlLUULErSCPVLVFQG.jpg"
+            ]
+        },
+        "groupId": 0,
+        "calendarId": 0,
+        "name": "BMW - DDY15",
+        "uniqueId": "860896050487453",
+        "status": "online",
+        "lastUpdate": "2025-10-31T11:55:51.731+00:00",
+        "positionId": 78944,
+        "phone": null,
+        "model": "530i",
+        "contact": null,
+        "category": null,
+        "disabled": false,
+        "expirationTime": null
+    },
+    {
+        "id": 20,
+        "attributes": {
+            "type": "Sedan",
+            "manufacturer": "BMW",
+            "color": "White",
+            "registration": "",
+            "plate": "IM7111",
+            "vin": "",
+            "odometer": "",
+            "fuelAverage": "",
+            "maxSpeed": "",
+            "photos": [
+                "vehicle-images\/lpvuUmVWMJzRiF2s0k31ta5A7BKPn0DgTNudvpGN.jpg"
+            ]
+        },
+        "groupId": 0,
+        "calendarId": 0,
+        "name": "BMW - IM7111",
+        "uniqueId": "860896051771111",
+        "status": "offline",
+        "lastUpdate": "2025-10-31T11:46:24.832+00:00",
+        "positionId": 78823,
+        "phone": null,
+        "model": "530i",
+        "contact": null,
+        "category": null,
+        "disabled": false,
+        "expirationTime": null
+    },
+    {
+        "id": 19,
+        "attributes": {
+            "type": "SUV",
+            "manufacturer": "hjghjg",
+            "color": "gjhghjg",
+            "registration": 76768,
+            "plate": "7867686",
+            "vin": 767867,
+            "odometer": 76767,
+            "fuelAverage": "15 km\/l",
+            "maxSpeed": 76565,
+            "photos": [
+                "vehicle-images\/kZHNwJ5SGJIbNjMPj1A6E3YfaXs18CT1bEZM9K0M.png"
+            ]
+        },
+        "groupId": 0,
+        "calendarId": 0,
+        "name": "Testing",
+        "uniqueId": "VHCL-10166867868",
+        "status": "offline",
+        "lastUpdate": null,
+        "positionId": 0,
+        "phone": null,
+        "model": "nbnb",
+        "contact": null,
+        "category": null,
+        "disabled": false,
+        "expirationTime": null
+    },
+    {
+        "id": 9,
+        "attributes": {
+            "type": "Truck",
+            "manufacturer": "test",
+            "color": "hhghjgh",
+            "registration": "656756",
+            "plate": "6567567",
+            "vin": "5675675",
+            "odometer": "656756",
+            "fuelAverage": "15 km\/l",
+            "maxSpeed": "6786",
+            "photos": [
+                "vehicle-images\/uLiTx9dmOB8CzGFEieiSXChkUQ3IkWkDg6oazFL3.png"
+            ]
+        },
+        "groupId": 0,
+        "calendarId": 0,
+        "name": "Testing Car",
+        "uniqueId": "860896051662252",
+        "status": "unknown",
+        "lastUpdate": "2025-10-30T20:05:57.301+00:00",
+        "positionId": 71483,
+        "phone": null,
+        "model": "Testing",
+        "contact": null,
+        "category": null,
+        "disabled": false,
+        "expirationTime": null
+    }
+]
