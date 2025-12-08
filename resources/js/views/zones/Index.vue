@@ -145,6 +145,7 @@ import { RouterLink, useRouter } from 'vue-router';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
 import { hasPermission as _hasPermission } from '../../auth';
+import { formatDateTime } from '../../utils/datetime';
 
 // Search input (static for now)
 const searchName = ref('');
@@ -203,19 +204,6 @@ function nextPage() { if (page.value < totalPages.value) { page.value += 1; fetc
 
 function statusClass(s) {
   return s === 'Active' ? 'is-on' : 'is-off';
-}
-
-function formatDateTime(iso) {
-  if (!iso) return '-';
-  try {
-    const d = new Date(iso);
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const yyyy = d.getFullYear();
-    const hh = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
-    return `${dd}/${mm}/${yyyy} - ${hh}:${min}`;
-  } catch { return iso; }
 }
 
 function mapRow(z) {

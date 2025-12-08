@@ -38,6 +38,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { formatDateTime } from '../../utils/datetime';
 
 const messages = ref([]);
 let echoChannel = null;
@@ -96,7 +97,7 @@ const mapEvent = (e) => ({
     key: e.type,
     title: formatTitle(e.type),
     description: formatDescription(e),
-    date: new Date(e.eventtime).toLocaleString(),
+    date: formatDateTime(e.eventtime),
     id: e.id || `${e.deviceid}-${e.eventtime}`
 });
 

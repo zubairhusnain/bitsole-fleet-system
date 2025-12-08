@@ -765,6 +765,7 @@ import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { LMap, LTileLayer, LMarker, LPolyline, LPopup, LCircle, LPolygon } from '@vue-leaflet/vue-leaflet';
+import { formatDateTime, formatDate } from '../../utils/datetime';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import L from 'leaflet';
@@ -1070,7 +1071,7 @@ const lastUpdateDisplay = computed(() => {
         || detailPayload.value?.position?.servertime
         || detailPayload.value?.device?.lastUpdate
         || null;
-    return t ? new Date(t).toLocaleString() : '-';
+    return formatDateTime(t);
 });
 const uniqueId = computed(() => detailPayload.value?.device?.uniqueId || detailPayload.value?.device?.uniqueid || null);
 
@@ -1974,7 +1975,7 @@ const driverStatusClass = computed(() => driverStatusLabel.value === 'Active'
     : 'bg-secondary-subtle text-secondary-emphasis');
 const memberSinceDisplay = computed(() => {
     const since = driverPickAttr(['memberSince', 'joinedAt', 'createdAt']);
-    return since ? new Date(since).toLocaleDateString() : '';
+    return since ? formatDate(since) : '';
 });
 
 const driverAvatarUrl = computed(() => {
@@ -2062,10 +2063,7 @@ const comparisons = computed(() => ([
 ]));
 
 // Trips helpers
-function formatDateTime(s) {
-    if (!s) return '-';
-    try { return new Date(s).toLocaleString(); } catch { return String(s); }
-}
+// formatDateTime imported from utils
 function formatDistanceKm(d) {
     const n = Number(d);
     if (!Number.isFinite(n)) return '-';

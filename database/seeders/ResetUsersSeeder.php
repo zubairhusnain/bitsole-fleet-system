@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use App\Models\UserPermission;
 use App\Models\Devices;
+use App\Models\Drivers;
+use App\Models\Zones;
 use App\Http\Middleware\ModulePermission;
 
 class ResetUsersSeeder extends Seeder
@@ -88,6 +90,18 @@ class ResetUsersSeeder extends Seeder
             'distributor_id' => $distributor->id,
         ]);
 
-        $this->command->info('Users reset, permissions assigned. ' . $updatedCount . ' existing devices updated to Fleet Manager & Distributor.');
+        // 7. Update Existing Drivers
+        $updatedDriversCount = Drivers::withTrashed()->update([
+            'user_id' => $fleetManager->id,
+            'distributor_id' => $distributor->id,
+        ]);
+
+        // 8. Update Existing Zones
+        $updatedZonesCount = Zones::withTrashed()->update([
+            'user_id' => $fleetManager->id,
+            'distributor_id' => $distributor->id,
+        ]);
+
+        $this->command->info('Users reset, permissions assigned. ' . $updatedCount . ' devices, ' . $updatedDriversCount . ' drivers, and ' . $updatedZonesCount . ' zones updated to Fleet Manager & Distributor.');
     }
 }
