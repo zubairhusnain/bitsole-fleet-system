@@ -64,8 +64,10 @@ window.Pusher = Pusher;
 const reverbKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REVERB_APP_KEY) || 'local';
 const envHost = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REVERB_HOST) || (typeof window !== 'undefined' ? window.location.hostname : 'localhost');
 const reverbHost = String(envHost).replace(/^"|"$/g, '');
-// Derive sane default port from scheme when env not provided
-const reverbScheme = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REVERB_SCHEME) || 'http';
+
+// Derive sane default port/scheme from current window location if env not provided
+const currentProtocol = typeof window !== 'undefined' ? window.location.protocol.replace(':', '') : 'http';
+const reverbScheme = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REVERB_SCHEME) || currentProtocol;
 const defaultWsPort = reverbScheme === 'https' ? 443 : 80;
 const reverbPort = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REVERB_PORT) ? Number(import.meta.env.VITE_REVERB_PORT) : defaultWsPort;
 
