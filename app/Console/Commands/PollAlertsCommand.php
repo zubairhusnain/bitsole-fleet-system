@@ -33,11 +33,17 @@ class PollAlertsCommand extends Command
     {
         $this->info('Starting alert polling service...');
 
-        // Initialize last_id to the current max id to avoid broadcasting old events on restart
-        // If cache exists, use it (optional, but safer to start fresh or from max to avoid flood)
-        // For this implementation, we'll start from current max to avoid spamming on restart.
-        $lastId = DB::connection('pgsql')->table('tc_events')->max('id') ?? 0;
+        // Initialize last_id. Priority: Cache > DB Max > 0
+        // In production, using Cache ensures we don't miss alerts during restarts.
+        $dbMaxId = DB::connection('pgsql')->table('tc_events')->max('id') ?? 0;
+        $lastId = Cache::get('alerts_poll_last_id', $dbMaxId);
         
+        // Safety check: If cache is too old (e.g., > 1000 events behind), skip to current to avoid massive flood
+        if ($dbMaxId - $lastId > 1000) {
+            $this->warn("Last ID {$lastId} is too far behind DB Max {$dbMaxId}. Skipping to DB Max to avoid flood.");
+            $lastId = $dbMaxId;
+        }
+
         $this->info("Initial Last ID: {$lastId}");
 
         while (true) {
@@ -73,6 +79,7 @@ class PollAlertsCommand extends Command
                         
                         // Update lastId
                         $lastId = $event->id;
+                        Cache::put('alerts_poll_last_id', $lastId, now()->addDay());
                     }
                 }
 
