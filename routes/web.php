@@ -179,6 +179,11 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
 // NEW: Auth-protected Geofence listing from Traccar DB (testing/util)
 Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('/web/traccar/geofences', [\App\Http\Controllers\ZoneController::class, 'geofencesDb']);
 
+Route::middleware('auth')->get('/web/traccar/assign-computed-attributes', function (\Illuminate\Http\Request $request) {
+    $summary = app(\App\Services\PermissionService::class)->assignComputedAttributesToAllDevices($request);
+    return response()->json($summary);
+});
+
 // Auth-protected Notifications APIs (publicly accessible to all roles)
 Route::middleware(['auth'])->prefix('/web/notifications')->group(function () {
     Route::get('/events', [\App\Http\Controllers\NotificationController::class, 'events']);
