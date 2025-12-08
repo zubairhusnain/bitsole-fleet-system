@@ -16,16 +16,19 @@ class NewAlertEvent implements ShouldBroadcastNow
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $event;
+    public $userId;
 
     /**
      * Create a new event instance.
      *
      * @param array|object $event
+     * @param int $userId
      * @return void
      */
-    public function __construct($event)
+    public function __construct($event, $userId)
     {
         $this->event = $event;
+        $this->userId = $userId;
     }
 
     /**
@@ -35,7 +38,7 @@ class NewAlertEvent implements ShouldBroadcastNow
      */
     public function broadcastOn()
     {
-        return new Channel('alerts');
+        return new PrivateChannel('alerts.' . $this->userId);
     }
 
     /**

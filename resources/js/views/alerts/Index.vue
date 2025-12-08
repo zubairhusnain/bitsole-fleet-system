@@ -39,9 +39,11 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import { formatDateTime } from '../../utils/datetime';
+import { authState } from '../../auth';
 
 const messages = ref([]);
 let echoChannel = null;
+let currentChannelName = null;
 
 const titleMap = {
   geofenceEnter: 'Geofence Entered',
@@ -164,8 +166,10 @@ const deleteEvent = async (id) => {
 const listenForAlerts = () => {
     if (echoChannel) return;
     if (!window.echo) return;
+    if (!authState.user || !authState.user.id) return;
 
-    echoChannel = window.echo.channel('alerts')
+    currentChannelName = `alerts.${authState.user.id}`;
+    echoChannel = window.echo.private(currentChannelName)
         .listen('.NewAlertEvent', (payload) => {
             console.log('New Alert (Live):', payload);
             const e = payload.event;
@@ -192,7 +196,7 @@ onMounted(() => {
 
 onUnmounted(() => {
     if (echoChannel) {
-        window.echo.leave('alerts');
+        window.echo.leave(currentChannelName || 'alerts');
     }
 });
 </script>

@@ -268,6 +268,7 @@ const year = new Date().getFullYear();
 const unreadCount = ref(0);
 const myDeviceIds = ref([]);
 let echoChannel = null;
+let currentChannelName = null;
 
 const isAuthed = computed(() => !!authState.user);
 
@@ -311,9 +312,12 @@ const fetchUnreadCount = async () => {
 const listenForAlerts = () => {
     if (echoChannel) return;
     if (!window.echo) return;
+    if (!authState.user || !authState.user.id) return;
 
-    console.log('Listening for alerts on channel "alerts"...');
-    echoChannel = window.echo.channel('alerts')
+    currentChannelName = `alerts.${authState.user.id}`;
+    console.log(`Listening for alerts on private channel "${currentChannelName}"...`);
+
+    echoChannel = window.echo.private(currentChannelName)
         .listen('.NewAlertEvent', (payload) => {
             console.log('New Alert Received:', payload);
             const e = payload.event;
@@ -322,9 +326,11 @@ const listenForAlerts = () => {
                 // Robust ID checking (handle string/number mismatch)
                 const eventDevId = Number(e.deviceid);
                 const userDevIds = myDeviceIds.value.map(id => Number(id));
-                
+
                 console.log(`Checking alert devId: ${eventDevId} against myDeviceIds:`, userDevIds);
 
+                // Note: Server-side filtering via private channel ensures we only get relevant alerts,
+                // but client-side check provides double safety.
                 if (userDevIds.includes(eventDevId)) {
                     if (route.path !== '/alerts') {
                         unreadCount.value++;
@@ -363,7 +369,7 @@ watch(isAuthed, (val) => {
         });
     } else {
         if (echoChannel) {
-            window.echo.leave('alerts');
+            window.echo.leave(currentChannelName || 'alerts');
             echoChannel = null;
         }
     }
@@ -371,7 +377,7 @@ watch(isAuthed, (val) => {
 
 onUnmounted(() => {
     if (echoChannel) {
-        window.echo.leave('alerts');
+        window.echo.leave(currentChannelName || 'alerts');
     }
 });
 const isAdminOrDistributor = computed(() => {
