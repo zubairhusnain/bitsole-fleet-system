@@ -46,8 +46,8 @@
              </div>
             <l-map v-if="showMap" id="liveMap" :zoom="zoom" :center="center" :options="mapOptions" @ready="onMapReady">
             <l-tile-layer :url="tileUrl" :attribution="tileAttribution" />
-            <l-circle v-if="selectedMarker" :lat-lng="[selectedMarker.lat, selectedMarker.lon]" :radius="200" :color="'#3f8fd7'" :weight="1" :fillColor="'#3f8fd7'" :fillOpacity="0.25" />
-            <l-marker v-for="m in markerItems" :key="m.id" :lat-lng="[m.lat, m.lon]" :icon="carIcon" :ref="el => setMarkerRef(m.id, el)">
+            <!-- Circle removed per request -->
+            <l-marker v-for="m in markerItems" :key="m.id" :lat-lng="[m.lat, m.lon]" :icon="isSelected(m.id) ? focusIcon : carIcon" :ref="el => setMarkerRef(m.id, el)">
             <l-popup>
             <div class="popup-card" v-html="m.popup"></div>
             </l-popup>
@@ -573,11 +573,22 @@ function speedKmh(speed) {
 }
 
 const carIcon = L.icon({
-    iconUrl: '/images/markers/device-pin.svg',
+    iconUrl: '/images/markers/device-pin.png',
     iconSize: [36, 48],
     iconAnchor: [18, 44],
     popupAnchor: [0, -38],
 });
+
+const focusIcon = L.icon({
+    iconUrl: '/images/markers/focus-marker.svg',
+    iconSize: [30, 42],
+    iconAnchor: [18, 44],
+    popupAnchor: [0, -38],
+});
+
+function isSelected(id) {
+    return String(id) === String(selectedId.value);
+}
 
 function popupHtml(v) {
     const { ignition, speed, address } = getPosition(v);
@@ -667,6 +678,10 @@ function focusVehicle(v) {
 }
 
 onMounted(() => {
+    // Preload icons to avoid delay on first click
+    const img = new Image();
+    img.src = '/images/markers/focus-marker.png';
+
     // Map is created declaratively via <l-map/>; load data and listeners
     fetchVehicles();
 

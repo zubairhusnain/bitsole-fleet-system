@@ -173,7 +173,7 @@
                 <div class="card panel rounded-4 shadow-sm">
                     <div class="card-body p-0">
                         <div ref="mapContainer" style="height: calc(60vh - 16px); min-height: 320px; position: relative;">
-                            <div class="zone-toggle-control" style="position: absolute; top: 10px; right: 10px; z-index: 1000; background: white; padding: 8px 12px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
+                            <div class="zone-toggle-control d-none" style="position: absolute; top: 10px; right: 10px; z-index: 1000; background: white; padding: 8px 12px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
                                 <div class="form-check form-switch mb-0">
                                     <input class="form-check-input" type="checkbox" id="showZonesCheck" v-model="showZones" :disabled="loadingGeofences">
                                     <label class="form-check-label fw-semibold" for="showZonesCheck">Show Zones</label>
