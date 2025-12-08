@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -22,3 +23,11 @@ Artisan::command('traccar:assign-computed-attributes', function () {
         foreach (array_slice($errs, 0, 10) as $e) { $this->line('- ' . $e); }
     }
 })->purpose('Assign all computed attributes to all Traccar devices');
+
+// Poll alerts service - runs continuously
+// In production, ensure the scheduler is running (cron)
+Schedule::command('alerts:poll')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();
+
