@@ -57,6 +57,8 @@ class ResetUsersSeeder extends Seeder
         $fleetManager = User::create([
             'name' => 'Fleet Manager',
             'email' => 'admin@gmail.com',
+            'manager_id'=>NULL,
+            'distributor_id'=>$distributor->id,
             'password' => $password,
             'role' => User::ROLE_FLEET_MANAGER,
             'email_verified_at' => now(),
