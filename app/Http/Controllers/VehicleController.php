@@ -808,7 +808,10 @@ class VehicleController extends Controller
                 if (!$notificationId) continue;
 
                 // Create a new request instance with merged data for this item
-                $itemReq = $request->duplicate(array_merge($request->all(), $item));
+                $mergedData = array_merge($request->all(), $item);
+                // Pass merged data as 2nd argument (request/POST params) to ensure it overrides body
+                // First argument (query) is null, so it inherits from original (likely empty)
+                $itemReq = $request->duplicate(null, $mergedData);
 
                 // assignNotification relies on $request->user()
                 $itemReq->setUserResolver(fn () => $request->user());
