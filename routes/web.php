@@ -3,6 +3,7 @@
 use App\Models\TcUser;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VehicleModelController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -63,20 +64,11 @@ Route::prefix('/web/auth')->group(function () {
 });
 
 // Auth-protected admin APIs (session-based)
-Route::middleware('auth')->prefix('/web/admin')->group(function () {
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/admin')->group(function () {
     Route::get('/dashboard', function (Request $request) {
         return response()->json([
             'message' => 'Welcome to admin dashboard',
             'user' => $request->user(),
-        ]);
-    });
-
-    Route::get('/stats', function () {
-        return response()->json([
-            'stats' => [
-                'users' => \App\Models\User::count(),
-                'time' => now()->toDateTimeString(),
-            ],
         ]);
     });
 
@@ -88,9 +80,11 @@ Route::middleware('auth')->prefix('/web/admin')->group(function () {
 });
 
 // Auth-protected Vehicles CRUD
-Route::middleware('auth')->prefix('/web/vehicles')->group(function () {
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/vehicles')->group(function () {
     Route::get('/', [\App\Http\Controllers\VehicleController::class, 'index']);
     Route::get('/options', [\App\Http\Controllers\VehicleController::class, 'options']);
+    // Tracker models options for vehicle form (not admin-only)
+    Route::get('/models/options', [VehicleModelController::class, 'options']);
     Route::post('/', [\App\Http\Controllers\VehicleController::class, 'store']);
     Route::get('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'show']);
     // Device detail: single payload with latest position and trips
@@ -100,6 +94,11 @@ Route::middleware('auth')->prefix('/web/vehicles')->group(function () {
     Route::get('/{deviceId}/position', [\App\Http\Controllers\VehicleController::class, 'positionCurrent']);
     Route::get('/{deviceId}/trips', [\App\Http\Controllers\VehicleController::class, 'trips']);
     Route::get('/{deviceId}/drivers', [\App\Http\Controllers\VehicleController::class, 'driversList']);
+    // Drivers/Zones options under vehicles namespace
+    Route::get('/drivers/options', [\App\Http\Controllers\VehicleController::class, 'driversOptions']);
+    // Geofences assigned to this vehicle
+    Route::get('/{deviceId}/geofences', [\App\Http\Controllers\VehicleController::class, 'geofences']);
+    Route::get('/geofences/options', [\App\Http\Controllers\VehicleController::class, 'geofencesOptions']);
     // Positions for map/waypoints (time-window support)
     Route::get('/{deviceId}/positions', [\App\Http\Controllers\VehicleController::class, 'positions']);
     // Raw device logs for Codec8 decoding
@@ -115,10 +114,20 @@ Route::middleware('auth')->prefix('/web/vehicles')->group(function () {
     Route::patch('/{deviceId}/restore', [\App\Http\Controllers\VehicleController::class, 'restore']);
     Route::delete('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'destroy']);
 
+    // Assign/unassign drivers
+    Route::post('/{deviceId}/drivers/assign', [\App\Http\Controllers\VehicleController::class, 'assignDrivers']);
+    Route::post('/{deviceId}/drivers/unassign', [\App\Http\Controllers\VehicleController::class, 'unassignDrivers']);
+    // Assign/unassign zones (geofences)
+    Route::post('/{deviceId}/zones/assign', [\App\Http\Controllers\VehicleController::class, 'assignZones']);
+    Route::post('/{deviceId}/zones/unassign', [\App\Http\Controllers\VehicleController::class, 'unassignZones']);
+    // Notifications under vehicles namespace
+    Route::get('/{deviceId}/notifications', [\App\Http\Controllers\VehicleController::class, 'notificationsDevice']);
+    Route::post('/{deviceId}/notifications/assign', [\App\Http\Controllers\VehicleController::class, 'notificationsAssign']);
+
 });
 
 // NEW: Auth-protected Drivers CRUD & assignment
-Route::middleware('auth')->prefix('/web/drivers')->group(function () {
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/drivers')->group(function () {
     Route::get('/', [\App\Http\Controllers\DriverController::class, 'index']);
     Route::get('/{driverId}', [\App\Http\Controllers\DriverController::class, 'show']);
     Route::post('/', [\App\Http\Controllers\DriverController::class, 'store']);
@@ -130,22 +139,34 @@ Route::middleware('auth')->prefix('/web/drivers')->group(function () {
 });
 
 // Live Tracking: trigger a broadcast of current positions
-Route::middleware('auth')->get('/web/live/positions/broadcast', [\App\Http\Controllers\LiveTrackingController::class, 'broadcast']);
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('/web/live/positions/broadcast', [\App\Http\Controllers\LiveTrackingController::class, 'broadcast']);
 // Live Tracking: HTTP fallback to fetch current positions (auth-protected)
-Route::middleware('auth')->get('/web/live/positions/current', [\App\Http\Controllers\LiveTrackingController::class, 'current']);
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('/web/live/positions/current', [\App\Http\Controllers\LiveTrackingController::class, 'current']);
 
 // NEW: Auth-protected Users CRUD
-Route::middleware('auth')->prefix('/web/users')->group(function () {
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/users')->group(function () {
     Route::get('/', [UserController::class, 'index']);
     Route::get('/options', [UserController::class, 'options']);
     Route::get('/{userId}', [UserController::class, 'show']);
+    Route::get('/{userId}/permissions', [UserController::class, 'permissions']);
+    Route::put('/{userId}/permissions', [UserController::class, 'updatePermissions']);
     Route::post('/', [UserController::class, 'store']);
     Route::put('/{userId}', [UserController::class, 'update']);
+    // Restore a soft-deleted (blocked) user
+    Route::patch('/{userId}/restore', [UserController::class, 'restore']);
     Route::delete('/{userId}', [UserController::class, 'destroy']);
 });
 
+// Admin-only Settings: Vehicle Models IOIDs
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/settings')->group(function () {
+    Route::get('/vehicle-models', [VehicleModelController::class, 'index']);
+    Route::post('/vehicle-models', [VehicleModelController::class, 'store']);
+    Route::put('/vehicle-models/{id}', [VehicleModelController::class, 'update']);
+    Route::delete('/vehicle-models/{id}', [VehicleModelController::class, 'destroy']);
+});
+
 // NEW: Auth-protected Zones CRUD
-Route::middleware('auth')->prefix('/web/zones')->group(function () {
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/zones')->group(function () {
     Route::get('/', [\App\Http\Controllers\ZoneController::class, 'index']);
     Route::get('/{zoneId}', [\App\Http\Controllers\ZoneController::class, 'show']);
     Route::post('/', [\App\Http\Controllers\ZoneController::class, 'store']);
@@ -156,8 +177,20 @@ Route::middleware('auth')->prefix('/web/zones')->group(function () {
 });
 
 // NEW: Auth-protected Geofence listing from Traccar DB (testing/util)
-Route::middleware('auth')->get('/web/traccar/geofences', [\App\Http\Controllers\ZoneController::class, 'geofencesDb']);
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('/web/traccar/geofences', [\App\Http\Controllers\ZoneController::class, 'geofencesDb']);
+
 Route::middleware('auth')->get('/web/traccar/assign-computed-attributes', function (\Illuminate\Http\Request $request) {
     $summary = app(\App\Services\PermissionService::class)->assignComputedAttributesToAllDevices($request);
     return response()->json($summary);
+});
+
+// Auth-protected Notifications APIs (publicly accessible to all roles)
+Route::middleware(['auth'])->prefix('/web/notifications')->group(function () {
+    Route::get('/events', [\App\Http\Controllers\NotificationController::class, 'events']);
+    Route::get('/my-device-ids', [\App\Http\Controllers\NotificationController::class, 'myDeviceIds']);
+    Route::delete('/events/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy']);
+    Route::get('/', [\App\Http\Controllers\NotificationController::class, 'index']);
+    Route::get('/device/{deviceId}', [\App\Http\Controllers\NotificationController::class, 'device']);
+    Route::post('/', [\App\Http\Controllers\NotificationController::class, 'store']);
+    Route::post('/assign', [\App\Http\Controllers\NotificationController::class, 'assign']);
 });

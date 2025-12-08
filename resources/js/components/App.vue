@@ -13,24 +13,41 @@
                 <!--begin::Start Navbar Links-->
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link" href="#" role="button" @click.stop.prevent="toggleSidebar($event)" @touchend.stop.prevent="toggleSidebar($event)" aria-label="Toggle sidebar">
-                            <svg class="menu-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                                <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="none" stroke="currentColor" stroke-width="1.8"/>
-                                <line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                <line x1="8" y1="15" x2="16" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                            </svg>
+                        <a class="nav-link toggle-btn" href="#" role="button" @click.stop.prevent="toggleSidebar($event)" @touchend.stop.prevent="toggleSidebar($event)" aria-label="Toggle sidebar">
+                            <i class="bi caret-toggle" :class="sidebarOpen ? 'bi-caret-left-fill' : 'bi-caret-right-fill'"></i>
                         </a>
                     </li>
                 </ul>
                 <!--end::Start Navbar Links-->
-                <!--begin::End Navbar Links-->
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item" v-if="isAuthed">
-                        <button @click="logout" class="btn btn-link nav-link text-danger">Logout</button>
+                        <RouterLink to="/alerts" class="nav-link position-relative" style="padding-top: 0.5rem;">
+                            <i class="bi bi-bell" style="font-size: 1.2rem;"></i>
+                            <span v-if="unreadCount > 0" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem; transform: translate(-50%, 50%) !important;">
+                                {{ unreadCount > 99 ? '99+' : unreadCount }}
+                                <span class="visually-hidden">unread messages</span>
+                            </span>
+                        </RouterLink>
+                    </li>
+                    <li class="nav-item user-menu" v-if="isAuthed">
+                        <div class="nav-link d-flex align-items-center user-toggle">
+                            <img v-if="avatarSrc" :src="avatarSrc" alt="Avatar" class="avatar-img" />
+                            <span v-else class="avatar">{{ initials }}</span>
+                            <div class="d-flex align-items-center ms-2">
+                                <div class="d-flex flex-column align-items-start">
+                                    <span class="fw-semibold name-text">{{ displayName }}</span>
+                                    <span class="role-badge mt-1">{{ displayRoleLabel }}</span>
+                                </div>
+                                <i class="bi bi-chevron-down ms-2 chevron"></i>
+                            </div>
+                        </div>
+                        <div class="user-dropdown">
+                            <RouterLink to="/profile" class="dropdown-item">Profile</RouterLink>
+                            <RouterLink v-if="roleToNumber(authState?.user?.role ?? 0) === 3" to="/settings" class="dropdown-item">Settings</RouterLink>
+                            <button class="dropdown-item text-danger" @click="logout">Logout</button>
+                        </div>
                     </li>
                 </ul>
-                <!--end::End Navbar Links-->
             </div>
             <!--end::Container-->
         </nav>
@@ -59,8 +76,8 @@
                 <nav class="mt-2">
                     <!--begin::Sidebar Menu-->
                     <ul class="nav sidebar-menu flex-column" role="navigation" aria-label="Main navigation"
-                        data-accordion="false" id="navigation">
-                        <li class="nav-item">
+                        data-lte-toggle="treeview" data-accordion="true" id="navigation">
+                        <li class="nav-item" v-if="showLiveTracking">
                             <RouterLink to="/live-tracking" class="nav-link"
                                 :class="{ active: route.name === 'live-tracking' }">
                                 <i class="nav-icon bi bi-broadcast"></i>
@@ -68,7 +85,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item d-none">
+                        <li class="nav-item" v-if="showDashboard">
                             <RouterLink to="/dashboard" class="nav-link"
                                 :class="{ active: route.name === 'dashboard' }">
                                 <i class="nav-icon bi bi-speedometer"></i>
@@ -76,7 +93,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item">
+                        <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('drivers','read')">
                             <RouterLink to="/drivers" class="nav-link"
                                 :class="{ active: route.path.startsWith('/drivers') }">
                                 <i class="nav-icon bi bi-people"></i>
@@ -84,31 +101,30 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item">
-                            <RouterLink to="/vehicles" class="nav-link"
-                                :class="{ active: route.path.startsWith('/vehicles') }">
+                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/vehicles') }" v-if="!isAdminOrDistributor && (hasPerm('vehicles','read') || hasPerm('vehicles.overview','read') || hasPerm('vehicles.maintenance','read'))">
+                            <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/vehicles') }">
                                 <i class="nav-icon bi bi-car-front"></i>
                                 <p>
                                     Vehicle Management
-                                    <i class="bi bi-chevron-right right"></i>
+                                    <i class="nav-arrow bi bi-chevron-right"></i>
                                 </p>
-                            </RouterLink>
+                            </a>
                             <ul class="nav nav-treeview">
-                                <li class="nav-item">
+                                <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('vehicles','read')">
                                     <RouterLink to="/vehicles" class="nav-link"
                                         :class="{ active: route.path === '/vehicles' }">
                                         <i class="nav-icon bi bi-list-ul"></i>
                                         <p>All Vehicles</p>
                                     </RouterLink>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('vehicles.maintenance','read')">
                                     <RouterLink to="/vehicles/maintenance" class="nav-link"
                                         :class="{ active: route.path.startsWith('/vehicles/maintenance') }">
                                         <i class="nav-icon bi bi-tools"></i>
                                         <p>Vehicle Maintenance</p>
                                     </RouterLink>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('vehicles.overview','read')">
                                     <RouterLink to="/vehicles/overview" class="nav-link"
                                         :class="{ active: route.path.startsWith('/vehicles/overview') }">
                                         <i class="nav-icon bi bi-clipboard-data"></i>
@@ -151,7 +167,7 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item" v-if="!isProd">
+                        <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('zones','read')">
                             <RouterLink to="/zones" class="nav-link" :class="{ active: route.name === 'zones' }">
                                 <i class="nav-icon bi bi-grid-3x3"></i>
                                 <p>Zone Management</p>
@@ -165,26 +181,39 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item  d-none">
+                        <li class="nav-item" v-if="isAuthed">
                             <RouterLink to="/alerts" class="nav-link" :class="{ active: route.name === 'alerts' }">
                                 <i class="nav-icon bi bi-bell"></i>
                                 <p>Alerts & Notifications</p>
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item  d-none">
-                            <RouterLink to="/settings" class="nav-link" :class="{ active: route.name === 'settings' }">
-                                <i class="nav-icon bi bi-gear"></i>
-                                <p>Settings</p>
-                            </RouterLink>
-                        </li>
 
-                        <li class="nav-item" v-if="!isProd">
-                            <RouterLink to="/users" class="nav-link"
-                                :class="{ active: route.path.startsWith('/users') }">
+
+                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/users') }" v-if="hasPerm('users','read')">
+                            <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/users') }">
                                 <i class="nav-icon bi bi-people-fill"></i>
-                                <p>User Management</p>
-                            </RouterLink>
+                                <p>
+                                    User Management
+                                    <i class="nav-arrow bi bi-chevron-right"></i>
+                                </p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item" v-if="hasPerm('users','read')">
+                                    <RouterLink to="/users" class="nav-link"
+                                        :class="{ active: route.path === '/users' }">
+                                        <i class="nav-icon bi bi-list-ul"></i>
+                                        <p>User List</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item" v-if="(roleToNumber(authState?.user?.role ?? 0) === 1 || roleToNumber(authState?.user?.role ?? 0) === 2 || roleToNumber(authState?.user?.role ?? 0) === 3) && hasPerm('users.permissions','read')">
+                                    <RouterLink to="/users/permissions" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/users/permissions') }">
+                                        <i class="nav-icon bi bi-shield-lock"></i>
+                                        <p>User Permission</p>
+                                    </RouterLink>
+                                </li>
+                            </ul>
                         </li>
                     </ul>
                     <!--end::Sidebar Menu-->
@@ -221,10 +250,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
-import { authState, clearAuthCache } from '../auth';
+import { authState, clearAuthCache, hasPermission, roleToNumber } from '../auth';
 
 // Resolve assets from Laravel backend in dev; use current origin in prod
 const assetBase = import.meta.env.DEV ? (import.meta.env.VITE_BACKEND_PROXY_TARGET || 'http://127.0.0.1:8001') : window.location.origin;
@@ -232,12 +261,203 @@ const logoSrc = assetBase + '/images/logo.png';
 
 const router = useRouter();
 const route = useRoute();
+const sidebarOpen = ref(false);
 const isProd = import.meta.env.PROD;
 const appName = document.title || 'Omayer Fleet System';
 const year = new Date().getFullYear();
+const unreadCount = ref(0);
+const myDeviceIds = ref([]);
+let echoChannel = null;
+
 const isAuthed = computed(() => !!authState.user);
+
+const fetchMyDeviceIds = async () => {
+    if (!isAuthed.value) return;
+    try {
+        const { data } = await axios.get('/web/notifications/my-device-ids');
+        myDeviceIds.value = data;
+    } catch (e) {
+        console.error('Failed to fetch device IDs', e);
+    }
+};
+
+const fetchUnreadCount = async () => {
+    if (!isAuthed.value) return;
+    try {
+        const { data } = await axios.get('/web/notifications/events');
+        if (Array.isArray(data) && data.length > 0) {
+            if (route.path === '/alerts') {
+                const latest = data[0].eventtime;
+                localStorage.setItem('lastSeenTime', latest);
+                unreadCount.value = 0;
+                return;
+            }
+
+            const lastSeen = localStorage.getItem('lastSeenTime');
+            if (!lastSeen) {
+                unreadCount.value = data.length;
+            } else {
+                const newEvents = data.filter(e => e.eventtime > lastSeen);
+                unreadCount.value = newEvents.length;
+            }
+        } else {
+             unreadCount.value = 0;
+        }
+    } catch (e) {
+        console.error('Failed to fetch unread count', e);
+    }
+};
+
+const listenForAlerts = () => {
+    if (echoChannel) return;
+    if (!window.echo) return;
+
+    echoChannel = window.echo.channel('alerts')
+        .listen('.NewAlertEvent', (payload) => {
+            console.log('New Alert Received:', payload);
+            const e = payload.event;
+            // Check if event exists and belongs to user's devices
+            if (e && e.deviceid && myDeviceIds.value.includes(e.deviceid)) {
+                if (route.path !== '/alerts') {
+                    unreadCount.value++;
+                }
+            }
+        });
+};
+
+const markAsRead = async () => {
+    if (!isAuthed.value) return;
+     try {
+        const { data } = await axios.get('/web/notifications/events');
+        if (Array.isArray(data) && data.length > 0) {
+            const latest = data[0].eventtime;
+            localStorage.setItem('lastSeenTime', latest);
+            unreadCount.value = 0;
+        }
+    } catch (e) {}
+};
+
+watch(() => route.path, (newPath) => {
+    if (newPath === '/alerts') {
+        markAsRead();
+    }
+});
+
+watch(isAuthed, (val) => {
+    if (val) {
+        fetchMyDeviceIds().then(() => {
+            fetchUnreadCount();
+            listenForAlerts();
+        });
+    } else {
+        if (echoChannel) {
+            window.echo.leave('alerts');
+            echoChannel = null;
+        }
+    }
+});
+
+onUnmounted(() => {
+    if (echoChannel) {
+        window.echo.leave('alerts');
+    }
+});
+const isAdminOrDistributor = computed(() => {
+  const rn = roleToNumber(authState?.user?.role ?? 0);
+  return rn === 3 || rn === 2;
+});
 const isGuestPage = computed(() => route.meta?.guestOnly === true);
 const pageTitle = computed(() => route.meta?.title || (route.name ? String(route.name).charAt(0).toUpperCase() + String(route.name).slice(1) : 'Dashboard'));
+const role = computed(() => authState?.user?.role ?? 0);
+const hasPerm = (key, action) => hasPermission(key, action);
+function roleLabel(r) {
+    if (typeof r === 'string') {
+        const v = r.trim().toLowerCase();
+        if (v === 'admin' || v === 'administrator') return 'admin';
+        if (v === 'distributor') return 'distributor';
+        if (v === 'manager' || v === 'fleet manager') return 'fleet manager';
+        return 'user';
+    }
+    switch (Number(r)) {
+        case 3: return 'admin';
+        case 2: return 'distributor';
+        case 1: return 'fleet manager';
+        default: return 'user';
+    }
+}
+const displayRoleLabel = computed(() => {
+    const u = authState?.user || {};
+    const lbl = u.role_label;
+    return typeof lbl === 'string' && lbl.trim() ? lbl : roleLabel(role.value);
+});
+const displayName = computed(() => authState.user?.name || 'Profile');
+const initials = computed(() => {
+    const n = String(displayName.value || '').trim();
+    const first = n ? n[0] : '?';
+    return String(first).toUpperCase();
+});
+// Ensure sidebar items render only after auth has been fetched
+const showLiveTracking = computed(() => authState.fetched && (roleToNumber(authState?.user?.role ?? 0) === 0 || roleToNumber(authState?.user?.role ?? 0) === 1));
+const showDashboard = computed(() => authState.fetched && (roleToNumber(authState?.user?.role ?? 0) === 3 || roleToNumber(authState?.user?.role ?? 0) === 2));
+const avatarSrc = computed(() => {
+    const u = authState.user || {};
+    const src = u.avatar_url || u.avatar || '';
+    if (src && /^https?:\/\//i.test(src)) return src;
+    if (src) return src;
+    return '';
+});
+
+// Ensure AdminLTE Treeview binds after Vue renders the sidebar (post-login)
+function initTreeview() {
+    const toggles = document.querySelectorAll('[data-lte-toggle="treeview"]');
+    const Treeview = window?.adminlte?.Treeview;
+    if (!toggles.length || !Treeview) return;
+    toggles.forEach((toggle) => {
+        // Avoid duplicate bindings across route changes
+        if (toggle.dataset.treeviewBound === '1') return;
+        toggle.addEventListener('click', (event) => {
+            const target = event.target;
+            const targetItem = target.closest('.nav-item');
+            const targetLink = target.closest('.nav-link');
+            if (target?.getAttribute('href') === '#' || targetLink?.getAttribute('href') === '#') {
+                event.preventDefault();
+            }
+            if (targetItem) {
+                const accordionAttr = toggle.dataset.accordion;
+                const animationSpeedAttr = toggle.dataset.animationSpeed;
+                const config = {
+                    accordion: accordionAttr === undefined ? true : accordionAttr === 'true',
+                    animationSpeed: animationSpeedAttr === undefined ? 300 : Number(animationSpeedAttr),
+                };
+                const tv = new Treeview(targetItem, config);
+                tv.toggle();
+            }
+        });
+        toggle.dataset.treeviewBound = '1';
+    });
+}
+
+onMounted(async () => {
+    if (isAuthed.value) {
+        await fetchMyDeviceIds();
+        fetchUnreadCount();
+        listenForAlerts();
+    }
+    if (!isGuestPage.value) {
+        await nextTick();
+        initTreeview();
+    }
+    const p = route.path || '';
+});
+
+watch(() => isGuestPage.value, async (isGuest) => {
+    if (!isGuest) {
+        await nextTick();
+        initTreeview();
+    }
+});
+
+// No manual menu-open manipulation; AdminLTE handles accordion via data attributes
 
 async function logout() {
     try {
@@ -250,28 +470,33 @@ async function logout() {
 }
 
 function closeSidebar() {
-    const body = document.body;
-    if (body.classList.contains('sidebar-open')) {
+    try {
+        const body = document.body;
         body.classList.remove('sidebar-open');
         body.classList.add('sidebar-collapse');
-    }
+        sidebarOpen.value = false;
+    } catch {}
 }
 
 let lastToggleTs = 0;
 function toggleSidebar(ev) {
     const now = Date.now();
-    // Dedup rapid click+touch sequences on mobile
     if (now - lastToggleTs < 300) return;
     lastToggleTs = now;
-
-    const body = document.body;
-    const isOpen = body.classList.contains('sidebar-open');
-    if (isOpen) {
-        body.classList.remove('sidebar-open');
-        body.classList.add('sidebar-collapse');
-    } else {
-        body.classList.add('sidebar-open');
-        body.classList.remove('sidebar-collapse');
+    try {
+        const body = document.body;
+        const isOpen = body.classList.contains('sidebar-open');
+        if (isOpen) {
+            body.classList.remove('sidebar-open');
+            body.classList.add('sidebar-collapse');
+            sidebarOpen.value = false;
+        } else {
+            body.classList.add('sidebar-open');
+            body.classList.remove('sidebar-collapse');
+            sidebarOpen.value = true;
+        }
+    } catch {
+        sidebarOpen.value = !sidebarOpen.value;
     }
 }
 </script>
@@ -341,10 +566,10 @@ nav a.router-link-exact-active {
         height: 28px;
     }
 }
-.app-header .nav-link .menu-icon {
-    display: inline-block;
-    color: #4a4a4a; /* dark grey close to screenshot */
-}
+.app-header .nav-link .caret-toggle { display: inline-block; color: #4a4a4a; font-size: 22px; }
+.app-header { position: relative; padding-left: 0 !important; }
+.app-header .container-fluid { padding-left: 0 !important; }
+.app-header .toggle-btn { position: absolute; left: 0; top: 50%; transform: translateY(-50%); padding: 0; z-index: 1051; display: flex; align-items: center; }
 
 /* Improve tap target spacing on mobile */
 @media (max-width: 576px) {
@@ -356,4 +581,14 @@ nav a.router-link-exact-active {
         height: 28px;
     }
 }
+.user-menu { position: relative; }
+.user-dropdown { position: absolute; right: 0; top: 100%; min-width: 160px; background: #fff; border: 1px solid #e5e7eb; box-shadow: 0 8px 24px rgba(0,0,0,0.12); display: none; z-index: 1050; border-radius: 6px; }
+.user-menu:hover .user-dropdown { display: block; }
+.user-dropdown .dropdown-item { display: block; padding: 8px 12px; color: #333; text-decoration: none; background: transparent; width: 100%; text-align: left; border: none; }
+.user-dropdown .dropdown-item:hover { background: #f7f7f7; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; background: #e9ecef; color: #343a40; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; }
+.avatar-img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
+.name-text { color: #0b0f28; }
+.chevron { color: #0b0f28; font-size: 18px; }
+.role-badge { font-size: 10px; line-height: 1; color: #6b7280; border: 1px solid #e5e7eb; border-radius: 999px; padding: 1px 6px; text-transform: capitalize; }
 </style>

@@ -1,13 +1,28 @@
 import axios from 'axios';
 import { reactive } from 'vue';
 
-export const authState = reactive({ user: null, fetched: false });
+export const authState = reactive({ user: null, permissions: {}, fetched: false });
+
+export function roleToNumber(r) {
+  if (typeof r === 'string') {
+    const v = r.trim().toLowerCase();
+    if (v === 'superadmin' || v === 'super admin' || v === 'super-admin') return 3;
+    if (v === 'admin' || v === 'administrator') return 3;
+    if (v === 'distributor') return 2;
+    if (v === 'manager' || v === 'fleet manager') return 1;
+    return 0;
+  }
+  const n = Number(r ?? 0);
+  return Number.isNaN(n) ? 0 : n;
+}
 
 export async function getCurrentUser() {
   if (authState.fetched) return authState.user;
   try {
     const { data } = await axios.get('/web/auth/me');
     authState.user = data?.user ?? null;
+    if (authState.user) authState.user.role = roleToNumber(authState.user.role);
+    authState.permissions = data?.permissions ?? {};
   } catch (e) {
     authState.user = null;
   } finally {
@@ -28,7 +43,25 @@ export function clearAuthCache() {
 
 export function setAuthenticatedUser(user) {
   authState.user = user ?? null;
+  if (authState.user) authState.user.role = roleToNumber(authState.user.role);
   authState.fetched = true;
+}
+
+export function hasPermission(moduleKey, action) {
+  const perms = authState.permissions || {};
+  const mod = perms[moduleKey] || {};
+  const role = roleToNumber(authState?.user?.role ?? 0);
+  if (role === 3 || role === 2) {
+    return true;
+  }
+  if (!action) return !!mod.read;
+  switch (action) {
+    case 'read': return !!mod.read;
+    case 'create': return !!mod.create;
+    case 'update': return !!mod.update;
+    case 'delete': return !!mod.delete;
+    default: return false;
+  }
 }
 
 // Refresh CSRF cookie and header after auth changes to prevent first POST mismatch

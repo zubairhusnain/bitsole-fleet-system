@@ -89,6 +89,14 @@
             <l-marker v-for="(p,i) in rectanglePoints" :key="'rect-'+i" :lat-lng="p" :draggable="true" @dragend="onDrawMarkerDragEnd('rectangle', i, $event)" />
             <l-marker v-if="searchMarkerLatLng" :lat-lng="searchMarkerLatLng" :draggable="true" @dragend="onSearchMarkerDragEnd" />
           </l-map>
+          <!-- Map tools: Reset shape and center to current location -->
+          <div class="map-tools">
+            <div class="btn-group btn-group-sm" role="group">
+              <button type="button" class="btn btn-light" @click="resetWholeMap">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
+              </button>
+            </div>
+          </div>
           <!-- map-controls removed
             <div class="btn-group btn-group-sm" role="group" aria-label="Basemap">
               <button type="button" class="btn btn-light" :class="{active: basemap === 'map'}" @click="basemap = 'map'">Map</button>
@@ -118,7 +126,7 @@
       </div>
     </div>
   </div>
-  
+
 </template>
 
 <script setup>
@@ -185,6 +193,8 @@ const rectanglePoints = ref([]); // two opposite corners
 const drawing = ref(false);
 const searchQuery = ref('');
 const searchMarkerLatLng = ref(null);
+// Keep a snapshot of initial geometry to restore on reset
+const initialShape = ref({ type: null, polygon: [], circle: null, radius: null });
 
 // Sync form fields into geofenceInfo
 watch(() => form.name, (v) => { geofenceInfo.name = String(v || '').trim(); });
@@ -286,6 +296,16 @@ function drawDemo() {
 onMounted(() => {
   // Pre-render demo polygon so the map doesn’t look empty
   drawDemo();
+  // Capture initial shape after demo draw
+  try {
+    if (polygonPoints.value.length >= 3) {
+      initialShape.value = { type: 'polygon', polygon: [...polygonPoints.value] };
+    } else if (Array.isArray(circleCenter.value) && circleCenter.value.length === 2) {
+      initialShape.value = { type: 'circle', circle: [...circleCenter.value], radius: typeof form.radius === 'number' ? form.radius : 1000 };
+    } else {
+      initialShape.value = { type: form.type || 'polygon', polygon: [...polygonPoints.value] };
+    }
+  } catch {}
   try {
     const uid = localStorage.getItem('APP_USER_ID');
     if (uid) geofenceInfo.user_id = uid;
@@ -715,6 +735,81 @@ function clearGeomanLayers() {
   } catch {}
 }
 
+function fitMapToCurrentShape() {
+  const map = mapRef.value;
+  try {
+    if (!map) return;
+    if (Array.isArray(polygonPoints.value) && polygonPoints.value.length) {
+      const bounds = L.latLngBounds(polygonPoints.value.map(p => L.latLng(p[0], p[1])));
+      map.fitBounds(bounds, { padding: [24, 24] });
+      return;
+    }
+    if (Array.isArray(rectanglePoints.value) && rectanglePoints.value.length === 2) {
+      const [p1, p2] = rectanglePoints.value;
+      const minLat = Math.min(p1[0], p2[0]);
+      const maxLat = Math.max(p1[0], p2[0]);
+      const minLng = Math.min(p1[1], p2[1]);
+      const maxLng = Math.max(p1[1], p2[1]);
+      const bounds = L.latLngBounds(L.latLng(minLat, minLng), L.latLng(maxLat, maxLng));
+      map.fitBounds(bounds, { padding: [24, 24] });
+      return;
+    }
+    if (Array.isArray(circleCenter.value) && circleCenter.value.length === 2) {
+      map.setView(L.latLng(circleCenter.value[0], circleCenter.value[1]), Math.max(13, map.getZoom()));
+      return;
+    }
+    if (Array.isArray(center.value)) {
+      map.setView(L.latLng(center.value[0], center.value[1]), Math.max(13, map.getZoom()));
+    }
+  } catch {}
+}
+
+function centerToCurrentLocation() {
+  const map = mapRef.value;
+  return new Promise((resolve) => {
+    try {
+      if (navigator?.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            center.value = [lat, lon];
+            searchMarkerLatLng.value = [lat, lon];
+            if (form.type === 'circle') {
+              circleCenter.value = [lat, lon];
+              form.coordinates = `${lat},${lon}`;
+              form.radius = typeof form.radius === 'number' ? form.radius : (initialShape.value.radius || 1000);
+            }
+            try { map && map.setView([lat, lon], Math.max(13, map.getZoom())); } catch {}
+            resolve();
+          },
+          () => { resolve(); }
+        );
+      } else {
+        resolve();
+      }
+    } catch { resolve(); }
+  });
+}
+
+async function resetWholeMap() {
+  try {
+    // Clear all shapes and geoman layers, reset geofence info
+    clearShapes();
+    updateGeomanControls();
+    drawing.value = form.type !== 'circle';
+    searchMarkerLatLng.value = null;
+    geofenceInfo.coordinates = [];
+    geofenceInfo.lat = null;
+    geofenceInfo.lng = null;
+    // Refresh map rendering
+    mapKey.value++;
+    const m = mapRef.value; try { m && m.invalidateSize(true); } catch {}
+    // Center to current device location if available
+    await centerToCurrentLocation();
+  } catch {}
+}
+
 watch(() => form.type, () => {
   // When switching type, clear shapes and auto-enter drawing mode for polygon/rectangle
   clearShapes();
@@ -841,6 +936,7 @@ async function submit() {
 <style scoped>
 .map-frame { position: relative; height: 380px; border-radius: 12px; overflow: hidden; }
 #zoneAddMap { height: 100%; width: 100%; }
+.map-tools { position: absolute; top: 8px; right: 8px; z-index: 1000; }
 .map-controls { position: absolute; left: 8px; bottom: 8px; display: flex; align-items: center; }
 .map-controls { z-index: 1000; }
 .map-controls .btn-group .btn { background: #fff; border-color: #ddd; }

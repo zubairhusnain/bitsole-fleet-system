@@ -29,9 +29,7 @@
               <label class="form-label small">Tracker Model</label>
               <select v-model="form.attributes.trackerModel" class="form-select">
                 <option value="">-- Select Tracker Model --</option>
-                <option>Teltonika-FMC-003</option>
-                <option>Teltonika-FMC-150</option>
-                <option>Teltonika-FMC-130</option>
+                <option v-for="opt in trackerModels" :key="opt" :value="opt">{{ opt }}</option>
               </select>
             </div>
             <div class="col-12 col-md-4">
@@ -137,7 +135,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onBeforeUnmount } from 'vue';
+import { reactive, ref, onBeforeUnmount, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
@@ -171,6 +169,7 @@ const message = ref('');
 const error = ref('');
 const submitting = ref(false);
 const MAX_IMAGE_SIZE_MB = 16;
+const trackerModels = ref(['Teltonika-FMC-003','Teltonika-FMC-150','Teltonika-FMC-130']);
 
 function dismissError() { error.value = ''; }
 function dismissMessage() { message.value = ''; }
@@ -202,6 +201,24 @@ function removeFile(i) {
 
 onBeforeUnmount(() => {
   previews.value.forEach((url) => url && URL.revokeObjectURL(url));
+});
+
+onMounted(async () => {
+  try {
+    const { data } = await axios.get('/web/vehicles/models/options');
+    const opts = Array.isArray(data?.options) ? data.options : [];
+    console.log('model opts ',opts);
+    if (opts.length > 0) trackerModels.value = opts;
+  } catch {}
+  // Fallback: if still static and admin list is available
+  if (trackerModels.value && trackerModels.value.length && trackerModels.value[0].includes('Teltonika-')) {
+    try {
+      const { data } = await axios.get('/web/settings/vehicle-models');
+      const rows = Array.isArray(data?.models) ? data.models : [];
+      const names = rows.map(r => r.modelname).filter(Boolean);
+      if (names.length > 0) trackerModels.value = names;
+    } catch {}
+  }
 });
 
 async function submit() {

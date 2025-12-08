@@ -5,11 +5,11 @@
       <ol class="breadcrumb mb-0 small text-muted">
         <li class="breadcrumb-item"><RouterLink to="/">Dashboard</RouterLink></li>
         <li class="breadcrumb-item"><RouterLink to="/users">User Management</RouterLink></li>
-        <li class="breadcrumb-item active" aria-current="page">Edit User</li>
+        <li class="breadcrumb-item active" aria-current="page">Edit {{ displayRoleLabel }}</li>
       </ol>
     </div>
 
-    <h4 class="mb-3 fw-semibold">Edit User</h4>
+    <h4 class="mb-3 fw-semibold">Edit {{ displayRoleLabel }}</h4>
 
     <!-- Status Messages -->
     <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="error = ''" />
@@ -66,7 +66,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue';
+import { reactive, ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
@@ -83,6 +83,8 @@ const form = reactive({
   phone: "",
   password: "",
   password_confirmation: "",
+  role: 0,
+  role_label: "",
 });
 
 const message = ref('');
@@ -91,6 +93,20 @@ const loading = ref(false);
 const submitting = ref(false);
 
 // Role/distributor options removed; roles are not editable here
+
+function roleLabel(role) {
+  switch (Number(role)) {
+    case 3: return 'admin';
+    case 2: return 'distributor';
+    case 1: return 'fleet manager';
+    default: return 'user';
+  }
+}
+
+const displayRoleLabel = computed(() => {
+  const lbl = String(form.role_label || '').trim();
+  return lbl ? lbl : roleLabel(form.role);
+});
 
 async function fetchUser() {
   loading.value = true;
@@ -104,6 +120,8 @@ async function fetchUser() {
     form.lastName = lastName || '';
     form.email = data?.email || '';
     form.phone = data?.phone || '';
+    form.role = Number(data?.role ?? 0);
+    form.role_label = String(data?.role_label || '');
   } catch (e) {
     const msg = e?.response?.data?.message || 'Failed to load user';
     error.value = msg;

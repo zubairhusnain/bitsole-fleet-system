@@ -5,6 +5,9 @@
         <div class="col-12 col-md-10 col-lg-7 d-flex justify-content-center">
           <div class="auth-card card w-100" style="max-width: 560px;">
             <div class="card-body">
+              <div v-if="submitting" class="loading-overlay">
+                <div class="spinner-border" role="status"><span class="visually-hidden">Processing…</span></div>
+              </div>
               <div class="text-center mb-3">
                 <img :src="logoSrc" alt="Logo" class="auth-logo" />
               </div>
@@ -15,35 +18,41 @@
                 <div class="row g-3">
                   <div class="col-12 col-md-6">
                     <label class="form-label">First Name</label>
-                    <input v-model="form.firstName" type="text" class="form-control" placeholder="First Name" required />
+                    <input v-model="form.firstName" type="text" class="form-control" placeholder="First Name" required :disabled="submitting" />
                   </div>
                   <div class="col-12 col-md-6">
                     <label class="form-label">Last Name</label>
-                    <input v-model="form.lastName" type="text" class="form-control" placeholder="Last Name" required />
+                    <input v-model="form.lastName" type="text" class="form-control" placeholder="Last Name" required :disabled="submitting" />
                   </div>
                   <div class="col-12 col-md-6">
                     <label class="form-label">Email Address</label>
-                    <input v-model="form.email" type="email" class="form-control" placeholder="Email Address" required />
+                    <input v-model="form.email" type="email" class="form-control" placeholder="Email Address" required :disabled="submitting" />
                   </div>
                   <div class="col-12 col-md-6">
                     <label class="form-label">Phone Number</label>
-                    <input v-model="form.phone" type="tel" class="form-control" placeholder="Phone Number" />
+                    <input v-model="form.phone" type="tel" class="form-control" placeholder="Phone Number" :disabled="submitting" />
                   </div>
                   <div class="col-12">
                     <label class="form-label">Password</label>
-                    <input v-model="form.password" type="password" class="form-control" placeholder="Password" required />
+                    <input v-model="form.password" type="password" class="form-control" placeholder="Password" required :disabled="submitting" />
                   </div>
                   <div class="col-12">
                     <label class="form-label">Confirm Password</label>
-                    <input v-model="form.password_confirmation" type="password" class="form-control" placeholder="Confirm Password" required />
+                    <input v-model="form.password_confirmation" type="password" class="form-control" placeholder="Confirm Password" required :disabled="submitting" />
                   </div>
                 </div>
                 <div class="form-check mt-3 mb-3">
-                  <input class="form-check-input" type="checkbox" id="agree" required />
+                  <input class="form-check-input" type="checkbox" id="agree" required :disabled="submitting" />
                   <label class="form-check-label text-muted" for="agree">By clicking, you agree with Terms &amp; Conditions.</label>
                 </div>
                 <div class="d-grid gap-2">
-                  <button type="submit" class="btn btn-primary">Register</button>
+                  <button type="submit" class="btn btn-primary" :disabled="submitting">
+                    <span v-if="submitting" class="d-inline-flex align-items-center">
+                      <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Registering…
+                    </span>
+                    <span v-else>Register</span>
+                  </button>
                 </div>
               </form>
               <div class="mt-3 text-center auth-footer">
@@ -72,10 +81,12 @@ const logoSrc = assetBase + '/images/login-page-logo.png';
 const router = useRouter();
 const appName = document.title || 'Omayer Fleet System';
 const error = ref('');
+const submitting = ref(false);
 const form = reactive({ firstName: '', lastName: '', email: '', phone: '', password: '', password_confirmation: '' });
 
 async function submit() {
   error.value = '';
+  submitting.value = true;
   const payload = { name: `${form.firstName} ${form.lastName}`.trim(), email: form.email, password: form.password, password_confirmation: form.password_confirmation };
   try {
     const { data } = await axios.post('/web/auth/register', payload);
@@ -85,6 +96,8 @@ async function submit() {
     router.push('/');
   } catch (e) {
     error.value = e?.response?.data?.message || 'Registration failed';
+  } finally {
+    submitting.value = false;
   }
 }
 </script>
@@ -92,4 +105,6 @@ async function submit() {
 <style scoped>
 .auth-card { max-width: 560px; }
 .auth-logo { display: block; margin: 0 auto; height: 32px; }
+.auth-card { position: relative; }
+.loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 1050; }
 </style>

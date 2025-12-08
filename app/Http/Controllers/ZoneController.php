@@ -32,8 +32,7 @@ class ZoneController extends Controller
             $query->where('user_id', $user->id);
         } else {
             if ($role === User::ROLE_DISTRIBUTOR) {
-                $query->where('user_id', $user->id)
-                      ->where('distributor_id', $user->id);
+                $query->where('distributor_id', $user->id);
             } elseif ($role !== User::ROLE_ADMIN) {
                 $distId = $user->distributor_id ?? $user->id;
                 $query->where('distributor_id', $distId)
@@ -336,7 +335,7 @@ class ZoneController extends Controller
         $query = Zones::withTrashed()->where('geofence_id', $zoneParam);
         if (!$query->count()) { $query = Zones::withTrashed()->where('id', $zoneParam); }
         if ($role === User::ROLE_DISTRIBUTOR) {
-            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
+            $query->where('distributor_id', $user->id);
         } elseif ($role !== User::ROLE_ADMIN) {
             $distId = $user->distributor_id ?? $user->id;
             $query->where('distributor_id', $distId)->where('user_id', $user->id);

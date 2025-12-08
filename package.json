@@ -23,6 +23,7 @@
         "laravel-echo": "^2.2.4",
         "leaflet": "^1.9.4",
         "leaflet-geosearch": "^4.2.2",
+        "leaflet-routing-machine": "^3.2.12",
         "pusher-js": "^8.4.0",
         "sweetalert2": "^11.26.2",
         "vue-leaflet": "^0.1.0"

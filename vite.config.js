@@ -12,6 +12,9 @@ export default defineConfig({
         vue(),
         tailwindcss(),
     ],
+    build: {
+        emptyOutDir: true,
+    },
     // Dev proxy forwards app routes to Laravel backend. Target can be overridden via VITE_BACKEND_PROXY_TARGET
     server: {
         proxy: {

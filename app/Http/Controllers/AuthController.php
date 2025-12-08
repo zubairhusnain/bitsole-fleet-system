@@ -80,12 +80,46 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
+        // Seed session with user permission keys to avoid per-request DB lookups
+        try {
+            $u = Auth::user();
+            if ($u) {
+                $keys = \App\Models\UserPermission::query()
+                    ->where('user_id', $u->id)
+                    ->pluck('module_key')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+                session(['user_module_keys' => $keys]);
+            }
+        } catch (\Throwable $e) { /* ignore session seed errors */ }
+
         return response()->json(['user' => Auth::user()]);
     }
 
     public function me(Request $request)
     {
-        return response()->json(['user' => $request->user()]);
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['user' => null, 'permissions' => []]);
+        }
+        // Ensure session holds module keys for middleware performance
+        try {
+            if (!session()->has('user_module_keys')) {
+                $keys = \App\Models\UserPermission::query()
+                    ->where('user_id', $user->id)
+                    ->pluck('module_key')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+                session(['user_module_keys' => $keys]);
+            }
+        } catch (\Throwable $e) { /* ignore seeding errors */ }
+        $modules = array_keys(\App\Http\Middleware\ModulePermission::modules());
+        $perms = \App\Support\Permissions::effectiveMap($user, $modules);
+        return response()->json(['user' => $user, 'permissions' => $perms]);
     }
 
     public function logout(Request $request)
@@ -93,6 +127,7 @@ class AuthController extends Controller
         Auth::guard()->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+        try { session()->forget('user_module_keys'); } catch (\Throwable $e) {}
         return response()->json(['status' => 'logged_out']);
     }
 

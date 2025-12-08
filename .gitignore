@@ -28,7 +28,7 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 \n# Trae/Traccar analysis and generated data (do not commit)
-devices_all.json
+device_*.json
 device_ids.txt
 positions_*.json
 positions_index.json
@@ -37,3 +37,4 @@ positions_report.csv
 fuel_candidates_top.txt
 odometer_keys_top.txt
 cookies*.txt
+readme.txt
