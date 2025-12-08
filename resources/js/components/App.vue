@@ -320,25 +320,9 @@ const listenForAlerts = () => {
     echoChannel = window.echo.private(currentChannelName)
         .listen('.NewAlertEvent', (payload) => {
             console.log('New Alert Received:', payload);
-            const e = payload.event;
-            // Check if event exists and belongs to user's devices
-            if (e && e.deviceid) {
-                // Robust ID checking (handle string/number mismatch)
-                const eventDevId = Number(e.deviceid);
-                const userDevIds = myDeviceIds.value.map(id => Number(id));
-
-                console.log(`Checking alert devId: ${eventDevId} against myDeviceIds:`, userDevIds);
-
-                // Note: Server-side filtering via private channel ensures we only get relevant alerts,
-                // but client-side check provides double safety.
-                if (userDevIds.includes(eventDevId)) {
-                    if (route.path !== '/alerts') {
-                        unreadCount.value++;
-                        console.log('Unread count incremented');
-                    }
-                } else {
-                    console.log('Alert ignored: Device ID not in user list');
-                }
+            // Refresh unread count from server to ensure accuracy
+            if (route.path !== '/alerts') {
+                fetchUnreadCount();
             }
         });
 };

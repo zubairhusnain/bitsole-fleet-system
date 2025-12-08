@@ -1,37 +1,91 @@
-# Live Server Setup Instructions
+# Live Server Setup Instructions for Alerts & WebSockets
 
-To ensure real-time alerts work on your live server, you need to run two background processes:
-1. `reverb:start` - The WebSocket server.
-2. `alerts:poll` - The database polling service.
+To ensure real-time alerts and websocket notifications work reliably on your live server, you must run background processes using `systemd`.
 
-## Step 1: Install Systemd Services
+## Services Overview
 
-1.  **Edit the service files:**
-    Open `setup/reverb.service` and `setup/alerts-poll.service` and ensure the `WorkingDirectory` matches your live server path (e.g., `/var/www/test.softdares.com/html/backend`).
+We have prepared two service files in this directory:
+1.  **`reverb.service`**: Runs the WebSocket server (`php artisan reverb:start`).
+2.  **`alerts-poll.service`**: Runs the alert polling script (`php artisan alerts:poll`).
 
-2.  **Copy to systemd:**
-    ```bash
-    sudo cp setup/reverb.service /etc/systemd/system/
-    sudo cp setup/alerts-poll.service /etc/systemd/system/
-    ```
+---
 
-3.  **Reload and Start:**
-    ```bash
-    sudo systemctl daemon-reload
-    sudo systemctl enable --now reverb
-    sudo systemctl enable --now alerts-poll
-    ```
+## Installation Steps
 
-## Step 2: Verify Status
+### 1. Verify Paths
+Open `setup/reverb.service` and `setup/alerts-poll.service`.
+Ensure the `WorkingDirectory` matches your actual project path on the server.
+*   Default: `/var/www/test.softdares.com/html/backend`
+*   If your project is elsewhere, update this line in both files.
 
-Check if they are running:
+### 2. Copy Service Files
+Run these commands from your project root (e.g., inside `backend/`):
+
+```bash
+sudo cp setup/reverb.service /etc/systemd/system/
+sudo cp setup/alerts-poll.service /etc/systemd/system/
+```
+
+**Why?**
+This installs the service definitions into Linux's system manager, allowing the OS to manage these processes.
+
+### 3. Register Services
+Tell systemd to read the new files:
+
+```bash
+sudo systemctl daemon-reload
+```
+
+**Why?**
+Systemd needs to refresh its configuration to "see" the new files you just copied.
+
+### 4. Enable Automatic Start
+Enable the services so they start automatically if the server reboots:
+
+```bash
+sudo systemctl enable reverb alerts-poll
+```
+
+**Why?**
+Ensures your alerts don't stop working after a server restart or power outage.
+
+### 5. Start Services
+Start them immediately:
+
+```bash
+sudo systemctl start reverb alerts-poll
+```
+
+**Why?**
+Starts the processes right now without waiting for a reboot.
+
+---
+
+## Verification & Troubleshooting
+
+### Check Status
+Check if the services are active and running:
+
 ```bash
 sudo systemctl status reverb
 sudo systemctl status alerts-poll
 ```
+You should see **`Active: active (running)`** in green.
 
-If `reverb` is failing, check if port 8000 is free.
-If `alerts-poll` is failing, check the logs:
+### View Logs
+If something isn't working, check the live logs:
+
 ```bash
+# Check alert polling logs
 journalctl -u alerts-poll -f
+
+# Check websocket server logs
+journalctl -u reverb -f
+```
+
+### Restarting After Code Changes
+If you modify the PHP code for alerts or events, you should restart the services to pick up changes:
+
+```bash
+sudo systemctl restart reverb alerts-poll
 ```
