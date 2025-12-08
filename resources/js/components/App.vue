@@ -167,7 +167,7 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('zones','read')">
+                        <li class="nav-item " v-if="!isAdminOrDistributor && hasPerm('zones','read')">
                             <RouterLink to="/zones" class="nav-link" :class="{ active: route.name === 'zones' }">
                                 <i class="nav-icon bi bi-grid-3x3"></i>
                                 <p>Zone Management</p>

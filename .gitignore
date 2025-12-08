@@ -23,7 +23,7 @@
 /vendor
 
 # Ignore environment-specific constants file
-/config/constants.php
+config/constants.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
