@@ -37,7 +37,7 @@ class PollAlertsCommand extends Command
         // In production, using Cache ensures we don't miss alerts during restarts.
         $dbMaxId = DB::connection('pgsql')->table('tc_events')->max('id') ?? 0;
         $lastId = Cache::get('alerts_poll_last_id', $dbMaxId);
-        
+
         // Safety check: If cache is too old (e.g., > 1000 events behind), skip to current to avoid massive flood
         if ($dbMaxId - $lastId > 1000) {
             $this->warn("Last ID {$lastId} is too far behind DB Max {$dbMaxId}. Skipping to DB Max to avoid flood.");
@@ -57,9 +57,9 @@ class PollAlertsCommand extends Command
                              ->on('n.id', '=', 'dn.notificationid');
                     })
                     ->select(
-                        'e.*', 
-                        'n.attributes as notification_attributes', 
-                        'n.type as notification_type', 
+                        'e.*',
+                        'n.attributes as notification_attributes',
+                        'n.type as notification_type',
                         'd.name as device_name'
                     )
                     ->where('e.id', '>', $lastId)
@@ -75,10 +75,10 @@ class PollAlertsCommand extends Command
                 if ($newEvents->isNotEmpty()) {
                     foreach ($newEvents as $event) {
                         $this->info("Broadcasting event ID: {$event->id} - Type: {$event->type}");
-                        
+
                         // Broadcast the event
                         broadcast(new NewAlertEvent($event));
-                        
+
                         // Update lastId
                         $lastId = $event->id;
                         Cache::put('alerts_poll_last_id', $lastId, now()->addDay());
@@ -86,10 +86,16 @@ class PollAlertsCommand extends Command
                 }
 
                 // Sleep to prevent high CPU usage
-                sleep(2); 
+                sleep(2);
 
             } catch (\Exception $e) {
-                $this->error("Error polling alerts: " . $e->getMessage());
+                $msg = $e->getMessage();
+                if (str_contains($msg, 'cURL error 7') || str_contains($msg, 'Connection refused')) {
+                    $this->error("Error: Cannot connect to Reverb server. Is it running?");
+                    $this->error("Run: php artisan reverb:start");
+                } else {
+                    $this->error("Error polling alerts: " . $msg);
+                }
                 sleep(5); // Sleep longer on error
             }
         }
