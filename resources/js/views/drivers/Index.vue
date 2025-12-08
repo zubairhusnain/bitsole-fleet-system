@@ -116,6 +116,7 @@ import DriverDetailModal from '../../components/DriverDetailModal.vue';
 import Swal from 'sweetalert2';
 import { useRouter } from 'vue-router';
 import { hasPermission as _hasPermission } from '../../auth';
+import { formatDateTime, formatDate } from '../../utils/datetime';
 
 const router = useRouter();
 const isProd = import.meta.env.PROD;
@@ -147,10 +148,10 @@ function formatDriver(d) {
     email: attrs?.email || '-',
     phone: attrs?.phone || '-',
     licence: attrs?.licence || attrs?.license || '-',
-    expiry: attrs?.licenseExpiry || '-',
+    expiry: attrs?.licenseExpiry ? formatDate(attrs.licenseExpiry) : '-',
     vehicle: d?.deviceName || d?.deviceUniqueId || attrs?.assignedVehicle || '-',
     status: (status =="online") ? status :"offline",
-    lastRide: attrs?.lastRide || '-',
+    lastRide: attrs?.lastRide ? formatDateTime(attrs.lastRide) : '-',
     avatarUrl: d?.avatarImageUrl || (attrs?.avatarImage ? `/storage/${attrs.avatarImage}` : ''),
     blocked: !!(d?.blocked || d?.deletedAt),
   };

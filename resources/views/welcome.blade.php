@@ -8,6 +8,11 @@
 
     <!-- CSRF for SPA requests -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script>
+      window.AppConfig = {
+        timezone: "{{ config('app.timezone') }}",
+      };
+    </script>
 
     <!-- Head styles aligned with AdminLTE samples -->
     <meta name="supported-color-schemes" content="light dark" />

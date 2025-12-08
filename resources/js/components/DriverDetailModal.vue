@@ -33,7 +33,7 @@
                       </div>
                       <div class="text-muted xsmall d-flex gap-3 flex-wrap">
                         <span>ID: {{ driverCode || '—' }}</span>
-                        <span v-if="memberSince">Member Since: {{ memberSince }}</span>
+                        <span v-if="memberSince">Member Since: {{ $formatDate(memberSince) }}</span>
                       </div>
                     </div>
                   </div>
@@ -69,7 +69,7 @@
                       </div>
                       <div class="row g-2 align-items-start">
                         <dt class="col-5 text-muted xsmall text-nowrap">Expiry Date</dt>
-                        <dd class="col-7 small mb-0">{{ attrs.licenseExpiry || '—' }}</dd>
+                        <dd class="col-7 small mb-0">{{ attrs.licenseExpiry ? $formatDate(attrs.licenseExpiry) : '—' }}</dd>
                       </div>
                     </dl>
                   </div>
@@ -249,7 +249,7 @@
                     </div>
                     <div class="row g-2 align-items-center">
                       <dt class="col-4 text-muted xsmall">Last Report</dt>
-                      <dd class="col-8 small mb-0">{{ tracking.lastReport || '—' }}</dd>
+                      <dd class="col-8 small mb-0">{{ tracking.lastReport ? $formatDateTime(tracking.lastReport) : '—' }}</dd>
                     </div>
                   </dl>
                   <div class="d-flex align-items-center gap-3 mt-2 xsmall">
@@ -270,6 +270,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { formatTelemetry } from '../utils/telemetry';
+import { formatDate, formatDateTime } from '../utils/datetime';
 import axios from 'axios';
 import { RouterLink } from 'vue-router';
 
@@ -297,7 +298,7 @@ const staticDriver = {
     address: '4545 118th Ave N, Clearwater, Florida USA',
     idCard: 'USA-ID-A84917-TR55',
     licence: 'D248-1982-6794',
-    licenseExpiry: 'July 15, 2035',
+    licenseExpiry: '2035-07-15',
     idlingHours: 56,
     harshDriveEvents: 120,
     overspeedEvents: 400,
@@ -307,7 +308,7 @@ const staticDriver = {
     drivingDurationText: '124 hours 56 minutes',
     trackDistanceKm: 12000,
     overallRating: 82.4,
-    memberSince: 'July 2020',
+    memberSince: '2020-07-01',
     assignedVehicle: 'Toyota Camry SE',
   },
   deviceName: 'Lightning Racer',
@@ -319,7 +320,7 @@ const staticDriver = {
 const staticVehicle = {
   name: 'Lightning Racer',
   uniqueId: 'W125-9873-1402',
-  cardChipDate: 'Mar 19, 2026',
+  cardChipDate: '2026-03-19',
   model: 'Camry SE',
   plate: 'TXR-9283d',
   vin: 'WAUYGAF6CN174200',
@@ -336,7 +337,7 @@ const staticVehicle = {
       attributes: { ignition: 'off' },
       address: 'PLUS KM 426',
     },
-    lastUpdate: '14/08/25-15:29',
+    lastUpdate: '2025-08-14T15:29:00',
   },
   tracking: {
     ignition: 'off',
@@ -344,7 +345,7 @@ const staticVehicle = {
     odometerKm: 211644,
     fuelLiters: 60,
     location: 'PLUS KM 426',
-    lastReport: '14/08/25-15:29',
+    lastReport: '2025-08-14T15:29:00',
   },
 };
 
@@ -472,26 +473,11 @@ const fmtLitres = (L) => (L == null ? null : `${fmtNumber(L)} litres`);
 const fmtKm = (km) => (km == null ? null : `${fmtNumber(km)} km`);
 const fmtLitresUpper = (L) => (L == null ? null : `${fmtNumber(L)} Litres`);
 const fmtKmUpper = (km) => (km == null ? null : `${fmtNumber(km)} KM`);
-const fmtDateHuman = (val) => {
-  if (!val) return null;
-  const tryDate = new Date(val);
-  if (!Number.isNaN(tryDate.getTime())) {
-    return tryDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  }
-  const m = String(val).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-  if (m) {
-    const dd = Number(m[1]);
-    const mm = Number(m[2]);
-    const yy = Number(m[3]);
-    const year = yy < 100 ? 2000 + yy : yy;
-    const d2 = new Date(year, mm - 1, dd);
-    if (!Number.isNaN(d2.getTime())) {
-      return d2.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    }
-  }
-  return String(val);
-};
-const vehicleChipDate = computed(() => vehicle.value?.cardChipDate || fmtDateHuman(tracking.value?.lastReport) || '');
+
+const vehicleChipDate = computed(() => {
+  const d = vehicle.value?.cardChipDate || tracking.value?.lastReport;
+  return d ? formatDate(d) : '';
+});
 </script>
 
 <style scoped>

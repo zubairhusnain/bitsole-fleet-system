@@ -2,8 +2,15 @@ import './bootstrap';
 import { createApp } from 'vue';
 import App from './components/App.vue';
 import router from './router';
+import { formatDateTime, formatDate, formatTime } from './utils/datetime';
 
 const app = createApp(App);
+
+// Make date formatters available globally in templates
+app.config.globalProperties.$formatDateTime = formatDateTime;
+app.config.globalProperties.$formatDate = formatDate;
+app.config.globalProperties.$formatTime = formatTime;
+
 app.use(router);
 app.mount('#app');
 
