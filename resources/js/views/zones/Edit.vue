@@ -81,9 +81,9 @@
           <l-map :key="mapKey" id="zoneEditMap" :zoom="zoom" :center="center" :options="mapOptions" @ready="onMapReady">
             <l-tile-layer :url="tileUrl" :attribution="tileAttribution" />
             <!-- Default center marker -->
-            <l-circle-marker :lat-lng="center" :radius="6" :color="'#d9534f'" :weight="2" :fillColor="'#d9534f'" :fillOpacity="0.9" />
+            <l-marker :lat-lng="center" />
             <l-polygon v-if="polygonPoints.length" :lat-lngs="polygonPoints" :color="'#1070e3'" :weight="2" :fillColor="'#1070e3'" :fillOpacity="0.25" />
-            <l-circle v-if="circleCenter && form.radius && form.type === 'circle'" :lat-lng="circleCenter" :radius="form.radius" :color="'#3f8fd7'" :weight="1" :fillColor="'#3f8fd7'" :fillOpacity="0.25" />
+            <l-circle v-if="form.type === 'circle'" :lat-lng="center" :radius="form.radius || 100" :color="'#3f8fd7'" :weight="1" :fillColor="'#3f8fd7'" :fillOpacity="0.25" />
             <!-- Draggable markers for vertices and search -->
             <l-marker v-for="(p,i) in polygonPoints" :key="'poly-'+i" :lat-lng="p" :draggable="true" @dragend="onDrawMarkerDragEnd('polygon', i, $event)" />
             <l-marker v-for="(p,i) in rectanglePoints" :key="'rect-'+i" :lat-lng="p" :draggable="true" @dragend="onDrawMarkerDragEnd('rectangle', i, $event)" />
@@ -428,6 +428,8 @@ function onMapReady(map) {
   setupGeoman(map);
   // Bind native Leaflet click for reliable capture
   try { map.on('click', onMapClick); } catch {}
+  // Ensure map fits the loaded shape once ready
+  setTimeout(() => { try { fitMapToCurrentShape(); } catch {} }, 100);
 }
 
 function drawFromInputs() {
@@ -446,6 +448,7 @@ function drawFromInputs() {
     const [lat, lng] = form.coordinates.split(',').map(Number);
     if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
       circleCenter.value = [lat, lng];
+      center.value = [lat, lng]; // Sync marker/circle center
       polygonPoints.value = [];
       return;
     }
@@ -544,14 +547,34 @@ async function loadZone() {
       const c0 = polygonPoints.value[0]; center.value = [c0[0], c0[1]];
       loadedShape.value = { type: 'polygon', coordinates: polygonPoints.value.map(p => [p[0], p[1]]) };
     } else {
+      // Fallback: Check attributes for saved circle if WKT area is missing/invalid
+      const lat = Number(attrs?.lat);
+      const lng = Number(attrs?.long || attrs?.lng);
+      const rad = Number(attrs?.radius);
+      const type = attrs?.type;
+
+      if (type === 'circle' && Number.isFinite(lat) && Number.isFinite(lng)) {
+          form.type = 'circle'; geofenceInfo.type = 'circle';
+          circleCenter.value = [lat, lng];
+          geofenceInfo.lat = lat; geofenceInfo.lng = lng;
+          geofenceInfo.radius = Number.isFinite(rad) ? rad : (form.radius || 1000);
+          geofenceInfo.coordinates = [[lat, lng]];
+          form.coordinates = `${lat},${lng}`;
+          form.radius = geofenceInfo.radius;
+          center.value = [lat, lng];
+          loadedShape.value = { type: 'circle', lat: lat, lng: lng, radius: geofenceInfo.radius };
+      }
       // If area is missing or unparsable, leave demo fallback
     }
+    // console.log('zoneformdata ',form,loadedShape);
     // Ensure controls reflect type
     updateGeomanControls();
-    // Fit map to current shape for visibility
-    setTimeout(() => { try { const m = mapRef.value; m && m.invalidateSize(true); fitMapToCurrentShape(); } catch {} }, 50);
+
+    // Force map re-render to ensure layers (especially l-circle) pick up the new state
+    mapKey.value++;
+
     // If we don't have a real address yet (or it's just name/description), try reverse geocoding by center
-    setTimeout(() => { try { reverseGeocodeForCenter(); } catch {} }, 0);
+    setTimeout(() => { try { reverseGeocodeForCenter(); } catch {} }, 500);
     suppressTypeWatch.value = false;
     // Debug: log what was parsed to help diagnose if shape still missing
     try { console.debug('[Edit] Geofence loaded', { remote, attrs, type: form.type, polygonPoints: polygonPoints.value, rectanglePoints: rectanglePoints.value, circleCenter: circleCenter.value, radius: form.radius }); } catch {}
@@ -772,8 +795,8 @@ function attachGeocoderControl(map) {
       });
       map.addControl(searchCtl);
       map.on('geosearch/showlocation', (e) => {
-        const lat = e?.location?.raw?.lat;
-        const lon = e?.location?.raw?.lon;
+        const lat = parseFloat(e?.location?.raw?.lat);
+        const lon = parseFloat(e?.location?.raw?.lon);
         if (Number.isFinite(lat) && Number.isFinite(lon)) {
           center.value = [lat, lon];
           searchMarkerLatLng.value = [lat, lon];
@@ -784,8 +807,9 @@ function attachGeocoderControl(map) {
           geofenceInfo.address = String(e?.location?.label || '').trim();
           if (form.type === 'circle') {
             circleCenter.value = [lat, lon];
-            form.radius = typeof form.radius === 'number' ? form.radius : 1000; // default area
-            geofenceInfo.radius = typeof form.radius === 'number' ? form.radius : (geofenceInfo.radius || 1000);
+            if (!form.radius || !Number.isFinite(Number(form.radius))) {
+              form.radius = 1000;
+            }
           }
           map.setView([lat, lon], map.getZoom());
         }
@@ -869,8 +893,9 @@ function attachGeocoderControl(map) {
                 geofenceInfo.address = String(r.display_name || '').trim();
                 if (form.type === 'circle') {
                   circleCenter.value = [lat, lon];
-                  form.radius = typeof form.radius === 'number' ? form.radius : 1000; // default area
-                  geofenceInfo.radius = typeof form.radius === 'number' ? form.radius : (geofenceInfo.radius || 1000);
+                  if (!form.radius || !Number.isFinite(Number(form.radius))) {
+                    form.radius = 1000;
+                  }
                 }
               } else {
                 searchQuery.value = input.value; searchAddress();
@@ -933,8 +958,9 @@ function attachGeocoderControl(map) {
             geofenceInfo.address = String(input.value || '').trim();
             if (form.type === 'circle') {
               circleCenter.value = [lat, lon];
-              form.radius = typeof form.radius === 'number' ? form.radius : 1000;
-              geofenceInfo.radius = typeof form.radius === 'number' ? form.radius : (geofenceInfo.radius || 1000);
+              if (!form.radius || !Number.isFinite(Number(form.radius))) {
+                form.radius = 1000;
+              }
             }
             m.setView([lat, lon], m.getZoom());
           }, clearSuggestions);
@@ -1048,6 +1074,7 @@ function clearGeomanLayers() {
 }
 
 watch(() => form.type, () => {
+  if (suppressTypeWatch.value) return;
   // When switching type, clear shapes and update controls instead of reloading saved geometry
   clearShapes();
   updateGeomanControls();

@@ -438,15 +438,17 @@ function attachGeocoderControl(map) {
       });
       map.addControl(searchCtl);
       map.on('geosearch/showlocation', (e) => {
-        const lat = e?.location?.raw?.lat;
-        const lon = e?.location?.raw?.lon;
+        const lat = parseFloat(e?.location?.raw?.lat);
+        const lon = parseFloat(e?.location?.raw?.lon);
         if (Number.isFinite(lat) && Number.isFinite(lon)) {
           center.value = [lat, lon];
           searchMarkerLatLng.value = [lat, lon];
           form.coordinates = `${lat},${lon}`;
           if (form.type === 'circle') {
             circleCenter.value = [lat, lon];
-            form.radius = typeof form.radius === 'number' ? form.radius : 1000;
+            if (!form.radius || !Number.isFinite(Number(form.radius))) {
+              form.radius = 1000;
+            }
           }
           map.setView([lat, lon], map.getZoom());
         }
@@ -549,8 +551,9 @@ function attachGeocoderControl(map) {
                 geofenceInfo.coordinates = [[lat, lon]];
                 if (form.type === 'circle') {
                   circleCenter.value = [lat, lon];
-                  form.radius = typeof form.radius === 'number' ? form.radius : 1000; // default area
-                  geofenceInfo.radius = typeof form.radius === 'number' ? form.radius : (geofenceInfo.radius || 1000);
+                  if (!form.radius || !Number.isFinite(Number(form.radius))) {
+                    form.radius = 1000;
+                  }
                 }
               } else {
                 // fallback: run normal geocode
@@ -620,8 +623,9 @@ function attachGeocoderControl(map) {
             geofenceInfo.coordinates = [[lat, lon]];
             if (form.type === 'circle') {
               circleCenter.value = [lat, lon];
-              form.radius = typeof form.radius === 'number' ? form.radius : 1000;
-              geofenceInfo.radius = typeof form.radius === 'number' ? form.radius : (geofenceInfo.radius || 1000);
+              if (!form.radius || !Number.isFinite(Number(form.radius))) {
+                form.radius = 1000;
+              }
             }
             m.setView([lat, lon], m.getZoom());
           }, clearSuggestions);
