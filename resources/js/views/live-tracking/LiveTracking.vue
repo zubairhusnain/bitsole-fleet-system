@@ -579,16 +579,16 @@ function speedKmh(speed) {
 }
 
 const carIcon = L.icon({
-    iconUrl: '/images/markers/device-pin.svg',
+    iconUrl: '/images/markers/device-pin.png',
     iconSize: [36, 48],
     iconAnchor: [18, 44],
     popupAnchor: [0, -38],
 });
 
 const focusIcon = L.icon({
-    iconUrl: '/images/markers/focus-marker.png',
-    iconSize: [48, 48],
-    iconAnchor: [24, 48], // Anchored at bottom center
+    iconUrl: '/images/markers/focus-marker.svg',
+    iconSize: [36, 48],
+    iconAnchor: [18, 44],
     popupAnchor: [0, -38],
 });
 
