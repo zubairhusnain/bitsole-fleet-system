@@ -48,16 +48,13 @@ class PollAlertsCommand extends Command
 
         while (true) {
             try {
-                // Fetch new events with the same join logic as NotificationController
+                // Fetch new events with relaxed join logic to include 'always' notifications
                 $newEvents = DB::connection('pgsql')->table('tc_events as e')
                     ->join('tc_devices as d', 'e.deviceid', '=', 'd.id')
-                    // We join tc_device_notification and tc_notifications to ensure we only pick up relevant alerts
-                    // Note: The original controller query started from tc_device_notification. 
-                    // Here we start from tc_events to efficiently filter by ID > $lastId.
-                    ->join('tc_device_notification as dn', 'e.deviceid', '=', 'dn.deviceid')
-                    ->join('tc_notifications as n', function($join) {
-                        $join->on('dn.notificationid', '=', 'n.id')
-                             ->on('e.type', '=', 'n.type');
+                    ->join('tc_notifications as n', 'e.type', '=', 'n.type')
+                    ->leftJoin('tc_device_notification as dn', function($join) {
+                        $join->on('e.deviceid', '=', 'dn.deviceid')
+                             ->on('n.id', '=', 'dn.notificationid');
                     })
                     ->select(
                         'e.*', 
@@ -66,6 +63,11 @@ class PollAlertsCommand extends Command
                         'd.name as device_name'
                     )
                     ->where('e.id', '>', $lastId)
+                    ->where(function($query) {
+                        $query->whereNotNull('dn.deviceid')
+                              ->orWhere('n.always', true);
+                    })
+                    ->distinct('e.id')
                     ->orderBy('e.id', 'asc')
                     ->limit(50) // Batch limit
                     ->get();

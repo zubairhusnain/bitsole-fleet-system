@@ -12,21 +12,34 @@ class NotificationController extends Controller
     public function events(Request $request)
     {
         $user = $request->user();
+
+        // No events for Super Admin (3) and Distributor (2)
+        if ($user->role === 3 || $user->role === 2) {
+            return response()->json([]);
+        }
+
         $deviceIds = Devices::where('user_id', $user->id)->pluck('device_id')->toArray();
 
-        // List notifications by joining tc_device_notifications with tc_notifications first,
-        // then joining tc_events based on deviceid and type from the first join.
-        // Also join tc_devices to get the device name.
-        $events = DB::connection('pgsql')->table('tc_device_notification as dn')
-            ->join('tc_notifications as n', 'dn.notificationid', '=', 'n.id')
-            ->join('tc_events as e', function($join) {
+        // List notifications by joining tc_notifications based on type,
+        // then left joining tc_device_notification to check for assignment.
+        // We include the event if it's assigned OR if the notification is marked 'always' (global).
+        $events = DB::connection('pgsql')->table('tc_events as e')
+            ->join('tc_notifications as n', 'e.type', '=', 'n.type')
+            ->leftJoin('tc_device_notification as dn', function($join) {
                 $join->on('e.deviceid', '=', 'dn.deviceid')
-                     ->on('e.type', '=', 'n.type');
+                     ->on('n.id', '=', 'dn.notificationid');
             })
             ->join('tc_devices as d', 'e.deviceid', '=', 'd.id')
             ->whereIn('e.deviceid', $deviceIds)
+            ->where(function($query) {
+                $query->whereNotNull('dn.deviceid')
+                      ->orWhere('n.always', true);
+            })
+            // Use distinct to avoid duplicates if multiple notifications match same type
+            // PostgreSQL requires ORDER BY to match DISTINCT ON columns
+            ->distinct('e.id')
             ->select('e.*', 'n.attributes as notification_attributes', 'n.type as notification_type', 'd.name as device_name')
-            ->orderBy('e.eventtime', 'desc')
+            ->orderBy('e.id', 'desc')
             ->limit(100)
             ->get();
 
@@ -36,6 +49,12 @@ class NotificationController extends Controller
     public function myDeviceIds(Request $request)
     {
         $user = $request->user();
+
+        // No live alerts for Super Admin (3) and Distributor (2)
+        if ($user->role === 3 || $user->role === 2) {
+            return response()->json([]);
+        }
+
         $deviceIds = Devices::where('user_id', $user->id)->pluck('device_id')->toArray();
         return response()->json($deviceIds);
     }
