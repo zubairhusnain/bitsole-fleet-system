@@ -587,7 +587,7 @@ const carIcon = L.icon({
 
 const focusIcon = L.icon({
     iconUrl: '/images/markers/focus-marker.svg',
-    iconSize: [36, 48],
+    iconSize: [30, 42],
     iconAnchor: [18, 44],
     popupAnchor: [0, -38],
 });
