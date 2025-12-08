@@ -312,14 +312,26 @@ const listenForAlerts = () => {
     if (echoChannel) return;
     if (!window.echo) return;
 
+    console.log('Listening for alerts on channel "alerts"...');
     echoChannel = window.echo.channel('alerts')
         .listen('.NewAlertEvent', (payload) => {
             console.log('New Alert Received:', payload);
             const e = payload.event;
             // Check if event exists and belongs to user's devices
-            if (e && e.deviceid && myDeviceIds.value.includes(e.deviceid)) {
-                if (route.path !== '/alerts') {
-                    unreadCount.value++;
+            if (e && e.deviceid) {
+                // Robust ID checking (handle string/number mismatch)
+                const eventDevId = Number(e.deviceid);
+                const userDevIds = myDeviceIds.value.map(id => Number(id));
+                
+                console.log(`Checking alert devId: ${eventDevId} against myDeviceIds:`, userDevIds);
+
+                if (userDevIds.includes(eventDevId)) {
+                    if (route.path !== '/alerts') {
+                        unreadCount.value++;
+                        console.log('Unread count incremented');
+                    }
+                } else {
+                    console.log('Alert ignored: Device ID not in user list');
                 }
             }
         });
