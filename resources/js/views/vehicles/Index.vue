@@ -10,6 +10,7 @@
             </ol>
         </div>
         <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="dismissError" />
+        <div v-if="loading" class="text-muted small mb-2">Loading vehicles…</div>
         <!-- Page Title and Actions -->
         <div class="row mb-3">
             <div class="col-sm-12 col-md-12 col-xl-8">
@@ -25,7 +26,7 @@
                             <span class="input-group-text"><i class="bi bi-sliders2"></i></span>
                         </div>
                     </div>
-                    <div class="col-sm-12 col-md-6 col-lg-5 ml-auto">
+                    <div class="col-sm-12 col-md-6 col-lg-5 ml-auto" v-if="hasPerm('vehicles','create')">
                         <RouterLink to="/vehicles/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> List New Vehicle</RouterLink>
                     </div>
                 </div>
@@ -77,24 +78,26 @@
                                 </td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
-                                        <button v-if="!row.blocked" class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i
+                                        <button v-if="!row.blocked && hasPerm('vehicles','update')" class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i
                                                 class="bi bi-pencil"></i></button>
-                                        <button v-if="!row.blocked && hasLocation(row)" class="btn btn-outline-primary" title="View" @click="toDetail(row)">
+                                        <button v-if="!row.blocked && hasPerm('vehicles','update')" class="btn btn-outline-secondary" title="Settings" @click="toSettings(row)">
+                                            <i class="bi bi-gear"></i>
+                                        </button>
+                                        <button v-if="(hasPerm('vehicles','read') || hasPerm('vehicles.overview','read')) && !row.blocked && hasLocation(row)" class="btn btn-outline-primary" title="View" @click="toDetail(row)">
                                             <i class="bi bi-eye"></i>
                                         </button>
                                         <button v-if="showWholeDataButton" class="btn btn-outline-info" title="Whole Data (JSON)" @click="openWholeData(row)">
                                             <i class="bi bi-braces"></i>
                                         </button>
-
-                                        <button v-if="!row.blocked" class="btn btn-outline-warning" title="Block" @click="block(row)"
+                                        <button v-if="!row.blocked && hasPerm('vehicles','delete')" class="btn btn-outline-warning" title="Block" @click="block(row)"
                                             :disabled="blocking[row.device_id] === true">
                                             <i class="bi bi-slash-circle"></i>
                                         </button>
-                                        <button v-if="row.blocked" class="btn btn-outline-success" title="Activate" @click="activate(row)"
+                                        <button v-if="row.blocked && hasPerm('vehicles','update')" class="btn btn-outline-success" title="Activate" @click="activate(row)"
                                             :disabled="activating[row.device_id] === true">
                                             <i class="bi bi-check-circle"></i>
                                         </button>
-                                        <button v-if="row.blocked" class="btn btn-outline-danger" title="Permanent Delete" @click="permanentRemove(row)"
+                                        <button v-if="row.blocked && hasPerm('vehicles','delete')" class="btn btn-outline-danger" title="Permanent Delete" @click="permanentRemove(row)"
                                             :disabled="deleting[row.device_id] === true">
                                             <i class="bi bi-trash"></i>
                                         </button>
@@ -150,6 +153,7 @@ import { useRouter, useRoute } from 'vue-router';
 import Swal from 'sweetalert2';
 import UiAlert from '../../components/UiAlert.vue';
 import { formatTelemetry } from '../../utils/telemetry';
+import { hasPermission as _hasPermission } from '../../auth';
 
 const router = useRouter();
 const route = useRoute();
@@ -167,6 +171,8 @@ const meta = ref({ total: 0, current_page: 1, per_page: 25 });
 // hide device detail link in production
 const showDeviceDetailLink = !import.meta.env.PROD;
 
+
+const hasPerm = (k, a) => _hasPermission(k, a);
 const showWholeDataButton = computed(() => String(route.query?.wholedata || '') === '1');
 const jsonModalVisible = ref(false);
 const wholeJson = ref('');
@@ -579,5 +585,10 @@ function toEdit(row) {
 function toDetail(row) {
     if (!row?.device_id) return;
     router.push(`/vehicles/${row.device_id}`);
+}
+
+function toSettings(row) {
+    if (!row?.device_id) return;
+    router.push(`/vehicles/${row.device_id}/settings`);
 }
 </script>

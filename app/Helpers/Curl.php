@@ -42,8 +42,11 @@ Trait Curl
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
 
-        if($method=='POST' || $method=='PUT' || $method=='DELETE') {
+        if($method=='POST') {
             curl_setopt($ch, CURLOPT_POST, 1);
+        }
+        
+        if($method=='POST' || $method=='PUT' || $method=='DELETE') {
             curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
         }
 

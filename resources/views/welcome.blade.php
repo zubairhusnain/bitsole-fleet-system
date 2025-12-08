@@ -25,7 +25,7 @@
       ])
     @endif
   </head>
-  <body>
+  <body class="layout-fixed sidebar-expand-lg sidebar-open bg-body-tertiary">
     <div id="app"></div>
 
     <!-- Footer scripts aligned with AdminLTE samples -->

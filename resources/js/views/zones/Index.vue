@@ -15,7 +15,7 @@
       <div class="col-sm-12 col-md-12 col-xl-8">
         <h4 class="mb-0 fw-semibold">Zone Management</h4>
       </div>
-      <div class="col-sm-12 col-md-12 col-xl-4 d-flex justify-content-xl-end">
+      <div class="col-sm-12 col-md-12 col-xl-4 d-flex justify-content-xl-end" v-if="hasPerm('zones','create')">
         <RouterLink to="/zones/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> Add New Zone</RouterLink>
       </div>
     </div>
@@ -23,6 +23,7 @@
     <!-- Status Messages -->
     <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="error = ''" />
     <UiAlert :show="!!message" :message="message" variant="success" dismissible @dismiss="message = ''" />
+    <div v-if="loading" class="text-muted small mb-2">Loading zones…</div>
 
     <!-- Summary Cards -->
     <div class="row g-3 mb-3">
@@ -55,10 +56,11 @@
           </div>
           <div class="col-sm-12 col-md-6 col-lg-4">
             <label class="form-label small">Status</label>
-            <select class="form-select">
+            <select class="form-select" v-model="searchStatus">
               <option value="">-- Select Status --</option>
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
+              <option value="Blocked">Blocked</option>
             </select>
           </div>
           <div class="col-sm-12 col-md-6 col-lg-4">
@@ -67,8 +69,8 @@
               <label class="form-check-label small" for="showBlocked">Include Blocked Zones</label>
             </div>
           </div>
-          <div class="col-sm-12 col-md-6 col-lg-4">
-            <button class="btn btn-primary mt-3 mt-md-0" @click="fetchZones">Submit</button>
+          <div class="col-sm-12 col-md-6 col-lg-4 d-flex align-items-end">
+            <button class="btn btn-primary w-auto" @click="fetchZones">Submit</button>
           </div>
         </div>
       </div>
@@ -91,6 +93,9 @@
               </tr>
             </thead>
             <tbody>
+              <tr v-if="!loading && filteredRows.length === 0">
+                <td colspan="7" class="text-center text-muted py-3">No zones found</td>
+              </tr>
               <tr v-for="row in pagedRows" :key="row.id" class="border-bottom">
                 <td class="text-muted text-nowrap">{{ row.zoneName }}</td>
                 <td class="text-muted text-nowrap">{{ row.owner }}</td>
@@ -105,11 +110,11 @@
                 </td>
                 <td class="text-end">
                   <div class="btn-group btn-group-sm">
-                    <button class="btn btn-outline-primary" title="View" @click="goView(row.id, row.geofenceId)"><i class="bi bi-eye"></i></button>
-                    <button class="btn btn-outline-secondary" title="Edit" @click="goEdit(row.id, row.geofenceId)" :disabled="row.deletedAt"><i class="bi bi-pencil"></i></button>
-                    <button v-if="!row.deletedAt" class="btn btn-outline-warning" title="Block" @click="confirmBlock(row.id, row.geofenceId)"><i class="bi bi-slash-circle"></i></button>
-                    <button v-if="row.deletedAt" class="btn btn-outline-success" title="Restore" @click="restoreZone(row.id, row.geofenceId)"><i class="bi bi-arrow-counterclockwise"></i></button>
-                    <button class="btn btn-outline-danger" title="Delete" @click="confirmDelete(row.id, row.geofenceId)"><i class="bi bi-trash"></i></button>
+                    <button v-if="hasPerm('zones','read')" class="btn btn-outline-primary" title="View" @click="goView(row.id, row.geofenceId)"><i class="bi bi-eye"></i></button>
+                    <button v-if="hasPerm('zones','update')" class="btn btn-outline-secondary" title="Edit" @click="goEdit(row.id, row.geofenceId)" :disabled="row.deletedAt"><i class="bi bi-pencil"></i></button>
+                    <button v-if="!row.deletedAt && hasPerm('zones','delete')" class="btn btn-outline-warning" title="Block" @click="confirmBlock(row.id, row.geofenceId)"><i class="bi bi-slash-circle"></i></button>
+                    <button v-if="row.deletedAt && hasPerm('zones','update')" class="btn btn-outline-success" title="Restore" @click="restoreZone(row.id, row.geofenceId)"><i class="bi bi-arrow-counterclockwise"></i></button>
+                    <button v-if="hasPerm('zones','delete')" class="btn btn-outline-danger" title="Delete" @click="confirmDelete(row.id, row.geofenceId)"><i class="bi bi-trash"></i></button>
                   </div>
                 </td>
               </tr>
@@ -118,8 +123,7 @@
         </div>
       </div>
       <div class="card-footer d-flex align-items-center py-2">
-        <div class="text-muted small me-auto">Showing {{ startIndex + 1 }} to {{ Math.min(startIndex + pageSize,
-          totalCount) }} of {{ totalCount }} results</div>
+        <div class="text-muted small me-auto">Showing {{ totalCount === 0 ? 0 : (startIndex + 1) }} to {{ totalCount === 0 ? 0 : Math.min(startIndex + pageSize, totalCount) }} of {{ totalCount }} results</div>
         <nav aria-label="Pagination" class="ms-auto">
           <ul class="pagination pagination-sm mb-0 pagination-app">
             <li class="page-item" :class="{ disabled: page === 1 }"><button class="page-link"
@@ -140,9 +144,12 @@ import { ref, computed, onMounted } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
+import { hasPermission as _hasPermission } from '../../auth';
 
 // Search input (static for now)
 const searchName = ref('');
+const searchStatus = ref('');
+const showBlocked = ref(false);
 
 // Summary metrics (dynamic counts from listing)
 const summaryCards = ref([
@@ -166,9 +173,26 @@ const loading = ref(false);
 const message = ref('');
 const error = ref('');
 const router = useRouter();
+const hasPerm = (k, a) => _hasPermission(k, a);
 
 const startIndex = computed(() => (page.value - 1) * pageSize.value);
-const pagedRows = computed(() => rows.value.slice(startIndex.value, startIndex.value + pageSize.value));
+const filteredRows = computed(() => {
+  // Text filter by zone name
+  const nameQ = (searchName.value || '').toLowerCase().trim();
+  const statusQ = (searchStatus.value || '').trim();
+  let list = rows.value;
+  if (nameQ) {
+    list = list.filter(r => String(r.zoneName || '').toLowerCase().includes(nameQ));
+  }
+  if (statusQ) {
+    list = list.filter(r => String(r.status || '') === statusQ);
+  }
+  if (!showBlocked.value) {
+    list = list.filter(r => r.status !== 'Blocked');
+  }
+  return list;
+});
+const pagedRows = computed(() => filteredRows.value.slice(startIndex.value, startIndex.value + pageSize.value));
 
 function goPage(n) {
   page.value = n;
@@ -216,20 +240,20 @@ async function fetchZones() {
   try {
     // Backend uses page size 25; we page client-side at 16 to fit UI.
     const params = {};
-    if (searchName.value) params.name = searchName.value;
     params.page = page.value;
     if (showBlocked.value) params.withDeleted = 1;
     const { data } = await axios.get('/web/zones', { params });
     const list = Array.isArray(data?.data) ? data.data : [];
     rows.value = list.map(mapRow);
-    console.log('rows list ',rows);
-    totalCount.value = Number(data?.total || list.length);
+    // Apply client-side filters to align with UI when backend name filter is unavailable
+    const filtered = filteredRows.value;
+    totalCount.value = filtered.length;
     const serverTotalPages = Number(data?.last_page || 1);
     // Mirror UI pagination count to show enough pages
     totalPages.value = Math.max(1, Math.ceil(totalCount.value / pageSize.value));
     // Summary cards
     summaryCards.value[0].value = totalCount.value;
-    const activeCount = list.filter(z => !z.deleted_at && (z.status || '').toLowerCase() !== 'inactive').length;
+    const activeCount = filtered.filter(r => r.status === 'Active').length;
     summaryCards.value[1].value = activeCount;
     summaryCards.value[2].value = totalCount.value - activeCount;
   } catch (e) {
@@ -286,4 +310,3 @@ onMounted(fetchZones);
 <style scoped>
 /* Reuse global app.css styles for tables, badges, and pagination */
 </style>
-const showBlocked = ref(false);

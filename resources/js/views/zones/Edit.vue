@@ -89,6 +89,14 @@
             <l-marker v-for="(p,i) in rectanglePoints" :key="'rect-'+i" :lat-lng="p" :draggable="true" @dragend="onDrawMarkerDragEnd('rectangle', i, $event)" />
             <l-marker v-if="searchMarkerLatLng" :lat-lng="searchMarkerLatLng" :draggable="true" @dragend="onSearchMarkerDragEnd" />
           </l-map>
+          <!-- Map tools: Reset shape to original and center to current location -->
+          <div class="map-tools">
+            <div class="btn-group btn-group-sm" role="group">
+              <button type="button" class="btn btn-light" @click="resetWholeMap">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -367,6 +375,53 @@ function renderLoadedShape() {
   updateGeomanControls();
   setTimeout(() => { try { const m = mapRef.value; m && m.invalidateSize(true); fitMapToCurrentShape(); } catch {} }, 40);
 }
+
+function centerToCurrentLocation() {
+  const map = mapRef.value;
+  return new Promise((resolve) => {
+    try {
+      if (navigator?.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            center.value = [lat, lon];
+            searchMarkerLatLng.value = [lat, lon];
+            if (form.type === 'circle') {
+              circleCenter.value = [lat, lon];
+              form.coordinates = `${lat},${lon}`;
+              form.radius = typeof form.radius === 'number' ? form.radius : (geofenceInfo.radius || 1000);
+              geofenceInfo.lat = lat; geofenceInfo.lng = lon; geofenceInfo.coordinates = [[lat, lon]];
+            }
+            try { map && map.setView([lat, lon], Math.max(13, map.getZoom())); } catch {}
+            resolve();
+          },
+          () => { resolve(); }
+        );
+      } else {
+        resolve();
+      }
+    } catch { resolve(); }
+  });
+}
+
+async function resetWholeMap() {
+  try {
+    // Clear all shapes and geoman layers, reset geofence info
+    clearShapes();
+    updateGeomanControls();
+    drawing.value = form.type !== 'circle';
+    searchMarkerLatLng.value = null;
+    geofenceInfo.coordinates = [];
+    geofenceInfo.lat = null;
+    geofenceInfo.lng = null;
+    // Refresh map rendering
+    mapKey.value++;
+    const m = mapRef.value; try { m && m.invalidateSize(true); } catch {}
+    // Center to current device location if available
+    await centerToCurrentLocation();
+  } catch {}
+}
 function onMapReady(map) {
   mapRef.value = map;
   attachGeocoderControl(map);
@@ -450,7 +505,6 @@ async function loadZone() {
     const { data } = await axios.get(`/web/zones/${zoneId.value}`);
     const z = data?.zone;
     const remote = data?.geofence;
-    console.log('remote zone ',remote);
     if (!z || !remote) throw new Error('Zone or geofence not found');
     geofenceInfo.geofenceId = String(z.geofence_id || '');
     // Read primary fields from remote geofence
@@ -464,7 +518,10 @@ async function loadZone() {
     form.status = String(attrs?.status || 'active');
     form.speed = Number.isFinite(parseFloat(attrs?.speed)) ? parseFloat(attrs.speed) : undefined;
     geofenceInfo.name = form.name;
-    geofenceInfo.address = form.description;
+    // Prefer explicit address if present in description; otherwise fall back to name
+    geofenceInfo.address = String(form.description || form.name || '').trim();
+    // Prefill search query with whatever textual address-like value we have
+    searchQuery.value = geofenceInfo.address || '';
     // Reset map state
     circleCenter.value = null; polygonPoints.value = []; rectanglePoints.value = []; form.coordinates = ''; form.polygon = '';
     // Parse WKT area only (ignore attributes.coordinates per request)
@@ -493,12 +550,31 @@ async function loadZone() {
     updateGeomanControls();
     // Fit map to current shape for visibility
     setTimeout(() => { try { const m = mapRef.value; m && m.invalidateSize(true); fitMapToCurrentShape(); } catch {} }, 50);
+    // If we don't have a real address yet (or it's just name/description), try reverse geocoding by center
+    setTimeout(() => { try { reverseGeocodeForCenter(); } catch {} }, 0);
     suppressTypeWatch.value = false;
     // Debug: log what was parsed to help diagnose if shape still missing
     try { console.debug('[Edit] Geofence loaded', { remote, attrs, type: form.type, polygonPoints: polygonPoints.value, rectanglePoints: rectanglePoints.value, circleCenter: circleCenter.value, radius: form.radius }); } catch {}
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'Failed to load zone';
   }
+}
+
+async function reverseGeocodeForCenter() {
+  try {
+    const c = Array.isArray(center.value) ? center.value : null;
+    const lat = Number(c?.[0]); const lon = Number(c?.[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+    const res = await fetch(url, { credentials: 'omit' });
+    const data = await res.json();
+    const display = String(data?.display_name || '').trim();
+    if (display) {
+      geofenceInfo.address = display;
+      searchQuery.value = display;
+      try { const el = document.getElementById('zone-edit-geocode-input'); if (el) el.value = display; } catch {}
+    }
+  } catch {}
 }
 
 async function submit() {
@@ -733,6 +809,13 @@ function attachGeocoderControl(map) {
         input.style.border = '1px solid #ddd';
         input.style.borderRadius = '4px';
         input.style.marginRight = '8px';
+        // Provide a stable id so we can update this from elsewhere if needed
+        input.id = 'zone-edit-geocode-input';
+        // Prefill with existing address/description/name if available
+        try {
+          const initialAddress = String(geofenceInfo.address || form.description || form.name || '').trim();
+          if (initialAddress) { input.value = initialAddress; searchQuery.value = initialAddress; }
+        } catch {}
 
         const btn = document.createElement('button');
         btn.textContent = 'Geocode';
@@ -965,13 +1048,17 @@ function clearGeomanLayers() {
 }
 
 watch(() => form.type, () => {
+  // When switching type, clear shapes and update controls instead of reloading saved geometry
+  clearShapes();
+  updateGeomanControls();
+  drawing.value = form.type !== 'circle';
+  searchMarkerLatLng.value = null;
+  mapKey.value++;
+  const map = mapRef.value; try { map && map.invalidateSize(true); } catch {}
   geofenceInfo.type = form.type;
-  if (suppressTypeWatch.value) {
-    updateGeomanControls();
-    const map = mapRef.value; try { map && map.invalidateSize(true); } catch {}
-    return;
-  }
-  renderLoadedShape();
+  geofenceInfo.coordinates = [];
+  geofenceInfo.lat = null;
+  geofenceInfo.lng = null;
 });
 
 async function searchAddress() {
@@ -1031,6 +1118,7 @@ async function searchAddress() {
 <style scoped>
 .map-frame { position: relative; height: 380px; border-radius: 12px; overflow: hidden; }
 #zoneEditMap { height: 100%; width: 100%; }
+.map-tools { position: absolute; top: 8px; right: 8px; z-index: 1000; }
 .map-controls { position: absolute; left: 8px; bottom: 8px; display: flex; align-items: center; z-index: 1000; }
 .map-controls .btn-group .btn { background: #fff; border-color: #ddd; }
 .map-controls .btn-group .btn.active { background: #0b0f28; color: #fff; }

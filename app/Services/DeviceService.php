@@ -166,9 +166,8 @@ class DeviceService
             $query->where('user_id', $user->id);
         } else {
             if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-                // Distributor: both user_id and distributor_id must match self
-                $query->where('user_id', $user->id)
-                      ->where('distributor_id', $user->id);
+                // Distributor: scope by distributor only
+                $query->where('distributor_id', $user->id);
             } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
                 // Non-admin (user/fleet manager): user_id must match; distributor scoped to user's distributor
                 $distId = $user->distributor_id ?? $user->id;

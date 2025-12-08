@@ -20,7 +20,7 @@
                 <span class="input-group-text"><i class="bi bi-sliders2"></i></span>
                 </div>
             </div>
-            <div class="col-sm-12 col-md-6 col-xl-5">
+            <div class="col-sm-12 col-md-6 col-xl-5" v-if="hasPerm('drivers','create')">
                     <RouterLink to="/drivers/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> New Driver</RouterLink>
             </div>
         </div>
@@ -71,15 +71,15 @@
                 <td class="text-muted text-nowrap">{{ row.lastRide }}</td>
                 <td class="text-end">
                   <div class="btn-group btn-group-sm">
-                    <button v-if="!isProd && !row.blocked" class="btn btn-outline-primary" title="View" @click="openDetails(row)"><i class="bi bi-person-lines-fill"></i></button>
-                    <button v-if="!row.blocked" class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i class="bi bi-pencil"></i></button>
-                    <button v-if="!row.blocked" class="btn btn-outline-warning" title="Block" @click="blockDriver(row.id, row.name)" :disabled="blocking[row.id] === true">
+                    <button v-if="!isProd && !row.blocked && hasPerm('drivers','read')" class="btn btn-outline-primary" title="View" @click="openDetails(row)"><i class="bi bi-person-lines-fill"></i></button>
+                    <button v-if="!row.blocked && hasPerm('drivers','update')" class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i class="bi bi-pencil"></i></button>
+                    <button v-if="!row.blocked && hasPerm('drivers','delete')" class="btn btn-outline-warning" title="Block" @click="blockDriver(row.id, row.name)" :disabled="blocking[row.id] === true">
                       <i class="bi bi-slash-circle"></i>
                     </button>
-                    <button v-if="row.blocked" class="btn btn-outline-success" title="Activate" @click="activateDriver(row.id, row.name)" :disabled="activating[row.id] === true">
+                    <button v-if="row.blocked && hasPerm('drivers','update')" class="btn btn-outline-success" title="Activate" @click="activateDriver(row.id, row.name)" :disabled="activating[row.id] === true">
                       <i class="bi bi-check-circle"></i>
                     </button>
-                    <button v-if="row.blocked" class="btn btn-outline-danger" title="Permanent Delete" @click="deleteDriverPermanent(row.id, row.name)" :disabled="deleting[row.id] === true">
+                    <button v-if="row.blocked && hasPerm('drivers','delete')" class="btn btn-outline-danger" title="Permanent Delete" @click="deleteDriverPermanent(row.id, row.name)" :disabled="deleting[row.id] === true">
                       <i class="bi bi-trash"></i>
                     </button>
                   </div>
@@ -115,9 +115,11 @@ import UiAlert from '../../components/UiAlert.vue';
 import DriverDetailModal from '../../components/DriverDetailModal.vue';
 import Swal from 'sweetalert2';
 import { useRouter } from 'vue-router';
+import { hasPermission as _hasPermission } from '../../auth';
 
 const router = useRouter();
 const isProd = import.meta.env.PROD;
+const hasPerm = (k, a) => _hasPermission(k, a);
 const query = ref('');
 const page = ref(1);
 const pageSize = 16;
