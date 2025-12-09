@@ -42,8 +42,8 @@
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-6 col-md-3">
-                    <label class="form-label small text-muted d-block">Vehicle Name</label>
-                    <span class="fw-medium">{{ selectedVehicle.tc_device?.name || '-' }}</span>
+                    <label class="form-label small text-muted d-block">Vehicle ID</label>
+                    <span class="fw-medium">{{ selectedVehicle.tc_device?.attributes?.vehicleNo || '-' }}</span>
                 </div>
                 <div class="col-6 col-md-3">
                     <label class="form-label small text-muted d-block">Identifier</label>

@@ -48,7 +48,7 @@
             <div class="row g-3">
                 <div class="col-6 col-md-3">
                     <label class="form-label small text-muted d-block">Vehicle Name</label>
-                    <span class="fw-medium">{{ selectedVehicle.tc_device?.name || '-' }}</span>
+                    <span class="fw-medium">{{ selectedVehicle.tc_device?.attributes?.vehicleNo || '-' }}</span>
                 </div>
                 <div class="col-6 col-md-3">
                     <label class="form-label small text-muted d-block">Identifier</label>
@@ -128,7 +128,7 @@ import UiAlert from '../../components/UiAlert.vue';
 
 const router = useRouter();
 const route = useRoute();
-const loading = ref(false);
+const loading = ref(true);
 const saving = ref(false);
 const error = ref('');
 const message = ref('');
@@ -219,6 +219,8 @@ onMounted(async () => {
     await fetchDevices();
     if (route.params.id) {
         await fetchEntry();
+    } else {
+        loading.value = false;
     }
 });
 </script>
