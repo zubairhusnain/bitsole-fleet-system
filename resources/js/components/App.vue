@@ -283,9 +283,21 @@ const fetchMyDeviceIds = async () => {
 
 const fetchUnreadCount = async () => {
     if (!isAuthed.value) return;
+
+    // If user is already on the alerts page, the count should be 0 (Index.vue marks them read)
+    if (route.path === '/alerts') {
+        unreadCount.value = 0;
+        return;
+    }
+
     try {
         const { data } = await axios.get('/web/notifications/unread-count');
-        unreadCount.value = data.count || 0;
+        // Double check route hasn't changed while request was in flight
+        if (route.path === '/alerts') {
+            unreadCount.value = 0;
+        } else {
+            unreadCount.value = data.count || 0;
+        }
     } catch (e) {
         console.error('Failed to fetch unread count', e);
     }
@@ -314,8 +326,14 @@ const listenForAlerts = () => {
     echoChannel = window.echo.private(`alerts.${userId}`)
         .listen('.alerts.updated', (payload) => {
             console.log('[App] Alerts Update Received', payload);
-            // When alerts are updated, refresh the unread count
-            fetchUnreadCount();
+
+            // If user is on /alerts page, keep count at 0
+            if (route.path === '/alerts') {
+                unreadCount.value = 0;
+            } else {
+                // Otherwise refresh the unread count
+                fetchUnreadCount();
+            }
         });
 
     // Handle subscription errors
