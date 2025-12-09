@@ -19,6 +19,7 @@ class ModulePermission
             'zones' => 'Zone Management',
             'users' => 'User Management',
             'users.permissions' => 'User Permission',
+            'fuel' => 'Fuel Management',
             // Admin-only areas are not part of assignable modules
             // 'admin' => 'Admin',
             // 'reports' => 'Reports & Analytics',

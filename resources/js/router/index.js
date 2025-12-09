@@ -76,6 +76,8 @@ const routes = [
   { path: '/reports', name: 'reports', component: Reports, meta: { requiresAuth: true, title: 'Reports & Analytics', moduleKey: 'reports', action: 'read' } },
   { path: '/alerts', name: 'alerts', component: Alerts, meta: { requiresAuth: true, title: 'Alerts & Notifications' } },
   { path: '/fuel', name: 'fuel', component: Fuel, meta: { requiresAuth: true, title: 'Fuel Management', moduleKey: 'fuel', action: 'read' } },
+  { path: '/fuel/new', name: 'fuel-new', component: () => import('../views/fuel/AddFuel.vue'), meta: { requiresAuth: true, title: 'Add Fuel Entry', moduleKey: 'fuel', action: 'create' } },
+  { path: '/fuel/:id(\\d+)/edit', name: 'fuel-edit', component: () => import('../views/fuel/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Fuel Entry', moduleKey: 'fuel', action: 'update' } },
   { path: '/zones', name: 'zones', component: Zones, meta: { requiresAuth: true, title: 'Zone Management', moduleKey: 'zones', action: 'read' } },
   { path: '/zones/new', name: 'zones-new', component: ZonesAdd, meta: { requiresAuth: true, title: 'Add New Zone', moduleKey: 'zones', action: 'create' } },
   // Edit Zone route (numeric id only)

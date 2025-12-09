@@ -14,7 +14,7 @@ Route::get('/testing', function () {
             // We prepend the schema name 'omayer' to ensure the database
             // looks in the correct location for the table.
             $users = TcUser::all();
-            dd($users);
+            // dd($users);
             // Return the fetched data as a JSON response
             return response()->json([
                 'status' => 'success',
@@ -174,6 +174,18 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     // Restore a soft-deleted (blocked) zone
     Route::patch('/{zoneId}/restore', [\App\Http\Controllers\ZoneController::class, 'restore']);
     Route::delete('/{zoneId}', [\App\Http\Controllers\ZoneController::class, 'destroy']);
+});
+
+// Auth-protected Fuel Management
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/fuel')->group(function () {
+    Route::get('/', [\App\Http\Controllers\FuelController::class, 'index']);
+    Route::get('/summary', [\App\Http\Controllers\FuelController::class, 'summary']);
+    Route::get('/vehicles', [\App\Http\Controllers\FuelController::class, 'vehicleOptions']);
+    Route::post('/', [\App\Http\Controllers\FuelController::class, 'store']);
+    Route::get('/{id}', [\App\Http\Controllers\FuelController::class, 'show']);
+    Route::put('/{id}', [\App\Http\Controllers\FuelController::class, 'update']);
+    Route::patch('/{id}/restore', [\App\Http\Controllers\FuelController::class, 'restore']);
+    Route::delete('/{id}', [\App\Http\Controllers\FuelController::class, 'destroy']);
 });
 
 // NEW: Auth-protected Geofence listing from Traccar DB (testing/util)
