@@ -17,7 +17,3 @@ Broadcast::channel('positions.{userId}', function ($user, int $userId) {
     // Authorize only the matching authenticated user to join their private channel
     return (int) $user->id === (int) $userId;
 });
-
-Broadcast::channel('alerts.{userId}', function ($user, int $userId) {
-    return (int) $user->id === (int) $userId;
-});
