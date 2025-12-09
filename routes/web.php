@@ -198,7 +198,10 @@ Route::middleware('auth')->get('/web/traccar/assign-computed-attributes', functi
 
 // Auth-protected Notifications APIs (publicly accessible to all roles)
 Route::middleware(['auth'])->prefix('/web/notifications')->group(function () {
+    Route::get('/broadcast', [\App\Http\Controllers\NotificationController::class, 'broadcast']);
     Route::get('/events', [\App\Http\Controllers\NotificationController::class, 'events']);
+    Route::get('/unread-count', [\App\Http\Controllers\NotificationController::class, 'unreadCount']);
+    Route::post('/mark-read', [\App\Http\Controllers\NotificationController::class, 'markAllRead']);
     Route::get('/my-device-ids', [\App\Http\Controllers\NotificationController::class, 'myDeviceIds']);
     Route::delete('/events/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy']);
     Route::get('/', [\App\Http\Controllers\NotificationController::class, 'index']);
