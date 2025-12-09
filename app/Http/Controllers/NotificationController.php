@@ -6,9 +6,19 @@ use App\Events\DeleteAlertEvent;
 use App\Models\Devices;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Events\AlertsUpdated;
 
 class NotificationController extends Controller
 {
+    public function broadcast(Request $request)
+    {
+        $user = $request->user();
+        if ($user) {
+            broadcast(new AlertsUpdated($user));
+        }
+        return response()->json(['ok' => true]);
+    }
+
     public function events(Request $request)
     {
         $user = $request->user();
@@ -44,6 +54,65 @@ class NotificationController extends Controller
             ->get();
 
         return response()->json($events);
+    }
+
+    public function unreadCount(Request $request)
+    {
+        $user = $request->user();
+        if ($user->role === 3 || $user->role === 2) {
+            return response()->json(['count' => 0]);
+        }
+        $deviceIds = Devices::where('user_id', $user->id)->pluck('device_id')->toArray();
+
+        $count = DB::connection('pgsql')->table('tc_events as e')
+            ->join('tc_notifications as n', 'e.type', '=', 'n.type')
+            ->leftJoin('tc_device_notification as dn', function($join) {
+                $join->on('e.deviceid', '=', 'dn.deviceid')
+                     ->on('n.id', '=', 'dn.notificationid');
+            })
+            ->whereIn('e.deviceid', $deviceIds)
+            ->where(function($query) {
+                $query->whereNotNull('dn.deviceid')
+                      ->orWhere('n.always', true);
+            })
+            ->where('e.is_read', 0)
+            ->distinct('e.id')
+            ->count('e.id');
+
+        return response()->json(['count' => $count]);
+    }
+
+    public function markAllRead(Request $request)
+    {
+        $user = $request->user();
+        if ($user->role === 3 || $user->role === 2) {
+             return response()->json(['success' => true]);
+        }
+
+        $deviceIds = Devices::where('user_id', $user->id)->pluck('device_id')->toArray();
+
+        $eventIds = DB::connection('pgsql')->table('tc_events as e')
+            ->join('tc_notifications as n', 'e.type', '=', 'n.type')
+            ->leftJoin('tc_device_notification as dn', function($join) {
+                $join->on('e.deviceid', '=', 'dn.deviceid')
+                     ->on('n.id', '=', 'dn.notificationid');
+            })
+            ->whereIn('e.deviceid', $deviceIds)
+            ->where(function($query) {
+                $query->whereNotNull('dn.deviceid')
+                      ->orWhere('n.always', true);
+            })
+            ->where('e.is_read', 0)
+            ->distinct('e.id')
+            ->pluck('e.id');
+
+        if ($eventIds->isNotEmpty()) {
+            DB::connection('pgsql')->table('tc_events')
+                ->whereIn('id', $eventIds)
+                ->update(['is_read' => 1]);
+        }
+
+        return response()->json(['success' => true]);
     }
 
     public function myDeviceIds(Request $request)

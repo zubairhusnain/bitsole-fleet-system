@@ -284,64 +284,53 @@ const fetchMyDeviceIds = async () => {
 const fetchUnreadCount = async () => {
     if (!isAuthed.value) return;
     try {
-        const { data } = await axios.get('/web/notifications/events');
-        if (Array.isArray(data) && data.length > 0) {
-            if (route.path === '/alerts') {
-                const latest = data[0].eventtime;
-                localStorage.setItem('lastSeenTime', latest);
-                unreadCount.value = 0;
-                return;
-            }
-
-            const lastSeen = localStorage.getItem('lastSeenTime');
-            if (!lastSeen) {
-                unreadCount.value = data.length;
-            } else {
-                const newEvents = data.filter(e => e.eventtime > lastSeen);
-                unreadCount.value = newEvents.length;
-            }
-        } else {
-             unreadCount.value = 0;
-        }
+        const { data } = await axios.get('/web/notifications/unread-count');
+        unreadCount.value = data.count || 0;
     } catch (e) {
         console.error('Failed to fetch unread count', e);
     }
 };
 
-const listenForAlerts = () => {
-    if (echoChannel) return;
-    if (!window.echo) return;
-
-    echoChannel = window.echo.channel('alerts')
-        .listen('.NewAlertEvent', (payload) => {
-            console.log('New Alert Received:', payload);
-            const e = payload.event;
-            // Check if event exists and belongs to user's devices
-            if (e && e.deviceid && myDeviceIds.value.includes(e.deviceid)) {
-                if (route.path !== '/alerts') {
-                    unreadCount.value++;
-                }
-            }
-        });
-};
-
-const markAsRead = async () => {
-    if (!isAuthed.value) return;
-     try {
-        const { data } = await axios.get('/web/notifications/events');
-        if (Array.isArray(data) && data.length > 0) {
-            const latest = data[0].eventtime;
-            localStorage.setItem('lastSeenTime', latest);
-            unreadCount.value = 0;
-        }
-    } catch (e) {}
-};
-
 watch(() => route.path, (newPath) => {
     if (newPath === '/alerts') {
-        markAsRead();
+        unreadCount.value = 0;
     }
 });
+
+const listenForAlerts = () => {
+    if (echoChannel) return;
+
+    // Retry if Echo isn't ready yet
+    if (!window.echo) {
+        setTimeout(listenForAlerts, 500);
+        return;
+    }
+
+    if (!authState.user || !authState.user.id) return;
+
+    const userId = authState.user.id;
+    console.log(`[App] Listening for alerts on channel: alerts.${userId}`);
+
+    echoChannel = window.echo.private(`alerts.${userId}`)
+        .listen('.alerts.updated', (payload) => {
+            console.log('[App] Alerts Update Received', payload);
+            // When alerts are updated, refresh the unread count
+            fetchUnreadCount();
+        });
+
+    // Handle subscription errors
+    if (echoChannel.subscription) {
+        echoChannel.subscription.bind('pusher:subscription_error', (status) => {
+            console.error('[App] Subscription error:', status);
+        });
+        echoChannel.subscription.bind('pusher:subscription_succeeded', () => {
+            console.log('[App] Subscription succeeded');
+        });
+    }
+};
+
+// Dev-only broadcast ping to ensure updates flow (mirrors LiveTracking)
+let broadcastPing = null;
 
 watch(isAuthed, (val) => {
     if (val) {
@@ -349,17 +338,48 @@ watch(isAuthed, (val) => {
             fetchUnreadCount();
             listenForAlerts();
         });
+
+        // Start ping in dev
+        if (import.meta.env.DEV && !broadcastPing) {
+            broadcastPing = setInterval(() => {
+                axios.get('/web/notifications/broadcast').catch(() => {});
+            }, 5000);
+        }
     } else {
         if (echoChannel) {
-            window.echo.leave('alerts');
+            window.echo.leave(`alerts.${authState?.user?.id}`);
             echoChannel = null;
+        }
+        if (broadcastPing) {
+            clearInterval(broadcastPing);
+            broadcastPing = null;
+        }
+    }
+});
+
+onMounted(() => {
+    if (isAuthed.value) {
+        fetchMyDeviceIds().then(() => {
+            fetchUnreadCount();
+            listenForAlerts();
+        });
+
+        // Start ping in dev
+        if (import.meta.env.DEV && !broadcastPing) {
+            broadcastPing = setInterval(() => {
+                axios.get('/web/notifications/broadcast').catch(() => {});
+            }, 5000);
         }
     }
 });
 
 onUnmounted(() => {
-    if (echoChannel) {
-        window.echo.leave('alerts');
+    if (echoChannel && authState.user) {
+        window.echo.leave(`alerts.${authState.user.id}`);
+    }
+    if (broadcastPing) {
+        clearInterval(broadcastPing);
+        broadcastPing = null;
     }
 });
 const isAdminOrDistributor = computed(() => {

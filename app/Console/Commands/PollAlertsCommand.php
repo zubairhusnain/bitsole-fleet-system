@@ -5,7 +5,8 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
-use App\Events\NewAlertEvent;
+use App\Events\AlertsUpdated;
+use App\Models\User;
 use Carbon\Carbon;
 
 class PollAlertsCommand extends Command
@@ -73,16 +74,38 @@ class PollAlertsCommand extends Command
                     ->get();
 
                 if ($newEvents->isNotEmpty()) {
+                    $affectedUserIds = [];
+                    $maxId = $lastId;
+
                     foreach ($newEvents as $event) {
-                        $this->info("Broadcasting event ID: {$event->id} - Type: {$event->type}");
+                        $this->info("Processing event ID: {$event->id} - Type: {$event->type}");
 
-                        // Broadcast the event
-                        broadcast(new NewAlertEvent($event));
+                        // Find user linked to this device
+                        $userId = DB::connection('pgsql')->table('devices')
+                            ->where('device_id', $event->deviceid)
+                            ->value('user_id');
 
-                        // Update lastId
-                        $lastId = $event->id;
-                        Cache::put('alerts_poll_last_id', $lastId, now()->addDay());
+                        if ($userId) {
+                            $affectedUserIds[$userId] = true;
+                        }
+
+                        if ($event->id > $maxId) {
+                            $maxId = $event->id;
+                        }
                     }
+
+                    // Broadcast to affected users
+                    foreach (array_keys($affectedUserIds) as $uid) {
+                        $user = User::find($uid);
+                        if ($user) {
+                             $this->info("Dispatching AlertsUpdated for User ID: {$uid}");
+                             broadcast(new AlertsUpdated($user));
+                        }
+                    }
+
+                    // Update lastId
+                    $lastId = $maxId;
+                    Cache::put('alerts_poll_last_id', $lastId, now()->addDay());
                 }
 
                 // Sleep to prevent high CPU usage

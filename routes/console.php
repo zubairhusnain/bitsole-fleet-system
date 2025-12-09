@@ -31,3 +31,9 @@ Schedule::command('alerts:poll')
     ->withoutOverlapping()
     ->runInBackground();
 
+// Check for missing columns in tc_events table every 5 minutes
+Schedule::command('events:check-columns')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->runInBackground();
+
