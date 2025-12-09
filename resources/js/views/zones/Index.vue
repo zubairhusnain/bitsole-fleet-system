@@ -47,14 +47,14 @@
       <div class="card-body">
         <div class="fw-semibold mb-2">Search Option</div>
         <div class="row g-2 align-items-end">
-          <div class="col-sm-12 col-md-6 col-lg-4">
+          <div class="col-sm-12 col-md-3 col-lg-4">
             <label class="form-label small">Zone Name</label>
             <div class="input-group">
               <span class="input-group-text"><i class="bi bi-search"></i></span>
               <input type="text" class="form-control" placeholder="Enter Zone Name" v-model="searchName" />
             </div>
           </div>
-          <div class="col-sm-12 col-md-6 col-lg-4">
+          <div class="col-sm-12 col-md-3 col-lg-4">
             <label class="form-label small">Status</label>
             <select class="form-select" v-model="searchStatus">
               <option value="">-- Select Status --</option>
@@ -63,13 +63,13 @@
               <option value="Blocked">Blocked</option>
             </select>
           </div>
-          <div class="col-sm-12 col-md-6 col-lg-4">
+          <div class="col-sm-12 col-md-3 col-lg-2">
             <div class="form-check mt-4">
               <input class="form-check-input" type="checkbox" id="showBlocked" v-model="showBlocked">
               <label class="form-check-label small" for="showBlocked">Include Blocked Zones</label>
             </div>
           </div>
-          <div class="col-sm-12 col-md-6 col-lg-4 d-flex align-items-end">
+          <div class="col-sm-12 col-md-3 col-lg-2 d-flex align-items-end">
             <button class="btn btn-primary w-auto" @click="fetchZones">Submit</button>
           </div>
         </div>
