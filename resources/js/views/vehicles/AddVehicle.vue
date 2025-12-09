@@ -22,8 +22,12 @@
         <div class="card-body">
           <div class="row g-3 align-items-start">
             <div class="col-12 col-md-4">
+              <label class="form-label small">Device Name</label>
+              <input v-model="form.name" type="text" class="form-control" placeholder="e.g. Toyota Camry" />
+            </div>
+            <div class="col-12 col-md-4">
               <label class="form-label small">Device ID ( IMEI )</label>
-              <input v-model="form.uniqueId" type="text" class="form-control" placeholder="VHCL-1016" />
+              <input v-model="form.uniqueId" type="text" class="form-control" placeholder="e.g. 123456789012345" />
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Tracker Model</label>
@@ -33,8 +37,8 @@
               </select>
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label small">Device Name</label>
-              <input v-model="form.name" type="text" class="form-control" placeholder="Device Name" />
+              <label class="form-label small">Vehicle No</label>
+              <input v-model="form.attributes.vehicleNo" type="text" class="form-control" placeholder="e.g. V-001" />
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Vehicle Type</label>
@@ -46,27 +50,29 @@
                 <option>Van</option>
               </select>
             </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Vehicle Color</label>
+              <input v-model="form.attributes.color" type="text" class="form-control" placeholder="e.g. White" />
+            </div>
+
+
 
             <div class="col-12 col-md-4">
               <label class="form-label small">Model</label>
-              <input v-model="form.model" type="text" class="form-control" placeholder="Model" />
+              <input v-model="form.model" type="text" class="form-control" placeholder="e.g. 2023" />
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Manufacturer</label>
-              <input v-model="form.attributes.manufacturer" type="text" class="form-control" placeholder="Manufacturer" />
-            </div>
-            <div class="col-12 col-md-4">
-              <label class="form-label small">Vehicle Color</label>
-              <input v-model="form.attributes.color" type="text" class="form-control" placeholder="Vehicle Color" />
+              <input v-model="form.attributes.manufacturer" type="text" class="form-control" placeholder="e.g. Toyota" />
             </div>
 
             <div class="col-12 col-md-4">
               <label class="form-label small">Registration Number</label>
-              <input v-model="form.attributes.registration" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="Registration Number" />
+              <input v-model="form.attributes.registration" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="e.g. 987654" />
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Plate Number</label>
-              <input v-model="form.attributes.plate" type="text" class="form-control" placeholder="Plate Number" />
+              <input v-model="form.attributes.plate" type="text" class="form-control" placeholder="e.g. ABC-123" />
             </div>
 
 
@@ -89,7 +95,7 @@
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Max Speed</label>
-              <input v-model="form.attributes.maxSpeed" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="Max Speed" />
+              <input v-model="form.attributes.maxSpeed" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="e.g. 120" />
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Fuel Tank Capacity (Liters)</label>
@@ -143,10 +149,11 @@ import UiAlert from '../../components/UiAlert.vue';
 const router = useRouter();
 
 const form = reactive({
-  uniqueId: 'VHCL-1016', /** vehicleId **/
+  uniqueId: '', /** vehicleId **/
   name: '',
   model: '',
   attributes: {
+    vehicleNo: '',
     type: '',
     manufacturer: '',
     color: '',

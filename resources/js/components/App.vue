@@ -134,7 +134,7 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item  d-none">
+                        <li class="nav-item" v-if="!isAdminOrDistributor">
                             <RouterLink to="/fuel" class="nav-link" :class="{ active: route.name === 'fuel' }">
                                 <i class="nav-icon bi bi-fuel-pump"></i>
                                 <p>Fuel Management</p>

@@ -93,7 +93,5 @@ class PollAlertsCommand extends Command
                 sleep(5); // Sleep longer on error
             }
         }
-
-        return 0;
     }
 }
