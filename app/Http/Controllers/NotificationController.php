@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\DeleteAlertEvent;
 use App\Models\Devices;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -12,7 +13,24 @@ class NotificationController extends Controller
     public function events(Request $request)
     {
         $user = $request->user();
-        $deviceIds = Devices::where('user_id', $user->id)->pluck('device_id')->toArray();
+
+        // Scope devices for this user (mirror VehicleController role logic)
+        $query = Devices::query();
+        $role = (int) ($user->role ?? User::ROLE_ADMIN);
+
+        if ($role === User::ROLE_DISTRIBUTOR) {
+             $query->where('distributor_id', $user->id);
+        } elseif ($role !== User::ROLE_ADMIN) {
+             $distId = $user->distributor_id ?? $user->id;
+             $query->where('distributor_id', $distId);
+
+             if ($role === User::ROLE_USER && $user->manager_id) {
+                  $query->where('user_id', $user->manager_id);
+             } else {
+                  $query->where('user_id', $user->id);
+             }
+        }
+        $deviceIds = $query->pluck('device_id')->toArray();
 
         // List notifications by joining tc_device_notifications with tc_notifications first,
         // then joining tc_events based on deviceid and type from the first join.
@@ -36,7 +54,24 @@ class NotificationController extends Controller
     public function myDeviceIds(Request $request)
     {
         $user = $request->user();
-        $deviceIds = Devices::where('user_id', $user->id)->pluck('device_id')->toArray();
+
+        $query = Devices::query();
+        $role = (int) ($user->role ?? User::ROLE_ADMIN);
+
+        if ($role === User::ROLE_DISTRIBUTOR) {
+             $query->where('distributor_id', $user->id);
+        } elseif ($role !== User::ROLE_ADMIN) {
+             $distId = $user->distributor_id ?? $user->id;
+             $query->where('distributor_id', $distId);
+
+             if ($role === User::ROLE_USER && $user->manager_id) {
+                  $query->where('user_id', $user->manager_id);
+             } else {
+                  $query->where('user_id', $user->id);
+             }
+        }
+        $deviceIds = $query->pluck('device_id')->toArray();
+
         return response()->json($deviceIds);
     }
 

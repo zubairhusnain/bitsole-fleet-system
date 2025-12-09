@@ -32,8 +32,14 @@ class VehicleController extends Controller
                 $query->where('distributor_id', $user->id);
             } elseif ($role !== User::ROLE_ADMIN) {
                 $distId = $user->distributor_id ?? $user->id;
-                $query->where('distributor_id', $distId)
-                ->where('user_id', $user->id);
+                $query->where('distributor_id', $distId);
+
+                // If Fleet Viewer (ROLE_USER) has a manager, show manager's vehicles
+                if ($role === User::ROLE_USER && $user->manager_id) {
+                    $query->where('user_id', $user->manager_id);
+                } else {
+                    $query->where('user_id', $user->id);
+                }
             }
             // Admin sees all devices; no additional where
         }
@@ -61,8 +67,13 @@ class VehicleController extends Controller
                 $query->where('distributor_id', $user->id);
             } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
                 $distId = $user->distributor_id ?? $user->id;
-                $query->where('distributor_id', $distId)
-                      ->where('user_id', $user->id);
+                $query->where('distributor_id', $distId);
+
+                if ($role === \App\Models\User::ROLE_USER && $user->manager_id) {
+                    $query->where('user_id', $user->manager_id);
+                } else {
+                    $query->where('user_id', $user->id);
+                }
             }
         }
 

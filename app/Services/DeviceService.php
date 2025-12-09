@@ -171,8 +171,14 @@ class DeviceService
             } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
                 // Non-admin (user/fleet manager): user_id must match; distributor scoped to user's distributor
                 $distId = $user->distributor_id ?? $user->id;
-                $query->where('distributor_id', $distId)
-                      ->where('user_id', $user->id);
+                $query->where('distributor_id', $distId);
+
+                // If Fleet Viewer (ROLE_USER) has a manager, show manager's vehicles
+                if ($role === \App\Models\User::ROLE_USER && $user->manager_id) {
+                    $query->where('user_id', $user->manager_id);
+                } else {
+                    $query->where('user_id', $user->id);
+                }
             }
             // Admin: see all devices; no additional where
         }
