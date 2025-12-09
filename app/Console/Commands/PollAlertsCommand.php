@@ -74,20 +74,10 @@ class PollAlertsCommand extends Command
 
                 if ($newEvents->isNotEmpty()) {
                     foreach ($newEvents as $event) {
-                        $this->info("Processing event ID: {$event->id} - Type: {$event->type}");
+                        $this->info("Broadcasting event ID: {$event->id} - Type: {$event->type}");
 
-                        // Find users assigned to this device (excluding admins/distributors who don't want alerts)
-                        // We assume 'devices' table contains assignments for regular users/managers.
-                        $userIds = DB::table('devices')->where('device_id', $event->deviceid)->pluck('user_id');
-
-                        if ($userIds->isEmpty()) {
-                            $this->info("No assigned users for device ID: {$event->deviceid}");
-                        }
-
-                        foreach ($userIds as $userId) {
-                            $this->info("Broadcasting to User ID: {$userId}");
-                            broadcast(new NewAlertEvent($event, $userId));
-                        }
+                        // Broadcast the event
+                        broadcast(new NewAlertEvent($event));
 
                         // Update lastId
                         $lastId = $event->id;
@@ -99,13 +89,7 @@ class PollAlertsCommand extends Command
                 sleep(2);
 
             } catch (\Exception $e) {
-                $msg = $e->getMessage();
-                if (str_contains($msg, 'cURL error 7') || str_contains($msg, 'Connection refused')) {
-                    $this->error("Error: Cannot connect to Reverb server. Is it running?");
-                    $this->error("Run: php artisan reverb:start");
-                } else {
-                    $this->error("Error polling alerts: " . $msg);
-                }
+                $this->error("Error polling alerts: " . $e->getMessage());
                 sleep(5); // Sleep longer on error
             }
         }

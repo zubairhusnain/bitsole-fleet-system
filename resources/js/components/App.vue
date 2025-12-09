@@ -268,7 +268,6 @@ const year = new Date().getFullYear();
 const unreadCount = ref(0);
 const myDeviceIds = ref([]);
 let echoChannel = null;
-let currentChannelName = null;
 
 const isAuthed = computed(() => !!authState.user);
 
@@ -312,17 +311,16 @@ const fetchUnreadCount = async () => {
 const listenForAlerts = () => {
     if (echoChannel) return;
     if (!window.echo) return;
-    if (!authState.user || !authState.user.id) return;
 
-    currentChannelName = `alerts.${authState.user.id}`;
-    console.log(`Listening for alerts on private channel "${currentChannelName}"...`);
-
-    echoChannel = window.echo.private(currentChannelName)
+    echoChannel = window.echo.channel('alerts')
         .listen('.NewAlertEvent', (payload) => {
             console.log('New Alert Received:', payload);
-            // Refresh unread count from server to ensure accuracy
-            if (route.path !== '/alerts') {
-                fetchUnreadCount();
+            const e = payload.event;
+            // Check if event exists and belongs to user's devices
+            if (e && e.deviceid && myDeviceIds.value.includes(e.deviceid)) {
+                if (route.path !== '/alerts') {
+                    unreadCount.value++;
+                }
             }
         });
 };
@@ -353,7 +351,7 @@ watch(isAuthed, (val) => {
         });
     } else {
         if (echoChannel) {
-            window.echo.leave(currentChannelName || 'alerts');
+            window.echo.leave('alerts');
             echoChannel = null;
         }
     }
@@ -361,7 +359,7 @@ watch(isAuthed, (val) => {
 
 onUnmounted(() => {
     if (echoChannel) {
-        window.echo.leave(currentChannelName || 'alerts');
+        window.echo.leave('alerts');
     }
 });
 const isAdminOrDistributor = computed(() => {
