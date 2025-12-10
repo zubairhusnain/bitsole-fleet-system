@@ -94,6 +94,7 @@
         <div v-if="loadingNotifications" class="text-muted small mb-2">Loading notifications…</div>
         <div v-else-if="noAdminNotifications" class="text-muted small mb-2">No notifications are enabled in admin settings. Enable notifications in Admin Settings to manage device preferences.</div>
         <div v-else>
+        <!-- Notification Channels Hidden
         <div class="row g-3">
           <div class="col-12 col-sm-3">
             <div class="form-check form-switch">
@@ -114,6 +115,7 @@
             </div>
           </div>
         </div>
+        -->
 
         <div class="row mt-3 align-items-center">
           <div class="col-sm-6"><h6 class="mb-2">Alarms</h6></div>

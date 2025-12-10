@@ -12,6 +12,7 @@
       <div class="card-body p-3">
         <div v-if="loading" class="text-muted small mb-2">Loading notifications…</div>
 
+        <!-- Notification Channels Hidden
         <div class="row g-3">
           <div class="col-12 col-sm-3">
             <div class="form-check form-switch">
@@ -32,6 +33,7 @@
             </div>
           </div>
         </div>
+        -->
 
         <div class="row mt-3 align-items-center">
           <div class="col-sm-6"><h6 class="mb-2">Alarms</h6></div>
