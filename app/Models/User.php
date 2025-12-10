@@ -95,6 +95,11 @@ class User extends Authenticatable
         return $this->hasMany(User::class, 'manager_id');
     }
 
+    public function devices()
+    {
+        return $this->belongsToMany(Devices::class, 'device_user', 'user_id', 'device_id');
+    }
+
     public function canRead(string $moduleKey): bool { return \App\Support\Permissions::check($this, $moduleKey, 'read'); }
     public function canCreate(string $moduleKey): bool { return \App\Support\Permissions::check($this, $moduleKey, 'create'); }
     public function canUpdate(string $moduleKey): bool { return \App\Support\Permissions::check($this, $moduleKey, 'update'); }

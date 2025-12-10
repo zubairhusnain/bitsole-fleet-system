@@ -35,8 +35,13 @@ class ZoneController extends Controller
                 $query->where('distributor_id', $user->id);
             } elseif ($role !== User::ROLE_ADMIN) {
                 $distId = $user->distributor_id ?? $user->id;
-                $query->where('distributor_id', $distId)
-                      ->where('user_id', $user->id);
+                $query->where('distributor_id', $distId);
+
+                if ($role === User::ROLE_FLEET_MANAGER) {
+                    $query->where('user_id', $user->id);
+                } else {
+                    $query->where('user_id', $user->manager_id);
+                }
             }
             // Admin sees all zones
         }

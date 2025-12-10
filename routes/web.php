@@ -147,6 +147,7 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('
 Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/users')->group(function () {
     Route::get('/', [UserController::class, 'index']);
     Route::get('/options', [UserController::class, 'options']);
+    Route::get('/device-options', [\App\Http\Controllers\VehicleController::class, 'options']); // Reused options for users
     Route::get('/{userId}', [UserController::class, 'show']);
     Route::get('/{userId}/permissions', [UserController::class, 'permissions']);
     Route::put('/{userId}/permissions', [UserController::class, 'updatePermissions']);

@@ -18,25 +18,18 @@ class VehicleController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $role = (int) ($user->role ?? User::ROLE_ADMIN);
+
+        if ($request->boolean('mine')) {
+            $query = Devices::accessibleByUser($user);
+            $query->whereHas('users', function($q) use ($user) {
+                $q->where('users.id', $user->id);
+            });
+        } else {
+            $query = Devices::accessibleByUser($user);
+        }
 
         // Eager load tcDevice and its current position; include soft-deleted (blocked) devices
-        $query = Devices::withTrashed()->with(['tcDevice.position']);
-
-        // Optional: scope strictly to current user's assignment when requested
-        if ($request->boolean('mine')) {
-            $query->where('user_id', $user->id);
-        } else {
-            // Role-based scoping
-            if ($role === User::ROLE_DISTRIBUTOR) {
-                $query->where('distributor_id', $user->id);
-            } elseif ($role !== User::ROLE_ADMIN) {
-                $distId = $user->distributor_id ?? $user->id;
-                $query->where('distributor_id', $distId)
-                ->where('user_id', $user->id);
-            }
-            // Admin sees all devices; no additional where
-        }
+        $query->withTrashed()->with(['tcDevice.position']);
 
         $devices = $query->orderByDesc('id')->paginate(25);
 
@@ -50,20 +43,21 @@ class VehicleController extends Controller
     public function options(Request $request)
     {
         $user = $request->user();
-        $role = (int) ($user->role ?? User::ROLE_ADMIN);
-
-        $query = \App\Models\Devices::query()->with(['tcDevice']);
 
         if ($request->boolean('mine')) {
-            $query->where('user_id', $user->id);
+             $query = \App\Models\Devices::accessibleByUser($user);
+             $query->whereHas('users', function($q) use ($user) {
+                 $q->where('users.id', $user->id);
+             });
         } else {
-            if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-                $query->where('distributor_id', $user->id);
-            } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
-                $distId = $user->distributor_id ?? $user->id;
-                $query->where('distributor_id', $distId)
-                      ->where('user_id', $user->id);
-            }
+             $query = \App\Models\Devices::accessibleByUser($user);
+        }
+
+        $query->with(['tcDevice']);
+
+        // Allow seeing soft-deleted devices if requesting all, to match index listing
+        if ($request->boolean('includeAll') || $request->boolean('all')) {
+            $query->withTrashed();
         }
 
         $list = $query->get();
@@ -213,18 +207,32 @@ class VehicleController extends Controller
         // Derive local user/distributor based on role (default to admin when null)
         $user = $request->user();
         $role = (int) ($user->role ?? User::ROLE_ADMIN);
-        if ($role === User::ROLE_ADMIN || $role === User::ROLE_DISTRIBUTOR) {
-            $userIdLocal = $user->id;
+
+        $managerIdLocal = null;
+        $userIdLocal = null;
+        $distributorIdLocal = $user->id;
+
+        if ($role === User::ROLE_ADMIN) {
             $distributorIdLocal = $user->id;
-        } else {
             $userIdLocal = $user->id;
+        } elseif ($role === User::ROLE_DISTRIBUTOR) {
+            $distributorIdLocal = $user->id;
+            $userIdLocal = $user->id;
+        } elseif ($role === User::ROLE_FLEET_MANAGER) {
             $distributorIdLocal = $user->distributor_id ?? $user->id;
+            $managerIdLocal = $user->id;
+        } else {
+            // Fleet Viewer
+            $distributorIdLocal = $user->distributor_id ?? $user->id;
+            $managerIdLocal = $user->manager_id;
+            $userIdLocal = $user->id;
         }
 
         // Persist locally only after tracking server success
         $local = Devices::create([
             'device_id' => (int) $payload->id,
             'user_id' => $userIdLocal,
+            'manager_id' => $managerIdLocal,
             'distributor_id' => $distributorIdLocal,
         ]);
 
@@ -241,7 +249,10 @@ class VehicleController extends Controller
     public function show(Request $request, int $deviceId)
     {
         // Include tracking server device join for edit prefill
-        $device = Devices::with('tcDevice')->where('device_id', $deviceId)->firstOrFail();
+        $device = Devices::accessibleByUser($request->user())
+            ->with('tcDevice')
+            ->where('device_id', $deviceId)
+            ->firstOrFail();
         return response()->json($device);
     }
 
@@ -284,6 +295,12 @@ class VehicleController extends Controller
                 return response()->json(['message' => 'Speed Limit must be numeric and >= 0'], 422);
             }
         }
+        if (array_key_exists('fuelTankCapacity', $attributes) && $attributes['fuelTankCapacity'] !== null && $attributes['fuelTankCapacity'] !== '') {
+            $capStr = (string) $attributes['fuelTankCapacity'];
+            if (!preg_match('/^\d+(?:\.\d+)?$/', $capStr)) {
+                return response()->json(['message' => 'Fuel Tank Capacity must be numeric and >= 0'], 422);
+            }
+        }
         if (array_key_exists('registration', $attributes) && $attributes['registration'] !== null && $attributes['registration'] !== '') {
             $regStr = (string) $attributes['registration'];
             if (!preg_match('/^\d+$/', $regStr)) {
@@ -295,7 +312,7 @@ class VehicleController extends Controller
         // Load existing photos from tracking server attributes
         $existingPhotos = [];
         try {
-            $row = Devices::with('tcDevice')->where('device_id', $deviceId)->first();
+            $row = Devices::accessibleByUser($request->user())->with('tcDevice')->where('device_id', $deviceId)->first();
             $tc = $row ? $row->tcDevice : null;
             if ($tc && isset($tc->attributes)) {
                 $existingAttrs = is_array($tc->attributes)
@@ -359,7 +376,7 @@ class VehicleController extends Controller
         $payload = json_decode($tracking->response, false);
 
         // Sync local record by tracking server device id
-        $device = Devices::where('device_id', $deviceId)->first();
+        $device = Devices::accessibleByUser($request->user())->where('device_id', $deviceId)->first();
         if ($device) {
             $user = $request->user();
             $role = (int) ($user->role ?? User::ROLE_ADMIN);
@@ -400,7 +417,7 @@ class VehicleController extends Controller
 
         if (!$force) {
             // SOFT DELETE (block): mark local record as deleted, do not delete on tracking server
-            $device = Devices::where('device_id', $deviceId)->first();
+            $device = Devices::accessibleByUser($request->user())->where('device_id', $deviceId)->first();
             if (!$device) {
                 return response()->json(['message' => 'Vehicle not found'], 404);
             }
@@ -425,8 +442,13 @@ class VehicleController extends Controller
         // Load existing photo paths from local attributes
         $existingPhotos = [];
         try {
-            $row = Devices::with(['tcDevice'])->where('device_id', $deviceId)->first();
-            $tc = $row ? $row->tcDevice : null;
+            // Check access before deletion
+            $row = Devices::accessibleByUser($request->user())->withTrashed()->with(['tcDevice'])->where('device_id', $deviceId)->first();
+            if (!$row) {
+                return response()->json(['message' => 'Vehicle not found or access denied'], 404);
+            }
+
+            $tc = $row->tcDevice;
             if ($tc && isset($tc->attributes)) {
                 $attrs = is_array($tc->attributes)
                     ? $tc->attributes
@@ -475,7 +497,7 @@ class VehicleController extends Controller
         }
 
         // 3) Permanently delete local record if present
-        $device = Devices::withTrashed()->where('device_id', $deviceId)->first();
+        $device = Devices::accessibleByUser($request->user())->withTrashed()->where('device_id', $deviceId)->first();
         if ($device) {
             try {
                 // Ensure hard delete even if previously soft-deleted
@@ -504,19 +526,13 @@ class VehicleController extends Controller
     public function driver(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
         $user = $request->user();
-        $role = (int) ($user->role ?? User::ROLE_ADMIN);
 
+        // Ensure user has access to this device
+        // If not accessible, firstOrFail will throw 404
+        $device = Devices::accessibleByUser($user)->where('device_id', $deviceId)->firstOrFail();
+
+        // Fetch driver associated with this device
         $query = \App\Models\Drivers::query()->with(['tcDriver','tcDevice'])->where('device_id', $deviceId);
-        if ($request->boolean('mine')) {
-            $query->where('user_id', $user->id);
-        } else {
-            if ($role === User::ROLE_DISTRIBUTOR) {
-                $query->where('distributor_id', $user->id);
-            } elseif ($role !== User::ROLE_ADMIN) {
-                $distId = $user->distributor_id ?? $user->id;
-                $query->where('distributor_id', $distId)->where('user_id', $user->id);
-            }
-        }
 
         $row = $query->first();
         if (!$row) {
@@ -751,8 +767,14 @@ class VehicleController extends Controller
                     $zoneQuery->where('distributor_id', $user->id);
                 } else {
                     $distId = $user->distributor_id ?? $user->id;
-                    $zoneQuery->where('distributor_id', $distId)
-                          ->where('user_id', $user->id);
+                    $zoneQuery->where('distributor_id', $distId);
+
+                    if ($role === User::ROLE_FLEET_MANAGER) {
+                        $zoneQuery->where('user_id', $user->id);
+                    } else {
+                        // Fleet Viewer sees manager's zones
+                        $zoneQuery->where('user_id', $user->manager_id);
+                    }
                 }
             }
             $allowedIds = $zoneQuery->pluck('geofence_id')->filter()->unique();
@@ -842,17 +864,10 @@ class VehicleController extends Controller
     public function positions(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
         $user = $request->user();
-        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
-
         // Authorize via local Devices mapping
-        $query = \App\Models\Devices::query()->with(['tcDevice'])->where('device_id', $deviceId);
-        if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
-        } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
-            $distId = $user->distributor_id ?? $user->id;
-            $query->where('distributor_id', $distId)->where('user_id', $user->id);
-        }
-        $mapping = $query->firstOrFail();
+        \App\Models\Devices::accessibleByUser($user)
+            ->where('device_id', $deviceId)
+            ->firstOrFail();
 
         // Derive time window
         $from = $request->query('from');
@@ -893,17 +908,10 @@ class VehicleController extends Controller
     public function logsRaw(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
         $user = $request->user();
-        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
-
         // Authorization via local Devices mapping
-        $query = \App\Models\Devices::query()->with(['tcDevice'])->where('device_id', $deviceId);
-        if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
-        } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
-            $distId = $user->distributor_id ?? $user->id;
-            $query->where('distributor_id', $distId)->where('user_id', $user->id);
-        }
-        $mapping = $query->firstOrFail();
+        \App\Models\Devices::accessibleByUser($user)
+            ->where('device_id', $deviceId)
+            ->firstOrFail();
 
         // Derive time window (UTC ISO)
         $from = $request->query('from');
@@ -954,6 +962,13 @@ class VehicleController extends Controller
      */
     public function rating(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
+        $user = $request->user();
+
+        // Authorize via local Devices mapping using accessibleByUser
+        if (! \App\Models\Devices::accessibleByUser($user)->where('device_id', $deviceId)->exists()) {
+             return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         // Release session lock early to allow other concurrent requests (detail/performance)
         try { if (PHP_SESSION_ACTIVE === session_status()) { @session_write_close(); } } catch (\Throwable $e) {}
         // Default window: last 7 days, overrideable via query
@@ -1023,6 +1038,13 @@ class VehicleController extends Controller
      */
     public function performance(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
+        $user = $request->user();
+
+        // Authorize via local Devices mapping using accessibleByUser
+        if (! \App\Models\Devices::accessibleByUser($user)->where('device_id', $deviceId)->exists()) {
+             return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         // Release session lock early to allow concurrency with detail/trips
         try { if (PHP_SESSION_ACTIVE === session_status()) { @session_write_close(); } } catch (\Throwable $e) {}
         $start = microtime(true);
@@ -1232,17 +1254,13 @@ class VehicleController extends Controller
     public function restore(Request $request, int $deviceId)
     {
         $user = $request->user();
-        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
 
-        $query = \App\Models\Devices::withTrashed()->where('device_id', $deviceId);
-        if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
-        } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
-            $distId = $user->distributor_id ?? $user->id;
-            $query->where('distributor_id', $distId)->where('user_id', $user->id);
-        }
+        // Use accessibleByUser scope on the withTrashed query
+        $device = Devices::withTrashed()
+            ->accessibleByUser($user)
+            ->where('device_id', $deviceId)
+            ->first();
 
-        $device = $query->first();
         if (!$device) {
             return response()->json(['message' => 'Vehicle not found'], 404);
         }

@@ -21,7 +21,12 @@
                 </div>
                 <div class="mb-1">
                   <label class="form-label mb-2">Password</label>
-                  <input v-model="form.password" type="password" class="form-control" placeholder="Password" required :disabled="submitting" />
+                  <div class="position-relative">
+                    <input v-model="form.password" :type="showPassword ? 'text' : 'password'" class="form-control pe-5" placeholder="Password" required :disabled="submitting" />
+                    <button type="button" class="btn btn-link position-absolute top-50 end-0 translate-middle-y text-decoration-none text-muted" @click="showPassword = !showPassword" tabindex="-1">
+                      <i class="bi" :class="showPassword ? 'bi-eye-slash' : 'bi-eye'"></i>
+                    </button>
+                  </div>
                 </div>
                 <div class="auth-actions">
                   <div class="auth-remember">
@@ -67,6 +72,7 @@ const router = useRouter();
 const appName = document.title || 'Omayer Fleet System';
 const error = ref('');
 const submitting = ref(false);
+const showPassword = ref(false);
 const form = reactive({ email: '', password: '', remember: false });
 
 async function submit() {
