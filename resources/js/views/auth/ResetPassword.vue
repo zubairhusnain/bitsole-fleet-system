@@ -19,11 +19,21 @@
                 </div>
                 <div class="mb-3">
                   <label class="form-label">New Password</label>
-                  <input v-model="form.password" type="password" class="form-control" placeholder="••••••••" required />
+                  <div class="position-relative">
+                    <input v-model="form.password" :type="showPassword ? 'text' : 'password'" class="form-control pe-5" placeholder="••••••••" required />
+                    <button type="button" class="btn btn-link position-absolute top-50 end-0 translate-middle-y text-decoration-none text-muted" @click="showPassword = !showPassword" tabindex="-1">
+                      <i class="bi" :class="showPassword ? 'bi-eye-slash' : 'bi-eye'"></i>
+                    </button>
+                  </div>
                 </div>
                 <div class="mb-3">
                   <label class="form-label">Confirm Password</label>
-                  <input v-model="form.password_confirmation" type="password" class="form-control" placeholder="••••••••" required />
+                  <div class="position-relative">
+                    <input v-model="form.password_confirmation" :type="showConfirmPassword ? 'text' : 'password'" class="form-control pe-5" placeholder="••••••••" required />
+                    <button type="button" class="btn btn-link position-absolute top-50 end-0 translate-middle-y text-decoration-none text-muted" @click="showConfirmPassword = !showConfirmPassword" tabindex="-1">
+                      <i class="bi" :class="showConfirmPassword ? 'bi-eye-slash' : 'bi-eye'"></i>
+                    </button>
+                  </div>
                 </div>
                 <div class="d-grid gap-2">
                   <button type="submit" class="btn btn-primary">Update Password</button>
@@ -54,6 +64,8 @@ const logoSrc = assetBase + '/images/login-page-logo.png';
 const form = reactive({ email: '', password: '', password_confirmation: '' });
 const message = ref('');
 const error = ref('');
+const showPassword = ref(false);
+const showConfirmPassword = ref(false);
 
 async function submit() {
   message.value = '';

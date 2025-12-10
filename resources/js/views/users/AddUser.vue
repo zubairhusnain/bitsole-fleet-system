@@ -39,11 +39,21 @@
               </div>
               <div class="col-12 col-md-6">
                 <label class="form-label small">Password</label>
-                <input v-model="form.password" type="password" class="form-control" placeholder="Minimum 8 characters" />
+                <div class="position-relative">
+                  <input v-model="form.password" :type="showPassword ? 'text' : 'password'" class="form-control pe-5" placeholder="Minimum 8 characters" />
+                  <button type="button" class="btn btn-link position-absolute top-50 end-0 translate-middle-y text-decoration-none text-muted" @click="showPassword = !showPassword" tabindex="-1">
+                    <i class="bi" :class="showPassword ? 'bi-eye-slash' : 'bi-eye'"></i>
+                  </button>
+                </div>
               </div>
               <div class="col-12 col-md-6">
                 <label class="form-label small">Confirm Password</label>
-                <input v-model="form.password_confirmation" type="password" class="form-control" placeholder="Confirm Password" />
+                <div class="position-relative">
+                  <input v-model="form.password_confirmation" :type="showConfirmPassword ? 'text' : 'password'" class="form-control pe-5" placeholder="Confirm Password" />
+                  <button type="button" class="btn btn-link position-absolute top-50 end-0 translate-middle-y text-decoration-none text-muted" @click="showConfirmPassword = !showConfirmPassword" tabindex="-1">
+                    <i class="bi" :class="showConfirmPassword ? 'bi-eye-slash' : 'bi-eye'"></i>
+                  </button>
+                </div>
               </div>
             </div>
         </div>
@@ -63,9 +73,6 @@
               {{ labelForDevice(id) }}
               <button type="button" class="chip-remove" @click.stop="removeDevice(id)" aria-label="Remove">×</button>
             </span>
-            <button v-if="form.assignedDeviceIds.length" type="button" class="clear-btn" @click.stop="clearDevices" aria-label="Clear">
-              <i class="bi bi-x"></i>
-            </button>
             <i class="bi bi-caret-down-fill ms-auto small"></i>
           </div>
           <div class="dropdown-list" v-show="devicesOpen">
@@ -111,6 +118,8 @@ const form = reactive({
 const message = ref('');
 const error = ref('');
 const submitting = ref(false);
+const showPassword = ref(false);
+const showConfirmPassword = ref(false);
 const availableDevices = ref([]);
 const loadingDevices = ref(false);
 const devicesOpen = ref(false);

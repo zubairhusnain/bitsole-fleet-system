@@ -27,7 +27,9 @@ class NotificationController extends Controller
              if ($role === User::ROLE_FLEET_MANAGER) {
                   $query->where('manager_id', $user->id);
              } else {
-                  $query->where('user_id', $user->id);
+                  $query->whereHas('users', function($q) use ($user) {
+                      $q->where('users.id', $user->id);
+                  });
              }
         }
         $deviceIds = $query->pluck('device_id')->toArray();
@@ -67,7 +69,9 @@ class NotificationController extends Controller
              if ($role === User::ROLE_FLEET_MANAGER) {
                   $query->where('manager_id', $user->id);
              } else {
-                  $query->where('user_id', $user->id);
+                  $query->whereHas('users', function($q) use ($user) {
+                      $q->where('users.id', $user->id);
+                  });
              }
         }
         $deviceIds = $query->pluck('device_id')->toArray();

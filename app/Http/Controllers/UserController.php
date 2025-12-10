@@ -168,7 +168,7 @@ class UserController extends Controller
         return response()->json(['users' => $payload]);
     }
 
-    public function show(Request $request, int $userId)
+    public function show(Request $request, $userId)
     {
         $me = $request->user();
         $builder = $this->scopeUsersFor($me);
@@ -195,14 +195,14 @@ class UserController extends Controller
             'distributor_id' => $u->distributor_id,
             'distributorName' => $distName,
             'manager_id' => $u->manager_id,
-            'assigned_device_ids' => \App\Models\Devices::where('user_id', $u->id)->pluck('device_id')->toArray(),
+            'assigned_device_ids' => $u->devices()->pluck('devices.device_id')->toArray(),
         ]);
     }
 
     /**
      * List a user's module permissions.
      */
-    public function permissions(Request $request, int $userId)
+    public function permissions(Request $request, $userId)
     {
         $me = $request->user();
         $target = User::query()->find($userId);
@@ -237,7 +237,7 @@ class UserController extends Controller
     /**
      * Update a user's module permissions: expects { permissions: [{ key, can_access }] }
      */
-    public function updatePermissions(Request $request, int $userId)
+    public function updatePermissions(Request $request, $userId)
     {
         $me = $request->user();
         $target = User::query()->find($userId);
@@ -336,10 +336,11 @@ class UserController extends Controller
         // Vehicle Assignment (Fleet Manager only)
         if ($request->has('device_ids') && $me->isFleetManager() && $role === User::ROLE_USER) {
             $deviceIds = $request->input('device_ids');
-            if (is_array($deviceIds) && !empty($deviceIds)) {
-                \App\Models\Devices::where('manager_id', $me->id)
+            if (is_array($deviceIds)) {
+                $validInternalIds = \App\Models\Devices::where('manager_id', $me->id)
                     ->whereIn('device_id', $deviceIds)
-                    ->update(['user_id' => $u->id]);
+                    ->pluck('id');
+                $u->devices()->sync($validInternalIds);
             }
         }
 
@@ -358,7 +359,7 @@ class UserController extends Controller
         ], 201);
     }
 
-    public function update(Request $request, int $userId)
+    public function update(Request $request, $userId)
     {
         $me = $request->user();
         if (!$me) { return response()->json(['message' => 'Unauthorized'], 401); }
@@ -416,17 +417,10 @@ class UserController extends Controller
         if ($request->has('device_ids') && $me->isFleetManager() && (int)$target->role === User::ROLE_USER) {
             $deviceIds = $request->input('device_ids');
             if (is_array($deviceIds)) {
-                // 1. Unassign all devices owned by this manager currently assigned to this user
-                \App\Models\Devices::where('manager_id', $me->id)
-                    ->where('user_id', $target->id)
-                    ->update(['user_id' => null]);
-
-                // 2. Assign selected devices (must be owned by this manager)
-                if (!empty($deviceIds)) {
-                    \App\Models\Devices::where('manager_id', $me->id)
-                        ->whereIn('device_id', $deviceIds)
-                        ->update(['user_id' => $target->id]);
-                }
+                $validInternalIds = \App\Models\Devices::where('manager_id', $me->id)
+                    ->whereIn('device_id', $deviceIds)
+                    ->pluck('id');
+                $target->devices()->sync($validInternalIds);
             }
         }
 
@@ -445,7 +439,7 @@ class UserController extends Controller
         ]);
     }
 
-    public function destroy(Request $request, int $userId)
+    public function destroy(Request $request, $userId)
     {
         $me = $request->user();
         if (!$me) { return response()->json(['message' => 'Unauthorized'], 401); }
@@ -515,7 +509,7 @@ class UserController extends Controller
     /**
      * Restore (activate) a soft-deleted user.
      */
-    public function restore(Request $request, int $userId)
+    public function restore(Request $request, $userId)
     {
         $me = $request->user();
         if (!$me) { return response()->json(['message' => 'Unauthorized'], 401); }

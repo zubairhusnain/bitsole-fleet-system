@@ -31,4 +31,9 @@ class Devices extends Model
     {
         return $this->belongsTo(TcDevice::class, 'device_id', 'id');
     }
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'device_user', 'device_id', 'user_id');
+    }
 }
