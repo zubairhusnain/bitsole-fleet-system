@@ -168,7 +168,7 @@ class UserController extends Controller
         return response()->json(['users' => $payload]);
     }
 
-    public function show(Request $request, int $userId)
+    public function show(Request $request, $userId)
     {
         $me = $request->user();
         $builder = $this->scopeUsersFor($me);
@@ -195,13 +195,14 @@ class UserController extends Controller
             'distributor_id' => $u->distributor_id,
             'distributorName' => $distName,
             'manager_id' => $u->manager_id,
+            'assigned_device_ids' => $u->devices()->pluck('devices.device_id')->toArray(),
         ]);
     }
 
     /**
      * List a user's module permissions.
      */
-    public function permissions(Request $request, int $userId)
+    public function permissions(Request $request, $userId)
     {
         $me = $request->user();
         $target = User::query()->find($userId);
@@ -236,7 +237,7 @@ class UserController extends Controller
     /**
      * Update a user's module permissions: expects { permissions: [{ key, can_access }] }
      */
-    public function updatePermissions(Request $request, int $userId)
+    public function updatePermissions(Request $request, $userId)
     {
         $me = $request->user();
         $target = User::query()->find($userId);
@@ -331,6 +332,18 @@ class UserController extends Controller
         ];
 
         $u = User::create($payload);
+
+        // Vehicle Assignment (Fleet Manager only)
+        if ($request->has('device_ids') && $me->isFleetManager() && $role === User::ROLE_USER) {
+            $deviceIds = $request->input('device_ids');
+            if (is_array($deviceIds)) {
+                $validInternalIds = \App\Models\Devices::where('manager_id', $me->id)
+                    ->whereIn('device_id', $deviceIds)
+                    ->pluck('id');
+                $u->devices()->sync($validInternalIds);
+            }
+        }
+
         return response()->json([
             'message' => 'User created',
             'user' => [
@@ -346,7 +359,7 @@ class UserController extends Controller
         ], 201);
     }
 
-    public function update(Request $request, int $userId)
+    public function update(Request $request, $userId)
     {
         $me = $request->user();
         if (!$me) { return response()->json(['message' => 'Unauthorized'], 401); }
@@ -400,6 +413,17 @@ class UserController extends Controller
         $target->fill($data);
         $target->save();
 
+        // Vehicle Assignment (Fleet Manager only)
+        if ($request->has('device_ids') && $me->isFleetManager() && (int)$target->role === User::ROLE_USER) {
+            $deviceIds = $request->input('device_ids');
+            if (is_array($deviceIds)) {
+                $validInternalIds = \App\Models\Devices::where('manager_id', $me->id)
+                    ->whereIn('device_id', $deviceIds)
+                    ->pluck('id');
+                $target->devices()->sync($validInternalIds);
+            }
+        }
+
         return response()->json([
             'message' => 'User updated',
             'user' => [
@@ -415,7 +439,7 @@ class UserController extends Controller
         ]);
     }
 
-    public function destroy(Request $request, int $userId)
+    public function destroy(Request $request, $userId)
     {
         $me = $request->user();
         if (!$me) { return response()->json(['message' => 'Unauthorized'], 401); }
@@ -485,7 +509,7 @@ class UserController extends Controller
     /**
      * Restore (activate) a soft-deleted user.
      */
-    public function restore(Request $request, int $userId)
+    public function restore(Request $request, $userId)
     {
         $me = $request->user();
         if (!$me) { return response()->json(['message' => 'Unauthorized'], 401); }

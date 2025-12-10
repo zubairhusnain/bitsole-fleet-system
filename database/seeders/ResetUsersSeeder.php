@@ -86,8 +86,9 @@ class ResetUsersSeeder extends Seeder
         // in the devices table to the new Fleet Manager and Distributor.
         // We use withTrashed() to include any soft-deleted device records.
         $updatedCount = Devices::withTrashed()->update([
-            'user_id' => $fleetManager->id,
+            'manager_id' => $fleetManager->id,
             'distributor_id' => $distributor->id,
+            'user_id' => null, // Clear legacy user assignment
         ]);
 
         // 7. Update Existing Drivers

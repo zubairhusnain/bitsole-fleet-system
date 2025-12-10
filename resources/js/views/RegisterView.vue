@@ -34,11 +34,21 @@
                   </div>
                   <div class="col-12">
                     <label class="form-label">Password</label>
-                    <input v-model="form.password" type="password" class="form-control" placeholder="Password" required :disabled="submitting" />
+                    <div class="position-relative">
+                      <input v-model="form.password" :type="showPassword ? 'text' : 'password'" class="form-control pe-5" placeholder="Password" required :disabled="submitting" />
+                      <button type="button" class="btn btn-link position-absolute top-50 end-0 translate-middle-y text-decoration-none text-muted" @click="showPassword = !showPassword" tabindex="-1">
+                        <i class="bi" :class="showPassword ? 'bi-eye-slash' : 'bi-eye'"></i>
+                      </button>
+                    </div>
                   </div>
                   <div class="col-12">
                     <label class="form-label">Confirm Password</label>
-                    <input v-model="form.password_confirmation" type="password" class="form-control" placeholder="Confirm Password" required :disabled="submitting" />
+                    <div class="position-relative">
+                      <input v-model="form.password_confirmation" :type="showConfirmPassword ? 'text' : 'password'" class="form-control pe-5" placeholder="Confirm Password" required :disabled="submitting" />
+                      <button type="button" class="btn btn-link position-absolute top-50 end-0 translate-middle-y text-decoration-none text-muted" @click="showConfirmPassword = !showConfirmPassword" tabindex="-1">
+                        <i class="bi" :class="showConfirmPassword ? 'bi-eye-slash' : 'bi-eye'"></i>
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div class="form-check mt-3 mb-3">
@@ -82,6 +92,8 @@ const router = useRouter();
 const appName = document.title || 'Omayer Fleet System';
 const error = ref('');
 const submitting = ref(false);
+const showPassword = ref(false);
+const showConfirmPassword = ref(false);
 const form = reactive({ firstName: '', lastName: '', email: '', phone: '', password: '', password_confirmation: '' });
 
 async function submit() {

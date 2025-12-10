@@ -25,15 +25,24 @@ class VehicleController extends Controller
 
         // Optional: scope strictly to current user's assignment when requested
         if ($request->boolean('mine')) {
-            $query->where('user_id', $user->id);
+            $query->whereHas('users', function($q) use ($user) {
+                $q->where('users.id', $user->id);
+            });
         } else {
             // Role-based scoping
             if ($role === User::ROLE_DISTRIBUTOR) {
                 $query->where('distributor_id', $user->id);
             } elseif ($role !== User::ROLE_ADMIN) {
                 $distId = $user->distributor_id ?? $user->id;
-                $query->where('distributor_id', $distId)
-                ->where('user_id', $user->id);
+                $query->where('distributor_id', $distId);
+
+                if ($role === User::ROLE_FLEET_MANAGER) {
+                    $query->where('manager_id', $user->id);
+                } else {
+                    $query->whereHas('users', function($q) use ($user) {
+                        $q->where('users.id', $user->id);
+                    });
+                }
             }
             // Admin sees all devices; no additional where
         }
@@ -54,15 +63,29 @@ class VehicleController extends Controller
 
         $query = \App\Models\Devices::query()->with(['tcDevice']);
 
+        // Allow seeing soft-deleted devices if requesting all, to match index listing
+        if ($request->boolean('includeAll') || $request->boolean('all')) {
+            $query->withTrashed();
+        }
+
         if ($request->boolean('mine')) {
-            $query->where('user_id', $user->id);
+            $query->whereHas('users', function($q) use ($user) {
+                $q->where('users.id', $user->id);
+            });
         } else {
             if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
                 $query->where('distributor_id', $user->id);
             } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
                 $distId = $user->distributor_id ?? $user->id;
-                $query->where('distributor_id', $distId)
-                      ->where('user_id', $user->id);
+                $query->where('distributor_id', $distId);
+
+                if ($role === \App\Models\User::ROLE_FLEET_MANAGER) {
+                     $query->where('manager_id', $user->id);
+                } else {
+                     $query->whereHas('users', function($q) use ($user) {
+                         $q->where('users.id', $user->id);
+                     });
+                }
             }
         }
 
@@ -213,18 +236,32 @@ class VehicleController extends Controller
         // Derive local user/distributor based on role (default to admin when null)
         $user = $request->user();
         $role = (int) ($user->role ?? User::ROLE_ADMIN);
-        if ($role === User::ROLE_ADMIN || $role === User::ROLE_DISTRIBUTOR) {
-            $userIdLocal = $user->id;
+
+        $managerIdLocal = null;
+        $userIdLocal = null;
+        $distributorIdLocal = $user->id;
+
+        if ($role === User::ROLE_ADMIN) {
             $distributorIdLocal = $user->id;
-        } else {
             $userIdLocal = $user->id;
+        } elseif ($role === User::ROLE_DISTRIBUTOR) {
+            $distributorIdLocal = $user->id;
+            $userIdLocal = $user->id;
+        } elseif ($role === User::ROLE_FLEET_MANAGER) {
             $distributorIdLocal = $user->distributor_id ?? $user->id;
+            $managerIdLocal = $user->id;
+        } else {
+            // Fleet Viewer
+            $distributorIdLocal = $user->distributor_id ?? $user->id;
+            $managerIdLocal = $user->manager_id;
+            $userIdLocal = $user->id;
         }
 
         // Persist locally only after tracking server success
         $local = Devices::create([
             'device_id' => (int) $payload->id,
             'user_id' => $userIdLocal,
+            'manager_id' => $managerIdLocal,
             'distributor_id' => $distributorIdLocal,
         ]);
 
@@ -514,7 +551,13 @@ class VehicleController extends Controller
                 $query->where('distributor_id', $user->id);
             } elseif ($role !== User::ROLE_ADMIN) {
                 $distId = $user->distributor_id ?? $user->id;
-                $query->where('distributor_id', $distId)->where('user_id', $user->id);
+                $query->where('distributor_id', $distId);
+
+                if ($role === User::ROLE_FLEET_MANAGER) {
+                    $query->where('user_id', $user->id);
+                } else {
+                    $query->where('user_id', $user->manager_id);
+                }
             }
         }
 
@@ -751,8 +794,14 @@ class VehicleController extends Controller
                     $zoneQuery->where('distributor_id', $user->id);
                 } else {
                     $distId = $user->distributor_id ?? $user->id;
-                    $zoneQuery->where('distributor_id', $distId)
-                          ->where('user_id', $user->id);
+                    $zoneQuery->where('distributor_id', $distId);
+
+                    if ($role === User::ROLE_FLEET_MANAGER) {
+                        $zoneQuery->where('user_id', $user->id);
+                    } else {
+                        // Fleet Viewer sees manager's zones
+                        $zoneQuery->where('user_id', $user->manager_id);
+                    }
                 }
             }
             $allowedIds = $zoneQuery->pluck('geofence_id')->filter()->unique();
@@ -845,14 +894,22 @@ class VehicleController extends Controller
         $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
 
         // Authorize via local Devices mapping
-        $query = \App\Models\Devices::query()->with(['tcDevice'])->where('device_id', $deviceId);
+        $query = \App\Models\Devices::query()->where('device_id', $deviceId);
         if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
+            $query->where('distributor_id', $user->id);
         } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
             $distId = $user->distributor_id ?? $user->id;
-            $query->where('distributor_id', $distId)->where('user_id', $user->id);
+            $query->where('distributor_id', $distId);
+
+            if ($role === \App\Models\User::ROLE_FLEET_MANAGER) {
+                $query->where('manager_id', $user->id);
+            } else {
+                $query->whereHas('users', function($q) use ($user) {
+                    $q->where('users.id', $user->id);
+                });
+            }
         }
-        $mapping = $query->firstOrFail();
+        $query->firstOrFail();
 
         // Derive time window
         $from = $request->query('from');
@@ -896,14 +953,22 @@ class VehicleController extends Controller
         $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
 
         // Authorization via local Devices mapping
-        $query = \App\Models\Devices::query()->with(['tcDevice'])->where('device_id', $deviceId);
+        $query = \App\Models\Devices::query()->where('device_id', $deviceId);
         if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
+            $query->where('distributor_id', $user->id);
         } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
             $distId = $user->distributor_id ?? $user->id;
-            $query->where('distributor_id', $distId)->where('user_id', $user->id);
+            $query->where('distributor_id', $distId);
+
+            if ($role === \App\Models\User::ROLE_FLEET_MANAGER) {
+                $query->where('manager_id', $user->id);
+            } else {
+                $query->whereHas('users', function($q) use ($user) {
+                    $q->where('users.id', $user->id);
+                });
+            }
         }
-        $mapping = $query->firstOrFail();
+        $query->firstOrFail();
 
         // Derive time window (UTC ISO)
         $from = $request->query('from');
@@ -954,6 +1019,29 @@ class VehicleController extends Controller
      */
     public function rating(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
+        $user = $request->user();
+        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
+
+        // Authorize via local Devices mapping
+        $query = \App\Models\Devices::query()->where('device_id', $deviceId);
+        if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
+            $query->where('distributor_id', $user->id);
+        } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
+            $distId = $user->distributor_id ?? $user->id;
+            $query->where('distributor_id', $distId);
+
+            if ($role === \App\Models\User::ROLE_FLEET_MANAGER) {
+                $query->where('manager_id', $user->id);
+            } else {
+                $query->whereHas('users', function($q) use ($user) {
+                    $q->where('users.id', $user->id);
+                });
+            }
+        }
+        if (!$query->exists()) {
+             return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         // Release session lock early to allow other concurrent requests (detail/performance)
         try { if (PHP_SESSION_ACTIVE === session_status()) { @session_write_close(); } } catch (\Throwable $e) {}
         // Default window: last 7 days, overrideable via query
@@ -1023,6 +1111,29 @@ class VehicleController extends Controller
      */
     public function performance(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
     {
+        $user = $request->user();
+        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
+
+        // Authorize via local Devices mapping
+        $query = \App\Models\Devices::query()->where('device_id', $deviceId);
+        if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
+            $query->where('distributor_id', $user->id);
+        } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
+            $distId = $user->distributor_id ?? $user->id;
+            $query->where('distributor_id', $distId);
+
+            if ($role === \App\Models\User::ROLE_FLEET_MANAGER) {
+                $query->where('manager_id', $user->id);
+            } else {
+                $query->whereHas('users', function($q) use ($user) {
+                    $q->where('users.id', $user->id);
+                });
+            }
+        }
+        if (!$query->exists()) {
+             return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         // Release session lock early to allow concurrency with detail/trips
         try { if (PHP_SESSION_ACTIVE === session_status()) { @session_write_close(); } } catch (\Throwable $e) {}
         $start = microtime(true);
@@ -1236,10 +1347,19 @@ class VehicleController extends Controller
 
         $query = \App\Models\Devices::withTrashed()->where('device_id', $deviceId);
         if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-            $query->where('user_id', $user->id)->where('distributor_id', $user->id);
+            $query->where('distributor_id', $user->id);
         } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
             $distId = $user->distributor_id ?? $user->id;
-            $query->where('distributor_id', $distId)->where('user_id', $user->id);
+            $query->where('distributor_id', $distId);
+
+            if ($role === \App\Models\User::ROLE_FLEET_MANAGER) {
+                $query->where('manager_id', $user->id);
+            } else {
+                // Fleet Viewers cannot restore usually, but if they could:
+                $query->whereHas('users', function($q) use ($user) {
+                    $q->where('users.id', $user->id);
+                });
+            }
         }
 
         $device = $query->first();

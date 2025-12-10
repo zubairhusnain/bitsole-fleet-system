@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\DeleteAlertEvent;
 use App\Models\Devices;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Events\AlertsUpdated;
@@ -23,12 +24,25 @@ class NotificationController extends Controller
     {
         $user = $request->user();
 
-        // No events for Super Admin (3) and Distributor (2)
-        if ($user->role === 3 || $user->role === 2) {
-            return response()->json([]);
-        }
+        // Scope devices for this user (mirror VehicleController role logic)
+        $query = Devices::query();
+        $role = (int) ($user->role ?? User::ROLE_ADMIN);
 
-        $deviceIds = Devices::where('user_id', $user->id)->pluck('device_id')->toArray();
+        if ($role === User::ROLE_DISTRIBUTOR) {
+             $query->where('distributor_id', $user->id);
+        } elseif ($role !== User::ROLE_ADMIN) {
+             $distId = $user->distributor_id ?? $user->id;
+             $query->where('distributor_id', $distId);
+
+             if ($role === User::ROLE_FLEET_MANAGER) {
+                  $query->where('manager_id', $user->id);
+             } else {
+                  $query->whereHas('users', function($q) use ($user) {
+                      $q->where('users.id', $user->id);
+                  });
+             }
+        }
+        $deviceIds = $query->pluck('device_id')->toArray();
 
         // List notifications by joining tc_notifications based on type,
         // then left joining tc_device_notification to check for assignment.
@@ -59,10 +73,26 @@ class NotificationController extends Controller
     public function unreadCount(Request $request)
     {
         $user = $request->user();
-        if ($user->role === 3 || $user->role === 2) {
-            return response()->json(['count' => 0]);
+
+        // Scope devices for this user (mirror VehicleController role logic)
+        $query = Devices::query();
+        $role = (int) ($user->role ?? User::ROLE_ADMIN);
+
+        if ($role === User::ROLE_DISTRIBUTOR) {
+             $query->where('distributor_id', $user->id);
+        } elseif ($role !== User::ROLE_ADMIN) {
+             $distId = $user->distributor_id ?? $user->id;
+             $query->where('distributor_id', $distId);
+
+             if ($role === User::ROLE_FLEET_MANAGER) {
+                  $query->where('manager_id', $user->id);
+             } else {
+                  $query->whereHas('users', function($q) use ($user) {
+                      $q->where('users.id', $user->id);
+                  });
+             }
         }
-        $deviceIds = Devices::where('user_id', $user->id)->pluck('device_id')->toArray();
+        $deviceIds = $query->pluck('device_id')->toArray();
 
         $count = DB::connection('pgsql')->table('tc_events as e')
             ->join('tc_notifications as n', 'e.type', '=', 'n.type')
@@ -85,11 +115,26 @@ class NotificationController extends Controller
     public function markAllRead(Request $request)
     {
         $user = $request->user();
-        if ($user->role === 3 || $user->role === 2) {
-             return response()->json(['success' => true]);
-        }
 
-        $deviceIds = Devices::where('user_id', $user->id)->pluck('device_id')->toArray();
+        // Scope devices for this user (mirror VehicleController role logic)
+        $query = Devices::query();
+        $role = (int) ($user->role ?? User::ROLE_ADMIN);
+
+        if ($role === User::ROLE_DISTRIBUTOR) {
+             $query->where('distributor_id', $user->id);
+        } elseif ($role !== User::ROLE_ADMIN) {
+             $distId = $user->distributor_id ?? $user->id;
+             $query->where('distributor_id', $distId);
+
+             if ($role === User::ROLE_FLEET_MANAGER) {
+                  $query->where('manager_id', $user->id);
+             } else {
+                  $query->whereHas('users', function($q) use ($user) {
+                      $q->where('users.id', $user->id);
+                  });
+             }
+        }
+        $deviceIds = $query->pluck('device_id')->toArray();
 
         $eventIds = DB::connection('pgsql')->table('tc_events as e')
             ->join('tc_notifications as n', 'e.type', '=', 'n.type')
@@ -119,12 +164,25 @@ class NotificationController extends Controller
     {
         $user = $request->user();
 
-        // No live alerts for Super Admin (3) and Distributor (2)
-        if ($user->role === 3 || $user->role === 2) {
-            return response()->json([]);
-        }
+        $query = Devices::query();
+        $role = (int) ($user->role ?? User::ROLE_ADMIN);
 
-        $deviceIds = Devices::where('user_id', $user->id)->pluck('device_id')->toArray();
+        if ($role === User::ROLE_DISTRIBUTOR) {
+             $query->where('distributor_id', $user->id);
+        } elseif ($role !== User::ROLE_ADMIN) {
+             $distId = $user->distributor_id ?? $user->id;
+             $query->where('distributor_id', $distId);
+
+             if ($role === User::ROLE_FLEET_MANAGER) {
+                  $query->where('manager_id', $user->id);
+             } else {
+                  $query->whereHas('users', function($q) use ($user) {
+                      $q->where('users.id', $user->id);
+                  });
+             }
+        }
+        $deviceIds = $query->pluck('device_id')->toArray();
+
         return response()->json($deviceIds);
     }
 
@@ -175,4 +233,3 @@ class NotificationController extends Controller
         return response()->json(['response' => $resp]);
     }
 }
-

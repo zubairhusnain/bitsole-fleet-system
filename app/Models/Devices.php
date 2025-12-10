@@ -17,16 +17,23 @@ class Devices extends Model
         'device_id',
         'user_id',
         'distributor_id',
+        'manager_id',
     ];
 
     protected $casts = [
         'device_id' => 'integer',
         'user_id' => 'integer',
         'distributor_id' => 'integer',
+        'manager_id' => 'integer',
     ];
 
     public function tcDevice(): BelongsTo
     {
         return $this->belongsTo(TcDevice::class, 'device_id', 'id');
+    }
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'device_user', 'device_id', 'user_id');
     }
 }

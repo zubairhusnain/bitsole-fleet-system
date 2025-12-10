@@ -45,7 +45,12 @@
                 </div>
                 <div class="col-12 col-md-6">
                   <label class="form-label">Password</label>
-                  <input type="password" class="form-control" v-model="edit.password" placeholder="Leave blank to keep current" />
+                  <div class="position-relative">
+                    <input :type="showPassword ? 'text' : 'password'" class="form-control pe-5" v-model="edit.password" placeholder="Leave blank to keep current" />
+                    <button type="button" class="btn btn-link position-absolute top-50 end-0 translate-middle-y text-decoration-none text-muted" @click="showPassword = !showPassword" tabindex="-1">
+                      <i class="bi" :class="showPassword ? 'bi-eye-slash' : 'bi-eye'"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -108,6 +113,7 @@ const success = ref('');
 const user = ref({});
 const permissions = ref({});
 const saving = ref(false);
+const showPassword = ref(false);
 const edit = ref({ name: '', email: '', phone: '', password: '' });
 
 const role = computed(() => Number(user.value?.role ?? 0));

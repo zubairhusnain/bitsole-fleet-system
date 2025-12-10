@@ -163,7 +163,9 @@ class DeviceService
         $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
         if ($mine) {
             // Strictly the current user's assigned devices
-            $query->where('user_id', $user->id);
+            $query->whereHas('users', function($q) use ($user) {
+                $q->where('users.id', $user->id);
+            });
         } else {
             if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
                 // Distributor: scope by distributor only
@@ -171,8 +173,15 @@ class DeviceService
             } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
                 // Non-admin (user/fleet manager): user_id must match; distributor scoped to user's distributor
                 $distId = $user->distributor_id ?? $user->id;
-                $query->where('distributor_id', $distId)
-                      ->where('user_id', $user->id);
+                $query->where('distributor_id', $distId);
+
+                if ($role === \App\Models\User::ROLE_FLEET_MANAGER) {
+                    $query->where('manager_id', $user->id);
+                } else {
+                    $query->whereHas('users', function($q) use ($user) {
+                        $q->where('users.id', $user->id);
+                    });
+                }
             }
             // Admin: see all devices; no additional where
         }
