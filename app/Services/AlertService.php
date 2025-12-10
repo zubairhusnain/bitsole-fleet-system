@@ -17,14 +17,9 @@ class AlertService
      */
     public function getLiveAlerts(User $user, array $options = [])
     {
-        // No alerts for Super Admin (3) and Distributor (2) if needed,
-        // but typically they might want to see them if they monitor devices.
-        // However, NotificationController::events excludes them. I will follow that.
-        if ($user->role === 3 || $user->role === 2) {
-            return [];
-        }
-
-        $deviceIds = Devices::where('user_id', $user->id)->pluck('device_id')->toArray();
+        // 1. Get allowed device IDs based on role
+        $query = Devices::accessibleByUser($user);
+        $deviceIds = $query->pluck('device_id')->toArray();
 
         if (empty($deviceIds)) {
             return [];

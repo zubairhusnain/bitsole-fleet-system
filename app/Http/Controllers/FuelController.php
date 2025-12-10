@@ -17,7 +17,8 @@ class FuelController extends Controller
         $user = $request->user();
 
         // Get allowed device IDs
-        $deviceIds = Devices::where('user_id', $user->id)->pluck('device_id')->toArray();
+        $devQuery = Devices::accessibleByUser($user);
+        $deviceIds = $devQuery->pluck('device_id')->toArray();
 
         $query = FuelEntry::withTrashed()->with('device:id,name')
             ->whereIn('device_id', $deviceIds);
@@ -62,6 +63,17 @@ class FuelController extends Controller
         ]);
 
         // TODO: Add stricter permission check (can user write to this device?)
+        // Permission Check:
+        $user = $request->user();
+        $targetDeviceId = $validated['device_id'];
+
+        $canAccess = Devices::accessibleByUser($user)
+            ->where('device_id', $targetDeviceId)
+            ->exists();
+
+        if (!$canAccess) {
+             return response()->json(['message' => 'Forbidden: You do not have access to this device'], 403);
+        }
 
         $entry = FuelEntry::create($validated);
 
@@ -71,9 +83,18 @@ class FuelController extends Controller
     /**
      * Get a single fuel entry.
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $entry = FuelEntry::findOrFail($id);
+
+        $canAccess = Devices::accessibleByUser($request->user())
+            ->where('device_id', $entry->device_id)
+            ->exists();
+
+        if (!$canAccess) {
+             return response()->json(['message' => 'Forbidden: You do not have access to this device'], 403);
+        }
+
         return response()->json($entry);
     }
 
@@ -94,6 +115,19 @@ class FuelController extends Controller
         ]);
 
         $entry = FuelEntry::findOrFail($id);
+
+        // Permission Check:
+        $user = $request->user();
+        $targetDeviceId = $validated['device_id'] ?? $entry->device_id; // Check new device if changing, or current if not
+
+        $canAccess = Devices::accessibleByUser($user)
+            ->where('device_id', $targetDeviceId)
+            ->exists();
+
+        if (!$canAccess) {
+             return response()->json(['message' => 'Forbidden: You do not have access to this device'], 403);
+        }
+
         $entry->update($validated);
 
         return response()->json($entry);
@@ -104,15 +138,23 @@ class FuelController extends Controller
      */
     public function destroy(Request $request, $id)
     {
+        // Find entry first to check permission
+        $entry = FuelEntry::withTrashed()->findOrFail($id);
+
+        $canAccess = Devices::accessibleByUser($request->user())
+            ->where('device_id', $entry->device_id)
+            ->exists();
+
+        if (!$canAccess) {
+             return response()->json(['message' => 'Forbidden: You do not have access to this device'], 403);
+        }
+
         // Handle force delete
         if ($request->boolean('force')) {
-            $entry = FuelEntry::withTrashed()->findOrFail($id);
             $entry->forceDelete();
             return response()->json(['message' => 'Permanently deleted']);
         }
 
-        $entry = FuelEntry::findOrFail($id);
-        // TODO: Add stricter permission check
         $entry->delete();
         return response()->json(['message' => 'Blocked successfully']);
     }
@@ -120,9 +162,18 @@ class FuelController extends Controller
     /**
      * Restore a deleted (blocked) fuel entry.
      */
-    public function restore($id)
+    public function restore(Request $request, $id)
     {
         $entry = FuelEntry::withTrashed()->findOrFail($id);
+
+        $canAccess = Devices::accessibleByUser($request->user())
+            ->where('device_id', $entry->device_id)
+            ->exists();
+
+        if (!$canAccess) {
+             return response()->json(['message' => 'Forbidden: You do not have access to this device'], 403);
+        }
+
         $entry->restore();
         return response()->json(['message' => 'Restored successfully']);
     }
@@ -133,7 +184,8 @@ class FuelController extends Controller
     public function summary(Request $request)
     {
         $user = $request->user();
-        $deviceIds = Devices::where('user_id', $user->id)->pluck('device_id')->toArray();
+        $devQuery = Devices::accessibleByUser($user);
+        $deviceIds = $devQuery->pluck('device_id')->toArray();
 
         $query = FuelEntry::whereIn('device_id', $deviceIds);
 
@@ -164,8 +216,8 @@ class FuelController extends Controller
         $user = $request->user();
 
         // Get devices assigned to the user
-        $devices = Devices::with('tcDevice')
-            ->where('user_id', $user->id)
+        $devices = Devices::accessibleByUser($user)
+            ->with('tcDevice')
             ->get();
 
         $options = $devices->map(function ($d) {

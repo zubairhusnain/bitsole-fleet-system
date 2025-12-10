@@ -337,7 +337,7 @@ class UserController extends Controller
         if ($request->has('device_ids') && $me->isFleetManager() && $role === User::ROLE_USER) {
             $deviceIds = $request->input('device_ids');
             if (is_array($deviceIds)) {
-                $validInternalIds = \App\Models\Devices::where('manager_id', $me->id)
+                $validInternalIds = \App\Models\Devices::accessibleByUser($me)
                     ->whereIn('device_id', $deviceIds)
                     ->pluck('id');
                 $u->devices()->sync($validInternalIds);
@@ -417,7 +417,7 @@ class UserController extends Controller
         if ($request->has('device_ids') && $me->isFleetManager() && (int)$target->role === User::ROLE_USER) {
             $deviceIds = $request->input('device_ids');
             if (is_array($deviceIds)) {
-                $validInternalIds = \App\Models\Devices::where('manager_id', $me->id)
+                $validInternalIds = \App\Models\Devices::accessibleByUser($me)
                     ->whereIn('device_id', $deviceIds)
                     ->pluck('id');
                 $target->devices()->sync($validInternalIds);
