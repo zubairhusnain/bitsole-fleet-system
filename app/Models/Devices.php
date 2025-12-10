@@ -17,12 +17,14 @@ class Devices extends Model
         'device_id',
         'user_id',
         'distributor_id',
+        'manager_id',
     ];
 
     protected $casts = [
         'device_id' => 'integer',
         'user_id' => 'integer',
         'distributor_id' => 'integer',
+        'manager_id' => 'integer',
     ];
 
     public function tcDevice(): BelongsTo

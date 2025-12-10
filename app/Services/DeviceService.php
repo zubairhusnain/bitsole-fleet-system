@@ -173,9 +173,8 @@ class DeviceService
                 $distId = $user->distributor_id ?? $user->id;
                 $query->where('distributor_id', $distId);
 
-                // If Fleet Viewer (ROLE_USER) has a manager, show manager's vehicles
-                if ($role === \App\Models\User::ROLE_USER && $user->manager_id) {
-                    $query->where('user_id', $user->manager_id);
+                if ($role === \App\Models\User::ROLE_FLEET_MANAGER) {
+                    $query->where('manager_id', $user->id);
                 } else {
                     $query->where('user_id', $user->id);
                 }

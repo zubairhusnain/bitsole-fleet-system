@@ -195,6 +195,7 @@ class UserController extends Controller
             'distributor_id' => $u->distributor_id,
             'distributorName' => $distName,
             'manager_id' => $u->manager_id,
+            'assigned_device_ids' => \App\Models\Devices::where('user_id', $u->id)->pluck('device_id')->toArray(),
         ]);
     }
 
@@ -331,6 +332,17 @@ class UserController extends Controller
         ];
 
         $u = User::create($payload);
+
+        // Vehicle Assignment (Fleet Manager only)
+        if ($request->has('device_ids') && $me->isFleetManager() && $role === User::ROLE_USER) {
+            $deviceIds = $request->input('device_ids');
+            if (is_array($deviceIds) && !empty($deviceIds)) {
+                \App\Models\Devices::where('manager_id', $me->id)
+                    ->whereIn('device_id', $deviceIds)
+                    ->update(['user_id' => $u->id]);
+            }
+        }
+
         return response()->json([
             'message' => 'User created',
             'user' => [
@@ -399,6 +411,24 @@ class UserController extends Controller
 
         $target->fill($data);
         $target->save();
+
+        // Vehicle Assignment (Fleet Manager only)
+        if ($request->has('device_ids') && $me->isFleetManager() && (int)$target->role === User::ROLE_USER) {
+            $deviceIds = $request->input('device_ids');
+            if (is_array($deviceIds)) {
+                // 1. Unassign all devices owned by this manager currently assigned to this user
+                \App\Models\Devices::where('manager_id', $me->id)
+                    ->where('user_id', $target->id)
+                    ->update(['user_id' => null]);
+
+                // 2. Assign selected devices (must be owned by this manager)
+                if (!empty($deviceIds)) {
+                    \App\Models\Devices::where('manager_id', $me->id)
+                        ->whereIn('device_id', $deviceIds)
+                        ->update(['user_id' => $target->id]);
+                }
+            }
+        }
 
         return response()->json([
             'message' => 'User updated',

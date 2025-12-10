@@ -24,8 +24,8 @@ class NotificationController extends Controller
              $distId = $user->distributor_id ?? $user->id;
              $query->where('distributor_id', $distId);
 
-             if ($role === User::ROLE_USER && $user->manager_id) {
-                  $query->where('user_id', $user->manager_id);
+             if ($role === User::ROLE_FLEET_MANAGER) {
+                  $query->where('manager_id', $user->id);
              } else {
                   $query->where('user_id', $user->id);
              }
@@ -64,8 +64,8 @@ class NotificationController extends Controller
              $distId = $user->distributor_id ?? $user->id;
              $query->where('distributor_id', $distId);
 
-             if ($role === User::ROLE_USER && $user->manager_id) {
-                  $query->where('user_id', $user->manager_id);
+             if ($role === User::ROLE_FLEET_MANAGER) {
+                  $query->where('manager_id', $user->id);
              } else {
                   $query->where('user_id', $user->id);
              }

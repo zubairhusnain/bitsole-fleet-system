@@ -34,9 +34,8 @@ class VehicleController extends Controller
                 $distId = $user->distributor_id ?? $user->id;
                 $query->where('distributor_id', $distId);
 
-                // If Fleet Viewer (ROLE_USER) has a manager, show manager's vehicles
-                if ($role === User::ROLE_USER && $user->manager_id) {
-                    $query->where('user_id', $user->manager_id);
+                if ($role === User::ROLE_FLEET_MANAGER) {
+                    $query->where('manager_id', $user->id);
                 } else {
                     $query->where('user_id', $user->id);
                 }
@@ -69,8 +68,8 @@ class VehicleController extends Controller
                 $distId = $user->distributor_id ?? $user->id;
                 $query->where('distributor_id', $distId);
 
-                if ($role === \App\Models\User::ROLE_USER && $user->manager_id) {
-                    $query->where('user_id', $user->manager_id);
+                if ($role === \App\Models\User::ROLE_FLEET_MANAGER) {
+                    $query->where('manager_id', $user->id);
                 } else {
                     $query->where('user_id', $user->id);
                 }
@@ -224,18 +223,32 @@ class VehicleController extends Controller
         // Derive local user/distributor based on role (default to admin when null)
         $user = $request->user();
         $role = (int) ($user->role ?? User::ROLE_ADMIN);
-        if ($role === User::ROLE_ADMIN || $role === User::ROLE_DISTRIBUTOR) {
-            $userIdLocal = $user->id;
+
+        $managerIdLocal = null;
+        $userIdLocal = null;
+        $distributorIdLocal = $user->id;
+
+        if ($role === User::ROLE_ADMIN) {
             $distributorIdLocal = $user->id;
-        } else {
             $userIdLocal = $user->id;
+        } elseif ($role === User::ROLE_DISTRIBUTOR) {
+            $distributorIdLocal = $user->id;
+            $userIdLocal = $user->id;
+        } elseif ($role === User::ROLE_FLEET_MANAGER) {
             $distributorIdLocal = $user->distributor_id ?? $user->id;
+            $managerIdLocal = $user->id;
+        } else {
+            // Fleet Viewer
+            $distributorIdLocal = $user->distributor_id ?? $user->id;
+            $managerIdLocal = $user->manager_id;
+            $userIdLocal = $user->id;
         }
 
         // Persist locally only after tracking server success
         $local = Devices::create([
             'device_id' => (int) $payload->id,
             'user_id' => $userIdLocal,
+            'manager_id' => $managerIdLocal,
             'distributor_id' => $distributorIdLocal,
         ]);
 

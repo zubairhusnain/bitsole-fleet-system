@@ -150,6 +150,7 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/{userId}', [UserController::class, 'show']);
     Route::get('/{userId}/permissions', [UserController::class, 'permissions']);
     Route::put('/{userId}/permissions', [UserController::class, 'updatePermissions']);
+    Route::get('/device-options', [\App\Http\Controllers\VehicleController::class, 'options']); // Reused options for users
     Route::post('/', [UserController::class, 'store']);
     Route::put('/{userId}', [UserController::class, 'update']);
     // Restore a soft-deleted (blocked) user
