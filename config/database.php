@@ -96,6 +96,11 @@ return [
             'prefix_indexes' => true,
             'search_path' => env('PGSQL_SEARCH_PATH', 'public'),
             'sslmode' => 'prefer',
+            'dump' => [
+                'dump_binary_path' => env('DB_DUMP_BINARY_PATH', ''),
+                'use_single_transaction',
+                'timeout' => 60 * 5,
+            ],
         ],
 
         'sqlsrv' => [
