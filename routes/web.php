@@ -79,6 +79,13 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     });
 });
 
+// Backups (Admin only)
+Route::middleware(['auth'])->prefix('/web/backups')->group(function () {
+    Route::get('/', [\App\Http\Controllers\BackupController::class, 'index']);
+    Route::get('/download', [\App\Http\Controllers\BackupController::class, 'download']);
+    Route::delete('/delete', [\App\Http\Controllers\BackupController::class, 'delete']);
+});
+
 // Auth-protected Vehicles CRUD
 Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/vehicles')->group(function () {
     Route::get('/', [\App\Http\Controllers\VehicleController::class, 'index']);
