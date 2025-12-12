@@ -38,5 +38,6 @@ Schedule::command('events:check-columns')
     ->runInBackground();
 
 // Backup database and files daily
-Schedule::command('backup:clean')->daily()->at('01:00');
+// Custom cleanup to keep only last 10 days
+Schedule::command('backup:cleanup-old')->daily()->at('01:00');
 Schedule::command('backup:run')->daily()->at('01:30');

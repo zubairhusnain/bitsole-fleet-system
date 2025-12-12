@@ -20,8 +20,8 @@ return [
     // Optional/hidden modules (keep for future use)
     // 'dashboard' => 'Dashboard',
     // 'fuel' => 'Fuel Management',
-    // 'monitoring.vehicles' => 'Monitoring – Vehicles',
-    // 'monitoring.zones' => 'Monitoring – Zones',
+    'monitoring.vehicles' => 'Monitoring – Vehicles',
+    'monitoring.zones' => 'Monitoring – Zones',
     // 'reports' => 'Reports & Analytics',
     // 'alerts' => 'Alerts & Notifications',
     // 'settings' => 'Settings',

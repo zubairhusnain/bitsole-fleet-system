@@ -4,6 +4,7 @@ use App\Models\TcUser;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VehicleModelController;
+use App\Http\Controllers\MaintenanceController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -79,8 +80,30 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     });
 });
 
+// Backups (Admin only)
+Route::middleware(['auth'])->prefix('/web/backups')->group(function () {
+    Route::get('/', [\App\Http\Controllers\BackupController::class, 'index']);
+    Route::get('/download', [\App\Http\Controllers\BackupController::class, 'download']);
+    Route::delete('/delete', [\App\Http\Controllers\BackupController::class, 'delete']);
+});
+
+// Monitoring Routes
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/monitoring')->group(function () {
+    Route::get('/vehicles', [\App\Http\Controllers\MonitoringController::class, 'index']);
+});
+
 // Auth-protected Vehicles CRUD
 Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/vehicles')->group(function () {
+    // Maintenance CRUD (Nested)
+    // IMPORTANT: Must be defined BEFORE /{deviceId} to avoid conflict
+    Route::prefix('maintenance')->group(function () {
+        Route::get('/', [MaintenanceController::class, 'index']);
+        Route::get('/vehicle/options', [MaintenanceController::class, 'vehicleOptions']);
+        Route::post('/', [MaintenanceController::class, 'store']);
+        Route::put('/{id}', [MaintenanceController::class, 'update']);
+        Route::delete('/{id}', [MaintenanceController::class, 'destroy']);
+    });
+
     Route::get('/', [\App\Http\Controllers\VehicleController::class, 'index']);
     Route::get('/options', [\App\Http\Controllers\VehicleController::class, 'options']);
     // Tracker models options for vehicle form (not admin-only)
@@ -125,6 +148,8 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::post('/{deviceId}/notifications/assign', [\App\Http\Controllers\VehicleController::class, 'notificationsAssign']);
 
 });
+
+
 
 // NEW: Auth-protected Drivers CRUD & assignment
 Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/drivers')->group(function () {

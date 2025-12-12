@@ -134,14 +134,14 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item" v-if="!isAdminOrDistributor">
+                        <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('fuel', 'read')">
                             <RouterLink to="/fuel" class="nav-link" :class="{ active: route.name === 'fuel' }">
                                 <i class="nav-icon bi bi-fuel-pump"></i>
                                 <p>Fuel Management</p>
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item ">
+                        <li class="nav-item" v-if="hasPerm('monitoring.vehicles', 'read') || hasPerm('monitoring.zones', 'read')">
                             <a href="#" class="nav-link">
                                 <i class="nav-icon bi bi-graph-up"></i>
                                 <p>
@@ -150,14 +150,14 @@
                                 </p>
                             </a>
                             <ul class="nav nav-treeview">
-                                <li class="nav-item">
+                                <li class="nav-item" v-if="hasPerm('monitoring.vehicles', 'read')">
                                     <RouterLink to="/monitoring/vehicles" class="nav-link"
                                         :class="{ active: route.name === 'monitoring-vehicles' }">
                                         <i class="nav-icon bi bi-truck"></i>
                                         <p>Vehicles</p>
                                     </RouterLink>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item" v-if="hasPerm('monitoring.zones', 'read')">
                                     <RouterLink to="/monitoring/zones" class="nav-link"
                                         :class="{ active: route.name === 'monitoring-zones' }">
                                         <i class="nav-icon bi bi-geo-alt"></i>

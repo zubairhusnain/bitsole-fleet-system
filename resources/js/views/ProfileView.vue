@@ -78,7 +78,7 @@
                     </thead>
                     <tbody>
                       <tr v-for="row in permRows" :key="row.key">
-                        <td>{{ row.key }}</td>
+                        <td>{{ row.label }}</td>
                         <td class="text-center">{{ row.read ? '✓' : '—' }}</td>
                         <td class="text-center">{{ row.create ? '✓' : '—' }}</td>
                         <td class="text-center">{{ row.update ? '✓' : '—' }}</td>
@@ -135,7 +135,7 @@ const permRows = computed(() => {
   const map = permissions.value || {};
   return Object.keys(map)
     .sort()
-    .map(k => ({ key: k, read: !!map[k]?.read, create: !!map[k]?.create, update: !!map[k]?.update, delete: !!map[k]?.delete }))
+    .map(k => ({ key: k, label: map[k]?.label || k, read: !!map[k]?.read, create: !!map[k]?.create, update: !!map[k]?.update, delete: !!map[k]?.delete }))
     .filter(r => r.read || r.create || r.update || r.delete);
 });
 
@@ -145,6 +145,8 @@ async function reload() {
     const { data } = await axios.get('/web/auth/me');
     user.value = data?.user || {};
     permissions.value = data?.permissions || {};
+      console.log('map permission ',permissions);
+
     authState.user = user.value;
     authState.permissions = permissions.value;
     edit.value = { name: user.value?.name || '', email: user.value?.email || '', phone: user.value?.phone || '', password: '' };
