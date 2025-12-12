@@ -124,6 +124,7 @@ import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
+import { hasPermission } from '../../auth';
 
 const router = useRouter();
 const loading = ref(false);
@@ -202,6 +203,10 @@ const submitAndAdd = () => {
 };
 
 onMounted(() => {
+    if (!hasPermission('fuel', 'create')) {
+        router.push('/fuel');
+        return;
+    }
     fetchDevices();
 });
 </script>

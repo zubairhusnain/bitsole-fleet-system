@@ -141,10 +141,10 @@
                                 <span v-else class="text-muted">N/A</span>
                             </td>
                             <td class="text-end pe-4">
-                                <button class="btn btn-sm btn-link text-primary p-0 me-2" @click="showDetails(vehicle)">
+                                <button v-if="hasPermission('monitoring.vehicles', 'read')" class="btn btn-sm btn-link text-primary p-0 me-2" @click="showDetails(vehicle)">
                                     <i class="bi bi-eye fs-5"></i>
                                 </button>
-                                <button class="btn btn-sm btn-link text-dark p-0" @click="editVehicle(vehicle)">
+                                <button v-if="hasPermission('vehicles', 'update')" class="btn btn-sm btn-link text-dark p-0" @click="editVehicle(vehicle)">
                                     <i class="bi bi-pencil-square fs-5"></i>
                                 </button>
                             </td>
@@ -339,33 +339,44 @@ const paginationStart = computed(() => (currentPage.value - 1) * itemsPerPage + 
 const paginationEnd = computed(() => Math.min(currentPage.value * itemsPerPage, filteredVehicles.value.length));
 
 // Methods
+const parseAttrs = (a) => {
+    if (!a) return {};
+    if (typeof a === 'object') return a;
+    try { return JSON.parse(a); } catch { return {}; }
+};
+
 const fetchVehicles = async () => {
     try {
-        const { data } = await axios.get('/web/vehicles', { params: { per_page: 500 } });
+        const { data } = await axios.get('/web/monitoring/vehicles', { params: { per_page: 500 } });
         const list = Array.isArray(data) ? data : (data.data ?? []);
 
-        vehicles.value = list.map(v => ({
-            id: v.device_id || v.id,
-            name: v.name || 'Unknown',
-            uniqueid: v.uniqueid || 'N/A',
-            plate: v.plate || 'N/A',
-            // status: determineStatus(v), // Not used in new UI explicitly
-            lat: parseFloat(v.lat) || 0,
-            lng: parseFloat(v.lng) || 0,
-            speed: parseFloat(v.speed).toFixed(1) || 0,
-            driver_name: v.driver_name,
-            last_update: v.last_update || 'Just now',
-            fuel: v.fuel,
-            odometer: v.odometer,
-            ignition: v.ignition, // Assuming API returns boolean or 0/1
-            group: v.group || 'AMT - Rent a Car NY, USA', // Placeholder default if missing
-            model: v.model || 'Unknown Model',
-            type: 'CAR', // Placeholder
-            owner: v.group || 'AMT - Rent a Car NY, USA',
-            maintenance: 'N/A',
-            alert_count: Math.floor(Math.random() * 2), // Mock alert count
-            blocked: v.blocked
-        }));
+        vehicles.value = list.map(v => {
+            const tc = v.tc_device || v.tcDevice || {};
+            const pos = tc.position || {};
+            const attrs = parseAttrs(pos.attributes);
+
+            return {
+                id: v.device_id || v.id,
+                name: tc.name || v.name || 'Unknown',
+                uniqueid: tc.uniqueid || v.uniqueid || 'N/A',
+                plate: v.plate || tc.plate || 'N/A',
+                lat: parseFloat(pos.latitude) || 0,
+                lng: parseFloat(pos.longitude) || 0,
+                speed: parseFloat(pos.speed).toFixed(1) || 0,
+                driver_name: v.driver_name || tc.driverUniqueId || 'N/A',
+                last_update: pos.servertime || pos.fixtime || 'N/A',
+                fuel: attrs.fuel || 0,
+                odometer: attrs.odometer || 0,
+                ignition: attrs.ignition || false,
+                group: v.group || 'Default Group',
+                model: v.model || tc.model || 'Unknown Model',
+                type: 'CAR', // Placeholder
+                owner: v.group || 'Default Owner',
+                maintenance: 'N/A',
+                alert_count: 0,
+                blocked: v.blocked
+            };
+        });
 
     } catch (e) {
         console.error("Failed to fetch vehicles", e);

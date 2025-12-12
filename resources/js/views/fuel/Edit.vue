@@ -125,6 +125,7 @@ import { ref, reactive, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
+import { hasPermission } from '../../auth';
 
 const router = useRouter();
 const route = useRoute();
@@ -216,6 +217,10 @@ const submit = async () => {
 };
 
 onMounted(async () => {
+    if (!hasPermission('fuel', 'update')) {
+        router.push('/fuel');
+        return;
+    }
     await fetchDevices();
     if (route.params.id) {
         await fetchEntry();

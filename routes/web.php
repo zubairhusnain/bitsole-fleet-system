@@ -87,6 +87,11 @@ Route::middleware(['auth'])->prefix('/web/backups')->group(function () {
     Route::delete('/delete', [\App\Http\Controllers\BackupController::class, 'delete']);
 });
 
+// Monitoring Routes
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/monitoring')->group(function () {
+    Route::get('/vehicles', [\App\Http\Controllers\MonitoringController::class, 'index']);
+});
+
 // Auth-protected Vehicles CRUD
 Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/vehicles')->group(function () {
     // Maintenance CRUD (Nested)

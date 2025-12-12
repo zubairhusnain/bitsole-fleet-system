@@ -150,8 +150,11 @@ import { ref, onMounted, computed, reactive } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { hasPermission } from '../../auth';
+import { useRouter } from 'vue-router';
 
 import Swal from 'sweetalert2';
+
+const router = useRouter();
 
 // State
 const loading = ref(false);
@@ -305,6 +308,10 @@ const permanentDeleteEntry = async (id) => {
 };
 
 onMounted(() => {
+    if (!hasPermission('fuel', 'read')) {
+        router.push('/');
+        return;
+    }
     fetchDevices();
     fetchData();
 });
