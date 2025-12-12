@@ -246,7 +246,7 @@ class VehicleController extends Controller
     /**
      * Show a single local record by tracking server device ID.
      */
-    public function show(Request $request, int $deviceId)
+    public function show(Request $request, $deviceId)
     {
         // Include tracking server device join for edit prefill
         $device = Devices::accessibleByUser($request->user())
@@ -259,7 +259,7 @@ class VehicleController extends Controller
     /**
      * Update device on tracking server and sync local record.
      */
-    public function update(Request $request, int $deviceId)
+    public function update(Request $request, $deviceId)
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],

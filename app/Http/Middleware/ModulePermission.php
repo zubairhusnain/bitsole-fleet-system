@@ -91,10 +91,27 @@ class ModulePermission
             foreach ($allModules as $mk) {
                 $mkTokens = preg_split('/[\._-]+/', strtolower($mk), -1, PREG_SPLIT_NO_EMPTY);
                 if (($mkTokens[0] ?? '') === $base) {
-                    if ($canonical === null) { $canonical = $mk; }
-                    else {
-                        $canonTokens = preg_split('/[\._-]+/', strtolower($canonical), -1, PREG_SPLIT_NO_EMPTY);
-                        if (count($mkTokens) < count($canonTokens)) { $canonical = $mk; }
+                    // Check if subsequent tokens match URL parts
+                    $isMatch = true;
+                    // Check remaining tokens against URL parts
+                    for ($i = 1; $i < count($mkTokens); $i++) {
+                        // Parts index offset by 1 because base is parts[1]
+                        if (!isset($parts[$i + 1]) || strtolower($parts[$i + 1]) !== $mkTokens[$i]) {
+                            $isMatch = false;
+                            break;
+                        }
+                    }
+
+                    if ($isMatch) {
+                        if ($canonical === null) {
+                            $canonical = $mk;
+                        } else {
+                            $canonTokens = preg_split('/[\._-]+/', strtolower($canonical), -1, PREG_SPLIT_NO_EMPTY);
+                            // Prefer longer specific match
+                            if (count($mkTokens) > count($canonTokens)) {
+                                $canonical = $mk;
+                            }
+                        }
                     }
                 }
             }
