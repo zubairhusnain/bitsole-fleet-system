@@ -122,7 +122,7 @@
                             <td colspan="8" class="text-center py-4">No vehicles found</td>
                         </tr>
                         <tr v-else v-for="vehicle in paginatedVehicles" :key="vehicle.id">
-                            <td class="ps-4 fw-medium">{{ vehicle.name }}</td>
+                            <td class="ps-4 fw-medium">{{ vehicle.uniqueid }} - {{ vehicle.name }}</td>
                             <td>{{ vehicle.type }} - {{ vehicle.model }}</td>
                             <td>{{ vehicle.owner }}</td>
                             <td>{{ vehicle.last_update }}</td>
@@ -144,7 +144,7 @@
                                 <button v-if="hasPermission('monitoring.vehicles', 'read')" class="btn btn-sm btn-link text-primary p-0 me-2" @click="showDetails(vehicle)">
                                     <i class="bi bi-eye fs-5"></i>
                                 </button>
-                                <button v-if="hasPermission('vehicles', 'update')" class="btn btn-sm btn-link text-dark p-0" @click="editVehicle(vehicle)">
+                                <button v-if="hasPermission('monitoring.vehicles', 'update')" class="btn btn-sm btn-link text-dark p-0" @click="editVehicle(vehicle)">
                                     <i class="bi bi-pencil-square fs-5"></i>
                                 </button>
                             </td>
@@ -241,12 +241,12 @@
         </div>
         <div class="modal-footer d-flex justify-content-between p-3 border-top">
           <div class="d-flex gap-2">
-            <button v-if="hasPermission('vehicles', 'update') && !selectedVehicle.blocked" type="button" class="btn btn-outline-danger" @click="toggleBlock(true)">Block Engine</button>
-            <button v-if="hasPermission('vehicles', 'update') && selectedVehicle.blocked" type="button" class="btn btn-outline-success" @click="toggleBlock(false)">Unblock Engine</button>
+            <button v-if="hasPermission('monitoring.vehicles', 'update') && !selectedVehicle.blocked" type="button" class="btn btn-outline-danger" @click="toggleBlock(true)">Block Engine</button>
+            <button v-if="hasPermission('monitoring.vehicles', 'update') && selectedVehicle.blocked" type="button" class="btn btn-outline-success" @click="toggleBlock(false)">Unblock Engine</button>
           </div>
           <div class="d-flex gap-2">
             <button type="button" class="btn btn-secondary" @click="closeModal">Close</button>
-            <button type="button" class="btn btn-primary" @click="editVehicle(selectedVehicle)">Edit Vehicle</button>
+            <button v-if="hasPermission('monitoring.vehicles', 'update')" type="button" class="btn btn-primary" @click="editVehicle(selectedVehicle)">Edit Vehicle</button>
           </div>
         </div>
       </div>
@@ -354,6 +354,7 @@ const fetchVehicles = async () => {
             const tc = v.tc_device || v.tcDevice || {};
             const pos = tc.position || {};
             const attrs = parseAttrs(pos.attributes);
+            const deviceAttrs = parseAttrs(tc.attributes);
 
             return {
                 id: v.device_id || v.id,
@@ -369,9 +370,9 @@ const fetchVehicles = async () => {
                 odometer: attrs.odometer || 0,
                 ignition: attrs.ignition || false,
                 group: v.group || 'Default Group',
-                model: v.model || tc.model || 'Unknown Model',
-                type: 'CAR', // Placeholder
-                owner: v.group || 'Default Owner',
+                model: tc.model || v.model || 'Unknown',
+                type: deviceAttrs.type || 'Unknown',
+                owner: v.manager ? v.manager.name : (v.group || 'N/A'),
                 maintenance: 'N/A',
                 alert_count: 0,
                 blocked: v.blocked
