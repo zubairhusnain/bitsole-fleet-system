@@ -37,6 +37,16 @@ class Devices extends Model
         return $this->belongsToMany(User::class, 'device_user', 'device_id', 'user_id');
     }
 
+    public function distributor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'distributor_id');
+    }
+
+    public function manager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'manager_id');
+    }
+
     /**
      * Scope the query to only include devices accessible by the given user.
      *

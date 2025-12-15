@@ -28,13 +28,14 @@ class MonitoringController extends Controller
 
         // Eager load tcDevice and its current position
         // We include soft-deleted devices if they are still relevant for monitoring history,
-        // but typically monitoring focuses on active devices. 
-        // VehicleController includes withTrashed(), so we'll keep it for consistency.
-        $query->withTrashed()->with(['tcDevice.position']);
+        // but typically monitoring focuses on active devices.
+        // As per request, we remove deleted vehicles from monitoring list.
+        // Also changing owner to manager instead of distributor.
+        $query->with(['tcDevice.position', 'manager']);
 
         // Pagination or fetch all
         $perPage = $request->input('per_page', 25);
-        
+
         // If per_page is -1 or very large, we might want to return all, but paginate is safer.
         // The frontend requests per_page=500 in fetchVehicles.
         $devices = $query->orderByDesc('id')->paginate($perPage);
