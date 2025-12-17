@@ -28,30 +28,31 @@ class NotificationController extends Controller
         $query = Devices::accessibleByUser($user);
         $deviceIds = $query->pluck('device_id')->toArray();
 
-        // List notifications by joining tc_notifications based on type,
-        // then left joining tc_device_notification to check for assignment.
-        // We include the event if it's assigned OR if the notification is marked 'always' (global).
-        $events = DB::connection('pgsql')->table('tc_events as e')
-            ->join('tc_notifications as n', 'e.type', '=', 'n.type')
-            ->leftJoin('tc_device_notification as dn', function($join) {
-                $join->on('e.deviceid', '=', 'dn.deviceid')
-                     ->on('n.id', '=', 'dn.notificationid');
-            })
-            ->join('tc_devices as d', 'e.deviceid', '=', 'd.id')
-            ->whereIn('e.deviceid', $deviceIds)
-            ->where(function($query) {
-                $query->whereNotNull('dn.deviceid')
-                      ->orWhere('n.always', true);
-            })
-            // Use distinct to avoid duplicates if multiple notifications match same type
-            // PostgreSQL requires ORDER BY to match DISTINCT ON columns
-            ->distinct('e.id')
-            ->select('e.*', 'n.attributes as notification_attributes', 'n.type as notification_type', 'd.name as device_name')
-            ->orderBy('e.id', 'desc')
+        // Retrieve events using Eloquent with relations and scope
+        $events = \App\Models\TcEvent::with(['device', 'notifications.devices'])
+            ->whereIn('deviceid', $deviceIds)
+            ->withEnabledNotifications()
+            ->distinct('id')
+            ->orderBy('id', 'desc')
             ->limit(100)
             ->get();
 
-        return response()->json($events);
+        // Transform to match expected JSON structure
+        $mappedEvents = $events->map(function ($event) {
+            // Find the notification definition that is assigned to this device
+            // Since we used withEnabledNotifications (strict), there should be one.
+            $notification = $event->notifications->first(function ($n) use ($event) {
+                return $n->devices->contains('id', $event->deviceid);
+            });
+
+            return array_merge($event->toArray(), [
+                'device_name' => $event->device->name ?? null,
+                'notification_type' => $event->type,
+                'notification_attributes' => $notification ? $notification->attributes : null,
+            ]);
+        });
+
+        return response()->json($mappedEvents);
     }
 
     public function unreadCount(Request $request)
@@ -62,20 +63,10 @@ class NotificationController extends Controller
         $query = Devices::accessibleByUser($user);
         $deviceIds = $query->pluck('device_id')->toArray();
 
-        $count = DB::connection('pgsql')->table('tc_events as e')
-            ->join('tc_notifications as n', 'e.type', '=', 'n.type')
-            ->leftJoin('tc_device_notification as dn', function($join) {
-                $join->on('e.deviceid', '=', 'dn.deviceid')
-                     ->on('n.id', '=', 'dn.notificationid');
-            })
-            ->whereIn('e.deviceid', $deviceIds)
-            ->where(function($query) {
-                $query->whereNotNull('dn.deviceid')
-                      ->orWhere('n.always', true);
-            })
-            ->where('e.is_read', 0)
-            ->distinct('e.id')
-            ->count('e.id');
+        $count = \App\Models\TcEvent::whereIn('deviceid', $deviceIds)
+            ->withEnabledNotifications()
+            ->where('is_read', 0)
+            ->count();
 
         return response()->json(['count' => $count]);
     }
@@ -88,26 +79,11 @@ class NotificationController extends Controller
         $query = Devices::accessibleByUser($user);
         $deviceIds = $query->pluck('device_id')->toArray();
 
-        $eventIds = DB::connection('pgsql')->table('tc_events as e')
-            ->join('tc_notifications as n', 'e.type', '=', 'n.type')
-            ->leftJoin('tc_device_notification as dn', function($join) {
-                $join->on('e.deviceid', '=', 'dn.deviceid')
-                     ->on('n.id', '=', 'dn.notificationid');
-            })
-            ->whereIn('e.deviceid', $deviceIds)
-            ->where(function($query) {
-                $query->whereNotNull('dn.deviceid')
-                      ->orWhere('n.always', true);
-            })
-            ->where('e.is_read', 0)
-            ->distinct('e.id')
-            ->pluck('e.id');
-
-        if ($eventIds->isNotEmpty()) {
-            DB::connection('pgsql')->table('tc_events')
-                ->whereIn('id', $eventIds)
-                ->update(['is_read' => 1]);
-        }
+        // Use Eloquent update
+        \App\Models\TcEvent::whereIn('deviceid', $deviceIds)
+            ->withEnabledNotifications()
+            ->where('is_read', 0)
+            ->update(['is_read' => 1]);
 
         return response()->json(['success' => true]);
     }
@@ -126,8 +102,8 @@ class NotificationController extends Controller
     {
         $user = $request->user();
 
-        // Check if event exists
-        $event = DB::connection('pgsql')->table('tc_events')->where('id', $id)->first();
+        // Check if event exists using Eloquent
+        $event = \App\Models\TcEvent::find($id);
 
         if (!$event) {
             return response()->json(['message' => 'Event not found'], 404);
@@ -143,16 +119,10 @@ class NotificationController extends Controller
         }
 
         try {
-            $deleted = DB::connection('pgsql')->table('tc_events')->where('id', $id)->delete();
+            $deleted = $event->delete();
 
             if ($deleted) {
-                // broadcast(new DeleteAlertEvent($id)); // Assuming this class exists and is imported, keeping commented if not sure, but original had it.
-                // Re-adding original broadcast line if it was there.
-                // Since I cannot see imports, I'll assume it works as it was there.
-                // But wait, the previous diff showed it was there.
-
-                // Let's check imports first or just leave it out if I'm not sure, but better to keep behavior.
-                // I will try to restore it.
+                // broadcast(new DeleteAlertEvent($id));
                 return response()->json(['message' => 'Notification deleted']);
             }
 

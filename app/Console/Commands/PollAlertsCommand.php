@@ -49,28 +49,12 @@ class PollAlertsCommand extends Command
 
         while (true) {
             try {
-                // Fetch new events with relaxed join logic to include 'always' notifications
-                $newEvents = DB::connection('pgsql')->table('tc_events as e')
-                    ->join('tc_devices as d', 'e.deviceid', '=', 'd.id')
-                    ->join('tc_notifications as n', 'e.type', '=', 'n.type')
-                    ->leftJoin('tc_device_notification as dn', function($join) {
-                        $join->on('e.deviceid', '=', 'dn.deviceid')
-                             ->on('n.id', '=', 'dn.notificationid');
-                    })
-                    ->select(
-                        'e.*',
-                        'n.attributes as notification_attributes',
-                        'n.type as notification_type',
-                        'd.name as device_name'
-                    )
-                    ->where('e.id', '>', $lastId)
-                    ->where(function($query) {
-                        $query->whereNotNull('dn.deviceid')
-                              ->orWhere('n.always', true);
-                    })
-                    ->distinct('e.id')
-                    ->orderBy('e.id', 'asc')
-                    ->limit(50) // Batch limit
+                // Fetch new events using Eloquent and strict notification logic
+                $newEvents = \App\Models\TcEvent::where('id', '>', $lastId)
+                    ->withEnabledNotifications()
+                    ->distinct('id')
+                    ->orderBy('id', 'asc')
+                    ->limit(50)
                     ->get();
 
                 if ($newEvents->isNotEmpty()) {
@@ -81,9 +65,9 @@ class PollAlertsCommand extends Command
                         $this->info("Processing event ID: {$event->id} - Type: {$event->type}");
 
                         // Find user linked to this device
-                        $userId = DB::connection('pgsql')->table('devices')
-                            ->where('device_id', $event->deviceid)
-                            ->value('user_id');
+                        // using Devices model to find the owner/manager
+                        $device = \App\Models\Devices::where('device_id', $event->deviceid)->first();
+                        $userId = $device ? $device->user_id : null;
 
                         if ($userId) {
                             $affectedUserIds[$userId] = true;

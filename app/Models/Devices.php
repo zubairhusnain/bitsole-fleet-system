@@ -47,6 +47,17 @@ class Devices extends Model
         return $this->belongsTo(User::class, 'manager_id');
     }
 
+    public function events()
+    {
+        return $this->hasMany(TcEvent::class, 'deviceid', 'device_id');
+    }
+
+    public function notifications()
+    {
+        return $this->belongsToMany(TcNotification::class, 'tc_device_notification', 'deviceid', 'notificationid')
+            ->using(TcDeviceNotification::class);
+    }
+
     /**
      * Scope the query to only include devices accessible by the given user.
      *

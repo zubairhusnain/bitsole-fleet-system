@@ -90,6 +90,10 @@ Route::middleware(['auth'])->prefix('/web/backups')->group(function () {
 // Monitoring Routes
 Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/monitoring')->group(function () {
     Route::get('/vehicles', [\App\Http\Controllers\MonitoringController::class, 'index']);
+    Route::get('/vehicles/{id}', [\App\Http\Controllers\MonitoringController::class, 'show']);
+    Route::get('/vehicles/{id}/events', [\App\Http\Controllers\MonitoringController::class, 'getDeviceEvents']);
+    // Include 'vehicles' in the path so ModulePermission maps to 'monitoring.vehicles'
+    Route::post('/vehicles/events/{eventId}/acknowledge', [\App\Http\Controllers\MonitoringController::class, 'acknowledgeEvent']);
 });
 
 // Auth-protected Vehicles CRUD
