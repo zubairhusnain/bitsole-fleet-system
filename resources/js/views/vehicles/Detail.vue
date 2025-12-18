@@ -838,8 +838,25 @@ watch(showZones, (val) => {
 
 const visibleZones = computed(() => {
     if (!showZones.value) return [];
-    return geofences.value.map(z => {
-        const attr = z.attributes || {};
+
+    // Deduplicate geofences by ID
+    const uniqueGeofences = [];
+    const seenIds = new Set();
+
+    geofences.value.forEach(z => {
+        if (!seenIds.has(z.id)) {
+            seenIds.add(z.id);
+            uniqueGeofences.push(z);
+        }
+    });
+
+    return uniqueGeofences.map(z => {
+        let attr = z.attributes || {};
+        // Parse attributes if string
+        if (typeof attr === 'string') {
+            try { attr = JSON.parse(attr); } catch(e) { attr = {}; }
+        }
+
         let center = null;
 
         // Try to get center from circle attributes
@@ -867,12 +884,15 @@ const visibleZones = computed(() => {
         }
 
         if (center) {
-            return {
-                id: z.id,
-                center: center,
-                name: z.name,
-                description: z.description
-            };
+            // Validate center coordinates
+            if (Number.isFinite(center[0]) && Number.isFinite(center[1])) {
+                return {
+                    id: z.id,
+                    center: center,
+                    name: z.name,
+                    description: z.description
+                };
+            }
         }
         return null;
     }).filter(z => z);
@@ -937,18 +957,35 @@ function onMapReady(map) {
 function updateRouting() {
     if (!routingControl || !currentLatLng.value) return;
 
+    // Validate current position
+    const cur = currentLatLng.value;
+    if (!Array.isArray(cur) || !Number.isFinite(cur[0]) || !Number.isFinite(cur[1])) return;
+
     const waypoints = [];
     if (showZones.value && visibleZones.value.length > 0) {
-        const deviceLoc = L.latLng(currentLatLng.value[0], currentLatLng.value[1]);
+        const deviceLoc = L.latLng(cur[0], cur[1]);
 
         // Star pattern: Device -> Zone 1 -> Device -> Zone 2...
         waypoints.push(deviceLoc);
+
+        let validZoneCount = 0;
         visibleZones.value.forEach(zone => {
-            waypoints.push(L.latLng(zone.center[0], zone.center[1]));
-            waypoints.push(deviceLoc);
+            if (zone.center && Number.isFinite(zone.center[0]) && Number.isFinite(zone.center[1])) {
+                waypoints.push(L.latLng(zone.center[0], zone.center[1]));
+                waypoints.push(deviceLoc);
+                validZoneCount++;
+            }
         });
 
-        routingControl.setWaypoints(waypoints);
+        if (validZoneCount > 0) {
+            try {
+                routingControl.setWaypoints(waypoints);
+            } catch(e) {
+                console.warn('Routing update failed', e);
+            }
+        } else {
+             routingControl.setWaypoints([]);
+        }
     } else {
         routingControl.setWaypoints([]);
     }
