@@ -901,14 +901,14 @@ const redIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-const mapInstance = ref(null);
-const routingControl = ref(null);
+let mapInstance = null;
+let routingControl = null;
 
 function initRouting() {
-    if (!mapInstance.value || typeof L === 'undefined' || !L.Routing || routingControl.value) return;
+    if (!mapInstance || typeof L === 'undefined' || !L.Routing || routingControl) return;
 
     try {
-        routingControl.value = L.Routing.control({
+        routingControl = L.Routing.control({
             waypoints: [],
             routeWhileDragging: false,
             showAlternatives: false,
@@ -918,9 +918,9 @@ function initRouting() {
                 styles: [{ color: '#6610f2', weight: 4, opacity: 0.7 }]
             },
             createMarker: function() { return null; }
-        }).addTo(mapInstance.value);
+        }).addTo(mapInstance);
 
-        const container = routingControl.value.getContainer();
+        const container = routingControl.getContainer();
         if (container) container.style.display = 'none';
 
         updateRouting();
@@ -930,27 +930,27 @@ function initRouting() {
 }
 
 function onMapReady(map) {
-    mapInstance.value = map;
+    mapInstance = map;
     initRouting();
 }
 
 function updateRouting() {
-    if (!routingControl.value || !currentLatLng.value) return;
-    
+    if (!routingControl || !currentLatLng.value) return;
+
     const waypoints = [];
     if (showZones.value && visibleZones.value.length > 0) {
         const deviceLoc = L.latLng(currentLatLng.value[0], currentLatLng.value[1]);
-        
+
         // Star pattern: Device -> Zone 1 -> Device -> Zone 2...
         waypoints.push(deviceLoc);
         visibleZones.value.forEach(zone => {
             waypoints.push(L.latLng(zone.center[0], zone.center[1]));
             waypoints.push(deviceLoc);
         });
-        
-        routingControl.value.setWaypoints(waypoints);
+
+        routingControl.setWaypoints(waypoints);
     } else {
-        routingControl.value.setWaypoints([]);
+        routingControl.setWaypoints([]);
     }
 }
 
@@ -1438,6 +1438,10 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
     window.removeEventListener('resize', handleResize);
+    if (routingControl) {
+        try { routingControl.remove(); } catch (e) {}
+        routingControl = null;
+    }
     if (typeof unsubEcho === 'function') { try { unsubEcho(); } catch (e) { } }
 });
 
