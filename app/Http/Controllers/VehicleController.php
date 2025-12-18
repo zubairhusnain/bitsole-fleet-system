@@ -687,6 +687,7 @@ class VehicleController extends Controller
         $ids = is_array($ids) ? $ids : [$ids];
         $ids = array_values(array_filter(array_map('intval', $ids), fn($v) => $v > 0));
         $results = [];
+       
         foreach ($ids as $geoId) {
             try {
                 $resp = $this->permissionService->assignGeofence($request, $deviceId, $geoId, 'POST');
