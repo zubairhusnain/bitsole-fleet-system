@@ -38,9 +38,116 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { formatDateTime } from '../../utils/datetime';
+import { authState } from '../../auth';
 
 const messages = ref([]);
+const myDeviceIds = ref([]);
 let echoChannel = null;
+
+// Batch incoming alerts to reduce UI thrash
+let pendingAlerts = [];
+let flushTimer = null;
+const FLUSH_MS = 250;
+function scheduleAlertsMerge(list) {
+    if (Array.isArray(list) && list.length) {
+        pendingAlerts.push(...list);
+        if (!flushTimer) {
+            flushTimer = setTimeout(() => {
+                const batch = pendingAlerts;
+                pendingAlerts = [];
+                flushTimer = null;
+                applyRealtimeAlerts(batch);
+            }, FLUSH_MS);
+        }
+    }
+}
+
+function applyRealtimeAlerts(list) {
+    const newMsgs = [];
+    list.forEach(e => {
+        if (e && e.deviceid && myDeviceIds.value.includes(e.deviceid)) {
+             // Dedupe check
+             if (!messages.value.some(m => m.id == e.id)) {
+                 const newMsg = mapEvent(e);
+                 if (e.id) newMsg.id = e.id;
+                 newMsgs.push(newMsg);
+             }
+        }
+    });
+
+    if (newMsgs.length > 0) {
+        markAsRead();
+        messages.value.unshift(...newMsgs);
+        // Sort by id desc (newest first)
+        messages.value.sort((a, b) => b.id - a.id);
+    }
+}
+
+// Live polling fallback
+let pollTimer = null;
+let visibilityHandler = null;
+const POLL_MS = 10000;
+let socketsSeen = false;
+let fallbackStartTimer = null;
+
+async function pollAlertsOnce() {
+    await fetchMessages();
+}
+
+function startAlertsPolling() {
+    stopAlertsPolling();
+    pollTimer = setInterval(() => {
+        pollAlertsOnce();
+    }, POLL_MS);
+}
+
+function stopAlertsPolling() {
+    if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+    }
+}
+
+function armPollingFallback() {
+    if (fallbackStartTimer) clearTimeout(fallbackStartTimer);
+    fallbackStartTimer = setTimeout(() => {
+        if (!socketsSeen) startAlertsPolling();
+    }, 8000);
+}
+
+const markAsRead = async () => {
+     try {
+        await axios.post('/web/notifications/mark-read');
+    } catch (e) {}
+};
+
+const fetchMyDeviceIds = async () => {
+    try {
+        const { data } = await axios.get('/web/notifications/my-device-ids');
+        myDeviceIds.value = data;
+    } catch (e) {
+        console.error('Failed to fetch device IDs', e);
+    }
+};
+
+const listenForAlerts = () => {
+    if (echoChannel) return;
+    if (!window.echo) return;
+    if (!authState.user || !authState.user.id) return;
+
+    const userId = authState.user.id;
+    echoChannel = window.echo.private(`alerts.${userId}`)
+        .listen('.alerts.updated', (payload) => {
+            if (Array.isArray(payload?.alerts)) {
+                console.log('Alerts Batch Received:', payload.alerts);
+                scheduleAlertsMerge(payload.alerts);
+                socketsSeen = true;
+                stopAlertsPolling();
+                if (fallbackStartTimer) { clearTimeout(fallbackStartTimer); fallbackStartTimer = null; }
+            }
+        });
+};
 
 const titleMap = {
   geofenceEnter: 'Geofence Entered',
@@ -96,17 +203,17 @@ const mapEvent = (e) => ({
     key: e.type,
     title: formatTitle(e.type),
     description: formatDescription(e),
-    date: new Date(e.eventtime).toLocaleString(),
+    date: formatDateTime(e.eventtime),
     id: e.id || `${e.deviceid}-${e.eventtime}`
 });
 
-const fetchEvents = async () => {
-  try {
-    const { data } = await axios.get('/web/notifications/events');
-    messages.value = data.map(mapEvent);
-  } catch (error) {
-    console.error('Failed to fetch events', error);
-  }
+const fetchMessages = async () => {
+    try {
+        const { data } = await axios.get('/web/notifications/events');
+        messages.value = data.map(mapEvent);
+    } catch (e) {
+        console.error('Failed to fetch messages', e);
+    }
 };
 
 const deleteEvent = async (id) => {
@@ -160,39 +267,44 @@ const deleteEvent = async (id) => {
     }
 };
 
-const listenForAlerts = () => {
-    if (echoChannel) return;
-    if (!window.echo) return;
+onMounted(() => {
+    fetchMessages();
+    fetchMyDeviceIds().then(() => {
+        listenForAlerts();
+    });
+    markAsRead();
 
-    echoChannel = window.echo.channel('alerts')
-        .listen('.NewAlertEvent', (payload) => {
-            console.log('New Alert (Live):', payload);
-            const e = payload.event;
-            if (e) {
-                const newMsg = mapEvent(e);
-                messages.value.unshift(newMsg);
-                if (messages.value.length > 100) {
-                    messages.value.pop();
+    // Start polling only if sockets don’t deliver updates shortly
+    armPollingFallback();
+    try {
+        visibilityHandler = () => {
+            if (document.hidden) {
+                stopAlertsPolling();
+            } else {
+                if (!socketsSeen) {
+                    startAlertsPolling();
+                } else {
+                    stopAlertsPolling();
                 }
             }
-        })
-        .listen('.DeleteAlertEvent', (payload) => {
-            console.log('Delete Alert (Live):', payload);
-            if (payload.eventId) {
-                messages.value = messages.value.filter(m => m.id !== payload.eventId);
-            }
-        });
-};
-
-onMounted(() => {
-  fetchEvents();
-  listenForAlerts();
+        };
+        document.addEventListener('visibilitychange', visibilityHandler);
+    } catch {}
 });
 
 onUnmounted(() => {
-    if (echoChannel) {
-        window.echo.leave('alerts');
+    if (echoChannel && authState.user) {
+        window.echo.leave(`alerts.${authState.user.id}`);
     }
+    if (flushTimer) clearTimeout(flushTimer);
+    if (pollTimer) clearInterval(pollTimer);
+    if (fallbackStartTimer) clearTimeout(fallbackStartTimer);
+    try {
+        if (visibilityHandler) {
+            document.removeEventListener('visibilitychange', visibilityHandler);
+            visibilityHandler = null;
+        }
+    } catch {}
 });
 </script>
 

@@ -216,13 +216,26 @@ class ReportService
         $sessionId = $request->user()->traccarSession ?? session('cookie');
         $deviceId = $request->device_id;
 
+        // Check permission and get device details
+        $deviceName = Devices::accessibleByUser($request->user())
+            ->where('device_id', $deviceId)
+            ->first();
+
+        if (!$deviceName) {
+             // Return empty or throw exception? 
+             // Since this returns an array, maybe return empty array or let the controller handle it.
+             // But existing code didn't check for null, so it would crash.
+             // Let's assume valid request for now but at least scope the query.
+             // If we want to be safe:
+             return [];
+        }
+
         // Format the timestamps
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date ?? date('Y-m-d H:i:s', strtotime('-7 days'))));
         $to = date('Y-m-d\TH:i:00\Z', strtotime($request->to_date ?? date('Y-m-d H:i:s')));
 
         $queryString = "deviceId={$deviceId}&from={$from}&to={$to}&type=allEvents";
         $headers = ['Content-Type: application/json', 'Accept: application/json'];
-        $deviceName = Devices::where('device_id',$deviceId)->first();
         // Events Report - following same pattern as other methods
         $eventsResponse = static::curl("/api/reports/events?$queryString", 'GET', $sessionId, '', $headers);
 
@@ -254,13 +267,21 @@ class ReportService
         $sessionId = $request->user()->traccarSession ?? session('cookie');
         $deviceId = $request->device_id;
 
+        // Check permission and get device details
+        $deviceName = Devices::accessibleByUser($request->user())
+            ->where('device_id', $deviceId)
+            ->first();
+
+        if (!$deviceName) {
+             return [];
+        }
+
         // Format the timestamps
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date ?? date('Y-m-d H:i:s', strtotime('-7 days'))));
         $to = date('Y-m-d\TH:i:00\Z', strtotime($request->to_date ?? date('Y-m-d H:i:s')));
 
         $queryString = "deviceId={$deviceId}&from={$from}&to={$to}&type=allEvents";
         $headers = ['Content-Type: application/json', 'Accept: application/json'];
-        $deviceName = Devices::where('device_id',$deviceId)->first();
         // Events Report - following same pattern as other methods
         $eventsResponse = static::curl("/api/reports/stops?$queryString", 'GET', $sessionId, '', $headers);
 

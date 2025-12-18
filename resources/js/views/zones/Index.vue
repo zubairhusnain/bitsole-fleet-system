@@ -47,14 +47,14 @@
       <div class="card-body">
         <div class="fw-semibold mb-2">Search Option</div>
         <div class="row g-2 align-items-end">
-          <div class="col-sm-12 col-md-6 col-lg-4">
+          <div class="col-sm-12 col-md-3 col-lg-4">
             <label class="form-label small">Zone Name</label>
             <div class="input-group">
               <span class="input-group-text"><i class="bi bi-search"></i></span>
               <input type="text" class="form-control" placeholder="Enter Zone Name" v-model="searchName" />
             </div>
           </div>
-          <div class="col-sm-12 col-md-6 col-lg-4">
+          <div class="col-sm-12 col-md-3 col-lg-4">
             <label class="form-label small">Status</label>
             <select class="form-select" v-model="searchStatus">
               <option value="">-- Select Status --</option>
@@ -63,13 +63,13 @@
               <option value="Blocked">Blocked</option>
             </select>
           </div>
-          <div class="col-sm-12 col-md-6 col-lg-4">
+          <div class="col-sm-12 col-md-3 col-lg-2">
             <div class="form-check mt-4">
               <input class="form-check-input" type="checkbox" id="showBlocked" v-model="showBlocked">
               <label class="form-check-label small" for="showBlocked">Include Blocked Zones</label>
             </div>
           </div>
-          <div class="col-sm-12 col-md-6 col-lg-4 d-flex align-items-end">
+          <div class="col-sm-12 col-md-3 col-lg-2 d-flex align-items-end">
             <button class="btn btn-primary w-auto" @click="fetchZones">Submit</button>
           </div>
         </div>
@@ -145,6 +145,7 @@ import { RouterLink, useRouter } from 'vue-router';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
 import { hasPermission as _hasPermission } from '../../auth';
+import { formatDateTime } from '../../utils/datetime';
 
 // Search input (static for now)
 const searchName = ref('');
@@ -203,19 +204,6 @@ function nextPage() { if (page.value < totalPages.value) { page.value += 1; fetc
 
 function statusClass(s) {
   return s === 'Active' ? 'is-on' : 'is-off';
-}
-
-function formatDateTime(iso) {
-  if (!iso) return '-';
-  try {
-    const d = new Date(iso);
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const yyyy = d.getFullYear();
-    const hh = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
-    return `${dd}/${mm}/${yyyy} - ${hh}:${min}`;
-  } catch { return iso; }
 }
 
 function mapRow(z) {

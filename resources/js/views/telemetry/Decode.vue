@@ -109,6 +109,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
 import { parseCodec8Extended } from '../../utils/codec8e';
+import { formatDateTime } from '../../utils/datetime';
 
 const vehicleOptions = ref([]);
 const selectedDeviceId = ref(0);
@@ -141,7 +142,7 @@ async function loadVehicles() {
 
 function onSelectDevice() { reloadPositionsRaw(); reload(); setTimer(); }
 
-function fmtTime(s) { try { return new Date(s).toLocaleString(); } catch { return String(s || ''); } }
+function fmtTime(s) { return formatDateTime(s); }
 
 function standardFromPosition(pos) {
   const a = pos.attributes || {};

@@ -32,7 +32,6 @@ class DeviceService
 
     //     $user = $request->user();
     //     if (!$user) {
-    //         return ['devices' => [], 'nextDevice' => []];
     //     }
 
     //     // **Step 1: Fetch Relevant Devices Efficiently**
@@ -158,32 +157,13 @@ class DeviceService
 
         // Scope devices for this user (mirror VehicleController role logic)
         // Note: Devices table does not have device_type; use user/distributor scoping only
-        $query = Devices::query();
-
-        $role = (int) ($user->role ?? \App\Models\User::ROLE_ADMIN);
         if ($mine) {
-            // Strictly the current user's assigned devices
-            $query->whereHas('users', function($q) use ($user) {
+            // Strictly the current user's assigned devices, but still respecting RBAC scope
+            $query = Devices::accessibleByUser($user)->whereHas('users', function($q) use ($user) {
                 $q->where('users.id', $user->id);
             });
         } else {
-            if ($role === \App\Models\User::ROLE_DISTRIBUTOR) {
-                // Distributor: scope by distributor only
-                $query->where('distributor_id', $user->id);
-            } elseif ($role !== \App\Models\User::ROLE_ADMIN) {
-                // Non-admin (user/fleet manager): user_id must match; distributor scoped to user's distributor
-                $distId = $user->distributor_id ?? $user->id;
-                $query->where('distributor_id', $distId);
-
-                if ($role === \App\Models\User::ROLE_FLEET_MANAGER) {
-                    $query->where('manager_id', $user->id);
-                } else {
-                    $query->whereHas('users', function($q) use ($user) {
-                        $q->where('users.id', $user->id);
-                    });
-                }
-            }
-            // Admin: see all devices; no additional where
+            $query = Devices::accessibleByUser($user);
         }
 
         $all_Device = $query->orderBy('id', 'desc')->get();
@@ -661,20 +641,39 @@ class DeviceService
 
     public function getDevicesByStatus($filter, $request)
     {
-        $sessionId = $request->user()->traccarSession ?? session('cookie');
+        $user = $request->user();
+        $sessionId = $user->traccarSession ?? session('cookie');
+
+        // 1. Fetch accessible device IDs from local DB to enforce RBAC
+        $accessibleDeviceIds = Devices::accessibleByUser($user)->pluck('device_id')->toArray();
+        if (empty($accessibleDeviceIds)) {
+            return [];
+        }
+
         $position_response = static::curl('/api/positions', 'GET', $sessionId, '', array('Content-Type: application/json', 'Accept: application/json'));
-        $position_response = json_decode($position_response->response);
-        $id = session('tc_user_id');
-        $data = 'id=' . $id;
-        $devices = static::curl('/api/devices?all=true' . $data, 'GET', $sessionId, '', array());
-        $devices = json_decode($devices->response);
+        $position_response = json_decode($position_response->response ?? '[]');
+
+        // Fetch all devices from Traccar
+        $devicesResp = static::curl('/api/devices?all=true', 'GET', $sessionId, '', array());
+        $devices = json_decode($devicesResp->response ?? '[]');
 
         $i = 0;
         $check = 0;
         $response = [];
-        $count['totalDevices'] = count($devices);
 
-        foreach ($devices as $key => $device) {
+        // Filter Traccar devices by our accessible list
+        $allowedDevices = [];
+        if (is_array($devices)) {
+            foreach ($devices as $d) {
+                if (in_array($d->id, $accessibleDeviceIds)) {
+                    $allowedDevices[] = $d;
+                }
+            }
+        }
+
+        $count['totalDevices'] = count($allowedDevices);
+
+        foreach ($allowedDevices as $key => $device) {
             if ($filter == "blocked") {
                 if ($device->disabled == 1) {
                     $check = 1;

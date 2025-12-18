@@ -15,6 +15,7 @@ import { authState, hasPermission, roleToNumber } from '../auth';
 // Feature screens
 const Profile = () => import('../views/ProfileView.vue');
 const MonitoringVehicles = () => import('../views/monitoring/Vehicles.vue');
+const MonitoringDashboard = () => import('../views/monitoring/VehicleDashboard.vue');
 const MonitoringZones = () => import('../views/monitoring/Zones.vue');
 const LiveTracking = () => import('../views/live-tracking/LiveTracking.vue');
 const Dashboard = () => import('../views/Dashboard.vue');
@@ -49,8 +50,9 @@ const routes = [
   { path: '/settings', name: 'settings', component: SettingsView, meta: { requiresAuth: true, title: 'Settings', roles: [3], moduleKey: 'settings', action: 'read' } },
   { path: '/profile', name: 'profile', component: Profile, meta: { requiresAuth: true, title: 'Profile' } },
   // Feature screens
-  { path: '/monitoring/vehicles', name: 'monitoring-vehicles', component: MonitoringVehicles, meta: { requiresAuth: true, title: 'Vehicles Monitoring', moduleKey: 'vehicles', action: 'read' } },
-  { path: '/monitoring/zones', name: 'monitoring-zones', component: MonitoringZones, meta: { requiresAuth: true, title: 'Zone Monitoring', moduleKey: 'zones', action: 'read' } },
+  { path: '/monitoring/vehicles', name: 'monitoring-vehicles', component: MonitoringVehicles, meta: { requiresAuth: true, title: 'Vehicles Monitoring', moduleKey: 'monitoring.vehicles', action: 'read' } },
+  { path: '/monitoring/dashboard', name: 'monitoring-dashboard', component: MonitoringDashboard, meta: { requiresAuth: true, title: 'Vehicle Dashboard Status', moduleKey: 'monitoring.vehicles', action: 'read' } },
+  { path: '/monitoring/zones', name: 'monitoring-zones', component: MonitoringZones, meta: { requiresAuth: true, title: 'Zone Monitoring', moduleKey: 'monitoring.zones', action: 'read' } },
   { path: '/live-tracking', name: 'live-tracking', component: LiveTracking, meta: { requiresAuth: true, title: 'Live Tracking', roles: [0, 1] } },
   { path: '/drivers', name: 'drivers', component: Drivers, meta: { requiresAuth: true, title: 'Driver Management', moduleKey: 'drivers', action: 'read' } },
   { path: '/vehicles/:deviceId(\\d+)/settings', name: 'vehicle-settings', component: VehicleSettings, meta: { requiresAuth: true, title: 'Vehicle Settings', moduleKey: 'vehicles', action: 'read' } },
@@ -76,6 +78,8 @@ const routes = [
   { path: '/reports', name: 'reports', component: Reports, meta: { requiresAuth: true, title: 'Reports & Analytics', moduleKey: 'reports', action: 'read' } },
   { path: '/alerts', name: 'alerts', component: Alerts, meta: { requiresAuth: true, title: 'Alerts & Notifications' } },
   { path: '/fuel', name: 'fuel', component: Fuel, meta: { requiresAuth: true, title: 'Fuel Management', moduleKey: 'fuel', action: 'read' } },
+  { path: '/fuel/new', name: 'fuel-new', component: () => import('../views/fuel/AddFuel.vue'), meta: { requiresAuth: true, title: 'Add Fuel Entry', moduleKey: 'fuel', action: 'create' } },
+  { path: '/fuel/:id(\\d+)/edit', name: 'fuel-edit', component: () => import('../views/fuel/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Fuel Entry', moduleKey: 'fuel', action: 'update' } },
   { path: '/zones', name: 'zones', component: Zones, meta: { requiresAuth: true, title: 'Zone Management', moduleKey: 'zones', action: 'read' } },
   { path: '/zones/new', name: 'zones-new', component: ZonesAdd, meta: { requiresAuth: true, title: 'Add New Zone', moduleKey: 'zones', action: 'create' } },
   // Edit Zone route (numeric id only)

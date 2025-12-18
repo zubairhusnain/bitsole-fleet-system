@@ -7,73 +7,131 @@
       </ol>
     </div>
 
-    <div class="card">
-      <div class="card-header"><h6 class="mb-0">Alerts & Notifications Settings</h6></div>
-      <div class="card-body p-3">
-        <div v-if="loading" class="text-muted small mb-2">Loading notifications…</div>
+    <ul class="nav nav-tabs mb-3">
+      <li class="nav-item">
+        <button class="nav-link" :class="{ active: activeTab === 'alerts' }" @click="activeTab = 'alerts'">Global Alert Settings</button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" :class="{ active: activeTab === 'models' }" @click="activeTab = 'models'">Vehicle Model</button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" :class="{ active: activeTab === 'backup' }" @click="activeTab = 'backup'">System Backup</button>
+      </li>
+    </ul>
 
-        <div class="row g-3">
-          <div class="col-12 col-sm-3">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="statue_web" v-model.lazy="notificationChannel.web" @change="changeChannel" :disabled="loading || saving" />
-              <label class="form-check-label" for="statue_web">Web Alert</label>
-            </div>
-          </div>
-          <div class="col-12 col-sm-3">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="statue_mail" v-model.lazy="notificationChannel.mail" @change="changeChannel" :disabled="loading || saving" />
-              <label class="form-check-label" for="statue_mail">E-Mail Alert</label>
-            </div>
-          </div>
-          <div class="col-12 col-sm-3">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="statue_mobile" v-model.lazy="notificationChannel.mobile" @change="changeChannel" :disabled="loading || saving" />
-              <label class="form-check-label" for="statue_mobile">Mobile Alert</label>
-            </div>
-          </div>
-        </div>
+    <div class="tab-content">
+      <!-- Tab 1: Global Alert Settings -->
+      <div v-if="activeTab === 'alerts'" class="tab-pane fade show active">
+        <div class="card">
+          <div class="card-header"><h6 class="mb-0">Alerts & Notifications Settings</h6></div>
+          <div class="card-body p-3">
+            <div v-if="loading" class="text-muted small mb-2">Loading notifications…</div>
 
-        <div class="row mt-3 align-items-center">
-          <div class="col-sm-6"><h6 class="mb-2">Alarms</h6></div>
-          <div class="col-sm-6 text-end">
-            <button class="btn btn-sm btn-outline-success me-2" :disabled="loading || saving" @click="enableAll(alarmType, true)">Enable All</button>
-            <button class="btn btn-sm btn-outline-danger" :disabled="loading || saving" @click="enableAll(alarmType, false)">Disable All</button>
-          </div>
-          <div class="col-12"></div>
-          <div class="col-12 col-sm-3" v-for="(item, idx) in alarmType" :key="item.id">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" :id="'statue_'+item.attributes.alarms" v-model.lazy="item.already_xist" @change="changeStatus(item)" :disabled="loading || saving" />
-              <label class="form-check-label" :for="'statue_'+item.attributes.alarms">{{ item.attributes.alarms }}</label>
-            </div>
-          </div>
-        </div>
-
-        <div class="row mt-4 align-items-center">
-          <div class="col-sm-6"><h6 class="mb-2">Notifications</h6></div>
-          <div class="col-sm-6 text-end">
-            <button class="btn btn-sm btn-outline-success me-2" :disabled="loading || saving" @click="enableAll(notificationType, true)">Enable All</button>
-            <button class="btn btn-sm btn-outline-danger" :disabled="loading || saving" @click="enableAll(notificationType, false)">Disable All</button>
-          </div>
-          <div class="col-12"></div>
-          <template v-for="(item, idx) in notificationType" :key="item.id">
-            <div class="col-12 col-sm-3" v-if="item && item.type!='alarm'">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" :id="'statue_'+item.type" v-model.lazy="item.already_xist" @change="changeStatus(item)" :disabled="loading || saving" />
-                <label class="form-check-label" :for="'statue_'+item.type">{{ item.type }}</label>
+            <div class="row mt-3 align-items-center">
+              <div class="col-sm-6"><h6 class="mb-2">Alarms</h6></div>
+              <div class="col-sm-6 text-end">
+                <button class="btn btn-sm btn-outline-success me-2" :disabled="loading || saving" @click="enableAll(alarmType, true)">Enable All</button>
+                <button class="btn btn-sm btn-outline-danger" :disabled="loading || saving" @click="enableAll(alarmType, false)">Disable All</button>
+              </div>
+              <div class="col-12"></div>
+              <div class="col-12 col-sm-3" v-for="(item, idx) in alarmType" :key="item.id">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" :id="'statue_'+item.attributes.alarms" v-model.lazy="item.already_xist" @change="changeStatus(item)" :disabled="loading || saving" />
+                  <label class="form-check-label" :for="'statue_'+item.attributes.alarms">{{ item.attributes.alarms }}</label>
+                </div>
               </div>
             </div>
-          </template>
+
+            <div class="row mt-4 align-items-center">
+              <div class="col-sm-6"><h6 class="mb-2">Notifications</h6></div>
+              <div class="col-sm-6 text-end">
+                <button class="btn btn-sm btn-outline-success me-2" :disabled="loading || saving" @click="enableAll(notificationType, true)">Enable All</button>
+                <button class="btn btn-sm btn-outline-danger" :disabled="loading || saving" @click="enableAll(notificationType, false)">Disable All</button>
+              </div>
+              <div class="col-12"></div>
+              <template v-for="(item, idx) in notificationType" :key="item.id">
+                <div class="col-12 col-sm-3" v-if="item && item.type!='alarm'">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" :id="'statue_'+item.type" v-model.lazy="item.already_xist" @change="changeStatus(item)" :disabled="loading || saving" />
+                    <label class="form-check-label" :for="'statue_'+item.type">{{ item.type }}</label>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Vehicle Model -->
+      <div v-if="activeTab === 'models'" class="tab-pane fade show active">
+        <div class="card">
+          <div class="card-body">
+            <VehicleModelsManager />
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: System Backup -->
+      <div v-if="activeTab === 'backup'" class="tab-pane fade show active">
+        <div class="card" v-if="isAdmin">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">System Backups</h6>
+            <button class="btn btn-sm btn-primary" @click="fetchBackups" :disabled="backupLoading">
+              <i class="bi bi-arrow-clockwise" :class="{'animate-spin': backupLoading}"></i> Refresh
+            </button>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Filename</th>
+                    <th>Size</th>
+                    <th>Date</th>
+                    <th class="text-end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-if="backupLoading && !backups.length">
+                    <td colspan="4" class="text-center p-3">Loading backups...</td>
+                  </tr>
+                  <tr v-if="!backupLoading && !backups.length">
+                    <td colspan="4" class="text-center p-3">No backups found</td>
+                  </tr>
+                  <tr v-for="backup in backups" :key="backup.path">
+                    <td>{{ backup.name }}</td>
+                    <td>{{ backup.size }}</td>
+                    <td>{{ formatDate(backup.timestamp) }}</td>
+                    <td class="text-end">
+                      <button class="btn btn-sm btn-outline-primary me-2" @click="downloadBackup(backup.path)" title="Download">
+                        <i class="bi bi-download"></i>
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger me-2" @click="deleteBackup(backup.path)" title="Delete">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div v-else class="alert alert-warning">
+          Access restricted to Administrators.
         </div>
       </div>
     </div>
   </div>
-
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { authState, getCurrentUser } from '../auth';
+import VehicleModelsManager from '../components/VehicleModelsManager.vue';
+
+const activeTab = ref('alerts');
 
 const loading = ref(false);
 const saving = ref(false);
@@ -82,6 +140,55 @@ const requestData = ref([]);
 const notificationType = ref([]);
 const alarmType = ref([]);
 const error = ref('');
+
+// Backup state
+const backups = ref([]);
+const backupLoading = ref(false);
+const isAdmin = computed(() => authState.user && authState.user.role === 3);
+
+function formatDate(ts) {
+  if (!ts) return '-';
+  return new Date(ts * 1000).toLocaleString();
+}
+
+async function fetchBackups() {
+  if (!isAdmin.value) return;
+  backupLoading.value = true;
+  try {
+    const res = await axios.get('/web/backups');
+    backups.value = res.data.backups || [];
+  } catch (e) {
+    console.error('Failed to fetch backups', e);
+  } finally {
+    backupLoading.value = false;
+  }
+}
+
+function downloadBackup(path) {
+  window.location.href = `/web/backups/download?path=${encodeURIComponent(path)}`;
+}
+
+async function deleteBackup(path) {
+  const result = await Swal.fire({
+    title: 'Are you sure?',
+    text: "You won't be able to revert this!",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Yes, delete it!'
+  });
+
+  if (result.isConfirmed) {
+    try {
+      await axios.delete('/web/backups/delete', { data: { path } });
+      showToast('Backup deleted successfully');
+      fetchBackups();
+    } catch (e) {
+      showToast('Failed to delete backup', 'error');
+    }
+  }
+}
 
 function applyChannels(item) {
   item.web = !!notificationChannel.value.web;
@@ -96,12 +203,37 @@ async function allNotification() {
     const res = await axios.get('/web/notifications');
     const notif = Array.isArray(res?.data?.notificationType) ? res.data.notificationType : [];
     const alarms = Array.isArray(res?.data?.alarmType) ? res.data.alarmType : [];
+
+    // Fetch backups if admin
+    if (isAdmin.value) {
+      fetchBackups();
+    }
     notificationType.value = notif;
     alarmType.value = alarms;
   } catch (e) {
-    error.value = e?.response?.data?.message || 'Failed to load notifications';
+    error.value = e?.response?.data?.message || e.message || 'Failed to update notifications';
+    return false;
   } finally {
+    saving.value = false;
     loading.value = false;
+  }
+}
+
+async function creatingNotification(payload) {
+  saving.value = true;
+  try {
+    const res = await axios.post('/web/notifications', payload);
+    if (res.data && res.data.ok === false) {
+      console.error('Notification creation errors:', res.data.errors);
+      throw new Error('Failed to create/update notification on server');
+    }
+    await allNotification();
+    return true;
+  } catch (e) {
+    error.value = e?.response?.data?.message || e.message || 'Failed to update notifications';
+    return false;
+  } finally {
+    saving.value = false;
   }
 }
 
@@ -140,73 +272,23 @@ async function enableAll(list, enabled) {
   const rawList = Array.isArray(list) ? list : [];
   // If list is notificationType, we must exclude alarms (since they have their own section)
   // If list is alarmType, they are all alarms.
-  // We can heuristically filter: if we are disabling 'notifications', exclude 'alarm' type.
-  // But 'list' is just an array. We can check if it's the notificationType array.
 
   let itemsToProcess = rawList;
   if (list === notificationType.value) {
     itemsToProcess = rawList.filter(item => item && item.type !== 'alarm');
-  } else if (list === alarmType.value) {
-    itemsToProcess = rawList; // all alarms
   }
 
-  if (itemsToProcess.length === 0) return;
-
-  // Optimistic Update: Update UI immediately
-  itemsToProcess.forEach(item => {
-    item.already_xist = !!enabled;
-    // Update channels based on global setting if enabling, or keep if disabling?
-    // Actually applyChannels updates local properties 'web', 'mail', 'sms' based on global toggles.
-    // If disabling, it doesn't matter much what channels are set, but let's be consistent.
-    item.web = !!notificationChannel.value.web;
-    item.mail = !!notificationChannel.value.mail;
-    item.sms = !!notificationChannel.value.mobile;
-  });
-
-  // Prepare payload
-  const payload = itemsToProcess.map(orig => {
-    return {
-      ...orig,
-      already_xist: !!enabled,
-      // Preserve existing channels if we are just enabling/disabling existence
-      // OR force them to match the global toggle?
-      // User expects "Enable All" to probably set them to the checked channels.
-      web: !!notificationChannel.value.web,
-      mail: !!notificationChannel.value.mail,
-      sms: !!notificationChannel.value.mobile
-    };
-  });
+  const payload = itemsToProcess.map(item => ({
+    ...item,
+    web: !!item.web,
+    mail: !!item.mail,
+    sms: !!item.sms,
+    already_xist: enabled
+  }));
 
   const ok = await creatingNotification(payload);
-
-  if (ok) {
-    showToast(`${enabled ? 'Enabled' : 'Disabled'} all`, 'success');
-  } else {
-    // Revert on failure (or reload)
-    showToast('Failed to update all', 'error');
-    await allNotification(); // Reload to get true state
-  }
-}
-
-async function creatingNotification(payload) {
-  error.value = '';
-  saving.value = true;
-  try {
-    // Use provided payload or fallback to requestData for legacy/other calls
-    const data = payload || requestData.value;
-    const res = await axios.post('/web/notifications', data);
-    if (res.data && res.data.ok === false) {
-      console.error('Notification creation errors:', res.data.errors);
-      throw new Error('Failed to create/update notification on server');
-    }
-    await allNotification();
-    return true;
-  } catch (e) {
-    error.value = e?.response?.data?.message || e.message || 'Failed to update notifications';
-    return false;
-  } finally {
-    saving.value = false;
-  }
+  if (ok) showToast(`${enabled ? 'Enabled' : 'Disabled'} All`, 'success');
+  else showToast('Failed to update all', 'error');
 }
 
 function itemLabel(item) { return item?.type === 'alarm' ? (item?.attributes?.alarms || 'Alarm') : (item?.type || 'Notification'); }
@@ -220,4 +302,5 @@ onMounted(allNotification);
 .form-check { text-align: left; }
 .form-check-input { cursor: pointer; }
 .form-check-label { cursor: pointer; }
+.nav-tabs .nav-link { cursor: pointer; }
 </style>

@@ -63,7 +63,13 @@ class ZoneController extends Controller
                         $z->setAttribute('description', $gf->description ?? null);
                         // Extract status/speed from attributes JSON if present
                         $attrs = null;
-                        try { $attrs = is_array($gf->attributes) ? $gf->attributes : (json_decode($gf->attributes, true) ?: null); } catch (\Throwable $e) { $attrs = null; }
+                        try {
+                            if (is_array($gf->attributes)) {
+                                $attrs = $gf->attributes;
+                            } elseif (is_string($gf->attributes)) {
+                                $attrs = json_decode($gf->attributes, true);
+                            }
+                        } catch (\Throwable $e) { $attrs = null; }
                         if (is_array($attrs)) {
                             $z->setAttribute('status', ($attrs['status'] ?? null) ?: $z->status ?? null);
                             $z->setAttribute('speed', isset($attrs['speed']) ? (float) $attrs['speed'] : ($z->speed ?? null));

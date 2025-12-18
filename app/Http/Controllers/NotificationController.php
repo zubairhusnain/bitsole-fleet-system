@@ -7,91 +7,128 @@ use App\Models\Devices;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Events\AlertsUpdated;
 
 class NotificationController extends Controller
 {
+    public function broadcast(Request $request)
+    {
+        $user = $request->user();
+        if ($user) {
+            broadcast(new AlertsUpdated($user));
+        }
+        return response()->json(['ok' => true]);
+    }
+
     public function events(Request $request)
     {
         $user = $request->user();
 
-        // Scope devices for this user (mirror VehicleController role logic)
-        $query = Devices::query();
-        $role = (int) ($user->role ?? User::ROLE_ADMIN);
-
-        if ($role === User::ROLE_DISTRIBUTOR) {
-             $query->where('distributor_id', $user->id);
-        } elseif ($role !== User::ROLE_ADMIN) {
-             $distId = $user->distributor_id ?? $user->id;
-             $query->where('distributor_id', $distId);
-
-             if ($role === User::ROLE_FLEET_MANAGER) {
-                  $query->where('manager_id', $user->id);
-             } else {
-                  $query->whereHas('users', function($q) use ($user) {
-                      $q->where('users.id', $user->id);
-                  });
-             }
-        }
+        // Scope devices for this user
+        $query = Devices::accessibleByUser($user);
         $deviceIds = $query->pluck('device_id')->toArray();
 
-        // List notifications by joining tc_device_notifications with tc_notifications first,
-        // then joining tc_events based on deviceid and type from the first join.
-        // Also join tc_devices to get the device name.
-        $events = DB::connection('pgsql')->table('tc_device_notification as dn')
-            ->join('tc_notifications as n', 'dn.notificationid', '=', 'n.id')
-            ->join('tc_events as e', function($join) {
-                $join->on('e.deviceid', '=', 'dn.deviceid')
-                     ->on('e.type', '=', 'n.type');
-            })
-            ->join('tc_devices as d', 'e.deviceid', '=', 'd.id')
-            ->whereIn('e.deviceid', $deviceIds)
-            ->select('e.*', 'n.attributes as notification_attributes', 'n.type as notification_type', 'd.name as device_name')
-            ->orderBy('e.eventtime', 'desc')
+        // Retrieve events using Eloquent with relations and scope
+        $events = \App\Models\TcEvent::with(['device', 'notifications.devices'])
+            ->whereIn('deviceid', $deviceIds)
+            ->withEnabledNotifications()
+            ->distinct('id')
+            ->orderBy('id', 'desc')
             ->limit(100)
             ->get();
 
-        return response()->json($events);
+        // Transform to match expected JSON structure
+        $mappedEvents = $events->map(function ($event) {
+            // Find the notification definition that is assigned to this device
+            // Since we used withEnabledNotifications (strict), there should be one.
+            $notification = $event->notifications->first(function ($n) use ($event) {
+                return $n->devices->contains('id', $event->deviceid);
+            });
+
+            return array_merge($event->toArray(), [
+                'device_name' => $event->device->name ?? null,
+                'notification_type' => $event->type,
+                'notification_attributes' => $notification ? $notification->attributes : null,
+            ]);
+        });
+
+        return response()->json($mappedEvents);
+    }
+
+    public function unreadCount(Request $request)
+    {
+        $user = $request->user();
+
+        // Scope devices for this user
+        $query = Devices::accessibleByUser($user);
+        $deviceIds = $query->pluck('device_id')->toArray();
+
+        $count = \App\Models\TcEvent::whereIn('deviceid', $deviceIds)
+            ->withEnabledNotifications()
+            ->where('is_read', 0)
+            ->count();
+
+        return response()->json(['count' => $count]);
+    }
+
+    public function markAllRead(Request $request)
+    {
+        $user = $request->user();
+
+        // Scope devices for this user
+        $query = Devices::accessibleByUser($user);
+        $deviceIds = $query->pluck('device_id')->toArray();
+
+        // Use Eloquent update
+        \App\Models\TcEvent::whereIn('deviceid', $deviceIds)
+            ->withEnabledNotifications()
+            ->where('is_read', 0)
+            ->update(['is_read' => 1]);
+
+        return response()->json(['success' => true]);
     }
 
     public function myDeviceIds(Request $request)
     {
         $user = $request->user();
 
-        $query = Devices::query();
-        $role = (int) ($user->role ?? User::ROLE_ADMIN);
-
-        if ($role === User::ROLE_DISTRIBUTOR) {
-             $query->where('distributor_id', $user->id);
-        } elseif ($role !== User::ROLE_ADMIN) {
-             $distId = $user->distributor_id ?? $user->id;
-             $query->where('distributor_id', $distId);
-
-             if ($role === User::ROLE_FLEET_MANAGER) {
-                  $query->where('manager_id', $user->id);
-             } else {
-                  $query->whereHas('users', function($q) use ($user) {
-                      $q->where('users.id', $user->id);
-                  });
-             }
-        }
+        $query = Devices::accessibleByUser($user);
         $deviceIds = $query->pluck('device_id')->toArray();
 
         return response()->json($deviceIds);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
+        $user = $request->user();
+
+        // Check if event exists using Eloquent
+        $event = \App\Models\TcEvent::find($id);
+
+        if (!$event) {
+            return response()->json(['message' => 'Event not found'], 404);
+        }
+
+        // Check if user has access to the device associated with this event
+        $canAccess = Devices::accessibleByUser($user)
+            ->where('device_id', $event->deviceid)
+            ->exists();
+
+        if (!$canAccess) {
+             return response()->json(['message' => 'Forbidden: You do not have access to this device'], 403);
+        }
+
         try {
-            $deleted = DB::connection('pgsql')->table('tc_events')->where('id', $id)->delete();
+            $deleted = $event->delete();
 
             if ($deleted) {
-                broadcast(new DeleteAlertEvent($id));
-                return response()->json(['message' => 'Event deleted successfully']);
+                // broadcast(new DeleteAlertEvent($id));
+                return response()->json(['message' => 'Notification deleted']);
             }
 
-            return response()->json(['message' => 'Event not found'], 404);
+            return response()->json(['message' => 'Failed to delete notification'], 500);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Error deleting event: ' . $e->getMessage()], 500);
+            return response()->json(['message' => 'Error deleting notification', 'error' => $e->getMessage()], 500);
         }
     }
 
@@ -126,4 +163,3 @@ class NotificationController extends Controller
         return response()->json(['response' => $resp]);
     }
 }
-

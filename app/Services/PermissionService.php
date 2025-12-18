@@ -45,17 +45,22 @@ class PermissionService
         }
 
         public function assignNotification($request,$deviceId,$notificationId){
-            if($deviceId !==null && $notificationId !==null){
-                $sessionId = $request->user()->traccarSession ?? session('cookie');
-                $data='{"deviceId":"'.$deviceId.'","notificationId":"'.$notificationId.'"}';
-                $method = "POST";
-                if(isset($request->already_xist) && $request->already_xist== false){
-                    $method = "DELETE";
-                }
-                $devices = static::curl('/api/permissions', $method,$sessionId,$data,array('Content-Type: application/json', 'Accept: application/json'));
-                return $devices->response;
+        if($deviceId !==null && $notificationId !==null){
+            $sessionId = $request->user()->traccarSession ?? session('cookie');
+            $data='{"deviceId":"'.$deviceId.'","notificationId":"'.$notificationId.'"}';
+            $method = "POST";
+
+            // Use strict boolean check on input
+            $alreadyExist = filter_var($request->input('already_xist'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            // If explicitly false, then DELETE
+            if ($alreadyExist === false) {
+                $method = "DELETE";
             }
+
+            $devices = static::curl('/api/permissions', $method,$sessionId,$data,array('Content-Type: application/json', 'Accept: application/json'));
+            return $devices->response;
         }
+    }
 
         public function unassignDriver($request,$device_id,$driver_id){
             $sessionId = $request->user()->traccarSession ?? session('cookie');

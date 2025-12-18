@@ -62,30 +62,62 @@
               <tr>
                 <th>Module</th>
                 <th>
-                  <input type="checkbox" :checked="isColAll('read')" @change="toggleColumn('read', $event.target.checked)" />
-                  <span class="ms-1">Read</span>
+                  <div class="d-flex align-items-center">
+                    <div class="form-check form-switch mb-0">
+                      <input class="form-check-input" type="checkbox" :checked="isColAll('read')" @change="toggleColumn('read', $event.target.checked)" />
+                    </div>
+                    <span class="ms-2">Read</span>
+                  </div>
                 </th>
                 <th>
-                  <input type="checkbox" :checked="isColAll('write')" @change="toggleColumn('write', $event.target.checked)" />
-                  <span class="ms-1">Write</span>
+                  <div class="d-flex align-items-center">
+                    <div class="form-check form-switch mb-0">
+                      <input class="form-check-input" type="checkbox" :checked="isColAll('write')" @change="toggleColumn('write', $event.target.checked)" />
+                    </div>
+                    <span class="ms-2">Write</span>
+                  </div>
                 </th>
                 <th>
-                  <input type="checkbox" :checked="isColAll('update')" @change="toggleColumn('update', $event.target.checked)" />
-                  <span class="ms-1">Update</span>
+                  <div class="d-flex align-items-center">
+                    <div class="form-check form-switch mb-0">
+                      <input class="form-check-input" type="checkbox" :checked="isColAll('update')" @change="toggleColumn('update', $event.target.checked)" />
+                    </div>
+                    <span class="ms-2">Update</span>
+                  </div>
                 </th>
                 <th>
-                  <input type="checkbox" :checked="isColAll('delete')" @change="toggleColumn('delete', $event.target.checked)" />
-                  <span class="ms-1">Delete</span>
+                  <div class="d-flex align-items-center">
+                    <div class="form-check form-switch mb-0">
+                      <input class="form-check-input" type="checkbox" :checked="isColAll('delete')" @change="toggleColumn('delete', $event.target.checked)" />
+                    </div>
+                    <span class="ms-2">Delete</span>
+                  </div>
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="m in modules" :key="m.key">
                 <td>{{ m.label }}</td>
-                <td><input type="checkbox" v-model="permissionsMap[m.key].read" /></td>
-                <td><input type="checkbox" v-model="permissionsMap[m.key].create" /></td>
-                <td><input type="checkbox" v-model="permissionsMap[m.key].update" /></td>
-                <td><input type="checkbox" v-model="permissionsMap[m.key].delete" /></td>
+                <td>
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" v-model="permissionsMap[m.key].read" />
+                  </div>
+                </td>
+                <td>
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" v-model="permissionsMap[m.key].create" />
+                  </div>
+                </td>
+                <td>
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" v-model="permissionsMap[m.key].update" />
+                  </div>
+                </td>
+                <td>
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" v-model="permissionsMap[m.key].delete" />
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>

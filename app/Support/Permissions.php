@@ -26,15 +26,26 @@ class Permissions
     public static function effectiveMap(User $user, array $modules): array
     {
         $rows = UserPermission::query()->where('user_id', $user->id)->get()->keyBy('module_key');
+        // Retrieve labels from ModulePermission config
+        $labels = \App\Http\Middleware\ModulePermission::modules();
+
         $map = [];
         foreach ($modules as $key) {
+            $label = $labels[$key] ?? $key;
             $row = $rows->get($key);
             if ($user->isAdmin() || $user->isDistributor()) {
-                $map[$key] = ['read' => true, 'create' => true, 'update' => true, 'delete' => true];
+                $map[$key] = [
+                    'label' => $label,
+                    'read' => true,
+                    'create' => true,
+                    'update' => true,
+                    'delete' => true
+                ];
                 continue;
             }
             if ($row) {
                 $map[$key] = [
+                    'label' => $label,
                     'read' => (bool)($row->can_read ?? $row->can_access ?? false),
                     'create' => (bool)($row->can_create ?? false),
                     'update' => (bool)($row->can_update ?? false),
@@ -42,6 +53,7 @@ class Permissions
                 ];
             } else {
                 $map[$key] = [
+                    'label' => $label,
                     'read' => static::fallbackCheck($user, $key, 'read'),
                     'create' => static::fallbackCheck($user, $key, 'create'),
                     'update' => static::fallbackCheck($user, $key, 'update'),

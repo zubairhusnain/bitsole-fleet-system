@@ -5,7 +5,8 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
-use App\Events\NewAlertEvent;
+use App\Events\AlertsUpdated;
+use App\Models\User;
 use Carbon\Carbon;
 
 class PollAlertsCommand extends Command
@@ -33,58 +34,71 @@ class PollAlertsCommand extends Command
     {
         $this->info('Starting alert polling service...');
 
-        // Initialize last_id to the current max id to avoid broadcasting old events on restart
-        // If cache exists, use it (optional, but safer to start fresh or from max to avoid flood)
-        // For this implementation, we'll start from current max to avoid spamming on restart.
-        $lastId = DB::connection('pgsql')->table('tc_events')->max('id') ?? 0;
-        
+        // Initialize last_id. Priority: Cache > DB Max > 0
+        // In production, using Cache ensures we don't miss alerts during restarts.
+        $dbMaxId = DB::connection('pgsql')->table('tc_events')->max('id') ?? 0;
+        $lastId = Cache::get('alerts_poll_last_id', $dbMaxId);
+
+        // Safety check: If cache is too old (e.g., > 1000 events behind), skip to current to avoid massive flood
+        if ($dbMaxId - $lastId > 1000) {
+            $this->warn("Last ID {$lastId} is too far behind DB Max {$dbMaxId}. Skipping to DB Max to avoid flood.");
+            $lastId = $dbMaxId;
+        }
+
         $this->info("Initial Last ID: {$lastId}");
 
         while (true) {
             try {
-                // Fetch new events with the same join logic as NotificationController
-                $newEvents = DB::connection('pgsql')->table('tc_events as e')
-                    ->join('tc_devices as d', 'e.deviceid', '=', 'd.id')
-                    // We join tc_device_notification and tc_notifications to ensure we only pick up relevant alerts
-                    // Note: The original controller query started from tc_device_notification. 
-                    // Here we start from tc_events to efficiently filter by ID > $lastId.
-                    ->join('tc_device_notification as dn', 'e.deviceid', '=', 'dn.deviceid')
-                    ->join('tc_notifications as n', function($join) {
-                        $join->on('dn.notificationid', '=', 'n.id')
-                             ->on('e.type', '=', 'n.type');
-                    })
-                    ->select(
-                        'e.*', 
-                        'n.attributes as notification_attributes', 
-                        'n.type as notification_type', 
-                        'd.name as device_name'
-                    )
-                    ->where('e.id', '>', $lastId)
-                    ->orderBy('e.id', 'asc')
-                    ->limit(50) // Batch limit
+                // Fetch new events using Eloquent and strict notification logic
+                $newEvents = \App\Models\TcEvent::where('id', '>', $lastId)
+                    ->withEnabledNotifications()
+                    ->distinct('id')
+                    ->orderBy('id', 'asc')
+                    ->limit(50)
                     ->get();
 
                 if ($newEvents->isNotEmpty()) {
+                    $affectedUserIds = [];
+                    $maxId = $lastId;
+
                     foreach ($newEvents as $event) {
-                        $this->info("Broadcasting event ID: {$event->id} - Type: {$event->type}");
-                        
-                        // Broadcast the event
-                        broadcast(new NewAlertEvent($event));
-                        
-                        // Update lastId
-                        $lastId = $event->id;
+                        $this->info("Processing event ID: {$event->id} - Type: {$event->type}");
+
+                        // Find user linked to this device
+                        // using Devices model to find the owner/manager
+                        $device = \App\Models\Devices::where('device_id', $event->deviceid)->first();
+                        $userId = $device ? $device->user_id : null;
+
+                        if ($userId) {
+                            $affectedUserIds[$userId] = true;
+                        }
+
+                        if ($event->id > $maxId) {
+                            $maxId = $event->id;
+                        }
                     }
+
+                    // Broadcast to affected users
+                    foreach (array_keys($affectedUserIds) as $uid) {
+                        $user = User::find($uid);
+                        if ($user) {
+                             $this->info("Dispatching AlertsUpdated for User ID: {$uid}");
+                             broadcast(new AlertsUpdated($user));
+                        }
+                    }
+
+                    // Update lastId
+                    $lastId = $maxId;
+                    Cache::put('alerts_poll_last_id', $lastId, now()->addDay());
                 }
 
                 // Sleep to prevent high CPU usage
-                sleep(2); 
+                sleep(2);
 
             } catch (\Exception $e) {
                 $this->error("Error polling alerts: " . $e->getMessage());
                 sleep(5); // Sleep longer on error
             }
         }
-
-        return 0;
     }
 }

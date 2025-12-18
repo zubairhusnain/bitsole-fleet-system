@@ -4,6 +4,7 @@ use App\Models\TcUser;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VehicleModelController;
+use App\Http\Controllers\MaintenanceController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -14,7 +15,7 @@ Route::get('/testing', function () {
             // We prepend the schema name 'omayer' to ensure the database
             // looks in the correct location for the table.
             $users = TcUser::all();
-            dd($users);
+            // dd($users);
             // Return the fetched data as a JSON response
             return response()->json([
                 'status' => 'success',
@@ -79,8 +80,36 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     });
 });
 
+// Backups (Admin only)
+Route::middleware(['auth'])->prefix('/web/backups')->group(function () {
+    Route::get('/', [\App\Http\Controllers\BackupController::class, 'index']);
+    Route::get('/download', [\App\Http\Controllers\BackupController::class, 'download']);
+    Route::delete('/delete', [\App\Http\Controllers\BackupController::class, 'delete']);
+});
+
+// Monitoring Routes
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/monitoring')->group(function () {
+    Route::get('/vehicles', [\App\Http\Controllers\MonitoringController::class, 'index']);
+    Route::get('/vehicles/{id}', [\App\Http\Controllers\MonitoringController::class, 'show']);
+    Route::get('/vehicles/{id}/events', [\App\Http\Controllers\MonitoringController::class, 'getDeviceEvents']);
+    // Include 'vehicles' in the path so ModulePermission maps to 'monitoring.vehicles'
+    Route::post('/vehicles/events/{eventId}/acknowledge', [\App\Http\Controllers\MonitoringController::class, 'acknowledgeEvent']);
+    Route::post('/vehicles/{id}/alert-status', [\App\Http\Controllers\MonitoringController::class, 'updateAlertStatus']);
+    Route::get('/zones', [\App\Http\Controllers\MonitoringController::class, 'zoneSummary']);
+});
+
 // Auth-protected Vehicles CRUD
 Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/vehicles')->group(function () {
+    // Maintenance CRUD (Nested)
+    // IMPORTANT: Must be defined BEFORE /{deviceId} to avoid conflict
+    Route::prefix('maintenance')->group(function () {
+        Route::get('/', [MaintenanceController::class, 'index']);
+        Route::get('/vehicle/options', [MaintenanceController::class, 'vehicleOptions']);
+        Route::post('/', [MaintenanceController::class, 'store']);
+        Route::put('/{id}', [MaintenanceController::class, 'update']);
+        Route::delete('/{id}', [MaintenanceController::class, 'destroy']);
+    });
+
     Route::get('/', [\App\Http\Controllers\VehicleController::class, 'index']);
     Route::get('/options', [\App\Http\Controllers\VehicleController::class, 'options']);
     // Tracker models options for vehicle form (not admin-only)
@@ -125,6 +154,8 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::post('/{deviceId}/notifications/assign', [\App\Http\Controllers\VehicleController::class, 'notificationsAssign']);
 
 });
+
+
 
 // NEW: Auth-protected Drivers CRUD & assignment
 Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/drivers')->group(function () {
@@ -177,6 +208,18 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::delete('/{zoneId}', [\App\Http\Controllers\ZoneController::class, 'destroy']);
 });
 
+// Auth-protected Fuel Management
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/fuel')->group(function () {
+    Route::get('/', [\App\Http\Controllers\FuelController::class, 'index']);
+    Route::get('/summary', [\App\Http\Controllers\FuelController::class, 'summary']);
+    Route::get('/vehicles', [\App\Http\Controllers\FuelController::class, 'vehicleOptions']);
+    Route::post('/', [\App\Http\Controllers\FuelController::class, 'store']);
+    Route::get('/{id}', [\App\Http\Controllers\FuelController::class, 'show']);
+    Route::put('/{id}', [\App\Http\Controllers\FuelController::class, 'update']);
+    Route::patch('/{id}/restore', [\App\Http\Controllers\FuelController::class, 'restore']);
+    Route::delete('/{id}', [\App\Http\Controllers\FuelController::class, 'destroy']);
+});
+
 // NEW: Auth-protected Geofence listing from Traccar DB (testing/util)
 Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('/web/traccar/geofences', [\App\Http\Controllers\ZoneController::class, 'geofencesDb']);
 
@@ -187,7 +230,10 @@ Route::middleware('auth')->get('/web/traccar/assign-computed-attributes', functi
 
 // Auth-protected Notifications APIs (publicly accessible to all roles)
 Route::middleware(['auth'])->prefix('/web/notifications')->group(function () {
+    Route::get('/broadcast', [\App\Http\Controllers\NotificationController::class, 'broadcast']);
     Route::get('/events', [\App\Http\Controllers\NotificationController::class, 'events']);
+    Route::get('/unread-count', [\App\Http\Controllers\NotificationController::class, 'unreadCount']);
+    Route::post('/mark-read', [\App\Http\Controllers\NotificationController::class, 'markAllRead']);
     Route::get('/my-device-ids', [\App\Http\Controllers\NotificationController::class, 'myDeviceIds']);
     Route::delete('/events/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy']);
     Route::get('/', [\App\Http\Controllers\NotificationController::class, 'index']);

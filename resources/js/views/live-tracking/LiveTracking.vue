@@ -98,6 +98,7 @@ import { LMap, LTileLayer, LMarker, LPopup, LCircle } from '@vue-leaflet/vue-lea
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { formatTelemetry } from '../../utils/telemetry';
+import { formatDateTime } from '../../utils/datetime';
 
 const map = ref(null);
 const markerRefs = new Map();
@@ -552,14 +553,7 @@ function statusIs(v, value) {
 }
 
 function formatTime(val) {
-    if (!val) return '—';
-    try {
-        const d = new Date(val);
-        if (!isNaN(d.getTime())) return d.toLocaleString();
-        const n = Number(val);
-        if (Number.isFinite(n)) return new Date(n).toLocaleString();
-        return String(val);
-    } catch { return String(val); }
+    return formatDateTime(val);
 }
 
 function lastUpdate(v) {
@@ -686,7 +680,7 @@ function focusVehicle(v) {
 onMounted(() => {
     // Preload icons to avoid delay on first click
     const img = new Image();
-    img.src = '/images/markers/focus-marker.png';
+    img.src = '/images/markers/focus-marker.svg';
 
     // Map is created declaratively via <l-map/>; load data and listeners
     fetchVehicles();

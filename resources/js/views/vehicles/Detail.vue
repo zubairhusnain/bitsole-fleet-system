@@ -173,7 +173,7 @@
                 <div class="card panel rounded-4 shadow-sm">
                     <div class="card-body p-0">
                         <div ref="mapContainer" style="height: calc(60vh - 16px); min-height: 320px; position: relative;">
-                            <div class="zone-toggle-control d-none" style="position: absolute; top: 10px; right: 10px; z-index: 1000; background: white; padding: 8px 12px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
+                            <div class="zone-toggle-control" style="position: absolute; top: 10px; right: 10px; z-index: 1000; background: white; padding: 8px 12px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
                                 <div class="form-check form-switch mb-0">
                                     <input class="form-check-input" type="checkbox" id="showZonesCheck" v-model="showZones" :disabled="loadingGeofences">
                                     <label class="form-check-label fw-semibold" for="showZonesCheck">Show Zones</label>
@@ -765,6 +765,7 @@ import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { LMap, LTileLayer, LMarker, LPolyline, LPopup, LCircle, LPolygon } from '@vue-leaflet/vue-leaflet';
+import { formatDateTime, formatDate } from '../../utils/datetime';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import L from 'leaflet';
@@ -1070,7 +1071,7 @@ const lastUpdateDisplay = computed(() => {
         || detailPayload.value?.position?.servertime
         || detailPayload.value?.device?.lastUpdate
         || null;
-    return t ? new Date(t).toLocaleString() : '-';
+    return formatDateTime(t);
 });
 const uniqueId = computed(() => detailPayload.value?.device?.uniqueId || detailPayload.value?.device?.uniqueid || null);
 
@@ -1974,7 +1975,7 @@ const driverStatusClass = computed(() => driverStatusLabel.value === 'Active'
     : 'bg-secondary-subtle text-secondary-emphasis');
 const memberSinceDisplay = computed(() => {
     const since = driverPickAttr(['memberSince', 'joinedAt', 'createdAt']);
-    return since ? new Date(since).toLocaleDateString() : '';
+    return since ? formatDate(since) : '';
 });
 
 const driverAvatarUrl = computed(() => {
@@ -2062,10 +2063,7 @@ const comparisons = computed(() => ([
 ]));
 
 // Trips helpers
-function formatDateTime(s) {
-    if (!s) return '-';
-    try { return new Date(s).toLocaleString(); } catch { return String(s); }
-}
+// formatDateTime imported from utils
 function formatDistanceKm(d) {
     const n = Number(d);
     if (!Number.isFinite(n)) return '-';

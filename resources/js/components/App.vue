@@ -20,7 +20,7 @@
                 </ul>
                 <!--end::Start Navbar Links-->
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item d-none" v-if="isAuthed">
+                    <li class="nav-item" v-if="isAuthed">
                         <RouterLink to="/alerts" class="nav-link position-relative" style="padding-top: 0.5rem;">
                             <i class="bi bi-bell" style="font-size: 1.2rem;"></i>
                             <span v-if="unreadCount > 0" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem; transform: translate(-50%, 50%) !important;">
@@ -43,7 +43,7 @@
                         </div>
                         <div class="user-dropdown">
                             <RouterLink to="/profile" class="dropdown-item">Profile</RouterLink>
-                            <RouterLink v-if="roleToNumber(authState?.user?.role ?? 0) === 3" to="/settings" class="dropdown-item d-none">Settings</RouterLink>
+                            <RouterLink v-if="roleToNumber(authState?.user?.role ?? 0) === 3" to="/settings" class="dropdown-item">Settings</RouterLink>
                             <button class="dropdown-item text-danger" @click="logout">Logout</button>
                         </div>
                     </li>
@@ -126,7 +126,7 @@
                                 </li>
                                 <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('vehicles.overview','read')">
                                     <RouterLink to="/vehicles/overview" class="nav-link"
-                                        :class="{ active: route.path.startsWith('/vehicles/overview') }">
+                                        :class="{ active: route.path.startsWith('/vehicles/overview') || route.name === 'vehicles-detail' }">
                                         <i class="nav-icon bi bi-clipboard-data"></i>
                                         <p>Vehicle Overview</p>
                                     </RouterLink>
@@ -134,15 +134,15 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item  d-none">
+                        <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('fuel', 'read')">
                             <RouterLink to="/fuel" class="nav-link" :class="{ active: route.name === 'fuel' }">
                                 <i class="nav-icon bi bi-fuel-pump"></i>
                                 <p>Fuel Management</p>
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item  d-none">
-                            <a href="#" class="nav-link">
+                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/monitoring') }" v-if="!isAdminOrDistributor && (hasPerm('monitoring.vehicles', 'read') || hasPerm('monitoring.zones', 'read'))">
+                            <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/monitoring') }">
                                 <i class="nav-icon bi bi-graph-up"></i>
                                 <p>
                                     Monitoring
@@ -150,24 +150,31 @@
                                 </p>
                             </a>
                             <ul class="nav nav-treeview">
-                                <li class="nav-item">
+                                <li class="nav-item" v-if="hasPerm('monitoring.vehicles', 'read')">
                                     <RouterLink to="/monitoring/vehicles" class="nav-link"
-                                        :class="{ active: route.name === 'monitoring-vehicles' }">
+                                        :class="{ active: route.path.startsWith('/monitoring/vehicles') }">
                                         <i class="nav-icon bi bi-truck"></i>
-                                        <p>Vehicles</p>
+                                        <p>Vehicle Monitoring</p>
                                     </RouterLink>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item" v-if="hasPerm('monitoring.zones', 'read')">
                                     <RouterLink to="/monitoring/zones" class="nav-link"
-                                        :class="{ active: route.name === 'monitoring-zones' }">
+                                        :class="{ active: route.path.startsWith('/monitoring/zones') }">
                                         <i class="nav-icon bi bi-geo-alt"></i>
-                                        <p>Zones</p>
+                                        <p>Zone Monitoring</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item" v-if="hasPerm('monitoring.vehicles', 'read')">
+                                    <RouterLink to="/monitoring/dashboard" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/monitoring/dashboard') }">
+                                        <i class="nav-icon bi bi-speedometer2"></i>
+                                        <p>Vehicle Dashboard</p>
                                     </RouterLink>
                                 </li>
                             </ul>
                         </li>
 
-                        <li class="nav-item d-none" v-if="!isAdminOrDistributor && hasPerm('zones','read')">
+                        <li class="nav-item " v-if="!isAdminOrDistributor && hasPerm('zones','read')">
                             <RouterLink to="/zones" class="nav-link" :class="{ active: route.name === 'zones' }">
                                 <i class="nav-icon bi bi-grid-3x3"></i>
                                 <p>Zone Management</p>
@@ -181,7 +188,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item d-none" v-if="isAuthed">
+                        <li class="nav-item" v-if="isAuthed">
                             <RouterLink to="/alerts" class="nav-link" :class="{ active: route.name === 'alerts' }">
                                 <i class="nav-icon bi bi-bell"></i>
                                 <p>Alerts & Notifications</p>
@@ -283,65 +290,72 @@ const fetchMyDeviceIds = async () => {
 
 const fetchUnreadCount = async () => {
     if (!isAuthed.value) return;
-    try {
-        const { data } = await axios.get('/web/notifications/events');
-        if (Array.isArray(data) && data.length > 0) {
-            if (route.path === '/alerts') {
-                const latest = data[0].eventtime;
-                localStorage.setItem('lastSeenTime', latest);
-                unreadCount.value = 0;
-                return;
-            }
 
-            const lastSeen = localStorage.getItem('lastSeenTime');
-            if (!lastSeen) {
-                unreadCount.value = data.length;
-            } else {
-                const newEvents = data.filter(e => e.eventtime > lastSeen);
-                unreadCount.value = newEvents.length;
-            }
+    // If user is already on the alerts page, the count should be 0 (Index.vue marks them read)
+    if (route.path === '/alerts') {
+        unreadCount.value = 0;
+        return;
+    }
+
+    try {
+        const { data } = await axios.get('/web/notifications/unread-count');
+        // Double check route hasn't changed while request was in flight
+        if (route.path === '/alerts') {
+            unreadCount.value = 0;
         } else {
-             unreadCount.value = 0;
+            unreadCount.value = data.count || 0;
         }
     } catch (e) {
         console.error('Failed to fetch unread count', e);
     }
 };
 
-const listenForAlerts = () => {
-    if (echoChannel) return;
-    if (!window.echo) return;
-
-    echoChannel = window.echo.channel('alerts')
-        .listen('.NewAlertEvent', (payload) => {
-            console.log('New Alert Received:', payload);
-            const e = payload.event;
-            // Check if event exists and belongs to user's devices
-            if (e && e.deviceid && myDeviceIds.value.includes(e.deviceid)) {
-                if (route.path !== '/alerts') {
-                    unreadCount.value++;
-                }
-            }
-        });
-};
-
-const markAsRead = async () => {
-    if (!isAuthed.value) return;
-     try {
-        const { data } = await axios.get('/web/notifications/events');
-        if (Array.isArray(data) && data.length > 0) {
-            const latest = data[0].eventtime;
-            localStorage.setItem('lastSeenTime', latest);
-            unreadCount.value = 0;
-        }
-    } catch (e) {}
-};
-
 watch(() => route.path, (newPath) => {
     if (newPath === '/alerts') {
-        markAsRead();
+        unreadCount.value = 0;
     }
 });
+
+const listenForAlerts = () => {
+    if (echoChannel) return;
+
+    // Retry if Echo isn't ready yet
+    if (!window.echo) {
+        setTimeout(listenForAlerts, 500);
+        return;
+    }
+
+    if (!authState.user || !authState.user.id) return;
+
+    const userId = authState.user.id;
+    console.log(`[App] Listening for alerts on channel: alerts.${userId}`);
+
+    echoChannel = window.echo.private(`alerts.${userId}`)
+        .listen('.alerts.updated', (payload) => {
+            console.log('[App] Alerts Update Received', payload);
+
+            // If user is on /alerts page, keep count at 0
+            if (route.path === '/alerts') {
+                unreadCount.value = 0;
+            } else {
+                // Otherwise refresh the unread count
+                fetchUnreadCount();
+            }
+        });
+
+    // Handle subscription errors
+    if (echoChannel.subscription) {
+        echoChannel.subscription.bind('pusher:subscription_error', (status) => {
+            console.error('[App] Subscription error:', status);
+        });
+        echoChannel.subscription.bind('pusher:subscription_succeeded', () => {
+            console.log('[App] Subscription succeeded');
+        });
+    }
+};
+
+// Dev-only broadcast ping to ensure updates flow (mirrors LiveTracking)
+let broadcastPing = null;
 
 watch(isAuthed, (val) => {
     if (val) {
@@ -349,17 +363,48 @@ watch(isAuthed, (val) => {
             fetchUnreadCount();
             listenForAlerts();
         });
+
+        // Start ping in dev
+        if (import.meta.env.DEV && !broadcastPing) {
+            broadcastPing = setInterval(() => {
+                axios.get('/web/notifications/broadcast').catch(() => {});
+            }, 5000);
+        }
     } else {
         if (echoChannel) {
-            window.echo.leave('alerts');
+            window.echo.leave(`alerts.${authState?.user?.id}`);
             echoChannel = null;
+        }
+        if (broadcastPing) {
+            clearInterval(broadcastPing);
+            broadcastPing = null;
+        }
+    }
+});
+
+onMounted(() => {
+    if (isAuthed.value) {
+        fetchMyDeviceIds().then(() => {
+            fetchUnreadCount();
+            listenForAlerts();
+        });
+
+        // Start ping in dev
+        if (import.meta.env.DEV && !broadcastPing) {
+            broadcastPing = setInterval(() => {
+                axios.get('/web/notifications/broadcast').catch(() => {});
+            }, 5000);
         }
     }
 });
 
 onUnmounted(() => {
-    if (echoChannel) {
-        window.echo.leave('alerts');
+    if (echoChannel && authState.user) {
+        window.echo.leave(`alerts.${authState.user.id}`);
+    }
+    if (broadcastPing) {
+        clearInterval(broadcastPing);
+        broadcastPing = null;
     }
 });
 const isAdminOrDistributor = computed(() => {
