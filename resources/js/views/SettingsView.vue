@@ -17,6 +17,9 @@
       <li class="nav-item">
         <button class="nav-link" :class="{ active: activeTab === 'backup' }" @click="activeTab = 'backup'">System Backup</button>
       </li>
+      <li class="nav-item" v-if="isAdmin">
+        <button class="nav-link" :class="{ active: activeTab === 'developer' }" @click="activeTab = 'developer'">Developer</button>
+      </li>
     </ul>
 
     <div class="tab-content">
@@ -120,18 +123,35 @@
           Access restricted to Administrators.
         </div>
       </div>
+
+      <!-- Tab 4: Developer Settings -->
+      <div v-if="activeTab === 'developer'" class="tab-pane fade show active">
+        <div class="card" v-if="isAdmin">
+          <div class="card-header"><h6 class="mb-0">Developer Settings</h6></div>
+          <div class="card-body">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="testingModeSwitch" :checked="isTestingMode" @change="toggleTestingMode">
+              <label class="form-check-label" for="testingModeSwitch">Enable Testing Mode</label>
+            </div>
+            <p class="text-muted small mt-2">
+              Enabling testing mode reveals additional debugging tools and buttons throughout the application (e.g., Settings button in Vehicles list).
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, inject } from 'vue';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import { authState, getCurrentUser } from '../auth';
 import VehicleModelsManager from '../components/VehicleModelsManager.vue';
 
 const activeTab = ref('alerts');
+const isTestingMode = inject('isTestingMode', ref(false));
 
 const loading = ref(false);
 const saving = ref(false);
@@ -145,6 +165,18 @@ const error = ref('');
 const backups = ref([]);
 const backupLoading = ref(false);
 const isAdmin = computed(() => authState.user && authState.user.role === 3);
+
+function toggleTestingMode() {
+  const newVal = !isTestingMode.value;
+  isTestingMode.value = newVal;
+  if (newVal) {
+    localStorage.setItem('testingMode', '1');
+    showToast('Testing Mode Enabled', 'success');
+  } else {
+    localStorage.removeItem('testingMode');
+    showToast('Testing Mode Disabled', 'success');
+  }
+}
 
 function formatDate(ts) {
   if (!ts) return '-';

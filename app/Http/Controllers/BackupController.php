@@ -20,11 +20,22 @@ class BackupController extends Controller
         $this->checkAdmin($request);
 
         $disk = Storage::disk('local');
-        $appName = config('app.name');
+        // Use the same logic as config/backup.php to determine the folder name
+        $appName = \Illuminate\Support\Str::slug(config('app.name', 'laravel-backup'));
 
         // Ensure we are looking at the right folder
-        // The spatie package uses the app name as the directory
-        $files = $disk->files($appName);
+        try {
+            if (!$disk->exists($appName)) {
+                // If directory doesn't exist, try to create it or return empty
+                // Returning empty is safer
+                return response()->json(['backups' => []]);
+            }
+            $files = $disk->files($appName);
+        } catch (\Exception $e) {
+            // Log the error or just return empty list to avoid breaking the UI
+            // \Log::error('Backup listing failed: ' . $e->getMessage());
+            return response()->json(['backups' => []]);
+        }
 
         $backups = [];
         foreach ($files as $file) {
@@ -58,9 +69,9 @@ class BackupController extends Controller
 
         $disk = Storage::disk('local');
         // Security check to ensure path is within allowed directory
-        if (!str_contains($path, 'Portal | AM TeleTech')) {
-             // Optional: stricter check
-        }
+        // if (!str_contains($path, 'Portal | AM TeleTech')) {
+        //      // Optional: stricter check
+        // }
 
         if (!$disk->exists($path)) {
             return response()->json(['message' => 'File not found'], 404);
