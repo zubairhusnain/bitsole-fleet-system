@@ -700,6 +700,19 @@ class VehicleController extends Controller
                 $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $e->getMessage()];
             }
         }
+
+        $hasError = false;
+        $firstError = '';
+        foreach ($results as $res) {
+            if (!$res['ok']) {
+                $hasError = true;
+                $firstError = $res['error'] ?? 'Unknown error';
+                break;
+            }
+        }
+        if ($hasError) {
+             return response()->json(['message' => 'Failed to assign zones: ' . $firstError, 'assigned' => $results], 400);
+        }
         return response()->json(['assigned' => $results]);
     }
 
@@ -724,6 +737,19 @@ class VehicleController extends Controller
             } catch (\Throwable $e) {
                 $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $e->getMessage()];
             }
+        }
+
+        $hasError = false;
+        $firstError = '';
+        foreach ($results as $res) {
+            if (!$res['ok']) {
+                $hasError = true;
+                $firstError = $res['error'] ?? 'Unknown error';
+                break;
+            }
+        }
+        if ($hasError) {
+             return response()->json(['message' => 'Failed to unassign zones: ' . $firstError, 'unassigned' => $results], 400);
         }
         return response()->json(['unassigned' => $results]);
     }
