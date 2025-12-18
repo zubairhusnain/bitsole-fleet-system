@@ -20,7 +20,7 @@
                 </ul>
                 <!--end::Start Navbar Links-->
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item d-testingmode" v-if="isAuthed">
+                    <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode }" v-if="isAuthed">
                         <RouterLink to="/alerts" class="nav-link position-relative" style="padding-top: 0.5rem;">
                             <i class="bi bi-bell" style="font-size: 1.2rem;"></i>
                             <span v-if="unreadCount > 0" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem; transform: translate(-50%, 50%) !important;">
@@ -280,13 +280,16 @@ const isTestingMode = ref(false);
 provide('isTestingMode', isTestingMode);
 
 const checkTestingMode = () => {
-    const q = route.query.testingmode;
+    // Support both lowercase and camelCase
+    const rawQ = route.query.testingmode ?? route.query.testingMode;
+    const q = rawQ !== null && rawQ !== undefined ? String(rawQ) : null;
+
     if (q === '1') {
+        console.log('testingMode on hai');
         localStorage.setItem('testingMode', '1');
         isTestingMode.value = true;
-        // Clean URL if desired, but user didn't explicitly ask to remove the param from URL, just "not need every time".
-        // Keeping it is fine.
     } else if (q === '0') {
+        console.log('testingMode off hai');
         localStorage.removeItem('testingMode');
         isTestingMode.value = false;
     } else {
