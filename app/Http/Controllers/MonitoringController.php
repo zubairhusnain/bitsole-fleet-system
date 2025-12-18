@@ -191,6 +191,41 @@ class MonitoringController extends Controller
         // The frontend requests per_page=500 in fetchVehicles.
         $devices = $query->orderByDesc('id')->paginate($perPage);
 
+        // Fetch last ignition events for these devices
+        $deviceIds = $devices->pluck('device_id')->unique()->values()->all();
+
+        if (!empty($deviceIds)) {
+            $ignitionEvents = DB::connection('pgsql')
+                ->table('tc_events')
+                ->select('deviceid', 'type', DB::raw('MAX(eventtime) as last_time'))
+                ->whereIn('deviceid', $deviceIds)
+                ->whereIn('type', ['ignitionOn', 'ignitionOff'])
+                ->groupBy('deviceid', 'type')
+                ->get();
+
+            $ignitionTimes = [];
+            foreach ($ignitionEvents as $evt) {
+                $ignitionTimes[$evt->deviceid][$evt->type] = $evt->last_time;
+            }
+
+            // Helper for date formatting
+            $formatDate = function ($dateStr) {
+                if (!$dateStr) return null;
+                return date('d/m/Y-H:i', strtotime($dateStr));
+            };
+
+            // Enrich the devices collection
+            $devices->getCollection()->transform(function ($device) use ($ignitionTimes, $formatDate) {
+                $ignOnTime = $ignitionTimes[$device->device_id]['ignitionOn'] ?? null;
+                $ignOffTime = $ignitionTimes[$device->device_id]['ignitionOff'] ?? null;
+
+                $device->last_ignition_on = $ignOnTime ? $formatDate($ignOnTime) : null;
+                $device->last_ignition_off = $ignOffTime ? $formatDate($ignOffTime) : null;
+                
+                return $device;
+            });
+        }
+
         // Enrich with alerts and maintenance counts
         $deviceIds = $devices->pluck('device_id')->toArray();
 

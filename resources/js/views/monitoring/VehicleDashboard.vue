@@ -295,6 +295,8 @@ const fetchVehicles = async () => {
                 model: tc.model || v.model || 'Unknown',
                 speed: speedKmh,
                 ignition: ign,
+                last_ignition_on: v.last_ignition_on || 'N/A',
+                last_ignition_off: v.last_ignition_off || 'N/A',
                 last_update: formatDate(pos.servertime || pos.fixtime),
                 lat: parseFloat(pos.latitude) || 0,
                 lng: parseFloat(pos.longitude) || 0,
