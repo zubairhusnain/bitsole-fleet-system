@@ -180,13 +180,9 @@
                                     <span v-if="loadingGeofences" class="spinner-border spinner-border-sm ms-2" role="status"></span>
                                 </div>
                             </div>
-                            <LMap v-if="mapReady" :zoom="zoom" :center="mapCenter" style="height: 100%; width: 100%;">
+                            <LMap v-if="mapReady" :zoom="zoom" :center="mapCenter" @ready="onMapReady" style="height: 100%; width: 100%;">
                                 <LTileLayer :url="tileUrl" :attribution="tileAttribution" />
                                 <LMarker :lat-lng="currentLatLng || mapCenter" ref="markerRef" />
-
-                                <template v-for="(line, idx) in zoneLines" :key="'line-'+idx">
-                                    <LPolyline :lat-lngs="line" color="#6610f2" :weight="2" dash-array="5, 5" />
-                                </template>
 
                                 <template v-for="zone in visibleZones" :key="zone.id">
                                     <LMarker :lat-lng="zone.center" :icon="redIcon">
@@ -771,6 +767,7 @@ import axios from 'axios';
 import { LMap, LTileLayer, LMarker, LPolyline, LPopup, LCircle, LPolygon } from '@vue-leaflet/vue-leaflet';
 import { formatDateTime, formatDate } from '../../utils/datetime';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import L from 'leaflet';
 import { formatTelemetry } from '../../utils/telemetry';
 import { getCurrentUser } from '../../auth';
@@ -904,12 +901,62 @@ const redIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-// Zone connection lines
-const zoneLines = computed(() => {
-    if (!showZones.value || !currentLatLng.value || !visibleZones.value.length) return [];
-    const deviceLoc = currentLatLng.value;
-    return visibleZones.value.map(zone => [deviceLoc, zone.center]);
-});
+const mapInstance = ref(null);
+const routingControl = ref(null);
+
+function initRouting() {
+    if (!mapInstance.value || typeof L === 'undefined' || !L.Routing || routingControl.value) return;
+
+    try {
+        routingControl.value = L.Routing.control({
+            waypoints: [],
+            routeWhileDragging: false,
+            showAlternatives: false,
+            fitSelectedRoutes: false,
+            serviceUrl: 'https://router.project-osrm.org/route/v1',
+            lineOptions: {
+                styles: [{ color: '#6610f2', weight: 4, opacity: 0.7 }]
+            },
+            createMarker: function() { return null; }
+        }).addTo(mapInstance.value);
+
+        const container = routingControl.value.getContainer();
+        if (container) container.style.display = 'none';
+
+        updateRouting();
+    } catch (e) {
+        console.error('Failed to init routing', e);
+    }
+}
+
+function onMapReady(map) {
+    mapInstance.value = map;
+    initRouting();
+}
+
+function updateRouting() {
+    if (!routingControl.value || !currentLatLng.value) return;
+    
+    const waypoints = [];
+    if (showZones.value && visibleZones.value.length > 0) {
+        const deviceLoc = L.latLng(currentLatLng.value[0], currentLatLng.value[1]);
+        
+        // Star pattern: Device -> Zone 1 -> Device -> Zone 2...
+        waypoints.push(deviceLoc);
+        visibleZones.value.forEach(zone => {
+            waypoints.push(L.latLng(zone.center[0], zone.center[1]));
+            waypoints.push(deviceLoc);
+        });
+        
+        routingControl.value.setWaypoints(waypoints);
+    } else {
+        routingControl.value.setWaypoints([]);
+    }
+}
+
+watch([visibleZones, currentLatLng, showZones], () => {
+    updateRouting();
+}, { deep: true });
 
 const mapContainer = ref(null);
 const mapReady = ref(false);
@@ -1340,6 +1387,16 @@ function armPollingFallback() {
 
 // Static view enhanced: fetch detail for dynamic content and weekly trips
 onMounted(async () => {
+    if (typeof window !== 'undefined') {
+        window.L = L;
+        try {
+            await import('leaflet-routing-machine');
+            initRouting();
+        } catch (e) {
+            console.error('Failed to load routing machine', e);
+        }
+    }
+
     pageLoading.value = true;
     mapReady.value = true;
     window.addEventListener('resize', handleResize);
