@@ -25,42 +25,42 @@ class AlertService
             return [];
         }
 
-        $query = DB::connection('pgsql')->table('tc_events as e')
-            ->join('tc_notifications as n', 'e.type', '=', 'n.type')
-            ->leftJoin('tc_device_notification as dn', function($join) {
-                $join->on('e.deviceid', '=', 'dn.deviceid')
-                     ->on('n.id', '=', 'dn.notificationid');
-            })
-            ->join('tc_devices as d', 'e.deviceid', '=', 'd.id')
-            ->whereIn('e.deviceid', $deviceIds)
-            ->where(function($q) {
-                $q->whereNotNull('dn.deviceid')
-                  ->orWhere('n.always', true);
-            })
-            ->select(
-                'e.id',
-                'e.type',
-                'e.eventtime',
-                'e.deviceid',
-                'e.attributes',
-                'n.attributes as notification_attributes',
-                'n.type as notification_type',
-                'd.name as device_name'
-            );
+        $query = \App\Models\TcEvent::with(['device', 'notifications.devices'])
+            ->whereIn('deviceid', $deviceIds)
+            ->withEnabledNotifications();
 
         // Filter options
         if (isset($options['unreadOnly']) && $options['unreadOnly']) {
-            $query->where('e.is_read', 0);
+            $query->where('is_read', 0);
         }
 
         // Limit
         $limit = $options['limit'] ?? 50;
 
-        $alerts = $query->orderBy('e.id', 'desc')
-            ->distinct('e.id')
+        $events = $query->orderBy('id', 'desc')
+            ->distinct('id')
             ->limit($limit)
             ->get();
 
-        return $alerts->toArray();
+        // Transform to match existing structure
+        return $events->map(function ($event) {
+            // Find the notification definition that is assigned to this device
+            // Since we used withEnabledNotifications (strict), there should be one.
+            $notification = $event->notifications->first(function ($n) use ($event) {
+                return $n->devices->contains('id', $event->deviceid);
+            });
+
+            return [
+                'id' => $event->id,
+                'type' => $event->type,
+                'eventtime' => $event->eventtime,
+                'deviceid' => $event->deviceid,
+                'attributes' => $event->attributes, // Ensure this is cast/array if model handles it
+                'notification_attributes' => $notification ? $notification->attributes : null,
+                'notification_type' => $notification ? $notification->type : $event->type,
+                'device_name' => $event->device->name ?? null,
+                'is_read' => $event->is_read, // Helpful to have
+            ];
+        })->toArray();
     }
 }

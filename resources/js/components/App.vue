@@ -126,7 +126,7 @@
                                 </li>
                                 <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('vehicles.overview','read')">
                                     <RouterLink to="/vehicles/overview" class="nav-link"
-                                        :class="{ active: route.path.startsWith('/vehicles/overview') }">
+                                        :class="{ active: route.path.startsWith('/vehicles/overview') || route.name === 'vehicles-detail' }">
                                         <i class="nav-icon bi bi-clipboard-data"></i>
                                         <p>Vehicle Overview</p>
                                     </RouterLink>
@@ -141,8 +141,8 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" v-if="hasPerm('monitoring.vehicles', 'read') || hasPerm('monitoring.zones', 'read')">
-                            <a href="#" class="nav-link">
+                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/monitoring') }" v-if="!isAdminOrDistributor && (hasPerm('monitoring.vehicles', 'read') || hasPerm('monitoring.zones', 'read'))">
+                            <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/monitoring') }">
                                 <i class="nav-icon bi bi-graph-up"></i>
                                 <p>
                                     Monitoring
@@ -152,16 +152,23 @@
                             <ul class="nav nav-treeview">
                                 <li class="nav-item" v-if="hasPerm('monitoring.vehicles', 'read')">
                                     <RouterLink to="/monitoring/vehicles" class="nav-link"
-                                        :class="{ active: route.name === 'monitoring-vehicles' }">
+                                        :class="{ active: route.path.startsWith('/monitoring/vehicles') }">
                                         <i class="nav-icon bi bi-truck"></i>
-                                        <p>Vehicles</p>
+                                        <p>Vehicle Monitoring</p>
                                     </RouterLink>
                                 </li>
                                 <li class="nav-item" v-if="hasPerm('monitoring.zones', 'read')">
                                     <RouterLink to="/monitoring/zones" class="nav-link"
-                                        :class="{ active: route.name === 'monitoring-zones' }">
+                                        :class="{ active: route.path.startsWith('/monitoring/zones') }">
                                         <i class="nav-icon bi bi-geo-alt"></i>
-                                        <p>Zones</p>
+                                        <p>Zone Monitoring</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item" v-if="hasPerm('monitoring.vehicles', 'read')">
+                                    <RouterLink to="/monitoring/dashboard" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/monitoring/dashboard') }">
+                                        <i class="nav-icon bi bi-speedometer2"></i>
+                                        <p>Vehicle Dashboard</p>
                                     </RouterLink>
                                 </li>
                             </ul>
