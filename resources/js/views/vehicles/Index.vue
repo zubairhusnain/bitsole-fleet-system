@@ -147,13 +147,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, inject } from 'vue';
 import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
 import Swal from 'sweetalert2';
 import UiAlert from '../../components/UiAlert.vue';
 import { formatTelemetry } from '../../utils/telemetry';
 import { hasPermission as _hasPermission } from '../../auth';
+
+const isTestingMode = inject('isTestingMode', ref(false));
 
 const router = useRouter();
 const route = useRoute();
