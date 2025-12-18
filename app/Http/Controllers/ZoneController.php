@@ -63,7 +63,7 @@ class ZoneController extends Controller
                         $z->setAttribute('description', $gf->description ?? null);
                         // Extract status/speed from attributes JSON if present
                         $attrs = null;
-                        try { 
+                        try {
                             if (is_array($gf->attributes)) {
                                 $attrs = $gf->attributes;
                             } elseif (is_string($gf->attributes)) {

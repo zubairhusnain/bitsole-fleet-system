@@ -57,6 +57,39 @@
             <div class="card border rounded-4 shadow-0 h-100 flex-fill bg-white">
                 <div class="card-body">
                     <div class="mb-2">
+                        <i class="bi bi-speedometer fs-3 text-info"></i>
+                    </div>
+                    <div class="text-muted small">Moving</div>
+                    <h4 class="fw-bold mb-0">{{ stats.moving }} Vehicles</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md d-flex">
+            <div class="card border rounded-4 shadow-0 h-100 flex-fill bg-white">
+                <div class="card-body">
+                    <div class="mb-2">
+                        <i class="bi bi-stop-circle fs-3 text-danger"></i>
+                    </div>
+                    <div class="text-muted small">Stop</div>
+                    <h4 class="fw-bold mb-0">{{ stats.stopped }} Vehicles</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md d-flex">
+            <div class="card border rounded-4 shadow-0 h-100 flex-fill bg-white">
+                <div class="card-body">
+                    <div class="mb-2">
+                        <i class="bi bi-pause-circle fs-3 text-warning"></i>
+                    </div>
+                    <div class="text-muted small">Idle</div>
+                    <h4 class="fw-bold mb-0">{{ stats.idle }} Vehicles</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md d-flex">
+            <div class="card border rounded-4 shadow-0 h-100 flex-fill bg-white">
+                <div class="card-body">
+                    <div class="mb-2">
                         <i class="bi bi-tools fs-3 text-info"></i>
                     </div>
                     <div class="text-muted small">Maintenance</div>
@@ -88,7 +121,18 @@
                 </div>
                 <div class="col-md-5">
                     <label class="form-label small">Auto Refresh (sec / min)</label>
-                    <input type="text" class="form-control" placeholder="Auto Refresh (sec / min)" v-model="refreshInput">
+                    <div class="d-flex gap-0 bg-light rounded overflow-hidden">
+                        <button
+                            v-for="(label, index) in refreshOptions"
+                            :key="index"
+                            class="btn btn-sm px-3 py-2 fw-medium flex-fill border-0 rounded-0"
+                            :class="selectedRefresh === index ? 'btn-primary text-white' : 'btn-light text-muted'"
+                            :style="selectedRefresh !== index ? 'background-color: #f8f9fa;' : 'background-color: #00A3FF;'"
+                            @click="selectedRefresh = index"
+                        >
+                            {{ label }}
+                        </button>
+                    </div>
                 </div>
                 <div class="col-md-2">
                     <button class="btn btn-primary w-100 text-white" @click="applySearch">Submit</button>
@@ -278,8 +322,8 @@
                 <div class="row g-4 mb-4">
                     <!-- Row 1 -->
                     <div class="col-6 col-md-3">
-                        <div class="fw-bold mb-1 text-dark">Vehicle ID</div>
-                        <div class="text-muted small">{{ selectedVehicle.name }}</div>
+                        <div class="fw-bold mb-1 text-dark">Vehicle No</div>
+                        <div class="text-muted small">{{ selectedVehicle.vehicle_no || selectedVehicle.name }}</div>
                     </div>
                     <div class="col-6 col-md-3">
                         <div class="fw-bold mb-1 text-dark">Device ID</div>
@@ -345,7 +389,7 @@
                 </div>
 
                 <!-- Button -->
-                <button class="btn btn-primary w-100 py-2 text-white" @click="editVehicle(selectedVehicle)">Change Status</button>
+                <button class="btn btn-primary w-100 py-2 text-white" @click="openAlertStatusPopup(selectedVehicle)">Change Status</button>
             </div>
         </div>
         <div class="modal-body p-5 text-center" v-else>
@@ -356,11 +400,42 @@
       </div>
     </div>
 
+    <!-- Status Popup -->
+    <div v-if="showAlertStatusPopup" class="driver-modal-overlay" @click.self="closeAlertStatusPopup">
+      <div class="driver-modal overflow-hidden" role="dialog" aria-modal="true" style="max-width: 400px;">
+        <div class="modal-header">
+          <h5 class="fw-bold mb-0">Change Status</h5>
+          <button type="button" class="btn-close" @click="closeAlertStatusPopup"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Alerts</label>
+            <select v-model="selectedAlertStatus" class="form-select">
+              <option value="" disabled>--Select Alerts Status--</option>
+              <option value="enabled">Enable Alerts</option>
+              <option value="disabled">Disable Alerts</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Maintenance</label>
+            <select v-model="selectedMaintenanceStatus" class="form-select">
+              <option value="" disabled>--Select Maintenance Status--</option>
+              <option value="enabled">Enable Maintenance</option>
+              <option value="disabled">Disable Maintenance</option>
+            </select>
+          </div>
+          <button class="btn btn-primary w-100" @click="updateAlertStatus" :disabled="submittingStatus">
+            {{ submittingStatus ? 'Updating...' : 'Update Status' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
 import { hasPermission } from '../../auth';
@@ -371,7 +446,8 @@ const router = useRouter();
 const vehicles = ref([]);
 const loading = ref(true);
 const searchQuery = ref('');
-const refreshInput = ref('');
+const refreshOptions = ['30s', '1m', '2m', '3m', '4m', '5m', '10m', 'Off'];
+const selectedRefresh = ref(7); // Default Off
 const refreshInterval = ref(null);
 const selectedVehicle = ref(null);
 const showDetailsModal = ref(false);
@@ -384,6 +460,13 @@ const selectedAlert = ref(null);
 const alertRemarks = ref('');
 const submittingAlert = ref(false);
 
+// Alert Status Popup State
+const showAlertStatusPopup = ref(false);
+const selectedAlertStatus = ref('');
+const selectedMaintenanceStatus = ref('');
+const alertStatusTargetId = ref(null);
+const submittingStatus = ref(false);
+
 // Pagination
 const currentPage = ref(1);
 const itemsPerPage = 16;
@@ -392,6 +475,9 @@ const stats = ref({
     total: 0,
     ignitionOn: 0,
     ignitionOff: 0,
+    moving: 0,
+    stopped: 0,
+    idle: 0,
     maintenance: 0,
     alerts: 0
 });
@@ -465,7 +551,7 @@ const formatDate = (dateStr) => {
 
 const fetchVehicles = async () => {
     try {
-        const { data } = await axios.get('/web/monitoring/vehicles', { params: { per_page: 500 } });
+        const { data } = await axios.get('/web/monitoring/vehicles', { params: { per_page: 50 } });
         const list = Array.isArray(data) ? data : (data.data ?? []);
 
         if (data.stats) {
@@ -490,7 +576,7 @@ const fetchVehicles = async () => {
                 plate: v.plate || tc.plate || 'N/A',
                 lat: parseFloat(pos.latitude) || 0,
                 lng: parseFloat(pos.longitude) || 0,
-                speed: parseFloat(pos.speed).toFixed(1) || 0,
+                speed: pos.speed != null ? Number((parseFloat(pos.speed) * 1.852).toFixed(1)) : 0,
                 driver_name: v.driver_name || tc.driverUniqueId || 'N/A',
                 last_update: formatDate(pos.servertime || pos.fixtime),
                 fuel: attrs.fuel || 0,
@@ -503,7 +589,9 @@ const fetchVehicles = async () => {
                 maintenance: v.maintenance_display || 'N/A',
                 maintenance_count: v.maintenance_count || 0,
                 alert_count: v.alert_count || 0,
-                blocked: v.blocked
+                blocked: v.blocked,
+                alert_status: deviceAttrs.alert_status || '',
+                maintenance_status: deviceAttrs.maintenance_status || ''
             };
         });
 
@@ -516,26 +604,33 @@ const fetchVehicles = async () => {
 
 const applySearch = () => {
     currentPage.value = 1;
-    // Auto refresh logic
-    if (refreshInput.value) {
-        setupAutoRefresh(refreshInput.value);
-    }
 };
 
 const setupAutoRefresh = (val) => {
     if (refreshInterval.value) clearInterval(refreshInterval.value);
 
+    const option = refreshOptions[val];
     let ms = 0;
-    if (val.includes('min')) {
-        ms = parseInt(val) * 60 * 1000;
-    } else {
-        ms = parseInt(val) * 1000;
-    }
+
+    if (option === '30s') ms = 30 * 1000;
+    else if (option === '1m') ms = 60 * 1000;
+    else if (option === '2m') ms = 120 * 1000;
+    else if (option === '3m') ms = 180 * 1000;
+    else if (option === '4m') ms = 240 * 1000;
+    else if (option === '5m') ms = 300 * 1000;
+    else if (option === '10m') ms = 600 * 1000;
+    else ms = 0; // Off
 
     if (ms > 0) {
         refreshInterval.value = setInterval(fetchVehicles, ms);
     }
+
+    try { localStorage.setItem('vehicleMonitoringRefresh', val); } catch {}
 };
+
+watch(selectedRefresh, (val) => {
+    setupAutoRefresh(val);
+});
 
 const changePage = (page) => {
     if (page >= 1 && page <= totalPages.value) {
@@ -566,7 +661,7 @@ const showDetails = async (vehicle) => {
             plate: data.plate || tc.plate || 'N/A',
             lat: parseFloat(pos.latitude) || 0,
             lng: parseFloat(pos.longitude) || 0,
-            speed: parseFloat(pos.speed).toFixed(1) || 0,
+            speed: pos.speed != null ? Number((parseFloat(pos.speed) * 1.852).toFixed(1)) : 0,
             driver_name: data.driver_name || tc.driverUniqueId || 'N/A',
             last_update: formatDate(pos.servertime || pos.fixtime),
             fuel: attrs.fuel || 0,
@@ -583,7 +678,9 @@ const showDetails = async (vehicle) => {
             last_ignition_off: formatDate(data.last_ignition_off),
             address: pos.address,
             // Format maintenance string
-            maintenance: data.maintenance_count > 0 ? `${data.maintenance_count} Due` : 'N/A'
+            maintenance: data.maintenance_count > 0 ? `${data.maintenance_count} Due` : 'N/A',
+            alert_status: deviceAttrs.alert_status || '',
+            maintenance_status: deviceAttrs.maintenance_status || ''
         };
 
     } catch (e) {
@@ -664,10 +761,55 @@ const acknowledgeAlert = async () => {
     }
 };
 
+const openAlertStatusPopup = (vehicle) => {
+    if (!vehicle) return;
+    alertStatusTargetId.value = vehicle.id;
+    selectedAlertStatus.value = vehicle.alert_status || '';
+    selectedMaintenanceStatus.value = vehicle.maintenance_status || '';
+    showAlertStatusPopup.value = true;
+};
+
+const closeAlertStatusPopup = () => {
+    showAlertStatusPopup.value = false;
+};
+
+const updateAlertStatus = async () => {
+    if (!alertStatusTargetId.value) return;
+    try {
+        submittingStatus.value = true;
+        await axios.post(`/web/monitoring/vehicles/${alertStatusTargetId.value}/alert-status`, {
+            alert_status: selectedAlertStatus.value || null,
+            maintenance_status: selectedMaintenanceStatus.value || null
+        });
+        closeAlertStatusPopup();
+        fetchVehicles();
+    } catch (e) {
+        console.error("Failed to update alert status", e);
+        alert("Failed to update alert status. Please try again.");
+    } finally {
+        submittingStatus.value = false;
+    }
+};
+
 onMounted(() => {
     fetchVehicles();
-    // Default polling 30s
-    refreshInterval.value = setInterval(fetchVehicles, 30000);
+    try {
+        const saved = localStorage.getItem('vehicleMonitoringRefresh');
+        if (saved !== null) {
+            const idx = parseInt(saved);
+            if (!isNaN(idx) && idx >= 0 && idx < refreshOptions.length) {
+                selectedRefresh.value = idx;
+                setupAutoRefresh(idx);
+            }
+        } else {
+             // Default 30s (Index 0)
+            selectedRefresh.value = 0;
+            setupAutoRefresh(0);
+        }
+    } catch {
+        selectedRefresh.value = 0;
+        setupAutoRefresh(0);
+    }
 });
 
 onUnmounted(() => {

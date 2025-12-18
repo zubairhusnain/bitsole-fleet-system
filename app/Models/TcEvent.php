@@ -39,9 +39,21 @@ class TcEvent extends Model
     public function scopeWithEnabledNotifications($query)
     {
         return $query->whereHas('notifications', function ($q) {
-            $q->whereHas('devices', function ($dq) {
-                   $dq->whereColumn('tc_devices.id', 'tc_events.deviceid');
-              });
-        });
+                $q->whereHas('devices', function ($dq) {
+                    $dq->whereColumn('tc_devices.id', 'tc_events.deviceid');
+                });
+            })->where(function ($q) {
+                $q->where(function ($q1) {
+                    $q1->where('tc_events.type', '!=', 'maintenance')
+                        ->whereHas('device', function ($dq) {
+                            $dq->whereRaw("(CAST(attributes AS json)->>'alert_status' IS NULL OR CAST(attributes AS json)->>'alert_status' != 'disabled')");
+                        });
+                })->orWhere(function ($q2) {
+                    $q2->where('tc_events.type', 'maintenance')
+                        ->whereHas('device', function ($dq) {
+                            $dq->whereRaw("(CAST(attributes AS json)->>'maintenance_status' IS NULL OR CAST(attributes AS json)->>'maintenance_status' != 'disabled')");
+                        });
+                });
+            });
     }
 }
