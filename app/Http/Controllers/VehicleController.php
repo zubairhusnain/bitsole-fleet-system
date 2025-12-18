@@ -9,9 +9,26 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Drivers;
 use App\Models\TcGeofence;
+use App\Services\PermissionService;
+use App\Services\GeofencesService;
+use App\Services\NotificationService;
 
 class VehicleController extends Controller
 {
+    protected $permissionService;
+    protected $geofencesService;
+    protected $notificationService;
+
+    public function __construct(
+        PermissionService $permissionService,
+        GeofencesService $geofencesService,
+        NotificationService $notificationService
+    ) {
+        $this->permissionService = $permissionService;
+        $this->geofencesService = $geofencesService;
+        $this->notificationService = $notificationService;
+    }
+
     /**
      * List vehicles with tracking server join/eager load, role-aware.
      */
