@@ -125,13 +125,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, inject } from 'vue';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import { authState, getCurrentUser } from '../auth';
 import VehicleModelsManager from '../components/VehicleModelsManager.vue';
 
 const activeTab = ref('alerts');
+const isTestingMode = inject('isTestingMode', ref(false));
 
 const loading = ref(false);
 const saving = ref(false);

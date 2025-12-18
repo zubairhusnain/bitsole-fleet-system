@@ -13,6 +13,9 @@
     'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 }
 
+.d-testingmode{
+    display: none !important;
+}
 /* App design tokens */
 :root {
   /* Layout */
