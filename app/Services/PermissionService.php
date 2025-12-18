@@ -31,7 +31,7 @@ class PermissionService
 
         public function assignGeofence($request,$device_id,$geo_id,$type){
             $sessionId = $request->user()->traccarSession ?? session('cookie');
-            $data='{"deviceId":"'.$device_id.'","geofenceId":'.$geo_id.'}';
+            $data = json_encode(['deviceId' => (int)$device_id, 'geofenceId' => (int)$geo_id]);
             $devices = static::curl('/api/permissions', $type, $sessionId, $data,array('Content-Type: application/json', 'Accept: application/json'));
             return $devices;
         }

@@ -9,26 +9,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Drivers;
 use App\Models\TcGeofence;
-use App\Services\PermissionService;
-use App\Services\GeofencesService;
-use App\Services\NotificationService;
 
 class VehicleController extends Controller
 {
-    protected $permissionService;
-    protected $geofencesService;
-    protected $notificationService;
-
-    public function __construct(
-        PermissionService $permissionService,
-        GeofencesService $geofencesService,
-        NotificationService $notificationService
-    ) {
-        $this->permissionService = $permissionService;
-        $this->geofencesService = $geofencesService;
-        $this->notificationService = $notificationService;
-    }
-
     /**
      * List vehicles with tracking server join/eager load, role-aware.
      */
@@ -707,7 +690,12 @@ class VehicleController extends Controller
         foreach ($ids as $geoId) {
             try {
                 $resp = $this->permissionService->assignGeofence($request, $deviceId, $geoId, 'POST');
-                $results[] = ['geofenceId' => $geoId, 'ok' => true, 'response' => $resp->response ?? null];
+                $code = (int) ($resp->responseCode ?? 0);
+                if ($code >= 200 && $code < 300) {
+                    $results[] = ['geofenceId' => $geoId, 'ok' => true, 'response' => $resp->response ?? null];
+                } else {
+                    $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $resp->response ?? 'Traccar error', 'code' => $code];
+                }
             } catch (\Throwable $e) {
                 $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $e->getMessage()];
             }
@@ -727,7 +715,12 @@ class VehicleController extends Controller
         foreach ($ids as $geoId) {
             try {
                 $resp = $this->permissionService->assignGeofence($request, $deviceId, $geoId, 'DELETE');
-                $results[] = ['geofenceId' => $geoId, 'ok' => true, 'response' => $resp->response ?? null];
+                $code = (int) ($resp->responseCode ?? 0);
+                if ($code >= 200 && $code < 300) {
+                    $results[] = ['geofenceId' => $geoId, 'ok' => true, 'response' => $resp->response ?? null];
+                } else {
+                    $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $resp->response ?? 'Traccar error', 'code' => $code];
+                }
             } catch (\Throwable $e) {
                 $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $e->getMessage()];
             }
