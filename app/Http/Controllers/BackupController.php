@@ -24,7 +24,18 @@ class BackupController extends Controller
         $appName = \Illuminate\Support\Str::slug(config('app.name', 'laravel-backup'));
 
         // Ensure we are looking at the right folder
-        $files = $disk->files($appName);
+        try {
+            if (!$disk->exists($appName)) {
+                // If directory doesn't exist, try to create it or return empty
+                // Returning empty is safer
+                return response()->json(['backups' => []]);
+            }
+            $files = $disk->files($appName);
+        } catch (\Exception $e) {
+            // Log the error or just return empty list to avoid breaking the UI
+            // \Log::error('Backup listing failed: ' . $e->getMessage());
+            return response()->json(['backups' => []]);
+        }
 
         $backups = [];
         foreach ($files as $file) {
