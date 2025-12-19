@@ -943,9 +943,16 @@ function initRouting() {
         const container = routingControl.getContainer();
         if (container) container.style.display = 'none';
 
+        // Listen for routing errors
+        routingControl.on('routingerror', (e) => {
+            console.warn('Routing error:', e);
+            error.value = 'Routing failed: ' + (e.error?.message || e.message || 'Could not calculate route to zones.');
+        });
+
         updateRouting();
     } catch (e) {
         console.error('Failed to init routing', e);
+        error.value = 'Failed to initialize routing map.';
     }
 }
 
@@ -982,6 +989,7 @@ function updateRouting() {
                 routingControl.setWaypoints(waypoints);
             } catch(e) {
                 console.warn('Routing update failed', e);
+                error.value = 'Failed to update route waypoints.';
             }
         } else {
              routingControl.setWaypoints([]);
