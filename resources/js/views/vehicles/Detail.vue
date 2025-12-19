@@ -923,11 +923,20 @@ const redIcon = new L.Icon({
 
 let mapInstance = null;
 let routingControl = null;
-
-function initRouting() {
-    if (!mapInstance || typeof L === 'undefined' || !L.Routing || routingControl) return;
-
-    try {
+function routingErrorMessage(e) {
+    const status = e?.error?.status ?? e?.error?.target?.status ?? null;
+    if (status === 400) return 'Unable to draw route lines between vehicle and zones.';
+    if (status === 429) return 'Route service is busy. Please try again in a moment.';
+    if (status === 0 || status === -1) return 'Network error while drawing route. Please check your connection.';
+    const msgRaw = e?.error?.message ?? e?.message ?? '';
+    if (typeof msgRaw === 'string' && msgRaw.toLowerCase().includes('failed')) return 'Unable to draw route lines between vehicle and zones.';
+    return 'Unable to draw route lines between vehicle and zones.';
+}
+ 
+ function initRouting() {
+     if (!mapInstance || typeof L === 'undefined' || !L.Routing || routingControl) return;
+ 
+     try {
         routingControl = L.Routing.control({
             waypoints: [],
             routeWhileDragging: false,
@@ -940,21 +949,19 @@ function initRouting() {
             createMarker: function() { return null; }
         }).addTo(mapInstance);
 
-        const container = routingControl.getContainer();
-        if (container) container.style.display = 'none';
-
-        // Listen for routing errors
-        routingControl.on('routingerror', (e) => {
-            console.warn('Routing error:', e);
-            error.value = 'Routing failed: ' + (e.error?.message || e.message || 'Could not calculate route to zones.');
-        });
-
-        updateRouting();
-    } catch (e) {
-        console.error('Failed to init routing', e);
-        error.value = 'Failed to initialize routing map.';
-    }
-}
+         const container = routingControl.getContainer();
+         if (container) container.style.display = 'none';
+ 
+         // Listen for routing errors
+         routingControl.on('routingerror', (e) => {
+            error.value = routingErrorMessage(e);
+         });
+ 
+         updateRouting();
+     } catch (e) {
+        error.value = 'Unable to draw route lines between vehicle and zones.';
+     }
+ }
 
 function onMapReady(map) {
     mapInstance = map;
@@ -984,17 +991,16 @@ function updateRouting() {
             }
         });
 
-        if (validZoneCount > 0) {
-            try {
-                routingControl.setWaypoints(waypoints);
-            } catch(e) {
-                console.warn('Routing update failed', e);
-                error.value = 'Failed to update route waypoints.';
-            }
-        } else {
-             routingControl.setWaypoints([]);
-        }
-    } else {
+         if (validZoneCount > 0) {
+             try {
+                 routingControl.setWaypoints(waypoints);
+             } catch(e) {
+                error.value = routingErrorMessage(e);
+             }
+         } else {
+              routingControl.setWaypoints([]);
+         }
+     } else {
         routingControl.setWaypoints([]);
     }
 }
