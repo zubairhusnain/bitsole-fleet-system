@@ -351,7 +351,9 @@ function deriveRow(r) {
     const plate = r.plate ?? pickAttr(attrs, ['plate', 'licensePlate', 'registration', 'regNumber']);
     const model = r.model ?? tc.model ?? pickAttr(attrs, ['model']);
     const capacityRaw = attrs.fuelTankCapacity ?? attrs.FuelTankCapacity ?? attrs.fueltankcapacity ?? null;
-    const mergedAttrs = { ...attrs, ...posAttrs };
+    const vehicleAttrs = parseAttrs(r.attributes);
+    // Merge: Device < Vehicle < Position
+    const mergedAttrs = { ...attrs, ...vehicleAttrs, ...posAttrs };
     // ignition: prefer tc.position.attributes.ignition, fallback to tc_device.attributes
     const ignRaw = posAttrs.ignition ?? (r.ignition ?? pickAttr(attrs, ['ignition', 'Ignition']));
     const ignition = ignRaw === true || ignRaw === 1 || String(ignRaw).toLowerCase() === 'on'
@@ -381,7 +383,8 @@ function deriveRow(r) {
     const location = pos.address ?? (r.location ?? pickAttr(attrs, ['address', 'location'])) ?? coords;
     let fuel = null;
     const capacity = hasFuelKey(posAttrs) ? capacityRaw : null;
-    const tel = formatTelemetry(posAttrs, { protocol: pos.protocol, model, capacity });
+    // Align with Detail/LiveTracking: prioritize named odometer, disable protocol-based meter assumption
+    const tel = formatTelemetry(mergedAttrs, { protocol: null, model, capacity, preferNamedOdometer: true });
     if (tel?.fuel) {
         const liters = tel.fuel.liters;
         const percent = tel.fuel.percent;
