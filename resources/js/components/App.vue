@@ -181,11 +181,72 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item  d-none">
-                            <RouterLink to="/reports" class="nav-link" :class="{ active: route.name === 'reports' }">
+                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/reports'), 'd-testingmode': !isTestingMode }" v-if="!isAdminOrDistributor && hasPerm('reports','read')">
+                            <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/reports') }">
                                 <i class="nav-icon bi bi-bar-chart"></i>
-                                <p>Reports & Analytics</p>
-                            </RouterLink>
+                                <p>
+                                    Reports & Analytics
+                                    <i class="bi bi-chevron-right right"></i>
+                                </p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/trip-analysis" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/trip-analysis') }">
+                                        <i class="nav-icon bi bi-table"></i>
+                                        <p>Trip Analysis Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/asset-activity" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/asset-activity') }">
+                                        <i class="nav-icon bi bi-graph-up"></i>
+                                        <p>Asset Activity Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/vehicle-activity" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/vehicle-activity') }">
+                                        <i class="nav-icon bi bi-list-check"></i>
+                                        <p>Vehicle Activity Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/vehicle-status" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/vehicle-status') }">
+                                        <i class="nav-icon bi bi-info-square"></i>
+                                        <p>Vehicle Status Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/idling" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/idling') }">
+                                        <i class="nav-icon bi bi-pause-circle"></i>
+                                        <p>Idling Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/utilisation" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/utilisation') }">
+                                        <i class="nav-icon bi bi-bar-chart-line"></i>
+                                        <p>Utilisation Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/incident-analysis" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/incident-analysis') }">
+                                        <i class="nav-icon bi bi-exclamation-circle"></i>
+                                        <p>Incident Analysis Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/vehicle-ranking" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/vehicle-ranking') }">
+                                        <i class="nav-icon bi bi-trophy"></i>
+                                        <p>Vehicle Ranking Report</p>
+                                    </RouterLink>
+                                </li>
+                            </ul>
                         </li>
 
                         <li class="nav-item" v-if="isAuthed">

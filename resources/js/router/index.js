@@ -30,6 +30,15 @@ const VehicleDetail = () => import('../views/vehicles/Detail.vue');
 const VehicleSettings = () => import('../views/vehicles/Settings.vue');
 const Alerts = () => import('../views/alerts/Index.vue');
 const Reports = () => import('../views/reports/Analytics.vue');
+const ReportsTripAnalysis = () => import('../views/reports/TripAnalysis.vue');
+const ReportsAssetActivity = () => import('../views/reports/AssetActivity.vue');
+const ReportsVehicleActivity = () => import('../views/reports/VehicleActivity.vue');
+const ReportsVehicleStatus = () => import('../views/reports/VehicleStatus.vue');
+const ReportsIdling = () => import('../views/reports/Idling.vue');
+const ReportsUtilisation = () => import('../views/reports/Utilisation.vue');
+const ReportsIncidentAnalysis = () => import('../views/reports/IncidentAnalysis.vue');
+const ReportsIncidentNew = () => import('../views/reports/IncidentNew.vue');
+const ReportsVehicleRanking = () => import('../views/reports/VehicleRanking.vue');
 const Fuel = () => import('../views/fuel/Index.vue');
 const Zones = () => import('../views/zones/Index.vue');
 // Zones add/edit
@@ -76,6 +85,15 @@ const routes = [
   // Edit Vehicle route (numeric id only)
   { path: '/vehicles/:deviceId(\\d+)/edit', name: 'vehicles-edit', component: () => import('../views/vehicles/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Vehicle', moduleKey: 'vehicles', action: 'update' } },
   { path: '/reports', name: 'reports', component: Reports, meta: { requiresAuth: true, title: 'Reports & Analytics', moduleKey: 'reports', action: 'read' } },
+  { path: '/reports/trip-analysis', name: 'reports-trip-analysis', component: ReportsTripAnalysis, meta: { requiresAuth: true, title: 'Trip Analysis Report', moduleKey: 'reports', action: 'read' } },
+  { path: '/reports/asset-activity', name: 'reports-asset-activity', component: ReportsAssetActivity, meta: { requiresAuth: true, title: 'Asset Activity Report', moduleKey: 'reports', action: 'read' } },
+  { path: '/reports/vehicle-activity', name: 'reports-vehicle-activity', component: ReportsVehicleActivity, meta: { requiresAuth: true, title: 'Vehicle Activity Report', moduleKey: 'reports', action: 'read' } },
+  { path: '/reports/vehicle-status', name: 'reports-vehicle-status', component: ReportsVehicleStatus, meta: { requiresAuth: true, title: 'Vehicle Status Report', moduleKey: 'reports', action: 'read' } },
+  { path: '/reports/idling', name: 'reports-idling', component: ReportsIdling, meta: { requiresAuth: true, title: 'Idling Report', moduleKey: 'reports', action: 'read' } },
+  { path: '/reports/utilisation', name: 'reports-utilisation', component: ReportsUtilisation, meta: { requiresAuth: true, title: 'Utilisation Report', moduleKey: 'reports', action: 'read' } },
+  { path: '/reports/incident-analysis', name: 'reports-incident-analysis', component: ReportsIncidentAnalysis, meta: { requiresAuth: true, title: 'Incident Analysis Report', moduleKey: 'reports', action: 'read' } },
+  { path: '/reports/incident/new', name: 'reports-incident-new', component: ReportsIncidentNew, meta: { requiresAuth: true, title: 'Create New Incident Report', moduleKey: 'reports', action: 'read' } },
+  { path: '/reports/vehicle-ranking', name: 'reports-vehicle-ranking', component: ReportsVehicleRanking, meta: { requiresAuth: true, title: 'Vehicle Ranking Report', moduleKey: 'reports', action: 'read' } },
   { path: '/alerts', name: 'alerts', component: Alerts, meta: { requiresAuth: true, title: 'Alerts & Notifications' } },
   { path: '/fuel', name: 'fuel', component: Fuel, meta: { requiresAuth: true, title: 'Fuel Management', moduleKey: 'fuel', action: 'read' } },
   { path: '/fuel/new', name: 'fuel-new', component: () => import('../views/fuel/AddFuel.vue'), meta: { requiresAuth: true, title: 'Add Fuel Entry', moduleKey: 'fuel', action: 'create' } },

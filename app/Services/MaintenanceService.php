@@ -65,7 +65,16 @@ class MaintenanceService
     public function getDevicesForMaintenance($request, $maintenanceId)
     {
         $sessionId = $request->user()->traccarSession ?? session('cookie');
-        $response = static::curl('/api/devices?maintenanceId=' . $maintenanceId, 'GET', $sessionId, '', ['Content-Type: application/json']);
-        return json_decode($response->response, true) ?? [];
+        $url = '/api/devices?maintenanceId=' . $maintenanceId;
+        $response = static::curl($url, 'GET', $sessionId, '', ['Content-Type: application/json']);
+
+        $decoded = json_decode($response->response, true);
+
+        if ($response->responseCode >= 400 || $decoded === null) {
+            \Illuminate\Support\Facades\Log::error("Failed to fetch devices for maintenance $maintenanceId. Code: {$response->responseCode}. Error: {$response->error}. Response: " . substr($response->response, 0, 200));
+            return null;
+        }
+
+        return $decoded ?? [];
     }
 }

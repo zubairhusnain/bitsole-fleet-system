@@ -90,6 +90,7 @@
                   <tr>
                     <th class="fw-semibold py-2">Name</th>
                     <th class="fw-semibold py-2">Type</th>
+                    <th class="fw-semibold py-2">Assigned To</th>
                     <th class="fw-semibold py-2">Start</th>
                     <th class="fw-semibold py-2">Period</th>
                     <th class="fw-semibold py-2 text-end">Actions</th>
@@ -105,6 +106,12 @@
                   <tr v-for="item in maintenanceList" :key="item.id">
                     <td>{{ item.name }}</td>
                     <td>{{ formatType(item.type) }}</td>
+                    <td>
+                      <span v-if="!item.deviceIds || item.deviceIds.length === 0" class="text-muted">None</span>
+                      <span v-else-if="item.deviceIds.length >= devices.length && devices.length > 0" class="badge bg-info">All Devices</span>
+                      <span v-else-if="item.deviceIds.length === 1">{{ getDeviceName(item.deviceIds[0]) }}</span>
+                      <span v-else class="badge bg-secondary">{{ item.deviceIds.length }} Devices</span>
+                    </td>
                     <td>{{ item.start }}</td>
                     <td>{{ item.period }}</td>
                     <td class="text-end">
@@ -240,6 +247,11 @@ const formatType = (type) => {
   return option ? option.label : type;
 };
 
+const getDeviceName = (id) => {
+  const device = devices.value.find(d => d.id === id || d.deviceId === id);
+  return device ? device.label : `Device #${id}`;
+};
+
 const saveMaintenance = async () => {
   saving.value = true;
   error.value = '';
@@ -270,21 +282,21 @@ const editMaintenance = (item) => {
   form.start = item.start;
   form.period = item.period;
 
-  // Find assigned devices
-  const assigned = devices.value.filter(d => d.maintenanceIds && d.maintenanceIds.includes(item.id));
+  // Use deviceIds from API response
+  const assignedIds = item.deviceIds || [];
 
-  if (assigned.length === 0) {
+  if (assignedIds.length === 0) {
       form.deviceId = '';
-  } else if (assigned.length === devices.value.length && devices.value.length > 0) {
+  } else if (assignedIds.length >= devices.value.length && devices.value.length > 0) {
+      // Heuristic: if assigned count matches total device count, assume 'all'
+      // Note: This isn't perfect if devices list changes, but 'all' is a special UI state
       form.deviceId = 'all';
-  } else if (assigned.length === 1) {
-      form.deviceId = assigned[0].id;
+  } else if (assignedIds.length === 1) {
+      form.deviceId = assignedIds[0];
   } else {
-      // If assigned to multiple specific devices (but not all),
-      // we can't easily represent this in a single select.
-      // Defaulting to 'all' might be misleading if it's only a subset.
-      // But defaulting to one hides the others.
-      // Let's default to 'all' for now as a fallback.
+      // If multiple devices but not all, default to 'all' or handle as multi-select
+      // Since UI only has single select or 'all', we default to 'all' or the first one?
+      // Given the logic in store/update, 'all' is safer to avoid unassigning others
       form.deviceId = 'all';
   }
 };

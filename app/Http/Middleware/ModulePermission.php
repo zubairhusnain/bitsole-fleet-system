@@ -22,9 +22,9 @@ class ModulePermission
             'fuel' => 'Fuel Management',
             'monitoring.vehicles' => 'Monitoring – Vehicles',
             'monitoring.zones' => 'Monitoring – Zones',
+            'reports' => 'Reports & Analytics',
             // Admin-only areas are not part of assignable modules
             // 'admin' => 'Admin',
-            // 'reports' => 'Reports & Analytics',
             // 'fuel' => 'Fuel Management',
             // 'tasks' => 'Tasks',
             // 'telemetry' => 'Telemetry Tools',
