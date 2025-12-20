@@ -37,8 +37,8 @@ export function formatOdometer(rawAttrs, ctx = {}) {
   const genericOrderIoFirst = ['16', '87', '50', ...primary, ...distanceKeys];
   const genericOrderNamedFirst = [...primary, ...distanceKeys, '16', '87', '50'];
   const orderedKeys = protocol === 'teltonika'
-    ? teltonikaOrderIoFirst
-    : genericOrderIoFirst;
+    ? (preferNamed ? teltonikaOrderNamedFirst : teltonikaOrderIoFirst)
+    : (preferNamed ? genericOrderNamedFirst : genericOrderIoFirst);
   const getIoVal = (n) => {
     const forms = [String(n), 'io' + String(n), 'io_' + String(n), 'io-' + String(n)];
     for (const f of forms) {
