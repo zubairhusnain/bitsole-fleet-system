@@ -542,14 +542,14 @@ function fuelDisplay(v) {
 function odometerDisplay(v) {
     const pos = getPosition(v).raw || {};
     const model = v.model || (v.tc_device?.model ?? v.tcDevice?.model) || null;
-    
+
     // Merge attributes: Tracker < Vehicle < Position
     const trackerAttrs = parseAttrs(v.tc_device?.attributes ?? v.tcDevice?.attributes);
     const vehicleAttrs = parseAttrs(v.attributes);
     const posAttrs = parseAttrs(pos.attributes);
     // User feedback: odometer value is in position attribute. Prioritize position attributes.
     const mergedAttrs = { ...trackerAttrs, ...vehicleAttrs, ...posAttrs };
-    
+
     // Pass protocol as null to prevent formatTelemetry from assuming 'odometer' key is in meters for Teltonika.
     // This aligns with Detail page behavior where the value (e.g. 118,213) is treated as km.
     const tel = formatTelemetry(mergedAttrs, { protocol: null, model, preferNamedOdometer: true });
