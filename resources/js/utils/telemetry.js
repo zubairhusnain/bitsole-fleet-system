@@ -29,16 +29,14 @@ export function formatOdometer(rawAttrs, ctx = {}) {
   const attrs = parseAttrs(rawAttrs);
   const protocol = String(ctx?.protocol || '').toLowerCase();
   const preferNamed = !!ctx?.preferNamedOdometer;
+  const userPriorityKeys = ['CAN_Total_Mileage_87', 'OBD_Total_Mileage_389', 'GNSS_Total_Odometer_16'];
   const distanceKeys = ['totalDistance', 'distance', 'tripDistance'];
   const primary = ['odometer', 'mileage', 'odometerKm', 'odometer_km'];
-  // Teltonika: prefer io389, then named odometer/mileage, then distance fallbacks
-  const teltonikaOrderIoFirst = ['16', '87', '50', '389', ...primary, ...distanceKeys];
-  const teltonikaOrderNamedFirst = [...primary, ...distanceKeys, '16', '87', '50', '389'];
-  const genericOrderIoFirst = ['16', '87', '50', ...primary, ...distanceKeys];
-  const genericOrderNamedFirst = [...primary, ...distanceKeys, '16', '87', '50'];
-  const orderedKeys = protocol === 'teltonika'
-    ? teltonikaOrderIoFirst
-    : genericOrderIoFirst;
+  // Unified order: include 389 in IO check list for everyone
+  const orderIoFirst = [...userPriorityKeys, '16', '87', '50', '389', ...primary, ...distanceKeys];
+  const orderNamedFirst = [...userPriorityKeys, ...primary, ...distanceKeys, '16', '87', '50', '389'];
+
+  const orderedKeys = preferNamed ? orderNamedFirst : orderIoFirst;
   const getIoVal = (n) => {
     const forms = [String(n), 'io' + String(n), 'io_' + String(n), 'io-' + String(n)];
     for (const f of forms) {
@@ -46,12 +44,25 @@ export function formatOdometer(rawAttrs, ctx = {}) {
     }
     return undefined;
   };
+
+  // Create case-insensitive map for named keys
+  const attrsLower = {};
+  for (const key of Object.keys(attrs)) {
+    attrsLower[key.toLowerCase()] = attrs[key];
+  }
+
   let keyFound = null;
-  const pre16 = getIoVal(16);
-  if (pre16 != null && pre16 !== '') { keyFound = '16'; }
+  // REMOVED pre-check for 16 to respect orderedKeys priority
   for (const k of orderedKeys) {
     // For numeric IO keys, check both raw and io-prefixed variants
-    const val = (k === '389' || k === '87' || k === '50' || k === '16') ? getIoVal(k) : attrs[k];
+    let val;
+    if (k === '389' || k === '87' || k === '50' || k === '16') {
+      val = getIoVal(k);
+    } else {
+      // Check exact match first, then case-insensitive
+      val = attrs[k] ?? attrsLower[k.toLowerCase()];
+    }
+
     const exists = val != null && val !== '';
     if (keyFound == null && exists) { keyFound = k; break; }
   }
@@ -59,7 +70,10 @@ export function formatOdometer(rawAttrs, ctx = {}) {
     const n = typeof val === 'string' ? parseFloat(val) : (typeof val === 'number' ? val : null);
     return Number.isFinite(n) ? n : null;
   };
-  const getAttrVal = (k) => ((k === '389' || k === '87' || k === '50' || k === '16') ? getIoVal(k) : attrs[k]);
+  const getAttrVal = (k) => {
+    if (k === '389' || k === '87' || k === '50' || k === '16') return getIoVal(k);
+    return attrs[k] ?? attrsLower[k.toLowerCase()];
+  };
   // Fallback scan
   if (!keyFound) {
     let specialKey = null;
@@ -80,18 +94,13 @@ export function formatOdometer(rawAttrs, ctx = {}) {
   if (!Number.isFinite(num)) return null;
   const keyLower = String(keyFound).toLowerCase();
   let km = num;
-  const looksMeters = (
-    distanceKeys.map(k => k.toLowerCase()).includes(keyLower)
-    || keyLower.endsWith('_m')
-    || keyLower.includes('meter')
-    || ((keyLower === 'odometer' || keyLower === 'mileage') && protocol === 'teltonika')
-  );
-  if (looksMeters) km = num / 1000;
-  // Heuristic for numeric IO keys (io87/io50): values typically in meters if very large
-  if ((keyFound === '87' || keyFound === '50' || keyFound === '389' || keyFound === '16') && !looksMeters) {
-    km = num >= 100000 ? (num / 1000) : num; // >=100,000 assumed meters → km
-  }
-  return {
+    // console.log('odometer km value ',km,rawVal,keyFound,keyLower);
+
+  const skipConversion = (keyFound === '389') || (keyLower === 'obd_total_mileage_389');
+
+  if (!skipConversion) km = num / 1000;
+  console.log('odometer in km or meter ',km,num,keyFound);
+;  return {
     key: keyFound,
     raw: rawVal,
     km,
