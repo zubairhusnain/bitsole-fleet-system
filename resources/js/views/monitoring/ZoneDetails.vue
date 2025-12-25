@@ -269,13 +269,7 @@ const onMapReady = (map) => {
              bounds.extend(center.value);
         }
 
-        vehicles.value.forEach(v => {
-            const lat = Number(v.latitude);
-            const lon = Number(v.longitude);
-            if (Number.isFinite(lat) && Number.isFinite(lon)) {
-                bounds.extend([lat, lon]);
-            }
-        });
+        // Do not include vehicles in initial bounds to avoid jump away from zone
 
         if (bounds.isValid()) {
             mapInstance.fitBounds(bounds, { padding: [50, 50] });
@@ -490,10 +484,16 @@ onMounted(async () => {
     vehicles.value = vlist.map(v => {
       const lat = Number(v.lat ?? v.latitude);
       const lon = Number(v.lng ?? v.longitude);
+      const valid =
+        Number.isFinite(lat) &&
+        Number.isFinite(lon) &&
+        Math.abs(lat) <= 90 &&
+        Math.abs(lon) <= 180 &&
+        !(lat === 0 && lon === 0);
       return {
         ...v,
-        latitude: Number.isFinite(lat) ? lat : undefined,
-        longitude: Number.isFinite(lon) ? lon : undefined,
+        latitude: valid ? lat : undefined,
+        longitude: valid ? lon : undefined,
       };
     });
 
