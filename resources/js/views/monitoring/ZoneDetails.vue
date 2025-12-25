@@ -270,8 +270,10 @@ const onMapReady = (map) => {
         }
 
         vehicles.value.forEach(v => {
-            if (v.latitude && v.longitude) {
-                bounds.extend([v.latitude, v.longitude]);
+            const lat = Number(v.latitude);
+            const lon = Number(v.longitude);
+            if (Number.isFinite(lat) && Number.isFinite(lon)) {
+                bounds.extend([lat, lon]);
             }
         });
 
@@ -485,14 +487,16 @@ onMounted(async () => {
     }
 
     const vlist = Array.isArray(md?.vehicles) ? md.vehicles : [];
-    vehicles.value = vlist.map(v => ({
-      ...v,
-      latitude: v.lat || v.latitude,
-      longitude: v.lng || v.longitude,
-    }));
+    vehicles.value = vlist.map(v => {
+      const lat = Number(v.lat ?? v.latitude);
+      const lon = Number(v.lng ?? v.longitude);
+      return {
+        ...v,
+        latitude: Number.isFinite(lat) ? lat : undefined,
+        longitude: Number.isFinite(lon) ? lon : undefined,
+      };
+    });
 
-    // Force map re-render for Leaflet layers
-    mapKey.value++;
     mapReady.value = true;
     await nextTick();
     try {
