@@ -62,6 +62,7 @@ const routes = [
   { path: '/monitoring/vehicles', name: 'monitoring-vehicles', component: MonitoringVehicles, meta: { requiresAuth: true, title: 'Vehicles Monitoring', moduleKey: 'monitoring.vehicles', action: 'read' } },
   { path: '/monitoring/dashboard', name: 'monitoring-dashboard', component: MonitoringDashboard, meta: { requiresAuth: true, title: 'Vehicle Dashboard Status', moduleKey: 'monitoring.vehicles', action: 'read' } },
   { path: '/monitoring/zones', name: 'monitoring-zones', component: MonitoringZones, meta: { requiresAuth: true, title: 'Zone Monitoring', moduleKey: 'monitoring.zones', action: 'read' } },
+  { path: '/monitoring/zones/:zoneId(\\d+)', name: 'monitoring-zone-details', component: () => import('../views/monitoring/ZoneDetails.vue'), meta: { requiresAuth: true, title: 'Zone Vehicles', moduleKey: 'monitoring.zones', action: 'read' } },
   { path: '/live-tracking', name: 'live-tracking', component: LiveTracking, meta: { requiresAuth: true, title: 'Live Tracking', roles: [0, 1] } },
   { path: '/drivers', name: 'drivers', component: Drivers, meta: { requiresAuth: true, title: 'Driver Management', moduleKey: 'drivers', action: 'read' } },
   { path: '/vehicles/:deviceId(\\d+)/settings', name: 'vehicle-settings', component: VehicleSettings, meta: { requiresAuth: true, title: 'Vehicle Settings', moduleKey: 'vehicles', action: 'read' } },

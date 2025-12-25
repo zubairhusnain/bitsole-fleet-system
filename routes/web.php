@@ -96,6 +96,7 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::post('/vehicles/events/{eventId}/acknowledge', [\App\Http\Controllers\MonitoringController::class, 'acknowledgeEvent']);
     Route::post('/vehicles/{id}/alert-status', [\App\Http\Controllers\MonitoringController::class, 'updateAlertStatus']);
     Route::get('/zones', [\App\Http\Controllers\MonitoringController::class, 'zoneSummary']);
+    Route::get('/zones/{id}', [\App\Http\Controllers\MonitoringController::class, 'zoneDetail']);
 });
 
 // Auth-protected Vehicles CRUD
