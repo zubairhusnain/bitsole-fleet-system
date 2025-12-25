@@ -431,16 +431,12 @@ onMounted(async () => {
   try {
     error.value = '';
     loading.value = true;
-    // Fetch zone + remote geofence like Edit.vue
-    const { data } = await axios.get(`/web/zones/${zoneId}`);
-    const z = data?.zone;
-    const remote = data?.geofence;
-    if (!z || !remote) {
-      throw new Error('Zone or geofence not found');
-    }
+    const mon = await axios.get(`/web/monitoring/zones/${zoneId}`);
+    const md = mon?.data || {};
+    const gf = md?.geofence || md;
 
     // Normalize attributes
-    let attrs = remote?.attributes || {};
+    let attrs = gf?.attributes || {};
     if (typeof attrs === 'string') {
       try {
         const parsed = JSON.parse(attrs);
@@ -448,12 +444,12 @@ onMounted(async () => {
       } catch {}
     }
 
-    zoneName.value = String(remote?.name || '').trim();
+    zoneName.value = String(gf?.name || '').trim();
     zoneData.value = {
-      id: z?.geofence_id || remote?.id,
+      id: gf?.id || zoneId,
       name: zoneName.value,
-      description: remote?.description || null,
-      area: remote?.area || null,
+      description: gf?.description || null,
+      area: gf?.area || null,
       attributes: attrs || null,
     };
 
@@ -462,7 +458,7 @@ onMounted(async () => {
     zoneCircle.value = null;
 
     // Parse WKT area first
-    const parsed = parseWKTArea(remote?.area || '');
+    const parsed = parseWKTArea(gf?.area || '');
     if (parsed && parsed.type === 'circle' && parsed.lat != null && parsed.lng != null) {
       const radius = Number.isFinite(parsed.radius)
         ? parsed.radius
@@ -488,6 +484,13 @@ onMounted(async () => {
       }
     }
 
+    const vlist = Array.isArray(md?.vehicles) ? md.vehicles : [];
+    vehicles.value = vlist.map(v => ({
+      ...v,
+      latitude: v.lat || v.latitude,
+      longitude: v.lng || v.longitude,
+    }));
+
     // Force map re-render for Leaflet layers
     mapKey.value++;
     mapReady.value = true;
@@ -496,24 +499,6 @@ onMounted(async () => {
       const m = mapRef.value && mapRef.value.leafletObject;
       if (m) { onMapReady(m); }
     } catch {}
-
-    // Then fetch vehicles from monitoring using geofence id
-    const gid = parseInt(z?.geofence_id || remote?.id || zoneId, 10);
-    if (Number.isFinite(gid)) {
-      try {
-        const mon = await axios.get(`/web/monitoring/zones/${gid}`);
-        const foundMon = mon?.data;
-        if (foundMon?.vehicles) {
-          vehicles.value = foundMon.vehicles.map(v => ({
-            ...v,
-            latitude: v.lat || v.latitude,
-            longitude: v.lng || v.longitude,
-          }));
-        } else {
-          vehicles.value = [];
-        }
-      } catch {}
-    }
 
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'Failed to load zone details';

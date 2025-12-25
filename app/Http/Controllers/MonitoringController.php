@@ -159,23 +159,19 @@ class MonitoringController extends Controller
         $count = count($vehicles);
         $percent = $totalDevices > 0 ? (int) floor(($count / $totalDevices) * 100) : 0;
 
-        $data = [
-            'id' => $gid,
-            'name' => $gf->name ?? ('Zone ' . $gid),
-            'description' => $gf->description ?? null,
-            'area' => $gf->area, // Important for shape
-            'attributes' => $gf->attributes, // Needed for shape fallback (circle)
-            'created_at' => $localZone ? $localZone->created_at : null,
-            'updated_at' => $localZone ? $localZone->updated_at : null,
-            'owner_name' => $localZone && $localZone->user ? $localZone->user->name : null,
-            'user_id' => $localZone ? $localZone->user_id : null,
-            'status' => $localZone ? $localZone->status : 'active',
+        // Return geofence payload in the same format as getGeofenceById,
+        // alongside monitoring-specific fields (vehicles, count, percent)
+        $geofence = $this->geofencesService->getGeofenceById($request, $gid);
+        if (!$geofence) {
+            return response()->json(['error' => 'Zone not found'], 404);
+        }
+
+        return response()->json([
+            'geofence' => $geofence,
             'count' => $count,
             'percent' => $percent,
             'vehicles' => $vehicles,
-        ];
-
-        return response()->json($data);
+        ]);
     }
 
     /**
