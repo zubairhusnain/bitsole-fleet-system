@@ -1,38 +1,92 @@
 <template>
   <div>
-    <div class="row mb-3">
-      <div class="col">
-        <h4 class="mb-0">Reports & Analytics</h4>
-        <small class="text-muted">Insights and trends</small>
-      </div>
-      <div class="col-auto">
-        <button class="btn btn-outline-secondary">Export</button>
-      </div>
+    <div class="app-content-header mb-2">
+      <ol class="breadcrumb mb-0 small text-muted">
+        <li class="breadcrumb-item"><RouterLink to="/dashboard">Dashboard</RouterLink></li>
+        <li class="breadcrumb-item">Reports & Analytics</li>
+        <li class="breadcrumb-item active" aria-current="page">Analytics Overview</li>
+      </ol>
     </div>
+    <h4 class="mb-3">Analytics Overview</h4>
 
-    <ComingSoon class="mb-3" />
-
-    <div class="row g-4">
-      <div class="col-12 col-lg-4" v-for="i in 3" :key="i">
-        <div class="card">
-          <div class="card-header"><h6 class="mb-0">Metric {{ i }}</h6></div>
-          <div class="card-body"><div class="placeholder-glow"><span class="placeholder col-12" style="height:140px"></span></div></div>
+    <div class="card panel border rounded-3 shadow-0 mb-3">
+      <div class="card-header"><h6 class="mb-0">Search Option</h6></div>
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-12 col-md-4">
+            <label class="form-label small">Duration</label>
+            <input type="text" class="form-control" placeholder="dd/mm/yyyy - dd/mm/yyyy" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label small">Vehicle Group</label>
+            <select class="form-select">
+              <option>-- Select Group --</option>
+              <option>All Vehicles</option>
+              <option>Group A</option>
+              <option>Group B</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-4 text-md-end">
+            <button class="btn btn-app-dark w-100">Submit</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="card mt-3">
+    <div class="row g-4 mb-3">
+      <div class="col-12 col-lg-4">
+        <div class="card border rounded-3 shadow-0 h-100">
+          <div class="card-header"><h6 class="mb-0">Fleet Utilisation</h6></div>
+          <div class="card-body d-flex align-items-center justify-content-center">
+             <div class="text-center">
+                <h2 class="fw-bold text-primary">85%</h2>
+                <div class="small text-muted">Average Daily Utilisation</div>
+             </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-4">
+        <div class="card border rounded-3 shadow-0 h-100">
+          <div class="card-header"><h6 class="mb-0">Fuel Efficiency</h6></div>
+          <div class="card-body d-flex align-items-center justify-content-center">
+             <div class="text-center">
+                <h2 class="fw-bold text-success">12.5 km/L</h2>
+                <div class="small text-muted">Average Fleet Consumption</div>
+             </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-4">
+        <div class="card border rounded-3 shadow-0 h-100">
+          <div class="card-header"><h6 class="mb-0">Safety Score</h6></div>
+          <div class="card-body d-flex align-items-center justify-content-center">
+             <div class="text-center">
+                <h2 class="fw-bold text-info">92/100</h2>
+                <div class="small text-muted">Fleet Safety Rating</div>
+             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border rounded-3 shadow-0">
       <div class="card-header"><h6 class="mb-0">Performance Over Time</h6></div>
-      <div class="card-body"><div class="placeholder-glow"><span class="placeholder col-12" style="height:280px"></span></div></div>
+      <div class="card-body">
+        <div class="placeholder-glow">
+          <span class="placeholder col-12 bg-light rounded" style="height:280px; display:flex; align-items:center; justify-content:center; color:#adb5bd;">
+            Chart Visualization Placeholder
+          </span>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import ComingSoon from '../../components/ComingSoon.vue';
-// Chart placeholders; integrate ApexCharts or similar later
+// Analytics logic here
 </script>
 
 <style scoped>
-.placeholder { display: block; background-color: rgba(0,0,0,.075); }
+.panel .card-body { padding-top: 1rem; padding-bottom: 1rem; }
+.card-header h6 { font-weight: 600; }
 </style>

@@ -20,7 +20,7 @@
                 </ul>
                 <!--end::Start Navbar Links-->
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item" v-if="isAuthed">
+                    <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode }" v-if="isAuthed">
                         <RouterLink to="/alerts" class="nav-link position-relative" style="padding-top: 0.5rem;">
                             <i class="bi bi-bell" style="font-size: 1.2rem;"></i>
                             <span v-if="unreadCount > 0" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem; transform: translate(-50%, 50%) !important;">
@@ -134,14 +134,14 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('fuel', 'read')">
+                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode }" v-if="!isAdminOrDistributor && hasPerm('fuel', 'read')">
                             <RouterLink to="/fuel" class="nav-link" :class="{ active: route.name === 'fuel' }">
                                 <i class="nav-icon bi bi-fuel-pump"></i>
                                 <p>Fuel Management</p>
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/monitoring') }" v-if="!isAdminOrDistributor && (hasPerm('monitoring.vehicles', 'read') || hasPerm('monitoring.zones', 'read'))">
+                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/monitoring'), 'd-testingmode': !isTestingMode }" v-if="!isAdminOrDistributor && (hasPerm('monitoring.vehicles', 'read') || hasPerm('monitoring.zones', 'read'))">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/monitoring') }">
                                 <i class="nav-icon bi bi-graph-up"></i>
                                 <p>
@@ -150,14 +150,14 @@
                                 </p>
                             </a>
                             <ul class="nav nav-treeview">
-                                <li class="nav-item" v-if="hasPerm('monitoring.vehicles', 'read')">
+                                <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('monitoring.vehicles', 'read')">
                                     <RouterLink to="/monitoring/vehicles" class="nav-link"
                                         :class="{ active: route.path.startsWith('/monitoring/vehicles') }">
                                         <i class="nav-icon bi bi-truck"></i>
                                         <p>Vehicle Monitoring</p>
                                     </RouterLink>
                                 </li>
-                                <li class="nav-item" v-if="hasPerm('monitoring.zones', 'read')">
+                                <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('monitoring.zones', 'read')">
                                     <RouterLink to="/monitoring/zones" class="nav-link"
                                         :class="{ active: route.path.startsWith('/monitoring/zones') }">
                                         <i class="nav-icon bi bi-geo-alt"></i>
@@ -174,18 +174,79 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item " v-if="!isAdminOrDistributor && hasPerm('zones','read')">
+                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode }" v-if="!isAdminOrDistributor && hasPerm('zones','read')">
                             <RouterLink to="/zones" class="nav-link" :class="{ active: route.name === 'zones' }">
                                 <i class="nav-icon bi bi-grid-3x3"></i>
                                 <p>Zone Management</p>
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item  d-none">
-                            <RouterLink to="/reports" class="nav-link" :class="{ active: route.name === 'reports' }">
+                        <li class="nav-item d-testingmode" :class="{ 'menu-open': route.path.startsWith('/reports') }" v-if="!isAdminOrDistributor && hasPerm('reports','read')">
+                            <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/reports') }">
                                 <i class="nav-icon bi bi-bar-chart"></i>
-                                <p>Reports & Analytics</p>
-                            </RouterLink>
+                                <p>
+                                    Reports & Analytics
+                                    <i class="bi bi-chevron-right right"></i>
+                                </p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/trip-analysis" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/trip-analysis') }">
+                                        <i class="nav-icon bi bi-table"></i>
+                                        <p>Trip Analysis Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/asset-activity" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/asset-activity') }">
+                                        <i class="nav-icon bi bi-graph-up"></i>
+                                        <p>Asset Activity Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/vehicle-activity" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/vehicle-activity') }">
+                                        <i class="nav-icon bi bi-list-check"></i>
+                                        <p>Vehicle Activity Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/vehicle-status" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/vehicle-status') }">
+                                        <i class="nav-icon bi bi-info-square"></i>
+                                        <p>Vehicle Status Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/idling" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/idling') }">
+                                        <i class="nav-icon bi bi-pause-circle"></i>
+                                        <p>Idling Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/utilisation" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/utilisation') }">
+                                        <i class="nav-icon bi bi-bar-chart-line"></i>
+                                        <p>Utilisation Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/incident-analysis" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/incident-analysis') }">
+                                        <i class="nav-icon bi bi-exclamation-circle"></i>
+                                        <p>Incident Analysis Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/vehicle-ranking" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/vehicle-ranking') }">
+                                        <i class="nav-icon bi bi-trophy"></i>
+                                        <p>Vehicle Ranking Report</p>
+                                    </RouterLink>
+                                </li>
+                            </ul>
                         </li>
 
                         <li class="nav-item" v-if="isAuthed">
@@ -257,7 +318,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, provide } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
 import { authState, clearAuthCache, hasPermission, roleToNumber } from '../auth';
@@ -275,6 +336,29 @@ const year = new Date().getFullYear();
 const unreadCount = ref(0);
 const myDeviceIds = ref([]);
 let echoChannel = null;
+
+const isTestingMode = ref(false);
+provide('isTestingMode', isTestingMode);
+
+const checkTestingMode = () => {
+    // Support both lowercase and camelCase
+    const rawQ = route.query.testingmode ?? route.query.testingMode;
+    const q = rawQ !== null && rawQ !== undefined ? String(rawQ) : null;
+
+    if (q === '1') {
+        console.log('testingMode on hai');
+        localStorage.setItem('testingMode', '1');
+        isTestingMode.value = true;
+    } else if (q === '0') {
+        console.log('testingMode off hai');
+        localStorage.removeItem('testingMode');
+        isTestingMode.value = false;
+    } else {
+        isTestingMode.value = localStorage.getItem('testingMode') === '1';
+    }
+};
+
+watch(() => route.query, checkTestingMode, { immediate: true });
 
 const isAuthed = computed(() => !!authState.user);
 

@@ -15,6 +15,166 @@ use App\Services\DeviceService;
 class MonitoringController extends Controller
 {
     /**
+     * Helper to parse attributes safely.
+     */
+    private function parseAttributes($attrs)
+    {
+        if (is_array($attrs)) {
+            return $attrs;
+        }
+        if (is_string($attrs)) {
+            try {
+                return json_decode($attrs, true) ?? [];
+            } catch (\Throwable $e) {
+                return [];
+            }
+        }
+        return [];
+    }
+
+    /**
+     * Helper to format date.
+     */
+    private function formatDate($dateStr)
+    {
+        if (!$dateStr) {
+            return 'N/A';
+        }
+        return date('d/m/Y-H:i', strtotime($dateStr));
+    }
+
+    /**
+     * Get zone details with full vehicle list.
+     */
+    public function zoneDetail(Request $request, $id)
+    {
+        $user = $request->user();
+        // Accept either a remote geofence ID or a local Zones.id and resolve to geofence_id
+        $gid = (int) $id;
+        $zone = Zones::where('geofence_id', $gid)->first();
+        if (!$zone) {
+            $zone = Zones::find($gid);
+            if ($zone && (int) $zone->geofence_id > 0) {
+                $gid = (int) $zone->geofence_id;
+            }
+        }
+
+        // Check permission (reuse logic or simplify if simple ownership)
+        // For now, assuming if they can see summary, they can see detail.
+        // But strictly we should check if this $gid is in allowed list.
+
+        $gf = TcGeofence::find($gid);
+        if (!$gf) {
+            return response()->json(['error' => 'Zone not found'], 404);
+        }
+
+        // Verify access
+        $canAccess = false;
+        $role = (int) ($user->role ?? User::ROLE_ADMIN);
+        $localZone = Zones::where('geofence_id', $gid)->first();
+
+        if ($request->boolean('mine')) {
+            if ($localZone && $localZone->user_id == $user->id) {
+                $canAccess = true;
+            }
+        } else {
+             // simplified check: if admin or if part of allowed zones
+             // Ideally reusing the query from zoneSummary would be better but expensive.
+             // Let's assume for now if they have the ID and are auth'd, we check basic ownership if not admin.
+             if ($role === User::ROLE_ADMIN) {
+                 $canAccess = true;
+             } elseif ($localZone) {
+                 if ($role === User::ROLE_DISTRIBUTOR && $localZone->distributor_id == $user->id) {
+                     $canAccess = true;
+                 } elseif ($role === User::ROLE_FLEET_MANAGER && $localZone->user_id == $user->id) {
+                     $canAccess = true;
+                 } elseif ($localZone->user_id == $user->manager_id) {
+                     $canAccess = true;
+                 }
+             }
+        }
+
+        // If not found in local Zones but exists in TcGeofence and user is admin?
+        if (!$localZone && $role === User::ROLE_ADMIN) {
+            $canAccess = true;
+        }
+
+        if (!$canAccess) {
+             return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        // Fetch vehicles
+        $deviceIds = Devices::accessibleByUser($user)->pluck('device_id')->filter()->unique()->values();
+        $totalDevices = $deviceIds->count();
+
+        $links = DB::connection('pgsql')
+            ->table('tc_device_geofence')
+            ->where('geofenceid', $gid)
+            ->whereIn('deviceid', $deviceIds->all())
+            ->get(['deviceid']);
+
+        $linkedDeviceIds = $links->pluck('deviceid')->unique()->values()->all();
+        $deviceRows = TcDevice::with('position')->whereIn('id', $linkedDeviceIds)->get()->keyBy('id');
+
+        $vehicles = collect($linkedDeviceIds)->map(function ($did) use ($deviceRows) {
+            $row = $deviceRows->get((int) $did);
+            if (!$row) {
+                return null;
+            }
+
+            $pos = $row->position;
+            $attrs = $this->parseAttributes($row->attributes);
+            $posAttrs = $pos ? $this->parseAttributes($pos->attributes) : [];
+
+            $vehicle_no = $attrs['vehicleNo'] ?? ($attrs['vehicle_id'] ?? ($attrs['vehicleId'] ?? ($attrs['vehicleID'] ?? null)));
+            $name = $row->name ?? $vehicle_no;
+            $ignition = $posAttrs['ignition'] ?? false;
+
+            // Status
+            $deviceStatus = trim(strtolower($row->status ?? ''));
+            $isOnline = ($deviceStatus === 'online') || (strtotime($row->lastupdate) > time() - 300);
+            $status = $isOnline ? 'Online' : 'Offline';
+
+            return [
+                'id' => $row->id,
+                'name' => $name,
+                'vehicle_no' => $vehicle_no,
+                'uniqueid' => $row->uniqueid,
+                'active' => (bool) $ignition,
+                'ignition' => (bool) $ignition,
+                'last_ignition_on' => 'N/A', // Deprecated
+                'last_ignition_off' => 'N/A', // Deprecated
+                'status' => $status,
+                'speed' => $pos ? round($pos->speed * 1.852, 1) : 0,
+                'lat' => $pos ? $pos->latitude : 0,
+                'lng' => $pos ? $pos->longitude : 0,
+                'last_update' => $this->formatDate($pos ? $pos->servertime : $row->lastupdate),
+                'address' => $pos ? $pos->address : '',
+                'type' => $attrs['type'] ?? 'Unknown',
+                'model' => $row->model ?? 'Unknown',
+                'odometer' => isset($posAttrs['odometer']) ? round($posAttrs['odometer'] / 1000, 1) : 0,
+            ];
+        })->filter()->values()->all();
+
+        $count = count($vehicles);
+        $percent = $totalDevices > 0 ? (int) floor(($count / $totalDevices) * 100) : 0;
+
+        // Return geofence payload in the same format as getGeofenceById,
+        // alongside monitoring-specific fields (vehicles, count, percent)
+        $geofence = $this->geofencesService->getGeofenceById($request, $gid);
+        if (!$geofence) {
+            return response()->json(['error' => 'Zone not found'], 404);
+        }
+
+        return response()->json([
+            'geofence' => $geofence,
+            'count' => $count,
+            'percent' => $percent,
+            'vehicles' => $vehicles,
+        ]);
+    }
+
+    /**
      * Get zone monitoring summary (grouped by zone with vehicle counts).
      */
     public function zoneSummary(Request $request)
@@ -52,112 +212,44 @@ class MonitoringController extends Controller
             ->whereIn('deviceid', $deviceIds->all())
             ->get(['deviceid', 'geofenceid']);
 
-        $byZone = [];
+        $byZoneCounts = [];
         foreach ($links as $ln) {
             $gid = (int) $ln->geofenceid;
-            $did = (int) $ln->deviceid;
-            if (!isset($byZone[$gid])) $byZone[$gid] = [];
-            $byZone[$gid][] = $did;
+            if (!isset($byZoneCounts[$gid])) $byZoneCounts[$gid] = 0;
+            $byZoneCounts[$gid]++;
         }
+
+        $vehiclesInAnyZone = $links->pluck('deviceid')->unique()->count();
 
         $zoneRows = TcGeofence::query()->whereIn('id', $allowedIds->all())->get()->keyBy('id');
+        $localZones = Zones::whereIn('geofence_id', $allowedIds->all())->get()->keyBy('geofence_id');
 
-        $allDeviceIdsLinked = collect($links)->pluck('deviceid')->unique()->values()->all();
-
-        // Fetch last ignition events for these devices
-        $ignitionEvents = DB::connection('pgsql')
-            ->table('tc_events')
-            ->select('deviceid', 'type', DB::raw('MAX(eventtime) as last_time'))
-            ->whereIn('deviceid', $allDeviceIdsLinked)
-            ->whereIn('type', ['ignitionOn', 'ignitionOff'])
-            ->groupBy('deviceid', 'type')
-            ->get();
-
-        $ignitionTimes = [];
-        foreach ($ignitionEvents as $evt) {
-            $ignitionTimes[$evt->deviceid][$evt->type] = $evt->last_time;
-        }
-
-        $deviceRows = TcDevice::with('position')->whereIn('id', $allDeviceIdsLinked)->get()->keyBy('id');
-
-        // Helper to parse attributes
-        $parseAttrs = function ($attrs) {
-            if (is_array($attrs)) return $attrs;
-            if (is_string($attrs)) {
-                try { return json_decode($attrs, true) ?? []; } catch (\Throwable $e) { return []; }
-            }
-            return [];
-        };
-
-        // Helper for date formatting
-        $formatDate = function ($dateStr) {
-            if (!$dateStr) return 'N/A';
-            return date('d/m/Y-H:i', strtotime($dateStr));
-        };
-
-        $zones = $allowedIds->map(function ($gid) use ($zoneRows, $byZone, $deviceRows, $parseAttrs, $formatDate, $totalDevices, $ignitionTimes) {
+        $zones = $allowedIds->map(function ($gid) use ($zoneRows, $byZoneCounts, $totalDevices, $localZones) {
             $gf = $zoneRows->get((int) $gid);
             if (!$gf) return null;
 
-            $assigned = $byZone[(int) $gid] ?? [];
-
-            $vehicles = collect($assigned)->map(function ($did) use ($deviceRows, $parseAttrs, $formatDate, $gf, $gid, $ignitionTimes) {
-                $row = $deviceRows->get((int) $did);
-                if (!$row) return null;
-
-                $pos = $row->position;
-                $attrs = $parseAttrs($row->attributes);
-                $posAttrs = $pos ? $parseAttrs($pos->attributes) : [];
-
-                $vehicle_no = $attrs['vehicleNo'] ?? ($attrs['vehicle_id'] ?? ($attrs['vehicleId'] ?? ($attrs['vehicleID'] ?? null)));
-                $name = $row->name ?? $vehicle_no;
-                $ignition = $posAttrs['ignition'] ?? false;
-
-                $ignOnTime = $ignitionTimes[$row->id]['ignitionOn'] ?? null;
-                $ignOffTime = $ignitionTimes[$row->id]['ignitionOff'] ?? null;
-
-                // Status from DB
-                $status = $row->status ? ucfirst($row->status) : 'Offline';
-
-                // Vehicle object matching frontend expectations
-                return [
-                    'id' => $row->id, // Traccar ID
-                    'name' => $name,
-                    'vehicle_no' => $vehicle_no,
-                    'uniqueid' => $row->uniqueid,
-                    'active' => (bool) $ignition, // For power icon color
-                    'ignition' => (bool) $ignition,
-                    'last_ignition_on' => $ignOnTime ? $formatDate($ignOnTime) : 'N/A',
-                    'last_ignition_off' => $ignOffTime ? $formatDate($ignOffTime) : 'N/A',
-                    'zone_name' => $gf->name ?? ('Zone ' . $gid),
-                    'status' => $status,
-                    'speed' => $pos ? round($pos->speed * 1.852, 1) : 0, // Knots to km/h
-                    'lat' => $pos ? $pos->latitude : 0,
-                    'lng' => $pos ? $pos->longitude : 0,
-                    'last_update' => $formatDate($pos ? $pos->servertime : $row->lastupdate),
-                    'address' => $pos ? $pos->address : '',
-                    'type' => $attrs['type'] ?? 'Unknown',
-                    'model' => $row->model ?? 'Unknown',
-                    'odometer' => isset($posAttrs['odometer']) ? round($posAttrs['odometer'] / 1000, 1) : 0,
-                    'maintenance' => 'N/A', // Can be enriched if needed
-                    'alert_count' => 0, // Can be enriched if needed
-                ];
-            })->filter()->values()->all();
-
-            $count = count($vehicles);
+            $localZone = $localZones->get((int) $gid);
+            $count = $byZoneCounts[(int) $gid] ?? 0;
             $percent = $totalDevices > 0 ? (int) floor(($count / $totalDevices) * 100) : 0;
 
             return [
                 'id' => (int) $gid,
                 'name' => $gf->name ?? ('Zone ' . $gid),
                 'description' => $gf->description ?? null,
+                'created_at' => $localZone ? $localZone->created_at : null,
+                'updated_at' => $localZone ? $localZone->updated_at : null,
+                'status' => $localZone ? $localZone->status : 'active',
                 'count' => $count,
                 'percent' => $percent,
-                'vehicles' => $vehicles,
+                'vehicles' => [], // Empty to improve performance
             ];
         })->filter()->values()->all();
 
-        return response()->json(['zones' => $zones, 'total_devices' => $totalDevices]);
+        return response()->json([
+            'zones' => $zones,
+            'total_devices' => $totalDevices,
+            'vehicles_in_zone' => $vehiclesInAnyZone
+        ]);
     }
 
     /**
@@ -190,6 +282,41 @@ class MonitoringController extends Controller
         // If per_page is -1 or very large, we might want to return all, but paginate is safer.
         // The frontend requests per_page=500 in fetchVehicles.
         $devices = $query->orderByDesc('id')->paginate($perPage);
+
+        // Fetch last ignition events for these devices
+        $deviceIds = $devices->pluck('device_id')->unique()->values()->all();
+
+        if (!empty($deviceIds)) {
+            $ignitionEvents = DB::connection('pgsql')
+                ->table('tc_events')
+                ->select('deviceid', 'type', DB::raw('MAX(eventtime) as last_time'))
+                ->whereIn('deviceid', $deviceIds)
+                ->whereIn('type', ['ignitionOn', 'ignitionOff'])
+                ->groupBy('deviceid', 'type')
+                ->get();
+
+            $ignitionTimes = [];
+            foreach ($ignitionEvents as $evt) {
+                $ignitionTimes[$evt->deviceid][$evt->type] = $evt->last_time;
+            }
+
+            // Helper for date formatting
+            $formatDate = function ($dateStr) {
+                if (!$dateStr) return null;
+                return date('d/m/Y-H:i', strtotime($dateStr));
+            };
+
+            // Enrich the devices collection
+            $devices->getCollection()->transform(function ($device) use ($ignitionTimes, $formatDate) {
+                $ignOnTime = $ignitionTimes[$device->device_id]['ignitionOn'] ?? null;
+                $ignOffTime = $ignitionTimes[$device->device_id]['ignitionOff'] ?? null;
+
+                $device->last_ignition_on = $ignOnTime ? $formatDate($ignOnTime) : null;
+                $device->last_ignition_off = $ignOffTime ? $formatDate($ignOffTime) : null;
+
+                return $device;
+            });
+        }
 
         // Enrich with alerts and maintenance counts
         $deviceIds = $devices->pluck('device_id')->toArray();

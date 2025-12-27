@@ -1,5 +1,5 @@
 <template>
-  <div class="container-fluid">
+  <div class="container-fluid py-3">
     <!-- Breadcrumb -->
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
@@ -10,6 +10,8 @@
         <li class="breadcrumb-item active" aria-current="page">Vehicle Monitoring</li>
       </ol>
     </div>
+
+    <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="error = ''" />
 
     <!-- Page Title -->
     <div class="row mb-3">
@@ -146,7 +148,7 @@
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover table-sm align-middle mb-0 table-grid-lines table-nowrap">
-                    <thead class="thead-app-dark bg-dark text-white">
+                    <thead class="thead-app-dark">
                         <tr>
                             <th class="py-2 ps-4">vehicle ID</th>
                             <th class="py-2">Vehicle Type/Model</th>
@@ -160,7 +162,11 @@
                     </thead>
                     <tbody>
                         <tr v-if="loading">
-                            <td colspan="8" class="text-center py-4">Loading...</td>
+                            <td colspan="8" class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </td>
                         </tr>
                         <tr v-else-if="paginatedVehicles.length === 0">
                             <td colspan="8" class="text-center py-4">No vehicles found</td>
@@ -200,39 +206,28 @@
                 </table>
             </div>
         </div>
-    </div>
-
-    <!-- Pagination (Outside Card) -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div class="text-muted small">
-            Showing {{ paginationStart }} to {{ paginationEnd }} of {{ filteredVehicles.length }} results
+        <!-- Pagination -->
+        <div class="card-footer d-flex align-items-center py-2">
+            <div class="text-muted small me-auto">
+                Showing {{ paginationStart }} to {{ paginationEnd }} of {{ filteredVehicles.length }} results
+            </div>
+            <nav aria-label="Page navigation" class="ms-auto">
+                <ul class="pagination pagination-sm mb-0 pagination-app">
+                    <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                        <button class="page-link" @click="changePage(currentPage - 1)">‹</button>
+                    </li>
+                    <li class="page-item" v-for="page in visiblePages" :key="page" :class="{ active: currentPage === page }">
+                        <button class="page-link" @click="changePage(page)">
+                            {{ page }}
+                        </button>
+                    </li>
+                    <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                        <button class="page-link" @click="changePage(currentPage + 1)">›</button>
+                    </li>
+                </ul>
+            </nav>
         </div>
-        <nav aria-label="Page navigation">
-            <ul class="pagination pagination-sm mb-0 gap-1">
-                <li class="page-item" :class="{ disabled: currentPage === 1 }">
-                    <button class="page-link border-0 rounded"
-                        :class="currentPage === 1 ? 'bg-secondary-subtle text-muted' : 'bg-dark text-white'"
-                        @click="changePage(currentPage - 1)">
-                        <i class="bi bi-chevron-left"></i>
-                    </button>
-                </li>
-                <li class="page-item" v-for="page in visiblePages" :key="page" :class="{ active: currentPage === page }">
-                    <button class="page-link border-0 rounded" :class="currentPage === page ? 'bg-dark text-white' : 'bg-white text-dark shadow-sm'" @click="changePage(page)">
-                        {{ page }}
-                    </button>
-                </li>
-                <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-                    <button class="page-link border-0 rounded"
-                        :class="currentPage === totalPages ? 'bg-secondary-subtle text-muted' : 'bg-dark text-white'"
-                        @click="changePage(currentPage + 1)">
-                        <i class="bi bi-chevron-right"></i>
-                    </button>
-                </li>
-            </ul>
-        </nav>
     </div>
-
-
 
     <!-- Alert Detail Modal -->
     <div v-if="showAlertModal" class="driver-modal-overlay" @click.self="closeAlertModal">
@@ -439,12 +434,14 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
 import { hasPermission } from '../../auth';
+import UiAlert from '../../components/UiAlert.vue';
 
 const router = useRouter();
 
 // State
 const vehicles = ref([]);
 const loading = ref(true);
+const error = ref('');
 const searchQuery = ref('');
 const refreshOptions = ['30s', '1m', '2m', '3m', '4m', '5m', '10m', 'Off'];
 const selectedRefresh = ref(7); // Default Off
@@ -551,6 +548,7 @@ const formatDate = (dateStr) => {
 
 const fetchVehicles = async () => {
     try {
+        error.value = '';
         const { data } = await axios.get('/web/monitoring/vehicles', { params: { per_page: 50 } });
         const list = Array.isArray(data) ? data : (data.data ?? []);
 
@@ -597,6 +595,7 @@ const fetchVehicles = async () => {
 
     } catch (e) {
         console.error("Failed to fetch vehicles", e);
+        error.value = 'Failed to load vehicles.';
     } finally {
         loading.value = false;
     }
@@ -830,21 +829,4 @@ onUnmounted(() => {
 }
 
 .modal-header h5 { font-size: 1.25rem; }
-
-/* Table Styles */
-.table th {
-    font-weight: 500;
-    font-size: 0.875rem;
-    white-space: nowrap;
-}
-.table td {
-    font-size: 0.875rem;
-    vertical-align: middle;
-}
-.bg-success-subtle {
-    background-color: #d1e7dd;
-}
-.bg-danger-subtle {
-    background-color: #f8d7da;
-}
 </style>

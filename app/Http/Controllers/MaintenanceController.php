@@ -7,6 +7,7 @@ use App\Services\DeviceService;
 use Illuminate\Http\Request;
 use App\Models\Devices;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 
 class MaintenanceController extends Controller
 {
@@ -54,6 +55,22 @@ class MaintenanceController extends Controller
             $maintenance = array_values($maintenance);
         }
 
+        // Fetch assigned devices for each maintenance record
+        // This might be N+1 query problem if not careful, but for now we iterate.
+        // Traccar API doesn't support "include=devices" in maintenance list easily.
+        foreach ($maintenance as &$item) {
+            // Check attributes for device_ids (Source of Truth)
+            if (isset($item['attributes']['device_ids']) && is_array($item['attributes']['device_ids'])) {
+                $item['deviceIds'] = $item['attributes']['device_ids'];
+            } else {
+                // Fallback to fetching from API (Legacy / Traccar Permissions)
+                $assignedDevices = $this->maintenanceService->getDevicesForMaintenance($request, $item['id']);
+                $item['deviceIds'] = $assignedDevices ? array_map(function($d) {
+                    return (int) (is_array($d) ? $d['id'] : $d->id);
+                }, $assignedDevices) : [];
+            }
+        }
+
         return response()->json($maintenance);
     }
 
@@ -67,7 +84,29 @@ class MaintenanceController extends Controller
             'deviceId' => 'nullable' // 0 or null for all, or specific ID
         ]);
 
+        // 1. Calculate Target Device IDs
+        $targetDeviceIds = [];
+        if ($request->has('deviceId')) {
+            $deviceId = $request->input('deviceId');
+
+            // Get allowed devices
+            $allowedOptions = $this->vehicleOptions($request)->getData(true);
+            $allowedDeviceIds = array_map('intval', array_column($allowedOptions, 'id'));
+
+            if ($deviceId === 'all' || $deviceId === 0 || $deviceId === '0') {
+                $targetDeviceIds = $allowedDeviceIds;
+            } elseif (!empty($deviceId)) {
+                $dIdInt = (int)$deviceId;
+                if (in_array($dIdInt, $allowedDeviceIds)) {
+                    $targetDeviceIds = [$dIdInt];
+                }
+            }
+            $targetDeviceIds = array_values($targetDeviceIds);
+        }
+
         $data = $request->only(['name', 'type', 'start', 'period']);
+
+        $attributes = [];
 
         // Add managerId to attributes
         $user = $request->user();
@@ -79,7 +118,16 @@ class MaintenanceController extends Controller
         }
 
         if ($managerId !== null) {
-            $data['attributes'] = ['managerId' => $managerId];
+            $attributes['managerId'] = $managerId;
+        }
+
+        // Add device_ids to attributes
+        if (!empty($targetDeviceIds)) {
+            $attributes['device_ids'] = $targetDeviceIds;
+        }
+
+        if (!empty($attributes)) {
+            $data['attributes'] = $attributes;
         }
 
         // Create Maintenance
@@ -95,28 +143,21 @@ class MaintenanceController extends Controller
 
         $maintenance = json_decode($resp->response, true);
 
-        if (isset($maintenance['id'])) {
-            $deviceId = $request->input('deviceId');
-
-            if ($deviceId === 'all' || $deviceId === 0) {
-                // Assign to all allowed devices
-                // Use getData(true) to get array from JsonResponse
-                $allowedOptions = $this->vehicleOptions($request)->getData(true);
-
-                foreach ($allowedOptions as $device) {
-                    $dId = $device['id']; // vehicleOptions returns array with 'id' key
-                     $this->maintenanceService->assignToDevice($request, $maintenance['id'], $dId);
-                }
-            } elseif (!empty($deviceId)) {
-                $this->maintenanceService->assignToDevice($request, $maintenance['id'], $deviceId);
+        if (isset($maintenance['id']) && !empty($targetDeviceIds)) {
+            // Sync Permissions (Legacy)
+            foreach ($targetDeviceIds as $dId) {
+                $this->maintenanceService->assignToDevice($request, $maintenance['id'], $dId);
             }
         }
+
+        $maintenance['deviceIds'] = $targetDeviceIds;
 
         return response()->json($maintenance);
     }
 
     public function update(Request $request, $id)
     {
+        // dd($request->all());
         $request->validate([
             'name' => 'required|string',
             'type' => 'required|string',
@@ -125,9 +166,33 @@ class MaintenanceController extends Controller
             'deviceId' => 'nullable'
         ]);
 
+        // 1. Calculate Target Device IDs (needed for attributes)
+        $targetDeviceIds = [];
+        if ($request->has('deviceId')) {
+            $deviceId = $request->input('deviceId');
+
+            // Get allowed devices
+            $allowedOptions = $this->vehicleOptions($request)->getData(true);
+            $allowedDeviceIds = array_map('intval', array_column($allowedOptions, 'id'));
+
+            if ($deviceId === 'all' || $deviceId === 0 || $deviceId === '0') {
+                $targetDeviceIds = $allowedDeviceIds;
+            } elseif (!empty($deviceId)) {
+                $dIdInt = (int)$deviceId;
+                if (in_array($dIdInt, $allowedDeviceIds)) {
+                    $targetDeviceIds = [$dIdInt];
+                }
+            }
+            // Ensure array is values only
+            $targetDeviceIds = array_values($targetDeviceIds);
+        }
+
         $data = $request->only(['name', 'type', 'start', 'period']);
 
-        // Add managerId to attributes
+        // Prepare Attributes
+        $attributes = [];
+
+        // Add managerId
         $user = $request->user();
         $managerId = null;
         if ($user->role === User::ROLE_USER) {
@@ -135,9 +200,17 @@ class MaintenanceController extends Controller
         } elseif ($user->role === User::ROLE_FLEET_MANAGER) {
             $managerId = $user->id;
         }
-
         if ($managerId !== null) {
-            $data['attributes'] = ['managerId' => $managerId];
+            $attributes['managerId'] = $managerId;
+        }
+
+        // Add device_ids if we have them
+        if ($request->has('deviceId')) {
+             $attributes['device_ids'] = $targetDeviceIds;
+        }
+
+        if (!empty($attributes)) {
+            $data['attributes'] = $attributes;
         }
 
         $resp = $this->maintenanceService->update($request, $id, $data);
@@ -152,47 +225,44 @@ class MaintenanceController extends Controller
 
         $maintenance = json_decode($resp->response, true);
 
-        // Update assignment
+        // Update assignment (Permissions) - Legacy/Sync attempt
+        // We still try to update permissions for other Traccar features, but we rely on attributes for display.
         if ($request->has('deviceId')) {
-            $deviceId = $request->input('deviceId');
 
-            // 1. Get allowed devices using vehicleOptions logic
-            // Use getData(true) to get array from JsonResponse
-            $allowedOptions = $this->vehicleOptions($request)->getData(true);
-            $allowedDeviceIds = array_column($allowedOptions, 'id');
-
-            // 2. Get current assignments from tracking server (scoped to this maintenance)
+            // 2. Get current assignments from tracking server (for diffing)
             $currentAssignedDevices = $this->maintenanceService->getDevicesForMaintenance($request, $id);
-            $currentDeviceIds = array_map(function($d) {
-                return is_array($d) ? $d['id'] : $d->id;
-            }, $currentAssignedDevices);
 
-            // Filter current assignments to only those we are allowed to see/manage
-            // This prevents unassigning devices that the user doesn't have access to
-            $visibleCurrentDeviceIds = array_intersect($currentDeviceIds, $allowedDeviceIds);
-
-            // 3. Determine Target Device IDs
-            $targetDeviceIds = [];
-            if ($deviceId === 'all' || $deviceId === 0) {
-                // Target is ALL ALLOWED devices
-                $targetDeviceIds = $allowedDeviceIds;
-            } elseif (!empty($deviceId)) {
-                // Target is specific device. Verify it is allowed.
-                if (in_array($deviceId, $allowedDeviceIds)) {
-                    $targetDeviceIds = [$deviceId];
-                }
+            $currentDeviceIds = [];
+            if ($currentAssignedDevices !== null) {
+                $currentDeviceIds = array_map(function($d) {
+                    return (int) (is_array($d) ? $d['id'] : $d->id);
+                }, $currentAssignedDevices);
             }
 
-            // 4. Calculate Diff (using only visible/allowed devices)
-            $toAdd = array_diff($targetDeviceIds, $visibleCurrentDeviceIds);
-            $toRemove = array_diff($visibleCurrentDeviceIds, $targetDeviceIds);
+            // We re-calculate allowedDeviceIds just to be safe (already done above)
+            $allowedOptions = $this->vehicleOptions($request)->getData(true);
+            $allowedDeviceIds = array_map('intval', array_column($allowedOptions, 'id'));
 
+            $visibleCurrentDeviceIds = array_intersect($currentDeviceIds, $allowedDeviceIds);
+
+            // 4. Reset Strategy: Remove all current (visible), then add all target
+            $toAdd = $targetDeviceIds;
+            $toRemove = $visibleCurrentDeviceIds;
+
+            $debugLog = [];
+
+            foreach ($toRemove as $dId) {
+                $res = $this->maintenanceService->removeAssignment($request, $id, $dId);
+                // Log but ignore failures since Traccar API is buggy for DELETE
+            }
             foreach ($toAdd as $dId) {
                 $this->maintenanceService->assignToDevice($request, $id, $dId);
             }
-            foreach ($toRemove as $dId) {
-                $this->maintenanceService->removeAssignment($request, $id, $dId);
-            }
+        }
+
+        // Return updated object with deviceIds from our calculation (Source of Truth)
+        if ($request->has('deviceId')) {
+            $maintenance['deviceIds'] = $targetDeviceIds;
         }
 
         return response()->json($maintenance);

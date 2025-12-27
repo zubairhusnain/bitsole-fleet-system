@@ -687,13 +687,32 @@ class VehicleController extends Controller
         $ids = is_array($ids) ? $ids : [$ids];
         $ids = array_values(array_filter(array_map('intval', $ids), fn($v) => $v > 0));
         $results = [];
+       
         foreach ($ids as $geoId) {
             try {
                 $resp = $this->permissionService->assignGeofence($request, $deviceId, $geoId, 'POST');
-                $results[] = ['geofenceId' => $geoId, 'ok' => true, 'response' => $resp->response ?? null];
+                $code = (int) ($resp->responseCode ?? 0);
+                if ($code >= 200 && $code < 300) {
+                    $results[] = ['geofenceId' => $geoId, 'ok' => true, 'response' => $resp->response ?? null];
+                } else {
+                    $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $resp->response ?? 'Traccar error', 'code' => $code];
+                }
             } catch (\Throwable $e) {
                 $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $e->getMessage()];
             }
+        }
+
+        $hasError = false;
+        $firstError = '';
+        foreach ($results as $res) {
+            if (!$res['ok']) {
+                $hasError = true;
+                $firstError = $res['error'] ?? 'Unknown error';
+                break;
+            }
+        }
+        if ($hasError) {
+             return response()->json(['message' => 'Failed to assign zones: ' . $firstError, 'assigned' => $results], 400);
         }
         return response()->json(['assigned' => $results]);
     }
@@ -710,10 +729,28 @@ class VehicleController extends Controller
         foreach ($ids as $geoId) {
             try {
                 $resp = $this->permissionService->assignGeofence($request, $deviceId, $geoId, 'DELETE');
-                $results[] = ['geofenceId' => $geoId, 'ok' => true, 'response' => $resp->response ?? null];
+                $code = (int) ($resp->responseCode ?? 0);
+                if ($code >= 200 && $code < 300) {
+                    $results[] = ['geofenceId' => $geoId, 'ok' => true, 'response' => $resp->response ?? null];
+                } else {
+                    $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $resp->response ?? 'Traccar error', 'code' => $code];
+                }
             } catch (\Throwable $e) {
                 $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $e->getMessage()];
             }
+        }
+
+        $hasError = false;
+        $firstError = '';
+        foreach ($results as $res) {
+            if (!$res['ok']) {
+                $hasError = true;
+                $firstError = $res['error'] ?? 'Unknown error';
+                break;
+            }
+        }
+        if ($hasError) {
+             return response()->json(['message' => 'Failed to unassign zones: ' . $firstError, 'unassigned' => $results], 400);
         }
         return response()->json(['unassigned' => $results]);
     }

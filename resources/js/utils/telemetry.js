@@ -99,8 +99,7 @@ export function formatOdometer(rawAttrs, ctx = {}) {
   const skipConversion = (keyFound === '389') || (keyLower === 'obd_total_mileage_389');
 
   if (!skipConversion) km = num / 1000;
-  console.log('odometer in km or meter ',km,num,keyFound);
-;  return {
+  return {
     key: keyFound,
     raw: rawVal,
     km,

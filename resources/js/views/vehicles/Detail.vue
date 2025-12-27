@@ -838,8 +838,25 @@ watch(showZones, (val) => {
 
 const visibleZones = computed(() => {
     if (!showZones.value) return [];
-    return geofences.value.map(z => {
-        const attr = z.attributes || {};
+
+    // Deduplicate geofences by ID
+    const uniqueGeofences = [];
+    const seenIds = new Set();
+
+    geofences.value.forEach(z => {
+        if (!seenIds.has(z.id)) {
+            seenIds.add(z.id);
+            uniqueGeofences.push(z);
+        }
+    });
+
+    return uniqueGeofences.map(z => {
+        let attr = z.attributes || {};
+        // Parse attributes if string
+        if (typeof attr === 'string') {
+            try { attr = JSON.parse(attr); } catch(e) { attr = {}; }
+        }
+
         let center = null;
 
         // Try to get center from circle attributes
@@ -867,12 +884,15 @@ const visibleZones = computed(() => {
         }
 
         if (center) {
-            return {
-                id: z.id,
-                center: center,
-                name: z.name,
-                description: z.description
-            };
+            // Validate center coordinates
+            if (Number.isFinite(center[0]) && Number.isFinite(center[1])) {
+                return {
+                    id: z.id,
+                    center: center,
+                    name: z.name,
+                    description: z.description
+                };
+            }
         }
         return null;
     }).filter(z => z);
@@ -901,18 +921,23 @@ const redIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-// Route handling with Leaflet Routing Machine
-const routingControl = ref(null);
-const mapInstance = ref(null);
-
-function initRouting() {
-    // Ensure we have map, library, and haven't initialized yet
-    if (!mapInstance.value || typeof L === 'undefined' || !L.Routing || routingControl.value) {
-        return;
-    }
-
-    try {
-        routingControl.value = L.Routing.control({
+let mapInstance = null;
+let routingControl = null;
+function routingErrorMessage(e) {
+    const status = e?.error?.status ?? e?.error?.target?.status ?? null;
+    if (status === 400) return 'Unable to draw route lines between vehicle and zones.';
+    if (status === 429) return 'Route service is busy. Please try again in a moment.';
+    if (status === 0 || status === -1) return 'Network error while drawing route. Please check your connection.';
+    const msgRaw = e?.error?.message ?? e?.message ?? '';
+    if (typeof msgRaw === 'string' && msgRaw.toLowerCase().includes('failed')) return 'Unable to draw route lines between vehicle and zones.';
+    return 'Unable to draw route lines between vehicle and zones.';
+}
+ 
+ function initRouting() {
+     if (!mapInstance || typeof L === 'undefined' || !L.Routing || routingControl) return;
+ 
+     try {
+        routingControl = L.Routing.control({
             waypoints: [],
             routeWhileDragging: false,
             showAlternatives: false,
@@ -921,46 +946,62 @@ function initRouting() {
             lineOptions: {
                 styles: [{ color: '#6610f2', weight: 4, opacity: 0.7 }]
             },
-            createMarker: function() { return null; } // Hide default routing markers
-        }).addTo(mapInstance.value);
+            createMarker: function() { return null; }
+        }).addTo(mapInstance);
 
-        // Hide the instructions container (itinerary)
-        const container = routingControl.value.getContainer();
-        if (container) {
-            container.style.display = 'none';
-        }
-
-        updateRouting();
-    } catch (e) {
-        console.error('Failed to initialize routing control', e);
-    }
-}
+         const container = routingControl.getContainer();
+         if (container) container.style.display = 'none';
+ 
+         // Listen for routing errors
+         routingControl.on('routingerror', (e) => {
+            error.value = routingErrorMessage(e);
+         });
+ 
+         updateRouting();
+     } catch (e) {
+        error.value = 'Unable to draw route lines between vehicle and zones.';
+     }
+ }
 
 function onMapReady(map) {
-    mapInstance.value = map;
+    mapInstance = map;
     initRouting();
 }
 
 function updateRouting() {
-    if (!routingControl.value || !currentLatLng.value) return;
+    if (!routingControl || !currentLatLng.value) return;
+
+    // Validate current position
+    const cur = currentLatLng.value;
+    if (!Array.isArray(cur) || !Number.isFinite(cur[0]) || !Number.isFinite(cur[1])) return;
 
     const waypoints = [];
     if (showZones.value && visibleZones.value.length > 0) {
-        const deviceLoc = L.latLng(currentLatLng.value[0], currentLatLng.value[1]);
+        const deviceLoc = L.latLng(cur[0], cur[1]);
 
-        // Logic from backup file: Device -> Device -> Zone1 -> Device -> Zone2 ...
-        // This ensures every segment starts from the device location.
+        // Star pattern: Device -> Zone 1 -> Device -> Zone 2...
         waypoints.push(deviceLoc);
 
+        let validZoneCount = 0;
         visibleZones.value.forEach(zone => {
-            const zoneLoc = L.latLng(zone.center[0], zone.center[1]);
-            waypoints.push(deviceLoc);
-            waypoints.push(zoneLoc);
+            if (zone.center && Number.isFinite(zone.center[0]) && Number.isFinite(zone.center[1])) {
+                waypoints.push(L.latLng(zone.center[0], zone.center[1]));
+                waypoints.push(deviceLoc);
+                validZoneCount++;
+            }
         });
 
-        routingControl.value.setWaypoints(waypoints);
-    } else {
-        routingControl.value.setWaypoints([]);
+         if (validZoneCount > 0) {
+             try {
+                 routingControl.setWaypoints(waypoints);
+             } catch(e) {
+                error.value = routingErrorMessage(e);
+             }
+         } else {
+              routingControl.setWaypoints([]);
+         }
+     } else {
+        routingControl.setWaypoints([]);
     }
 }
 
@@ -1397,7 +1438,6 @@ function armPollingFallback() {
 
 // Static view enhanced: fetch detail for dynamic content and weekly trips
 onMounted(async () => {
-    // Fix for Leaflet Routing Machine relying on global L
     if (typeof window !== 'undefined') {
         window.L = L;
         try {
@@ -1411,6 +1451,7 @@ onMounted(async () => {
     pageLoading.value = true;
     mapReady.value = true;
     window.addEventListener('resize', handleResize);
+
     const perfPromise = fetchPerformance();
     // Load device options for switcher in background (do not await)
     try { fetchDeviceOptions(); } catch {}
@@ -1448,6 +1489,10 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
     window.removeEventListener('resize', handleResize);
+    if (routingControl) {
+        try { routingControl.remove(); } catch (e) {}
+        routingControl = null;
+    }
     if (typeof unsubEcho === 'function') { try { unsubEcho(); } catch (e) { } }
 });
 
