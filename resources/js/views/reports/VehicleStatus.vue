@@ -98,14 +98,14 @@
 import { ref } from 'vue';
 
 const rows = ref([
-  { id: 'VHCL-1001', owner: 'AMT - Sime Darby Rent A Car S...', type: 'MPV • STARIA 2.2V', device: 'FMC130', imei: '864292044667002', iccid: '8960012002723151360', odo: '181141', power: '13.4V' },
-  { id: 'VHCL-1002', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry', device: 'FMC130', imei: '864292044667002', iccid: '8960012002723151360', odo: '181141', power: '13.6V' },
-  { id: 'VHCL-1002', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry 2.5V', device: 'FMC130', imei: '864292044667002', iccid: '8960012002723151360', odo: '181141', power: '13.8V' },
-  { id: 'VHCL-1003', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry', device: 'FMC130', imei: '864292044667002', iccid: '8960012002723151360', odo: '181141', power: '13.8V' },
-  { id: 'VHCL-1004', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry 2.5V', device: 'FMC130', imei: '864292044667002', iccid: '8960012002723151360', odo: '181141', power: '14.0V' },
-  { id: 'VHCL-1005', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry', device: 'FMC130', imei: '864292044667002', iccid: '8960012002723151360', odo: '181141', power: '14.4V' },
-  { id: 'VHCL-1006', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry', device: 'FMC130', imei: '864292044667002', iccid: '8960012002723151360', odo: '181141', power: '14.6V' },
-  { id: 'VHCL-1003', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry', device: 'FMC130', imei: '864292044667002', iccid: '8960012002723151360', odo: '181141', power: '13.8V' },
+  { id: 'VHCL-1001', owner: 'AMT - Sime Darby Rent A Car S...', type: 'MPV • STARIA 2.2V', device: 'FMC130', imei: '864292044667001', iccid: '8960012002723151361', odo: '181,141', power: '13.4V' },
+  { id: 'VHCL-1002', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry 2.5V', device: 'FMC130', imei: '864292044667002', iccid: '8960012002723151362', odo: '154,230', power: '13.6V' },
+  { id: 'VHCL-1003', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry', device: 'FMC130', imei: '864292044667003', iccid: '8960012002723151363', odo: '120,450', power: '13.8V' },
+  { id: 'VHCL-1004', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry 2.5V', device: 'FMC130', imei: '864292044667004', iccid: '8960012002723151364', odo: '198,700', power: '14.0V' },
+  { id: 'VHCL-1005', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry', device: 'FMC130', imei: '864292044667005', iccid: '8960012002723151365', odo: '165,890', power: '14.4V' },
+  { id: 'VHCL-1006', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry', device: 'FMC130', imei: '864292044667006', iccid: '8960012002723151366', odo: '142,300', power: '14.6V' },
+  { id: 'VHCL-1007', owner: 'AMT - Sime Darby Rent A Car S...', type: 'MPV • STARIA 2.2V', device: 'FMC130', imei: '864292044667007', iccid: '8960012002723151367', odo: '175,600', power: '13.9V' },
+  { id: 'VHCL-1008', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry', device: 'FMC130', imei: '864292044667008', iccid: '8960012002723151368', odo: '133,450', power: '14.1V' },
 ]);
 </script>
 

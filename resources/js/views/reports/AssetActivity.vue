@@ -100,13 +100,13 @@
           <table class="table table-sm align-middle mb-0 table-striped">
             <thead class="table-dark">
               <tr>
-                <th>(Hours)</th>
+                <th>Activity Duration (Hours)</th>
                 <th class="text-center">Idling Duration (Hours)</th>
-                <th class="text-center">Utilisation(%)</th>
+                <th class="text-center">Utilisation (%)</th>
                 <th class="text-center">Avg. Fuel Consumption</th>
                 <th class="text-center">Fuel Refill (L)</th>
                 <th class="text-center">Fuel Refill (Frequency)</th>
-                <th class="text-center">Speed (Km/h)</th>
+                <th class="text-center">Max Speed (Km/h)</th>
                 <th class="text-center">Action</th>
               </tr>
               <tr class="text-muted">
@@ -114,15 +114,15 @@
                 <th class="text-center">Total • Avg. Per Day</th>
                 <th class="text-center">—</th>
                 <th class="text-center">Avg. Litres • Avg. KM/L</th>
-                <th class="text-center">—</th>
-                <th class="text-center">—</th>
+                <th class="text-center">Total</th>
+                <th class="text-center">Count</th>
                 <th class="text-center">—</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="row in rows" :key="row.key">
-                <td>{{ row.avgPerDay }}</td>
+                <td>{{ row.activePerDay }}</td>
                 <td class="text-center">{{ row.idleTotal }} • {{ row.idlePerDay }}</td>
                 <td class="text-center">{{ row.util }}</td>
                 <td class="text-center">{{ row.avgLitres }} • {{ row.avgKml }}</td>
@@ -130,8 +130,8 @@
                 <td class="text-center">{{ row.refillFreq }}</td>
                 <td class="text-center">{{ row.speed }}</td>
                 <td class="text-center">
-                  <i class="bi bi-eye text-primary me-2"></i>
-                  <i class="bi bi-trash text-danger"></i>
+                  <i class="bi bi-eye text-primary me-2" role="button"></i>
+                  <i class="bi bi-trash text-danger" role="button"></i>
                 </td>
               </tr>
             </tbody>
@@ -139,15 +139,13 @@
         </div>
       </div>
       <div class="card-footer d-flex align-items-center py-2">
-        <div class="text-muted small me-auto">Showing 1 to 16 of 1079 results</div>
+        <div class="text-muted small me-auto">Showing 1 to 10 of 10 results</div>
         <nav aria-label="Pagination" class="ms-auto">
           <ul class="pagination pagination-sm mb-0 pagination-app">
             <li class="page-item disabled"><button class="page-link">‹</button></li>
             <li class="page-item active"><button class="page-link">1</button></li>
             <li class="page-item"><button class="page-link">2</button></li>
             <li class="page-item"><button class="page-link">3</button></li>
-            <li class="page-item"><button class="page-link">4</button></li>
-            <li class="page-item"><button class="page-link">5</button></li>
             <li class="page-item"><button class="page-link">›</button></li>
           </ul>
         </nav>
@@ -160,16 +158,16 @@
 import { ref } from 'vue';
 
 const rows = ref([
-  { key: 1, avgPerDay: '175.6', idleTotal: '5680.5', idlePerDay: '175.6', util: 'B345-3920-5436', avgLitres: '412.75', avgKml: '175.6', refillL: '321,450 KM', refillFreq: '12', speed: '0 km/h' },
-  { key: 2, avgPerDay: '130.0', idleTotal: '3000.8', idlePerDay: '130.0', util: 'C567-3890-2845', avgLitres: '298.90', avgKml: '130.0', refillL: '154,200 KM', refillFreq: '10', speed: '0 km/h' },
-  { key: 3, avgPerDay: '140.2', idleTotal: '4550.0', idlePerDay: '140.2', util: 'D666-2399-7743', avgLitres: '376.85', avgKml: '140.2', refillL: '245,600 KM', refillFreq: '9', speed: '0 km/h' },
-  { key: 4, avgPerDay: '160.4', idleTotal: '5000.4', idlePerDay: '160.4', util: 'A123-8470-9032', avgLitres: '450.00', avgKml: '160.4', refillL: '290,300 KM', refillFreq: '11', speed: '0 km/h' },
-  { key: 5, avgPerDay: '190.5', idleTotal: '6200.7', idlePerDay: '190.5', util: 'E890-5623-0012', avgLitres: '520.25', avgKml: '190.5', refillL: '410,100 KM', refillFreq: '14', speed: '0 km/h' },
-  { key: 6, avgPerDay: '145.8', idleTotal: '4500.1', idlePerDay: '145.8', util: 'F234-9502-1287', avgLitres: '389.90', avgKml: '145.8', refillL: '123,000 KM', refillFreq: '7', speed: '0 km/h' },
-  { key: 7, avgPerDay: '155.4', idleTotal: '4700.3', idlePerDay: '155.4', util: 'G456-7321-8745', avgLitres: '395.75', avgKml: '155.4', refillL: '200,900 KM', refillFreq: '8', speed: '0 km/h' },
-  { key: 8, avgPerDay: '185.0', idleTotal: '5200.2', idlePerDay: '185.0', util: 'H789-3491-0010', avgLitres: '460.80', avgKml: '185.0', refillL: '370,200 KM', refillFreq: '13', speed: '0 km/h' },
-  { key: 9, avgPerDay: '210.7', idleTotal: '5900.6', idlePerDay: '210.7', util: 'I901-4783-5629', avgLitres: '510.55', avgKml: '210.7', refillL: '500,300 KM', refillFreq: '15', speed: '0 km/h' },
-  { key: 10, avgPerDay: '195.2', idleTotal: '5300.9', idlePerDay: '195.2', util: 'J876-5432-1098', avgLitres: '485.60', avgKml: '195.2', refillL: '380,450 KM', refillFreq: '12', speed: '0 km/h' },
+  { key: 1, activePerDay: '8.5', idleTotal: '42.5', idlePerDay: '4.2', util: '85%', avgLitres: '12.5', avgKml: '8.2', refillL: '450', refillFreq: '3', speed: '95' },
+  { key: 2, activePerDay: '7.2', idleTotal: '35.0', idlePerDay: '3.5', util: '78%', avgLitres: '10.8', avgKml: '9.5', refillL: '380', refillFreq: '2', speed: '88' },
+  { key: 3, activePerDay: '9.1', idleTotal: '55.2', idlePerDay: '5.5', util: '92%', avgLitres: '14.2', avgKml: '7.8', refillL: '520', refillFreq: '4', speed: '102' },
+  { key: 4, activePerDay: '6.5', idleTotal: '28.4', idlePerDay: '2.8', util: '65%', avgLitres: '9.5', avgKml: '10.2', refillL: '320', refillFreq: '2', speed: '85' },
+  { key: 5, activePerDay: '8.8', idleTotal: '48.6', idlePerDay: '4.8', util: '88%', avgLitres: '13.5', avgKml: '8.0', refillL: '480', refillFreq: '3', speed: '98' },
+  { key: 6, activePerDay: '7.9', idleTotal: '38.2', idlePerDay: '3.8', util: '82%', avgLitres: '11.8', avgKml: '8.8', refillL: '410', refillFreq: '3', speed: '92' },
+  { key: 7, activePerDay: '5.5', idleTotal: '22.0', idlePerDay: '2.2', util: '55%', avgLitres: '8.2', avgKml: '11.5', refillL: '250', refillFreq: '1', speed: '80' },
+  { key: 8, activePerDay: '9.5', idleTotal: '60.5', idlePerDay: '6.0', util: '95%', avgLitres: '15.5', avgKml: '7.2', refillL: '580', refillFreq: '4', speed: '105' },
+  { key: 9, activePerDay: '6.8', idleTotal: '32.5', idlePerDay: '3.2', util: '72%', avgLitres: '10.2', avgKml: '9.8', refillL: '350', refillFreq: '2', speed: '86' },
+  { key: 10, activePerDay: '8.2', idleTotal: '45.0', idlePerDay: '4.5', util: '86%', avgLitres: '12.8', avgKml: '8.5', refillL: '460', refillFreq: '3', speed: '94' },
 ]);
 </script>
 

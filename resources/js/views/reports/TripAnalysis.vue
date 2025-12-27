@@ -68,8 +68,8 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="r in rowsDailyBreakdown" :key="r.key">
-                  <td class="ps-3"><a href="#" class="text-decoration-none" :class="r.key === 8 ? 'text-primary fw-semibold' : ''">{{ r.date }}</a></td>
+                <tr v-for="r in rowsDailyTrips" :key="r.key">
+                  <td class="ps-3"><a href="#" class="text-decoration-none" :class="r.key === 1 ? 'text-primary fw-semibold' : ''">{{ r.date }}</a></td>
                   <td>{{ r.startTime }}</td>
                   <td class="text-primary">{{ r.startLocation }}</td>
                   <td><span class="badge bg-danger-subtle text-danger border">OUT PC</span></td>
@@ -83,15 +83,11 @@
           </div>
         </div>
         <div class="card-footer d-flex align-items-center py-2 bg-white border-top">
-            <div class="text-muted small me-auto">Showing 1 to 18 of 1079 results</div>
+            <div class="text-muted small me-auto">Showing 1 to {{ rowsDailyTrips.length }} of {{ rowsDailyTrips.length }} results</div>
             <nav aria-label="Pagination" class="ms-auto">
               <ul class="pagination pagination-sm mb-0 pagination-app">
                 <li class="page-item disabled"><button class="page-link"><i class="bi bi-chevron-left"></i></button></li>
                 <li class="page-item active"><button class="page-link">1</button></li>
-                <li class="page-item"><button class="page-link">2</button></li>
-                <li class="page-item"><button class="page-link">3</button></li>
-                <li class="page-item"><button class="page-link">4</button></li>
-                <li class="page-item"><button class="page-link">5</button></li>
                 <li class="page-item"><button class="page-link"><i class="bi bi-chevron-right"></i></button></li>
               </ul>
             </nav>
@@ -103,54 +99,25 @@
       <div class="card border rounded-3 shadow-0">
         <div class="card-body p-0">
           <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0 table-striped w-100 text-nowrap">
+            <table class="table table-sm align-middle mb-0 table-striped">
               <thead class="table-dark">
                 <tr>
-                  <th rowspan="2" class="align-middle ps-3">Vehicle ID</th>
-                  <th rowspan="2" class="align-middle">Vehicles Name</th>
-                  <th colspan="2" class="text-center border-bottom border-secondary">Travelled Distance (KM)</th>
-                  <th colspan="2" class="text-center border-bottom border-secondary">Trip Duration (Hours)</th>
-                  <th colspan="2" class="text-center border-bottom border-secondary">Idling Duration (Hours)</th>
-                  <th rowspan="2" class="align-middle">Utilisation(%)</th>
-                  <th colspan="2" class="text-center border-bottom border-secondary">Avg. Fuel Consumption</th>
-                  <th rowspan="2" class="align-middle">Fuel Refill (L)</th>
-                  <th rowspan="2" class="align-middle">Fuel Refill<br>(Frequency)</th>
-                  <th rowspan="2" class="align-middle">Speed (Km/h)</th>
-                  <th rowspan="2" class="align-middle pe-3">Action</th>
-                </tr>
-                <tr>
-                  <th class="bg-custom-blue text-white text-center">Total</th>
-                  <th class="bg-custom-blue text-white text-center">Avg. Per Day</th>
-                  <th class="bg-custom-blue text-white text-center">Total</th>
-                  <th class="bg-custom-blue text-white text-center">Avg. Per Day</th>
-                  <th class="bg-custom-blue text-white text-center">Total</th>
-                  <th class="bg-custom-blue text-white text-center">Avg. Per Day</th>
-                  <th class="bg-custom-blue text-white text-center">Avg. Litres</th>
-                  <th class="bg-custom-blue text-white text-center">Avg. KM/L</th>
+                  <th class="ps-3">Date</th>
+                  <th>Vehicle ID</th>
+                  <th class="text-end">Travelled Distance</th>
+                  <th class="text-end">Trip Duration</th>
+                  <th class="text-end">Idle Duration</th>
+                  <th class="text-end pe-3">Idle Percentage</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="r in rowsDailyVehicleList" :key="r.key" :class="{ 'table-active': r.highlight }">
-                  <td class="ps-3">{{ r.vehicle }}</td>
-                  <td>{{ r.vehicleName }}</td>
-                  <td class="text-center">{{ r.distTotal }}</td>
-                  <td class="text-center">{{ r.distAvg }}</td>
-                  <td class="text-center">{{ r.tripTotal }}</td>
-                  <td class="text-center">{{ r.tripAvg }}</td>
-                  <td class="text-center">{{ r.idleTotal }}</td>
-                  <td class="text-center">{{ r.idleAvg }}</td>
-                  <td>{{ r.utilisation }}</td>
-                  <td class="text-center">{{ r.fuelAvgLitres }}</td>
-                  <td class="text-center">{{ r.fuelAvgKmL }}</td>
-                  <td>{{ r.fuelRefillL }}</td>
-                  <td class="text-center">{{ r.fuelRefillFreq }}</td>
-                  <td>{{ r.speed }}</td>
-                  <td class="pe-3">
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-sm p-0 text-primary"><i class="bi bi-eye"></i></button>
-                        <button class="btn btn-sm p-0 text-danger"><i class="bi bi-trash"></i></button>
-                    </div>
-                  </td>
+                <tr v-for="r in rowsDailyVehicleList" :key="r.key">
+                  <td class="ps-3">{{ r.date }}</td>
+                  <td class="text-primary">{{ r.vehicle }}</td>
+                  <td class="text-end">{{ r.distance }}</td>
+                  <td class="text-end">{{ r.trip }}</td>
+                  <td class="text-end">{{ r.idle }}</td>
+                  <td class="text-end pe-3">{{ r.idlePct }}</td>
                 </tr>
               </tbody>
             </table>
@@ -174,125 +141,85 @@
     </template>
 
     <template v-else-if="viewType === 'Daily Breakdown (with map)'">
-      <ReportSummary />
       <div class="card border rounded-3 shadow-0">
         <div class="card-body">
           <div class="row g-3">
             <div class="col-12 col-lg-4">
               <div class="list-group small">
-                <div class="list-group-item d-flex justify-content-between align-items-center bg-light">
-                  <div>
-                    <div class="fw-bold">26/08/2025 • Saturday</div>
-                    <div class="text-muted">126.53 KM</div>
-                  </div>
-                  <i class="bi bi-chevron-up"></i>
-                </div>
-                <div class="list-group-item p-0 border-0">
-                  <div class="bg-light border-bottom p-3">
-                    <div class="fw-semibold mb-2">Summary for 26/08/2025 • Saturday</div>
-                    <div class="row g-2">
-                      <div class="col-6">
-                        <div class="text-muted small">Total Distance</div>
-                        <div class="fw-bold">126.53 KM</div>
-                      </div>
-                      <div class="col-6">
-                        <div class="text-muted small">Total Duration</div>
-                        <div class="fw-bold">2h 8m 8s</div>
-                      </div>
-                      <div class="col-6">
-                        <div class="text-muted small">Total Idling</div>
-                        <div class="fw-bold">0</div>
-                      </div>
-                      <div class="col-6">
-                        <div class="text-muted small">Behaviour</div>
-                        <div class="fw-bold text-danger">12 SV, 1 HA</div>
-                      </div>
+                <template v-for="day in rowsDailyBreakdown" :key="day.key">
+                  <!-- Day Header -->
+                  <div class="list-group-item d-flex justify-content-between align-items-center bg-light"
+                       @click="day.isOpen = !day.isOpen"
+                       role="button">
+                    <div>
+                      <div class="fw-bold">{{ day.date }}</div>
+                      <div class="text-muted">{{ day.distance }}</div>
                     </div>
+                    <i class="bi" :class="day.isOpen ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
                   </div>
-                  <div class="list-group list-group-flush">
-                    <div class="list-group-item">
-                      <div class="d-flex gap-3">
-                        <div class="d-flex flex-column align-items-center">
-                          <div class="text-muted small">05:48 AM</div>
-                          <div class="flex-grow-1 border-start border-2 my-1"></div>
+
+                  <!-- Day Details (Timeline) -->
+                  <div v-if="day.isOpen" class="list-group-item p-0 border-0">
+                    <div v-if="day.summary" class="bg-light border-bottom p-3">
+                      <div class="fw-semibold mb-2">Summary for {{ day.summary.date }}</div>
+                      <div class="row g-2">
+                        <div class="col-6">
+                          <div class="text-muted small">Total Distance</div>
+                          <div class="fw-bold">{{ day.summary.dist }}</div>
                         </div>
-                        <div class="pb-3">
-                          <div class="fw-semibold text-primary">Start</div>
-                          <div class="small text-muted">Exit 3506, Bukit Jelutong North Intersection, Persiaran Gerbang Utama E35, 40150 Shah Alam, Selangor</div>
+                        <div class="col-6">
+                          <div class="text-muted small">Total Duration</div>
+                          <div class="fw-bold">{{ day.summary.dur }}</div>
                         </div>
-                      </div>
-                      <div class="d-flex gap-3">
-                        <div class="d-flex flex-column align-items-center">
-                          <div class="text-muted small">05:49 AM</div>
+                        <div class="col-6">
+                          <div class="text-muted small">Total Idling</div>
+                          <div class="fw-bold">{{ day.summary.idle }}</div>
                         </div>
-                        <div>
-                          <div class="fw-semibold text-primary">End</div>
-                          <div class="small text-muted">Persiaran Gerbang Utama, Bukit Jelutong</div>
-                          <div class="mt-1"><span class="badge bg-light text-dark border me-1">1KM</span> <span class="badge bg-light text-dark border">14m 59s</span></div>
+                        <div class="col-6">
+                          <div class="text-muted small">Behaviour</div>
+                          <div class="fw-bold text-danger">{{ day.summary.behav }}</div>
                         </div>
                       </div>
                     </div>
-                    <div class="list-group-item">
-                      <div class="d-flex gap-3">
-                        <div class="d-flex flex-column align-items-center">
-                          <div class="text-muted small">06:15 AM</div>
-                          <div class="flex-grow-1 border-start border-2 my-1"></div>
-                        </div>
-                        <div class="pb-3">
-                          <div class="fw-semibold text-primary">Start</div>
-                          <div class="small text-muted">Exit 3510, Bukit Jelutong East Intersection, Persiaran Gerbang Utama E35, 40150 Shah Alam, Selangor</div>
-                        </div>
-                      </div>
-                      <div class="d-flex gap-3">
-                        <div class="d-flex flex-column align-items-center">
-                          <div class="text-muted small">06:16 AM</div>
-                        </div>
-                        <div>
-                          <div class="fw-semibold text-primary">End</div>
-                          <div class="small text-muted">Persiaran Gerbang Timur, Bukit Jelutong</div>
-                          <div class="mt-1"><span class="badge bg-light text-dark border me-1">3KM</span> <span class="badge bg-light text-dark border">44m 15s</span> <span class="badge bg-danger-subtle text-danger border border-danger">12 SV</span></div>
+                    <div class="list-group list-group-flush">
+                      <div v-for="(item, idx) in day.timeline" :key="idx" class="list-group-item">
+                        <div class="d-flex gap-3">
+                          <div class="d-flex flex-column align-items-center" style="width: 60px;">
+                            <div class="text-muted small">{{ item.time }}</div>
+                            <div v-if="idx < day.timeline.length - 1 || item.type === 'start'" class="flex-grow-1 border-start border-2 my-1"></div>
+                          </div>
+                          <div class="pb-2">
+                            <div class="fw-semibold" :class="item.type === 'start' ? 'text-primary' : 'text-danger'">{{ item.type === 'start' ? 'Start' : 'End' }}</div>
+                            <div class="small text-muted">{{ item.location }}</div>
+                            <div v-if="item.dist || item.dur || item.alert" class="mt-1">
+                              <span v-if="item.dist" class="badge bg-light text-dark border me-1">{{ item.dist }}</span>
+                              <span v-if="item.dur" class="badge bg-light text-dark border me-1">{{ item.dur }}</span>
+                              <span v-if="item.alert" class="badge bg-danger-subtle text-danger border border-danger">{{ item.alert }}</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-                <div class="list-group-item d-flex justify-content-between align-items-center">
-                  <div>
-                    <div class="fw-semibold">28/08/2025 • Monday</div>
-                    <div class="text-muted">118.22 KM</div>
-                  </div>
-                  <i class="bi bi-chevron-down"></i>
-                </div>
-                 <div class="list-group-item d-flex justify-content-between align-items-center">
-                  <div>
-                    <div class="fw-semibold">29/08/2025 • Tuesday</div>
-                    <div class="text-muted">145.90 KM</div>
-                  </div>
-                  <i class="bi bi-chevron-down"></i>
-                </div>
-                 <div class="list-group-item d-flex justify-content-between align-items-center">
-                  <div>
-                    <div class="fw-semibold">30/08/2025 • Wednesday</div>
-                    <div class="text-muted">121.15 KM</div>
-                  </div>
-                  <i class="bi bi-chevron-down"></i>
-                </div>
+                </template>
               </div>
             </div>
             <div class="col-12 col-lg-8">
-              <div class="d-flex align-items-center gap-2 mb-2">
-                <button class="btn btn-sm btn-outline-secondary">Restart</button>
-                <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-skip-backward-fill"></i></button>
-                <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-play-fill"></i></button>
-                <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-pause-fill"></i></button>
-                <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-skip-forward-fill"></i></button>
-                <div class="ms-auto d-flex align-items-center gap-2">
-                  <span class="small">Slow</span>
-                  <div class="form-range w-25"><div class="progress" style="height:6px;"><div class="progress-bar" style="width:50%"></div></div></div>
-                  <span class="small">Fast</span>
-                </div>
+              <div class="position-relative h-100">
+                 <div class="position-absolute top-0 start-50 translate-middle-x mt-3 z-3 bg-white p-2 rounded-pill shadow-sm d-flex align-items-center gap-2" style="width: fit-content;">
+                    <button class="btn btn-sm btn-link text-dark text-decoration-none fw-semibold"><i class="bi bi-arrow-counterclockwise"></i> Restart</button>
+                    <div class="vr"></div>
+                    <button class="btn btn-sm btn-link text-secondary"><i class="bi bi-skip-backward-fill"></i></button>
+                    <button class="btn btn-sm btn-link text-secondary"><i class="bi bi-play-fill"></i></button>
+                    <button class="btn btn-sm btn-link text-secondary"><i class="bi bi-pause-fill"></i></button>
+                    <button class="btn btn-sm btn-link text-secondary"><i class="bi bi-skip-forward-fill"></i></button>
+                    <div class="vr"></div>
+                    <span class="small text-muted ms-1">Slow</span>
+                    <input type="range" class="form-range" style="width: 80px">
+                    <span class="small text-muted me-1">Fast</span>
+                 </div>
+                 <div ref="mapEl" style="height: 60vh; min-height: 320px;" class="rounded-3 overflow-hidden border"></div>
               </div>
-              <div ref="mapEl" style="height: 60vh; min-height: 320px;" class="rounded-3 overflow-hidden border"></div>
             </div>
           </div>
         </div>
@@ -308,20 +235,20 @@
             <table class="table table-sm align-middle mb-0 table-striped">
               <thead class="table-dark">
                 <tr>
-                  <th>Date</th>
-                  <th>Travelled Distance</th>
-                  <th>Trip Duration</th>
-                  <th>Idle Duration</th>
-                  <th>Idle Percentage</th>
+                  <th class="ps-3">Date</th>
+                  <th class="text-end">Travelled Distance</th>
+                  <th class="text-end">Trip Duration</th>
+                  <th class="text-end">Idle Duration</th>
+                  <th class="text-end pe-3">Idle Percentage</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="r in rowsDailySummary" :key="r.key">
-                  <td>{{ r.date }}</td>
-                  <td>{{ r.distance }}</td>
-                  <td>{{ r.trip }}</td>
-                  <td>{{ r.idle }}</td>
-                  <td>{{ r.idlePct }}</td>
+                  <td class="ps-3">{{ r.date }}</td>
+                  <td class="text-end">{{ r.distance }}</td>
+                  <td class="text-end">{{ r.trip }}</td>
+                  <td class="text-end">{{ r.idle }}</td>
+                  <td class="text-end pe-3">{{ r.idlePct }}</td>
                 </tr>
               </tbody>
             </table>
@@ -353,20 +280,20 @@
             <table class="table table-sm align-middle mb-0 table-striped">
               <thead class="table-dark">
                 <tr>
-                  <th>Date</th>
-                  <th>Travelled Distance</th>
-                  <th>Trip Duration</th>
-                  <th>Idle Duration</th>
-                  <th>Idle Percentage</th>
+                  <th class="ps-3">Date</th>
+                  <th class="text-end">Travelled Distance</th>
+                  <th class="text-end">Trip Duration</th>
+                  <th class="text-end">Idle Duration</th>
+                  <th class="text-end pe-3">Idle Percentage</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="r in rowsMonthlySummary" :key="r.key">
-                  <td>{{ r.date }}</td>
-                  <td>{{ r.distance }}</td>
-                  <td>{{ r.trip }}</td>
-                  <td>{{ r.idle }}</td>
-                  <td>{{ r.idlePct }}</td>
+                  <td class="ps-3">{{ r.date }}</td>
+                  <td class="text-end">{{ r.distance }}</td>
+                  <td class="text-end">{{ r.trip }}</td>
+                  <td class="text-end">{{ r.idle }}</td>
+                  <td class="text-end pe-3">{{ r.idlePct }}</td>
                 </tr>
               </tbody>
             </table>
@@ -382,22 +309,22 @@
             <table class="table table-sm align-middle mb-0 table-striped">
               <thead class="table-dark">
                 <tr>
-                  <th>Vehicle ID</th>
+                  <th class="ps-3">Vehicle ID</th>
                   <th>Date</th>
-                  <th>Travelled Distance</th>
-                  <th>Trip Duration</th>
-                  <th>Idle Duration</th>
-                  <th>Idle Percentage</th>
+                  <th class="text-end">Travelled Distance</th>
+                  <th class="text-end">Trip Duration</th>
+                  <th class="text-end">Idle Duration</th>
+                  <th class="text-end pe-3">Idle Percentage</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="r in rowsMonthlyVehicleList" :key="r.key">
-                  <td>{{ r.vehicle }}</td>
+                  <td class="ps-3 text-primary">{{ r.vehicle }}</td>
                   <td>{{ r.date }}</td>
-                  <td>{{ r.distance }}</td>
-                  <td>{{ r.trip }}</td>
-                  <td>{{ r.idle }}</td>
-                  <td>{{ r.idlePct }}</td>
+                  <td class="text-end">{{ r.distance }}</td>
+                  <td class="text-end">{{ r.trip }}</td>
+                  <td class="text-end">{{ r.idle }}</td>
+                  <td class="text-end pe-3">{{ r.idlePct }}</td>
                 </tr>
               </tbody>
             </table>
@@ -436,26 +363,95 @@ try {
   });
 } catch {}
 
-const duration = ref('2025-08-01 to 2025-08-12');
-const vehicle = ref('VGP2563');
+const duration = ref('2025-08-26 to 2025-08-31');
+const vehicle = ref('VGPS2563');
 const viewType = ref('Daily Breakdown (with map)');
+
+const rowsDailyTrips = ref([
+  {
+    key: 1,
+    date: '26/08/2025',
+    startTime: '05:48 AM',
+    startLocation: 'Exit 3506, Bukit Jelutong North Intersection, Persiaran Gerbang Utama E35, 40150 Shah Alam, Selangor',
+    endTime: '05:49 AM',
+    endLocation: 'Persiaran Gerbang Utama, Bukit Jelutong',
+    distance: '1.00 KM'
+  },
+  {
+    key: 2,
+    date: '26/08/2025',
+    startTime: '06:15 AM',
+    startLocation: 'Exit 3510, Bukit Jelutong East Intersection, Persiaran Gerbang Utama E35, 40150 Shah Alam, Selangor',
+    endTime: '06:16 AM',
+    endLocation: 'Persiaran Gerbang Timur, Bukit Jelutong',
+    distance: '3.00 KM'
+  },
+  {
+    key: 3,
+    date: '28/08/2025',
+    startTime: '07:30 AM',
+    startLocation: 'Persiaran Gerbang Utama, Bukit Jelutong',
+    endTime: '08:45 AM',
+    endLocation: 'Kuala Lumpur City Centre',
+    distance: '35.50 KM'
+  },
+  {
+    key: 4,
+    date: '28/08/2025',
+    startTime: '05:00 PM',
+    startLocation: 'Kuala Lumpur City Centre',
+    endTime: '06:30 PM',
+    endLocation: 'Persiaran Gerbang Utama, Bukit Jelutong',
+    distance: '36.20 KM'
+  },
+  {
+    key: 5,
+    date: '29/08/2025',
+    startTime: '08:00 AM',
+    startLocation: 'Bukit Jelutong',
+    endTime: '09:00 AM',
+    endLocation: 'Subang Jaya',
+    distance: '40.00 KM'
+  },
+  {
+    key: 6,
+    date: '29/08/2025',
+    startTime: '06:00 PM',
+    startLocation: 'Subang Jaya',
+    endTime: '07:10 PM',
+    endLocation: 'Bukit Jelutong',
+    distance: '40.00 KM'
+  },
+  {
+    key: 7,
+    date: '30/08/2025',
+    startTime: '08:30 AM',
+    startLocation: 'Bukit Jelutong',
+    endTime: '09:45 AM',
+    endLocation: 'Shah Alam',
+    distance: '25.00 KM'
+  },
+  {
+    key: 8,
+    date: '30/08/2025',
+    startTime: '05:15 PM',
+    startLocation: 'Shah Alam',
+    endTime: '06:15 PM',
+    endLocation: 'Bukit Jelutong',
+    distance: '26.00 KM'
+  }
+]);
 
 const rowsDailyBreakdown = ref([
   {
     key: 1,
     date: '26/08/2025 - Saturday',
     distance: '126.53 KM',
-    isOpen: false
-  },
-  {
-    key: 2,
-    date: '28/08/2025 - Monday',
-    distance: '118.22 KM',
     isOpen: true,
     summary: {
-      date: '28/08/2025 - Monday',
+      date: '26/08/2025 - Saturday',
       dist: '126.53 km',
-      dur: '2h 8m 35s',
+      dur: '2h 8m 8s',
       idle: '0',
       behav: '12 SV, 1 HA'
     },
@@ -463,67 +459,111 @@ const rowsDailyBreakdown = ref([
       { time: '05:48 AM', location: 'Exit 3506, Bukit Jelutong North Intersection, Persiaran Gerbang Utama E35, 40150 Shah Alam, Selangor', dist: '1KM', dur: '14m 59s', type: 'start' },
       { time: '05:49 AM', location: 'Persiaran Gerbang Utama, Bukit Jelutong', type: 'end' },
       { time: '06:15 AM', location: 'Exit 3510, Bukit Jelutong East Intersection, Persiaran Gerbang Utama E35, 40150 Shah Alam, Selangor', dist: '3KM', dur: '44m 15s', alert: '12 SV', type: 'start' },
-      { time: '06:16 AM', location: 'Persiaran Gerbang Timur, Bukit Jelutong', type: 'end' },
-      { time: '06:05 AM', location: 'Exit 3508, Bukit Jelutong South Intersection, Persiaran Gerbang Utama E35, 40150 Shah Alam, Selangor', dist: '2KM', dur: '29m 30s', type: 'start' },
-      { time: '06:06 AM', location: 'Persiaran Gerbang Selatan, Bukit Jelutong', type: 'end' }
+      { time: '06:16 AM', location: 'Persiaran Gerbang Timur, Bukit Jelutong', type: 'end' }
     ]
   },
-  { key: 3, date: '28/08/2025 - Monday', distance: '118.22 KM', isOpen: false },
-  { key: 4, date: '29/08/2025 - Tuesday', distance: '145.90 KM', isOpen: false },
+  {
+    key: 2,
+    date: '27/08/2025 - Sunday',
+    distance: '0.00 KM',
+    isOpen: false,
+    summary: {
+        date: '27/08/2025 - Sunday',
+        dist: '0.00 km',
+        dur: '0h 0m 0s',
+        idle: '0',
+        behav: '-'
+    },
+    timeline: []
+  },
+  {
+    key: 3,
+    date: '28/08/2025 - Monday',
+    distance: '118.22 KM',
+    isOpen: false,
+    summary: {
+      date: '28/08/2025 - Monday',
+      dist: '118.22 km',
+      dur: '1h 50m 30s',
+      idle: '5m',
+      behav: '2 SV'
+    },
+    timeline: [
+        { time: '07:30 AM', location: 'Persiaran Gerbang Utama, Bukit Jelutong', dist: '35.5KM', dur: '1h 15m', type: 'start' },
+        { time: '08:45 AM', location: 'Kuala Lumpur City Centre', type: 'end' },
+        { time: '05:00 PM', location: 'Kuala Lumpur City Centre', dist: '36.2KM', dur: '1h 30m', alert: '2 SV', type: 'start' },
+        { time: '06:30 PM', location: 'Persiaran Gerbang Utama, Bukit Jelutong', type: 'end' }
+    ]
+  },
+  {
+      key: 4,
+      date: '29/08/2025 - Tuesday',
+      distance: '145.90 KM',
+      isOpen: false,
+      summary: {
+        date: '29/08/2025 - Tuesday',
+        dist: '145.90 km',
+        dur: '2h 15m 10s',
+        idle: '20m',
+        behav: '5 SV'
+      },
+      timeline: [
+        { time: '08:00 AM', location: 'Bukit Jelutong', dist: '40KM', dur: '1h', type: 'start' },
+        { time: '09:00 AM', location: 'Subang Jaya', type: 'end' },
+        { time: '06:00 PM', location: 'Subang Jaya', dist: '40KM', dur: '1h 10m', alert: '5 SV', type: 'start' },
+        { time: '07:10 PM', location: 'Bukit Jelutong', type: 'end' }
+      ]
+  },
   { key: 5, date: '30/08/2025 - Wednesday', distance: '121.15 KM', isOpen: false },
   { key: 6, date: '31/08/2025 - Thursday', distance: '134.67 KM', isOpen: false }
 ]);
 
 const rowsDailySummary = ref([
-  { key: 1, date: '26/08/2025', distance: '0.01 Kilo-meters', trip: '1h 3m 48s', idle: '1h 3m 48s', idlePct: '01%' },
-  { key: 2, date: '26/08/2025', distance: '14.00 Kilo-meters', trip: '2h 10m 5s', idle: '2h 10m 5s', idlePct: '10%' },
-  { key: 3, date: '26/08/2025', distance: '14.00 Kilo-meters', trip: '0h 36m 58s', idle: '0h 36m 58s', idlePct: '05%' },
-  { key: 4, date: '26/08/2025', distance: '3.00 Kilo-meters', trip: '2h 51m 26s', idle: '2h 51m 26s', idlePct: '03%' },
-  { key: 5, date: '26/08/2025', distance: '63.00 Kilo-meters', trip: '1h 18m 40s', idle: '1h 18m 40s', idlePct: '45%' },
-  { key: 6, date: '26/08/2025', distance: '46.00 Kilo-meters', trip: '3h 14m 33s', idle: '3h 14m 33s', idlePct: '05%' },
-  { key: 7, date: '26/08/2025', distance: '0.52 Kilo-meters', trip: '0h 57m 19s', idle: '0h 57m 19s', idlePct: '17%' },
-  { key: 8, date: '26/08/2025', distance: '14.00 Kilo-meters', trip: '1h 42m 7s', idle: '1h 42m 7s', idlePct: '10%' },
-  { key: 9, date: '26/08/2025', distance: '3.00 Kilo-meters', trip: '0h 29m 54s', idle: '0h 29m 54s', idlePct: '20%' },
-  { key: 10, date: '26/08/2025', distance: '63.00 Kilo-meters', trip: '1h 30m 22s', idle: '1h 30m 22s', idlePct: '05%' },
-  { key: 11, date: '26/08/2025', distance: '0.52 Kilo-meters', trip: '2h 5m 15s', idle: '2h 5m 15s', idlePct: '10%' },
+  { key: 1, date: '26/08/2025', distance: '126.53 Kilo-meters', trip: '2h 8m 8s', idle: '0h 13m 41s', idlePct: '11.23%' },
+  { key: 2, date: '27/08/2025', distance: '0.00 Kilo-meters', trip: '0h 0m 0s', idle: '0h 0m 0s', idlePct: '0%' },
+  { key: 3, date: '28/08/2025', distance: '118.22 Kilo-meters', trip: '1h 50m 30s', idle: '0h 5m 0s', idlePct: '4.5%' },
+  { key: 4, date: '29/08/2025', distance: '145.90 Kilo-meters', trip: '2h 15m 10s', idle: '0h 20m 0s', idlePct: '14.8%' },
+  { key: 5, date: '30/08/2025', distance: '121.15 Kilo-meters', trip: '1h 55m 45s', idle: '0h 10m 15s', idlePct: '8.8%' },
+  { key: 6, date: '31/08/2025', distance: '134.67 Kilo-meters', trip: '2h 5m 20s', idle: '0h 12m 30s', idlePct: '9.9%' },
 ]);
 
 const rowsMonthlySummary = ref([
-  { key: 1, date: '05/2025', distance: '8515.33 KM', trip: '7d 13h 19m 56s', idle: '4h 20m 33s', idlePct: '02%' },
-  { key: 2, date: '06/2025', distance: '8515.33 KM', trip: '7d 13h 19m 56s', idle: '4h 20m 33s', idlePct: '02%' },
-  { key: 3, date: '07/2025', distance: '8515.33 KM', trip: '7d 13h 19m 56s', idle: '4h 20m 33s', idlePct: '02%' },
+  { key: 1, date: '05/2025', distance: '8515.33 KM', trip: '7d 13h 19m 56s', idle: '4h 20m 33s', idlePct: '2.4%' },
+  { key: 2, date: '06/2025', distance: '7840.12 KM', trip: '6d 22h 10m 15s', idle: '3h 45m 20s', idlePct: '2.2%' },
+  { key: 3, date: '07/2025', distance: '9102.50 KM', trip: '8d 05h 30m 45s', idle: '5h 10m 10s', idlePct: '2.6%' },
 ]);
 
 const rowsMonthlyVehicleList = ref([
-  { key: 1, vehicle: 'VGP7894', date: '04/2025', distance: '9200.45 KM', trip: '8d 5h 12m 30s', idle: '5h 15m 20s', idlePct: '03%' },
-  { key: 2, vehicle: 'VGP1023', date: '05/2025', distance: '9200.45 KM', trip: '8d 5h 12m 30s', idle: '5h 15m 20s', idlePct: '03%' },
-  { key: 3, vehicle: 'VGP4567', date: '06/2025', distance: '9200.45 KM', trip: '8d 5h 12m 30s', idle: '5h 15m 20s', idlePct: '03%' },
-  { key: 4, vehicle: 'VGP8910', date: '07/2025', distance: '9200.45 KM', trip: '8d 5h 12m 30s', idle: '5h 15m 20s', idlePct: '03%' },
-  { key: 5, vehicle: 'VGP2345', date: '09/2025', distance: '9200.45 KM', trip: '8d 5h 12m 30s', idle: '5h 15m 20s', idlePct: '03%' },
-  { key: 6, vehicle: 'VGP6789', date: '10/2025', distance: '9200.45 KM', trip: '8d 5h 12m 30s', idle: '5h 15m 20s', idlePct: '03%' },
-  { key: 7, vehicle: 'VGP3456', date: '11/2025', distance: '9200.45 KM', trip: '8d 5h 12m 30s', idle: '5h 15m 20s', idlePct: '03%' },
-  { key: 8, vehicle: 'VGP1234', date: '12/2025', distance: '9200.45 KM', trip: '8d 5h 12m 30s', idle: '5h 15m 20s', idlePct: '03%' },
-  { key: 9, vehicle: 'VGP5678', date: '01/2026', distance: '9200.45 KM', trip: '8d 5h 12m 30s', idle: '5h 15m 20s', idlePct: '03%' },
-  { key: 10, vehicle: 'VGP8901', date: '02/2026', distance: '9200.45 KM', trip: '8d 5h 12m 30s', idle: '5h 15m 20s', idlePct: '03%' },
-  { key: 11, vehicle: 'VGP2341', date: '03/2026', distance: '9200.45 KM', trip: '8d 5h 12m 30s', idle: '5h 15m 20s', idlePct: '03%' },
-  { key: 12, vehicle: 'VGP9876', date: '04/2026', distance: '9200.45 KM', trip: '8d 5h 12m 30s', idle: '5h 15m 20s', idlePct: '03%' },
-  { key: 13, vehicle: 'VGP5432', date: '05/2026', distance: '9200.45 KM', trip: '8d 5h 12m 30s', idle: '5h 15m 20s', idlePct: '03%' },
+  { key: 1, vehicle: 'VGP7894', date: '08/2025', distance: '9200.45 KM', trip: '8d 5h 12m 30s', idle: '5h 15m 20s', idlePct: '03%' },
+  { key: 2, vehicle: 'VGP1023', date: '08/2025', distance: '8100.20 KM', trip: '7d 2h 10m 15s', idle: '4h 05m 10s', idlePct: '02%' },
+  { key: 3, vehicle: 'VGP4567', date: '08/2025', distance: '7540.80 KM', trip: '6d 18h 45m 20s', idle: '3h 50m 30s', idlePct: '03%' },
+  { key: 4, vehicle: 'VGP8910', date: '08/2025', distance: '8800.60 KM', trip: '7d 20h 30m 45s', idle: '4h 30m 15s', idlePct: '02%' },
+  { key: 5, vehicle: 'VGP2345', date: '08/2025', distance: '6900.30 KM', trip: '5d 15h 20m 10s', idle: '3h 10m 05s', idlePct: '04%' },
+  { key: 6, vehicle: 'VGP6789', date: '08/2025', distance: '9500.90 KM', trip: '8d 10h 05m 50s', idle: '5h 40m 25s', idlePct: '03%' },
+  { key: 7, vehicle: 'VGP3456', date: '08/2025', distance: '7200.50 KM', trip: '6d 08h 15m 30s', idle: '3h 25m 40s', idlePct: '03%' },
+  { key: 8, vehicle: 'VGP1234', date: '08/2025', distance: '8300.75 KM', trip: '7d 06h 40m 20s', idle: '4h 15m 55s', idlePct: '02%' },
+  { key: 9, vehicle: 'VGP5678', date: '08/2025', distance: '7900.10 KM', trip: '6d 22h 55m 10s', idle: '4h 00m 05s', idlePct: '03%' },
+  { key: 10, vehicle: 'VGP8901', date: '08/2025', distance: '8600.40 KM', trip: '7d 16h 25m 35s', idle: '4h 45m 50s', idlePct: '02%' },
+  { key: 11, vehicle: 'VGP2341', date: '08/2025', distance: '7100.80 KM', trip: '6d 04h 10m 15s', idle: '3h 30m 20s', idlePct: '04%' },
+  { key: 12, vehicle: 'VGP9876', date: '08/2025', distance: '9000.25 KM', trip: '8d 02h 50m 45s', idle: '5h 05m 10s', idlePct: '03%' },
+  { key: 13, vehicle: 'VGP5432', date: '08/2025', distance: '7400.60 KM', trip: '6d 12h 35m 55s', idle: '3h 45m 30s', idlePct: '03%' },
 ]);
 
 const rowsDailyVehicleList = ref([
-  { key: 1, vehicle: 'VHCL-1002', vehicleName: 'Turbo Hawk ZR', distTotal: '5680.5', distAvg: '175.6', tripTotal: '5680.5', tripAvg: '175.6', idleTotal: '5680.5', idleAvg: '175.6', utilisation: 'B345-3920-5436', fuelAvgLitres: '412.75', fuelAvgKmL: '175.6', fuelRefillL: '321,450 KM', fuelRefillFreq: '12', speed: '0 km/h' },
-  { key: 2, vehicle: 'VHCL-1003', vehicleName: 'Stealth Chaser X', distTotal: '3000.8', distAvg: '130.0', tripTotal: '3000.8', tripAvg: '130.0', idleTotal: '3000.8', idleAvg: '130.0', utilisation: 'C567-3890-2845', fuelAvgLitres: '298.90', fuelAvgKmL: '130.0', fuelRefillL: '154,200 KM', fuelRefillFreq: '10', speed: '0 km/h' },
-  { key: 3, vehicle: 'VHCL-1004', vehicleName: 'Lunar Explorer 5', distTotal: '4550.0', distAvg: '140.2', tripTotal: '4550.0', tripAvg: '140.2', idleTotal: '4550.0', idleAvg: '140.2', utilisation: 'D666-2399-7743', fuelAvgLitres: '376.85', fuelAvgKmL: '140.2', fuelRefillL: '245,600 KM', fuelRefillFreq: '9', speed: '0 km/h' },
-  { key: 4, vehicle: 'VHCL-1004', vehicleName: 'Lunar Explorer 5', distTotal: '4550.0', distAvg: '140.2', tripTotal: '4550.0', tripAvg: '140.2', idleTotal: '4550.0', idleAvg: '140.2', utilisation: 'D666-2399-7743', fuelAvgLitres: '376.85', fuelAvgKmL: '140.2', fuelRefillL: '245,600 KM', fuelRefillFreq: '9', speed: '0 km/h' },
-  { key: 5, vehicle: 'VHCL-1005', vehicleName: 'Raptor GT', distTotal: '5000.4', distAvg: '160.4', tripTotal: '5000.4', tripAvg: '160.4', idleTotal: '5000.4', idleAvg: '160.4', utilisation: 'A123-8470-9032', fuelAvgLitres: '450.00', fuelAvgKmL: '160.4', fuelRefillL: '290,300 KM', fuelRefillFreq: '11', speed: '0 km/h' },
-  { key: 6, vehicle: 'VHCL-1006', vehicleName: 'Shadow Hunter 12', distTotal: '6200.7', distAvg: '190.5', tripTotal: '6200.7', tripAvg: '190.5', idleTotal: '6200.7', idleAvg: '190.5', utilisation: 'E890-5623-0012', fuelAvgLitres: '520.25', fuelAvgKmL: '190.5', fuelRefillL: '410,100 KM', fuelRefillFreq: '14', speed: '0 km/h' },
-  { key: 7, vehicle: 'VHCL-1006', vehicleName: 'Shadow Hunter 12', distTotal: '6200.7', distAvg: '190.5', tripTotal: '6200.7', tripAvg: '190.5', idleTotal: '6200.7', idleAvg: '190.5', utilisation: 'E890-5623-0012', fuelAvgLitres: '520.25', fuelAvgKmL: '190.5', fuelRefillL: '410,100 KM', fuelRefillFreq: '14', speed: '0 km/h' },
-  { key: 8, vehicle: 'VHCL-1007', vehicleName: 'Volt Fusion R', distTotal: '4500.1', distAvg: '145.8', tripTotal: '4500.1', tripAvg: '145.8', idleTotal: '4500.1', idleAvg: '145.8', utilisation: 'F234-9502-1287', fuelAvgLitres: '389.90', fuelAvgKmL: '145.8', fuelRefillL: '123,000 KM', fuelRefillFreq: '7', speed: '0 km/h' },
-  { key: 9, vehicle: 'VHCL-1008', vehicleName: 'Quantum Leap 6', distTotal: '4700.3', distAvg: '155.4', tripTotal: '4700.3', tripAvg: '155.4', idleTotal: '4700.3', idleAvg: '155.4', utilisation: 'G456-7321-8745', fuelAvgLitres: '395.75', fuelAvgKmL: '155.4', fuelRefillL: '200,900 KM', fuelRefillFreq: '8', speed: '0 km/h' },
-  { key: 10, vehicle: 'VHCL-1008', vehicleName: 'Quantum Leap 6', distTotal: '4700.3', distAvg: '155.4', tripTotal: '4700.3', tripAvg: '155.4', idleTotal: '4700.3', idleAvg: '155.4', utilisation: 'G456-7321-8745', fuelAvgLitres: '395.75', fuelAvgKmL: '155.4', fuelRefillL: '200,900 KM', fuelRefillFreq: '8', speed: '0 km/h' },
-  { key: 11, vehicle: 'VHCL-1009', vehicleName: 'Meteor Strike 11', distTotal: '5200.2', distAvg: '185.0', tripTotal: '5200.2', tripAvg: '185.0', idleTotal: '5200.2', idleAvg: '185.0', utilisation: 'H789-3491-0010', fuelAvgLitres: '460.80', fuelAvgKmL: '185.0', fuelRefillL: '370,200 KM', fuelRefillFreq: '13', speed: '0 km/h' },
-  { key: 12, vehicle: 'VHCL-1010', vehicleName: 'Apex Predator S', distTotal: '5900.6', distAvg: '210.7', tripTotal: '5900.6', tripAvg: '210.7', idleTotal: '5900.6', idleAvg: '210.7', utilisation: 'I901-4783-5629', fuelAvgLitres: '510.55', fuelAvgKmL: '210.7', fuelRefillL: '500,300 KM', fuelRefillFreq: '15', speed: '0 km/h' },
-  { key: 13, vehicle: 'VHCL-1011', vehicleName: 'Falcon Cruiser Z', distTotal: '5300.9', distAvg: '195.2', tripTotal: '5300.9', tripAvg: '195.2', idleTotal: '5300.9', idleAvg: '195.2', utilisation: 'J876-5432-1098', fuelAvgLitres: '485.60', fuelAvgKmL: '195.2', fuelRefillL: '380,450 KM', fuelRefillFreq: '12', speed: '0 km/h' },
+  { key: 1, date: '25/08/2025', vehicle: 'VGP7894', distance: '120.45 KM', trip: '2h 15m 30s', idle: '15m 20s', idlePct: '11.3%' },
+  { key: 2, date: '25/08/2025', vehicle: 'VGP1023', distance: '98.20 KM', trip: '1h 50m 10s', idle: '10m 15s', idlePct: '9.3%' },
+  { key: 3, date: '25/08/2025', vehicle: 'VGP4567', distance: '145.80 KM', trip: '3h 05m 20s', idle: '25m 30s', idlePct: '13.7%' },
+  { key: 4, date: '25/08/2025', vehicle: 'VGP8910', distance: '110.60 KM', trip: '2h 10m 45s', idle: '12m 15s', idlePct: '9.4%' },
+  { key: 5, date: '25/08/2025', vehicle: 'VGP2345', distance: '85.30 KM', trip: '1h 30m 10s', idle: '08m 05s', idlePct: '8.9%' },
+  { key: 6, date: '25/08/2025', vehicle: 'VGP6789', distance: '132.90 KM', trip: '2h 45m 50s', idle: '20m 25s', idlePct: '12.3%' },
+  { key: 7, date: '25/08/2025', vehicle: 'VGP3456', distance: '105.50 KM', trip: '2h 00m 30s', idle: '11m 40s', idlePct: '9.7%' },
+  { key: 8, date: '26/08/2025', vehicle: 'VGP7894', distance: '115.40 KM', trip: '2h 05m 15s', idle: '14m 20s', idlePct: '11.4%' },
+  { key: 9, date: '26/08/2025', vehicle: 'VGP1023', distance: '95.10 KM', trip: '1h 45m 05s', idle: '09m 10s', idlePct: '8.7%' },
+  { key: 10, date: '26/08/2025', vehicle: 'VGP4567', distance: '150.20 KM', trip: '3h 15m 40s', idle: '28m 15s', idlePct: '14.4%' },
+  { key: 11, date: '26/08/2025', vehicle: 'VGP8910', distance: '118.70 KM', trip: '2h 20m 55s', idle: '13m 30s', idlePct: '9.5%' },
+  { key: 12, date: '26/08/2025', vehicle: 'VGP2345', distance: '88.50 KM', trip: '1h 35m 25s', idle: '08m 45s', idlePct: '9.1%' },
+  { key: 13, date: '26/08/2025', vehicle: 'VGP6789', distance: '128.60 KM', trip: '2h 40m 35s', idle: '19m 50s', idlePct: '12.3%' },
+  { key: 14, date: '26/08/2025', vehicle: 'VGP3456', distance: '102.30 KM', trip: '1h 55m 20s', idle: '10m 55s', idlePct: '9.4%' },
 ]);
 
 const mapEl = ref(null);
@@ -534,24 +574,24 @@ function initMap() {
     map.remove();
     map = null;
   }
-  map = L.map(mapEl.value).setView([38.627, -90.199], 6);
+  map = L.map(mapEl.value).setView([3.111, 101.533], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
   const route = [
-    [38.627, -90.199],
-    [38.9, -89.7],
-    [39.5, -89.3],
-    [40.0, -89.0],
-    [40.5, -88.5],
-    [41.0, -88.0],
-    [41.878, -87.629],
+    [3.111, 101.533], // Bukit Jelutong
+    [3.115, 101.540],
+    [3.120, 101.550],
+    [3.130, 101.600],
+    [3.140, 101.650],
+    [3.150, 101.700],
+    [3.157, 101.711], // KLCC
   ];
   L.polyline(route, { color: '#0b5ed7', weight: 4 }).addTo(map);
-  L.marker(route[0]).bindPopup('Start Time 05:48 AM • 26/08/2025').addTo(map);
-  L.marker(route[route.length - 1]).bindPopup('End Time 05:49 AM • 26/08/2025').addTo(map);
-  map.fitBounds(L.polyline(route).getBounds(), { padding: [20, 20] });
+  L.marker(route[0]).bindPopup('Start Time 05:48 AM • 26/08/2025<br>Bukit Jelutong').addTo(map);
+  L.marker(route[route.length - 1]).bindPopup('End Time 06:30 AM • 26/08/2025<br>Kuala Lumpur').addTo(map);
+  map.fitBounds(L.polyline(route).getBounds(), { padding: [50, 50] });
 }
 
 watch(viewType, async (val) => {
@@ -574,8 +614,8 @@ const ReportSummary = {
   name: 'ReportSummary',
   template: `
   <div class="card border rounded-3 shadow-0 mb-3">
-    <div class="card-header"><h6 class="mb-0">Vehicle Activity Report Result</h6></div>
-    <div class="card-body">
+    <div class="card-header bg-white border-bottom-0 pt-3 ps-3"><h6 class="mb-0 fw-bold">Vehicle Activity Report Result</h6></div>
+    <div class="card-body pt-0">
       <div class="row g-3">
         <div class="col-12 col-md-3">
           <div class="small text-muted">Vehicle ID</div>
@@ -609,15 +649,27 @@ const ChartAndKPIs = {
     <div class="col-12 col-lg-6">
       <div class="card border rounded-3 shadow-0 h-100">
         <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <div class="small text-muted">Trip Duration • Idle Duration • Distance</div>
+          <div class="d-flex align-items-center gap-3 mb-2">
+             <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#e83e8c;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Trip Duration</span></div>
+             <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#0b0f28;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Idle Duration</span></div>
+             <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#339af0;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Distance</span></div>
           </div>
           <svg viewBox="0 0 600 260" width="100%" height="220">
-            <rect x="0" y="0" width="600" height="220" fill="#f8f9fa" rx="8"/>
-            <g>
-              <rect v-for="(bar,i) in [180,120,90,200,160,80,140]" :key="'b'+i" :x="30 + i*80" :y="200-bar" width="40" :height="bar" fill="#74c0fc"/>
-              <rect v-for="(bar,i) in [120,100,70,150,110,60,90]" :key="'i'+i" :x="30 + i*80 + 45" :y="200-bar" width="40" :height="bar" fill="#adb5bd"/>
-              <path d="M30 120 L110 80 L190 140 L270 70 L350 110 L430 90 L510 130" stroke="#f03e3e" stroke-width="3" fill="none"/>
+            <rect x="0" y="0" width="600" height="220" fill="#fff" rx="8"/>
+            <!-- Grid lines -->
+            <line x1="40" y1="40" x2="580" y2="40" stroke="#f1f3f5" stroke-dasharray="4"/>
+            <line x1="40" y1="80" x2="580" y2="80" stroke="#f1f3f5" stroke-dasharray="4"/>
+            <line x1="40" y1="120" x2="580" y2="120" stroke="#f1f3f5" stroke-dasharray="4"/>
+            <line x1="40" y1="160" x2="580" y2="160" stroke="#f1f3f5" stroke-dasharray="4"/>
+            <line x1="40" y1="200" x2="580" y2="200" stroke="#f1f3f5" stroke-dasharray="4"/>
+            <g transform="translate(10,0)">
+              <!-- Bars (Distance - Blue) -->
+              <rect v-for="(bar,i) in [140, 100, 80, 160, 120, 70, 110]" :key="'b'+i" :x="40 + i*75" :y="200-bar" width="20" :height="bar" fill="#339af0" rx="2"/>
+              <!-- Bars (Idle - Dark) - Mocking different values -->
+              <rect v-for="(bar,i) in [40, 30, 20, 50, 40, 10, 30]" :key="'i'+i" :x="40 + i*75 + 24" :y="200-bar" width="20" :height="bar" fill="#0b0f28" rx="2"/>
+              <!-- Line (Trip Duration - Pink) -->
+              <path d="M50 120 L125 80 L200 140 L275 70 L350 110 L425 90 L500 130" stroke="#e83e8c" stroke-width="3" fill="none"/>
+              <circle v-for="(cx,i) in [50, 125, 200, 275, 350, 425, 500]" :key="'p'+i" :cx="cx" :cy="[120, 80, 140, 70, 110, 90, 130][i]" r="4" fill="#e83e8c"/>
             </g>
           </svg>
         </div>
@@ -626,28 +678,34 @@ const ChartAndKPIs = {
     <div class="col-12 col-lg-6">
       <div class="card border rounded-3 shadow-0 h-100">
         <div class="card-body">
-          <div class="row g-3">
-            <div class="col-12 col-md-6">
-              <div class="bg-light rounded-3 p-3 h-100">
-                <div class="small text-muted">Total Duration</div>
-                <div class="display-6 fw-semibold">7d 13h 19m 56s</div>
-                <div class="mt-3 small">Trip Duration</div>
-                <div class="progress" style="height: 6px;"><div class="progress-bar" style="width:90%"></div></div>
-                <div class="fw-semibold mt-1">7d 8h 59m 23s</div>
-                <div class="mt-3 small">Idle Duration</div>
-                <div class="progress" style="height: 6px;"><div class="progress-bar bg-secondary" style="width:10%"></div></div>
-                <div class="fw-semibold mt-1">4h 20m 33s</div>
+          <div class="row g-3 h-100">
+            <div class="col-12 col-md-5">
+              <div class="h-100 d-flex flex-column justify-content-center">
+                <div class="small text-muted mb-1">Total Duration</div>
+                <div class="display-6 fw-bold mb-3">2h 8m 8s</div>
+
+                <div class="progress mb-1" style="height: 8px;"><div class="progress-bar" style="width:90%; background-color: #e83e8c;"></div></div>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                   <div class="small fw-semibold" style="color: #e83e8c;">Trip Duration</div>
+                   <div class="fw-bold">1h 54m 27s</div>
+                </div>
+
+                <div class="progress mb-1" style="height: 8px;"><div class="progress-bar" style="width:10%; background-color: #0b0f28;"></div></div>
+                <div class="d-flex justify-content-between align-items-center">
+                   <div class="small fw-semibold" style="color: #0b0f28;">Idle Duration</div>
+                   <div class="fw-bold">13m 41s</div>
+                </div>
               </div>
             </div>
-            <div class="col-12 col-md-6">
-              <div class="bg-light rounded-3 p-3 h-100">
-                <div class="small text-muted mb-2">Summary</div>
-                <div class="d-flex justify-content-between"><span>Total Distance (km)</span><span class="fw-semibold">8515.33 KM</span></div>
-                <div class="d-flex justify-content-between"><span>Total Trip Duration (hr)</span><span class="fw-semibold">7d 13h 19m 56s</span></div>
-                <div class="d-flex justify-content-between"><span>Total Idling (hr)</span><span class="fw-semibold">4h 20m 33s</span></div>
-                <div class="d-flex justify-content-between"><span>Idling Percentage vs Trip Duration</span><span class="fw-semibold">02%</span></div>
-                <div class="d-flex justify-content-between"><span>Average Fuel Consumption (km/litre)</span><span class="fw-semibold">0 km/l</span></div>
-                <div class="d-flex justify-content-between"><span>Total Fuel Usage (litre)</span><span class="fw-semibold">0 Litre</span></div>
+            <div class="col-12 col-md-7 border-start">
+              <div class="ps-md-3 h-100 d-flex flex-column justify-content-center">
+                <h6 class="fw-bold mb-3">Summary</h6>
+                <div class="d-flex justify-content-between mb-2"><span class="small text-muted">Total Distance (km)</span><span class="fw-semibold">126.53 KM</span></div>
+                <div class="d-flex justify-content-between mb-2"><span class="small text-muted">Total Trip Duration (hr)</span><span class="fw-semibold">1h 54m 27s</span></div>
+                <div class="d-flex justify-content-between mb-2"><span class="small text-muted">Total Idling (hr)</span><span class="fw-semibold">13m 41s</span></div>
+                <div class="d-flex justify-content-between mb-2"><span class="small text-muted">Idling Percentage vs Trip Duration</span><span class="fw-semibold">11.23%</span></div>
+                <div class="d-flex justify-content-between mb-2"><span class="small text-muted">Average Fuel Consumption (km/litre)</span><span class="fw-semibold">0 km/l</span></div>
+                <div class="d-flex justify-content-between"><span class="small text-muted">Total Fuel Usage (litre)</span><span class="fw-semibold">0 Litre</span></div>
               </div>
             </div>
           </div>
