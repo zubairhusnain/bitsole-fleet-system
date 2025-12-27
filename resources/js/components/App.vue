@@ -341,11 +341,16 @@ const isTestingMode = ref(false);
 provide('isTestingMode', isTestingMode);
 
 const checkTestingMode = () => {
-    // Support both lowercase and camelCase
+    // Check for environment variable configuration
+    const envTestingMode = import.meta.env.VITE_TESTING_MODE;
+
+    // Support both lowercase and camelCase query params
     const rawQ = route.query.testingmode ?? route.query.testingMode;
     const q = rawQ !== null && rawQ !== undefined ? String(rawQ) : null;
 
-    if (q === '1') {
+    if (envTestingMode === 'true') {
+        isTestingMode.value = true;
+    } else if (q === '1') {
         console.log('testingMode on hai');
         localStorage.setItem('testingMode', '1');
         isTestingMode.value = true;
