@@ -155,7 +155,7 @@ const isTestingMode = inject('isTestingMode', ref(false));
 
 const loading = ref(false);
 const saving = ref(false);
-const notificationChannel = ref({ web: true, mail: true, mobile: true });
+const notificationChannel = ref({ web: true, mail: false, mobile: false });
 const requestData = ref([]);
 const notificationType = ref([]);
 const alarmType = ref([]);

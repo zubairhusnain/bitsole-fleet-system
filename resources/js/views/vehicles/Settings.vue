@@ -171,7 +171,7 @@ const loadingDrivers = ref(false);
 const loadingZones = ref(false);
 const loadingNotifications = ref(false);
 const savingNotifications = ref(false);
-const notificationChannel = ref({ web: true, mail: true, mobile: true });
+const notificationChannel = ref({ web: true, mail: false, mobile: false });
 
 const driverOptions = ref([]);
 const zoneOptions = ref([]);
