@@ -224,6 +224,8 @@ class NotificationService
             foreach($data as $key=>$value){
                 $type = 'POST';
                 $id = '';
+                $value['mail']=false;
+                $value['sms']=false;
                 $already_xist = $value['already_xist'] ? true : false;
                 $notificators = $value['web'] ? "web,":"";
                 $notificators.= $value['mail'] ? "mail,":"";
@@ -254,11 +256,11 @@ class NotificationService
                     }
 
                     $attributes = (!empty($value['attributes'])) ? json_encode($value['attributes']): json_encode(new \stdClass());
-                    $payloadData = '{"id": '.$value['id'].',"type": "'.$value['type'].'","always": true,"calendarId": 0,"attributes": '.$attributes.',"notificators": "'.$notificators.'"}';
+                    $payloadData = '{"id": '.$value['id'].',"type": "'.$value['type'].'","always": false,"calendarId": 0,"attributes": '.$attributes.',"notificators": "'.$notificators.'"}';
 
                     // For new creation (POST), remove ID from payload if it's 0 or just let Traccar handle it (usually ignore ID in POST)
                     if ($type === 'POST') {
-                         $payloadData = '{"type": "'.$value['type'].'","always": true,"calendarId": 0,"attributes": '.$attributes.',"notificators": "'.$notificators.'"}';
+                         $payloadData = '{"type": "'.$value['type'].'","always": false,"calendarId": 0,"attributes": '.$attributes.',"notificators": "'.$notificators.'"}';
                     }
                 }
 
