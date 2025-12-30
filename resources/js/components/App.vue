@@ -249,7 +249,7 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item" v-if="isAuthed">
+                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode }" v-if="isAuthed">
                             <RouterLink to="/alerts" class="nav-link" :class="{ active: route.name === 'alerts' }">
                                 <i class="nav-icon bi bi-bell"></i>
                                 <p>Alerts & Notifications</p>
