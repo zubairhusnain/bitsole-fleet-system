@@ -33,6 +33,7 @@
           <div class="col-12 col-md-3">
             <label class="form-label small fw-semibold text-muted">View Type</label>
             <select v-model="viewType" class="form-select text-muted">
+              <option>Trip Summary</option>
               <option>Daily Breakdown</option>
               <option>Daily Breakdown (with map)</option>
               <option>Daily Summary</option>
@@ -48,324 +49,109 @@
       </div>
     </div>
 
-    <template v-if="viewType === 'Daily Breakdown'">
-      <ReportSummary />
-      <ChartAndKPIs />
-      <div class="card border rounded-3 shadow-0">
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0 table-striped w-100 text-nowrap">
-              <thead class="table-dark">
-                <tr>
-                  <th class="py-2 ps-3">Date</th>
-                  <th class="py-2">Start Time</th>
-                  <th class="py-2">Start Location</th>
-                  <th class="py-2">Start Remarks</th>
-                  <th class="py-2">End Time</th>
-                  <th class="py-2">End Location</th>
-                  <th class="py-2">End Remarks</th>
-                  <th class="py-2 pe-3 text-end">Travelled Dist</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in rowsDailyTrips" :key="r.key">
-                  <td class="ps-3"><a href="#" class="text-decoration-none" :class="r.key === 1 ? 'text-primary fw-semibold' : ''">{{ r.date }}</a></td>
-                  <td>{{ r.startTime }}</td>
-                  <td class="text-primary">{{ r.startLocation }}</td>
-                  <td><span class="badge bg-danger-subtle text-danger border">OUT PC</span></td>
-                  <td>{{ r.endTime }}</td>
-                  <td class="text-primary">{{ r.endLocation }}</td>
-                  <td><span class="badge bg-success-subtle text-success border">IN PC</span></td>
-                  <td class="text-end pe-3">{{ r.distance }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card-footer d-flex align-items-center py-2 bg-white border-top">
-            <div class="text-muted small me-auto">Showing 1 to {{ rowsDailyTrips.length }} of {{ rowsDailyTrips.length }} results</div>
-            <nav aria-label="Pagination" class="ms-auto">
-              <ul class="pagination pagination-sm mb-0 pagination-app">
-                <li class="page-item disabled"><button class="page-link"><i class="bi bi-chevron-left"></i></button></li>
-                <li class="page-item active"><button class="page-link">1</button></li>
-                <li class="page-item"><button class="page-link"><i class="bi bi-chevron-right"></i></button></li>
-              </ul>
-            </nav>
-          </div>
-      </div>
-    </template>
+    <DailyBreakdown v-if="viewType === 'Daily Breakdown'" :rowsDailyTrips="rowsDailyTrips" />
 
-    <template v-else-if="viewType === 'Daily Summary List'">
-      <div class="card border rounded-3 shadow-0">
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0 table-striped">
-              <thead class="table-dark">
-                <tr>
-                  <th class="ps-3">Date</th>
-                  <th>Vehicle ID</th>
-                  <th class="text-end">Travelled Distance</th>
-                  <th class="text-end">Trip Duration</th>
-                  <th class="text-end">Idle Duration</th>
-                  <th class="text-end pe-3">Idle Percentage</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in rowsDailyVehicleList" :key="r.key">
-                  <td class="ps-3">{{ r.date }}</td>
-                  <td class="text-primary">{{ r.vehicle }}</td>
-                  <td class="text-end">{{ r.distance }}</td>
-                  <td class="text-end">{{ r.trip }}</td>
-                  <td class="text-end">{{ r.idle }}</td>
-                  <td class="text-end pe-3">{{ r.idlePct }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card-footer d-flex align-items-center py-2 bg-white border-top">
-          <div class="text-muted small me-auto">Showing 1 to 16 of 1079 results</div>
-          <nav aria-label="Pagination" class="ms-auto">
-            <ul class="pagination pagination-sm mb-0 pagination-app">
-              <li class="page-item disabled"><button class="page-link"><i class="bi bi-chevron-left"></i></button></li>
-              <li class="page-item active"><button class="page-link">1</button></li>
-              <li class="page-item"><button class="page-link">2</button></li>
-              <li class="page-item"><button class="page-link">3</button></li>
-              <li class="page-item"><button class="page-link">4</button></li>
-              <li class="page-item"><button class="page-link">5</button></li>
-              <li class="page-item"><button class="page-link"><i class="bi bi-chevron-right"></i></button></li>
-            </ul>
-          </nav>
-        </div>
-      </div>
-    </template>
+    <TripSummary v-else-if="viewType === 'Trip Summary'" :rowsTripSummary="rowsTripSummary" />
 
-    <template v-else-if="viewType === 'Daily Breakdown (with map)'">
-      <div class="card border rounded-3 shadow-0">
-        <div class="card-body">
-          <div class="row g-3">
-            <div class="col-12 col-lg-4">
-              <div class="list-group small">
-                <template v-for="day in rowsDailyBreakdown" :key="day.key">
-                  <!-- Day Header -->
-                  <div class="list-group-item d-flex justify-content-between align-items-center bg-light"
-                       @click="day.isOpen = !day.isOpen"
-                       role="button">
-                    <div>
-                      <div class="fw-bold">{{ day.date }}</div>
-                      <div class="text-muted">{{ day.distance }}</div>
-                    </div>
-                    <i class="bi" :class="day.isOpen ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
-                  </div>
+    <DailySummaryList v-else-if="viewType === 'Daily Summary List'" :rowsDailyVehicleList="rowsDailyVehicleList" />
 
-                  <!-- Day Details (Timeline) -->
-                  <div v-if="day.isOpen" class="list-group-item p-0 border-0">
-                    <div v-if="day.summary" class="bg-light border-bottom p-3">
-                      <div class="fw-semibold mb-2">Summary for {{ day.summary.date }}</div>
-                      <div class="row g-2">
-                        <div class="col-6">
-                          <div class="text-muted small">Total Distance</div>
-                          <div class="fw-bold">{{ day.summary.dist }}</div>
-                        </div>
-                        <div class="col-6">
-                          <div class="text-muted small">Total Duration</div>
-                          <div class="fw-bold">{{ day.summary.dur }}</div>
-                        </div>
-                        <div class="col-6">
-                          <div class="text-muted small">Total Idling</div>
-                          <div class="fw-bold">{{ day.summary.idle }}</div>
-                        </div>
-                        <div class="col-6">
-                          <div class="text-muted small">Behaviour</div>
-                          <div class="fw-bold text-danger">{{ day.summary.behav }}</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="list-group list-group-flush">
-                      <div v-for="(item, idx) in day.timeline" :key="idx" class="list-group-item">
-                        <div class="d-flex gap-3">
-                          <div class="d-flex flex-column align-items-center" style="width: 60px;">
-                            <div class="text-muted small">{{ item.time }}</div>
-                            <div v-if="idx < day.timeline.length - 1 || item.type === 'start'" class="flex-grow-1 border-start border-2 my-1"></div>
-                          </div>
-                          <div class="pb-2">
-                            <div class="fw-semibold" :class="item.type === 'start' ? 'text-primary' : 'text-danger'">{{ item.type === 'start' ? 'Start' : 'End' }}</div>
-                            <div class="small text-muted">{{ item.location }}</div>
-                            <div v-if="item.dist || item.dur || item.alert" class="mt-1">
-                              <span v-if="item.dist" class="badge bg-light text-dark border me-1">{{ item.dist }}</span>
-                              <span v-if="item.dur" class="badge bg-light text-dark border me-1">{{ item.dur }}</span>
-                              <span v-if="item.alert" class="badge bg-danger-subtle text-danger border border-danger">{{ item.alert }}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </template>
-              </div>
-            </div>
-            <div class="col-12 col-lg-8">
-              <div class="position-relative h-100">
-                 <div class="position-absolute top-0 start-50 translate-middle-x mt-3 z-3 bg-white p-2 rounded-pill shadow-sm d-flex align-items-center gap-2" style="width: fit-content;">
-                    <button class="btn btn-sm btn-link text-dark text-decoration-none fw-semibold"><i class="bi bi-arrow-counterclockwise"></i> Restart</button>
-                    <div class="vr"></div>
-                    <button class="btn btn-sm btn-link text-secondary"><i class="bi bi-skip-backward-fill"></i></button>
-                    <button class="btn btn-sm btn-link text-secondary"><i class="bi bi-play-fill"></i></button>
-                    <button class="btn btn-sm btn-link text-secondary"><i class="bi bi-pause-fill"></i></button>
-                    <button class="btn btn-sm btn-link text-secondary"><i class="bi bi-skip-forward-fill"></i></button>
-                    <div class="vr"></div>
-                    <span class="small text-muted ms-1">Slow</span>
-                    <input type="range" class="form-range" style="width: 80px">
-                    <span class="small text-muted me-1">Fast</span>
-                 </div>
-                 <div ref="mapEl" style="height: 60vh; min-height: 320px;" class="rounded-3 overflow-hidden border"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </template>
+    <DailyBreakdownMap v-else-if="viewType === 'Daily Breakdown (with map)'" :rowsDailyBreakdown="rowsDailyBreakdown" />
 
-    <template v-else-if="viewType === 'Daily Summary'">
-      <ReportSummary />
-      <ChartAndKPIs />
-      <div class="card border rounded-3 shadow-0">
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0 table-striped">
-              <thead class="table-dark">
-                <tr>
-                  <th class="ps-3">Date</th>
-                  <th class="text-end">Travelled Distance</th>
-                  <th class="text-end">Trip Duration</th>
-                  <th class="text-end">Idle Duration</th>
-                  <th class="text-end pe-3">Idle Percentage</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in rowsDailySummary" :key="r.key">
-                  <td class="ps-3">{{ r.date }}</td>
-                  <td class="text-end">{{ r.distance }}</td>
-                  <td class="text-end">{{ r.trip }}</td>
-                  <td class="text-end">{{ r.idle }}</td>
-                  <td class="text-end pe-3">{{ r.idlePct }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="d-flex justify-content-between align-items-center p-2 small text-muted">
-            <div>Showing 1 to 18 of 1079 results</div>
-            <nav>
-              <ul class="pagination pagination-sm mb-0">
-                <li class="page-item disabled"><span class="page-link">&lt;</span></li>
-                <li class="page-item active"><span class="page-link">1</span></li>
-                <li class="page-item"><span class="page-link">2</span></li>
-                <li class="page-item"><span class="page-link">3</span></li>
-                <li class="page-item"><span class="page-link">4</span></li>
-                <li class="page-item"><span class="page-link">5</span></li>
-                <li class="page-item"><span class="page-link">&gt;</span></li>
-              </ul>
-            </nav>
-          </div>
-        </div>
-      </div>
-    </template>
+    <DailySummary v-else-if="viewType === 'Daily Summary'" :rowsDailySummary="rowsDailySummary" />
 
-    <template v-else-if="viewType === 'Monthly Summary'">
-      <ReportSummary />
-      <ChartAndKPIs />
-      <div class="card border rounded-3 shadow-0">
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0 table-striped">
-              <thead class="table-dark">
-                <tr>
-                  <th class="ps-3">Date</th>
-                  <th class="text-end">Travelled Distance</th>
-                  <th class="text-end">Trip Duration</th>
-                  <th class="text-end">Idle Duration</th>
-                  <th class="text-end pe-3">Idle Percentage</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in rowsMonthlySummary" :key="r.key">
-                  <td class="ps-3">{{ r.date }}</td>
-                  <td class="text-end">{{ r.distance }}</td>
-                  <td class="text-end">{{ r.trip }}</td>
-                  <td class="text-end">{{ r.idle }}</td>
-                  <td class="text-end pe-3">{{ r.idlePct }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </template>
+    <MonthlySummary v-else-if="viewType === 'Monthly Summary'" :rowsMonthlySummary="rowsMonthlySummary" />
 
-    <template v-else-if="viewType === 'Monthly Summary List'">
-      <div class="card border rounded-3 shadow-0">
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0 table-striped">
-              <thead class="table-dark">
-                <tr>
-                  <th class="ps-3">Vehicle ID</th>
-                  <th>Date</th>
-                  <th class="text-end">Travelled Distance</th>
-                  <th class="text-end">Trip Duration</th>
-                  <th class="text-end">Idle Duration</th>
-                  <th class="text-end pe-3">Idle Percentage</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in rowsMonthlyVehicleList" :key="r.key">
-                  <td class="ps-3 text-primary">{{ r.vehicle }}</td>
-                  <td>{{ r.date }}</td>
-                  <td class="text-end">{{ r.distance }}</td>
-                  <td class="text-end">{{ r.trip }}</td>
-                  <td class="text-end">{{ r.idle }}</td>
-                  <td class="text-end pe-3">{{ r.idlePct }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="d-flex justify-content-between align-items-center p-2 small text-muted">
-            <div>Showing 1 to 16 of 1079 results</div>
-            <nav>
-              <ul class="pagination pagination-sm mb-0">
-                <li class="page-item disabled"><span class="page-link">&lt;</span></li>
-                <li class="page-item active"><span class="page-link">1</span></li>
-                <li class="page-item"><span class="page-link">2</span></li>
-                <li class="page-item"><span class="page-link">3</span></li>
-                <li class="page-item"><span class="page-link">4</span></li>
-                <li class="page-item"><span class="page-link">5</span></li>
-                <li class="page-item"><span class="page-link">&gt;</span></li>
-              </ul>
-            </nav>
-          </div>
-        </div>
-      </div>
-    </template>
+    <MonthlySummaryList v-else-if="viewType === 'Monthly Summary List'" :rowsMonthlyVehicleList="rowsMonthlyVehicleList" />
+
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
-try {
-  delete L.Icon.Default.prototype._getIconUrl;
-  L.Icon.Default.mergeOptions({
-    iconRetinaUrl: new URL('leaflet/dist/images/marker-icon-2x.png', import.meta.url).toString(),
-    iconUrl: new URL('leaflet/dist/images/marker-icon.png', import.meta.url).toString(),
-    shadowUrl: new URL('leaflet/dist/images/marker-shadow.png', import.meta.url).toString(),
-  });
-} catch {}
+import { ref } from 'vue';
+import TripSummary from './components/trip-analysis/TripSummary.vue';
+import DailyBreakdown from './components/trip-analysis/DailyBreakdown.vue';
+import DailyBreakdownMap from './components/trip-analysis/DailyBreakdownMap.vue';
+import DailySummary from './components/trip-analysis/DailySummary.vue';
+import DailySummaryList from './components/trip-analysis/DailySummaryList.vue';
+import MonthlySummary from './components/trip-analysis/MonthlySummary.vue';
+import MonthlySummaryList from './components/trip-analysis/MonthlySummaryList.vue';
 
 const duration = ref('2025-08-26 to 2025-08-31');
 const vehicle = ref('VGPS2563');
-const viewType = ref('Daily Breakdown (with map)');
+const viewType = ref('Trip Summary');
+
+const rowsTripSummary = ref([
+  {
+    key: 1, vehicleId: 'VHCL-1002', vehicleName: 'Turbo Hawk ZR',
+    distTotal: '5680.5', distAvg: '175.6',
+    durTotal: '145h 30m', durAvg: '4h 15m',
+    idleTotal: '12h 15m', idleAvg: '0h 25m',
+    util: '45.5%', avgFuel: '12.5 L'
+  },
+  {
+    key: 2, vehicleId: 'VHCL-1003', vehicleName: 'Stealth Chaser X',
+    distTotal: '3000.8', distAvg: '130.0',
+    durTotal: '98h 10m', durAvg: '3h 45m',
+    idleTotal: '8h 40m', idleAvg: '0h 20m',
+    util: '38.2%', avgFuel: '11.8 L'
+  },
+  {
+    key: 3, vehicleId: 'VHCL-1004', vehicleName: 'Lunar Explorer 5',
+    distTotal: '4550.0', distAvg: '140.2',
+    durTotal: '112h 20m', durAvg: '4h 05m',
+    idleTotal: '10h 30m', idleAvg: '0h 22m',
+    util: '42.1%', avgFuel: '13.2 L'
+  },
+  {
+    key: 4, vehicleId: 'VHCL-1005', vehicleName: 'Raptor GT',
+    distTotal: '5000.4', distAvg: '160.4',
+    durTotal: '130h 45m', durAvg: '4h 30m',
+    idleTotal: '11h 15m', idleAvg: '0h 24m',
+    util: '48.9%', avgFuel: '14.5 L'
+  },
+  {
+    key: 5, vehicleId: 'VHCL-1006', vehicleName: 'Shadow Hunter 12',
+    distTotal: '6200.7', distAvg: '190.5',
+    durTotal: '155h 10m', durAvg: '5h 00m',
+    idleTotal: '14h 20m', idleAvg: '0h 28m',
+    util: '52.3%', avgFuel: '15.1 L'
+  },
+  {
+    key: 6, vehicleId: 'VHCL-1007', vehicleName: 'Volt Fusion R',
+    distTotal: '4500.1', distAvg: '145.8',
+    durTotal: '115h 30m', durAvg: '4h 10m',
+    idleTotal: '9h 45m', idleAvg: '0h 21m',
+    util: '40.5%', avgFuel: '10.5 L'
+  },
+  {
+    key: 7, vehicleId: 'VHCL-1008', vehicleName: 'Quantum Leap 6',
+    distTotal: '4700.3', distAvg: '155.4',
+    durTotal: '122h 40m', durAvg: '4h 25m',
+    idleTotal: '10h 50m', idleAvg: '0h 23m',
+    util: '43.8%', avgFuel: '12.8 L'
+  },
+  {
+    key: 8, vehicleId: 'VHCL-1009', vehicleName: 'Meteor Strike 11',
+    distTotal: '5200.2', distAvg: '185.0',
+    durTotal: '135h 20m', durAvg: '4h 50m',
+    idleTotal: '12h 10m', idleAvg: '0h 26m',
+    util: '49.2%', avgFuel: '14.0 L'
+  },
+  {
+    key: 9, vehicleId: 'VHCL-1010', vehicleName: 'Apex Predator S',
+    distTotal: '5900.6', distAvg: '210.7',
+    durTotal: '150h 00m', durAvg: '5h 15m',
+    idleTotal: '13h 30m', idleAvg: '0h 27m',
+    util: '55.6%', avgFuel: '16.2 L'
+  },
+  {
+    key: 10, vehicleId: 'VHCL-1011', vehicleName: 'Falcon Cruiser Z',
+    distTotal: '5300.9', distAvg: '195.2',
+    durTotal: '140h 15m', durAvg: '5h 05m',
+    idleTotal: '12h 45m', idleAvg: '0h 26m',
+    util: '50.1%', avgFuel: '14.8 L'
+  }
+]);
 
 const rowsDailyTrips = ref([
   {
@@ -565,163 +351,9 @@ const rowsDailyVehicleList = ref([
   { key: 13, date: '26/08/2025', vehicle: 'VGP6789', distance: '128.60 KM', trip: '2h 40m 35s', idle: '19m 50s', idlePct: '12.3%' },
   { key: 14, date: '26/08/2025', vehicle: 'VGP3456', distance: '102.30 KM', trip: '1h 55m 20s', idle: '10m 55s', idlePct: '9.4%' },
 ]);
-
-const mapEl = ref(null);
-let map = null;
-function initMap() {
-  if (!mapEl.value) return;
-  if (map) {
-    map.remove();
-    map = null;
-  }
-  map = L.map(mapEl.value).setView([3.111, 101.533], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
-  const route = [
-    [3.111, 101.533], // Bukit Jelutong
-    [3.115, 101.540],
-    [3.120, 101.550],
-    [3.130, 101.600],
-    [3.140, 101.650],
-    [3.150, 101.700],
-    [3.157, 101.711], // KLCC
-  ];
-  L.polyline(route, { color: '#0b5ed7', weight: 4 }).addTo(map);
-  L.marker(route[0]).bindPopup('Start Time 05:48 AM • 26/08/2025<br>Bukit Jelutong').addTo(map);
-  L.marker(route[route.length - 1]).bindPopup('End Time 06:30 AM • 26/08/2025<br>Kuala Lumpur').addTo(map);
-  map.fitBounds(L.polyline(route).getBounds(), { padding: [50, 50] });
-}
-
-watch(viewType, async (val) => {
-  if (val === 'Daily Breakdown (with map)') {
-    await nextTick();
-    initMap();
-  }
-});
-
-onMounted(async () => {
-  if (viewType.value === 'Daily Breakdown (with map)') {
-    await nextTick();
-    initMap();
-  }
-});
-</script>
-
-<script>
-const ReportSummary = {
-  name: 'ReportSummary',
-  template: `
-  <div class="card border rounded-3 shadow-0 mb-3">
-    <div class="card-header bg-white border-bottom-0 pt-3 ps-3"><h6 class="mb-0 fw-bold">Vehicle Activity Report Result</h6></div>
-    <div class="card-body pt-0">
-      <div class="row g-3">
-        <div class="col-12 col-md-3">
-          <div class="small text-muted">Vehicle ID</div>
-          <div class="fw-semibold">VGPS2563</div>
-        </div>
-        <div class="col-12 col-md-3">
-          <div class="small text-muted">Device ID</div>
-          <div class="fw-semibold">#34939829</div>
-        </div>
-        <div class="col-12 col-md-3">
-          <div class="small text-muted">Duration</div>
-          <div class="fw-semibold">2025-08-26 00:00 - 2025-08-31 23:59</div>
-        </div>
-        <div class="col-12 col-md-3">
-          <div class="small text-muted">View Type</div>
-          <div class="fw-semibold">Summary</div>
-        </div>
-        <div class="col-12">
-          <div class="small text-muted">Remarks</div>
-          <div class="fw-semibold">Average fuel consumption calculated up to 6 months of data. Fuel refill amount shown for duration selected. Fuel refill amount does not imply fuel consumed in the same duration selected.</div>
-        </div>
-      </div>
-    </div>
-  </div>`
-};
-
-const ChartAndKPIs = {
-  name: 'ChartAndKPIs',
-  template: `
-  <div class="row g-3 mb-3">
-    <div class="col-12 col-lg-6">
-      <div class="card border rounded-3 shadow-0 h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center gap-3 mb-2">
-             <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#e83e8c;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Trip Duration</span></div>
-             <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#0b0f28;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Idle Duration</span></div>
-             <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#339af0;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Distance</span></div>
-          </div>
-          <svg viewBox="0 0 600 260" width="100%" height="220">
-            <rect x="0" y="0" width="600" height="220" fill="#fff" rx="8"/>
-            <!-- Grid lines -->
-            <line x1="40" y1="40" x2="580" y2="40" stroke="#f1f3f5" stroke-dasharray="4"/>
-            <line x1="40" y1="80" x2="580" y2="80" stroke="#f1f3f5" stroke-dasharray="4"/>
-            <line x1="40" y1="120" x2="580" y2="120" stroke="#f1f3f5" stroke-dasharray="4"/>
-            <line x1="40" y1="160" x2="580" y2="160" stroke="#f1f3f5" stroke-dasharray="4"/>
-            <line x1="40" y1="200" x2="580" y2="200" stroke="#f1f3f5" stroke-dasharray="4"/>
-            <g transform="translate(10,0)">
-              <!-- Bars (Distance - Blue) -->
-              <rect v-for="(bar,i) in [140, 100, 80, 160, 120, 70, 110]" :key="'b'+i" :x="40 + i*75" :y="200-bar" width="20" :height="bar" fill="#339af0" rx="2"/>
-              <!-- Bars (Idle - Dark) - Mocking different values -->
-              <rect v-for="(bar,i) in [40, 30, 20, 50, 40, 10, 30]" :key="'i'+i" :x="40 + i*75 + 24" :y="200-bar" width="20" :height="bar" fill="#0b0f28" rx="2"/>
-              <!-- Line (Trip Duration - Pink) -->
-              <path d="M50 120 L125 80 L200 140 L275 70 L350 110 L425 90 L500 130" stroke="#e83e8c" stroke-width="3" fill="none"/>
-              <circle v-for="(cx,i) in [50, 125, 200, 275, 350, 425, 500]" :key="'p'+i" :cx="cx" :cy="[120, 80, 140, 70, 110, 90, 130][i]" r="4" fill="#e83e8c"/>
-            </g>
-          </svg>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-lg-6">
-      <div class="card border rounded-3 shadow-0 h-100">
-        <div class="card-body">
-          <div class="row g-3 h-100">
-            <div class="col-12 col-md-5">
-              <div class="h-100 d-flex flex-column justify-content-center">
-                <div class="small text-muted mb-1">Total Duration</div>
-                <div class="display-6 fw-bold mb-3">2h 8m 8s</div>
-
-                <div class="progress mb-1" style="height: 8px;"><div class="progress-bar" style="width:90%; background-color: #e83e8c;"></div></div>
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                   <div class="small fw-semibold" style="color: #e83e8c;">Trip Duration</div>
-                   <div class="fw-bold">1h 54m 27s</div>
-                </div>
-
-                <div class="progress mb-1" style="height: 8px;"><div class="progress-bar" style="width:10%; background-color: #0b0f28;"></div></div>
-                <div class="d-flex justify-content-between align-items-center">
-                   <div class="small fw-semibold" style="color: #0b0f28;">Idle Duration</div>
-                   <div class="fw-bold">13m 41s</div>
-                </div>
-              </div>
-            </div>
-            <div class="col-12 col-md-7 border-start">
-              <div class="ps-md-3 h-100 d-flex flex-column justify-content-center">
-                <h6 class="fw-bold mb-3">Summary</h6>
-                <div class="d-flex justify-content-between mb-2"><span class="small text-muted">Total Distance (km)</span><span class="fw-semibold">126.53 KM</span></div>
-                <div class="d-flex justify-content-between mb-2"><span class="small text-muted">Total Trip Duration (hr)</span><span class="fw-semibold">1h 54m 27s</span></div>
-                <div class="d-flex justify-content-between mb-2"><span class="small text-muted">Total Idling (hr)</span><span class="fw-semibold">13m 41s</span></div>
-                <div class="d-flex justify-content-between mb-2"><span class="small text-muted">Idling Percentage vs Trip Duration</span><span class="fw-semibold">11.23%</span></div>
-                <div class="d-flex justify-content-between mb-2"><span class="small text-muted">Average Fuel Consumption (km/litre)</span><span class="fw-semibold">0 km/l</span></div>
-                <div class="d-flex justify-content-between"><span class="small text-muted">Total Fuel Usage (litre)</span><span class="fw-semibold">0 Litre</span></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>`
-};
 </script>
 
 <style scoped>
-thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; border-color: rgba(255,255,255,0.15); vertical-align: middle; }
-thead.table-dark tr th.bg-custom-blue { background-color: #00b0f0 !important; border-color: rgba(255,255,255,0.15); }
-tbody tr td { font-size: 13px; vertical-align: middle; }
 .panel .card-body { padding-top: 1rem; padding-bottom: 1rem; }
-.badge.border { border: 1px solid currentColor; }
 .card-header h6 { font-weight: 600; }
-.table-striped tbody tr:nth-of-type(odd) { --bs-table-accent-bg: #f8f9fb; }
 </style>

@@ -181,7 +181,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item d-testingmode" :class="{ 'menu-open': route.path.startsWith('/reports') }" v-if="!isAdminOrDistributor && hasPerm('reports','read')">
+                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode, 'menu-open': route.path.startsWith('/reports') }" v-if="!isAdminOrDistributor && hasPerm('reports','read')">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/reports') }">
                                 <i class="nav-icon bi bi-bar-chart"></i>
                                 <p>
@@ -341,11 +341,16 @@ const isTestingMode = ref(false);
 provide('isTestingMode', isTestingMode);
 
 const checkTestingMode = () => {
-    // Support both lowercase and camelCase
+    // Check for environment variable configuration
+    const envTestingMode = import.meta.env.VITE_TESTING_MODE;
+
+    // Support both lowercase and camelCase query params
     const rawQ = route.query.testingmode ?? route.query.testingMode;
     const q = rawQ !== null && rawQ !== undefined ? String(rawQ) : null;
 
-    if (q === '1') {
+    if (envTestingMode === 'true') {
+        isTestingMode.value = true;
+    } else if (q === '1') {
         console.log('testingMode on hai');
         localStorage.setItem('testingMode', '1');
         isTestingMode.value = true;
