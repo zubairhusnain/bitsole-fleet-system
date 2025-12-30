@@ -687,7 +687,7 @@ class VehicleController extends Controller
         $ids = is_array($ids) ? $ids : [$ids];
         $ids = array_values(array_filter(array_map('intval', $ids), fn($v) => $v > 0));
         $results = [];
-       
+
         foreach ($ids as $geoId) {
             try {
                 $resp = $this->permissionService->assignGeofence($request, $deviceId, $geoId, 'POST');
@@ -861,6 +861,7 @@ class VehicleController extends Controller
         // Handle bulk assignment
         if ($request->has('items') && is_array($request->input('items'))) {
             $items = $request->input('items');
+            Log::info('Bulk assigning notifications', ['count' => count($items), 'deviceId' => $deviceId]);
             $results = [];
             foreach ($items as $item) {
                 $notificationId = (int) ($item['notificationId'] ?? 0);
@@ -868,17 +869,26 @@ class VehicleController extends Controller
 
                 // Create a new request instance with merged data for this item
                 $mergedData = array_merge($request->all(), $item);
-                // Pass merged data as 2nd argument (request/POST params) to ensure it overrides body
-                // First argument (query) is null, so it inherits from original (likely empty)
-                $itemReq = $request->duplicate(null, $mergedData);
+
+                // Override CONTENT_TYPE to ensure input() reads from request parameters
+                // instead of JSON payload (which duplicate() doesn't update)
+                $server = array_merge($request->server->all(), [
+                    'CONTENT_TYPE' => 'application/x-www-form-urlencoded',
+                    'REQUEST_METHOD' => 'POST'
+                ]);
+
+                // Pass merged data as 2nd argument (request/POST params)
+                $itemReq = $request->duplicate(null, $mergedData, null, null, null, $server);
 
                 // assignNotification relies on $request->user()
                 $itemReq->setUserResolver(fn () => $request->user());
 
                 try {
+                    // Log::info('Assigning notification item', ['nid' => $notificationId, 'already_xist' => $itemReq->input('already_xist')]);
                     $resp = $this->permissionService->assignNotification($itemReq, $deviceId, $notificationId);
                     $results[] = ['notificationId' => $notificationId, 'ok' => true, 'response' => $resp];
                 } catch (\Throwable $e) {
+                    Log::error('Assign notification error', ['nid' => $notificationId, 'error' => $e->getMessage()]);
                     $results[] = ['notificationId' => $notificationId, 'ok' => false, 'error' => $e->getMessage()];
                 }
             }

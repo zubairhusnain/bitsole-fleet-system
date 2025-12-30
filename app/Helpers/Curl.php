@@ -76,6 +76,7 @@ Trait Curl
         curl_close($ch);
         return $res;
     }
+    
 
 
 
