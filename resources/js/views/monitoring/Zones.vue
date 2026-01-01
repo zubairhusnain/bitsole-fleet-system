@@ -161,12 +161,12 @@
                 </td>
                 <td class="text-center">
                     <span class="badge rounded-pill px-3 py-2" style="background-color: #8B4513; color: white;">
-                        {{ zone.count || 0 }} Vehicles
+                        {{ zone.assigned_count || 0 }} Vehicles
                     </span>
                 </td>
                 <td class="text-center">
                     <span class="badge bg-success-subtle text-success rounded-pill px-3 py-2">
-                        {{ zone.count || 0 }} Vehicles
+                        {{ zone.inside_count || 0 }} Vehicles
                     </span>
                 </td>
                 <td class="text-end">

@@ -212,25 +212,55 @@ class MonitoringController extends Controller
             ->whereIn('deviceid', $deviceIds->all())
             ->get(['deviceid', 'geofenceid']);
 
-        $byZoneCounts = [];
+        $assignedCounts = [];
         foreach ($links as $ln) {
             $gid = (int) $ln->geofenceid;
-            if (!isset($byZoneCounts[$gid])) $byZoneCounts[$gid] = 0;
-            $byZoneCounts[$gid]++;
+            if (!isset($assignedCounts[$gid])) $assignedCounts[$gid] = 0;
+            $assignedCounts[$gid]++;
         }
 
-        $vehiclesInAnyZone = $links->pluck('deviceid')->unique()->count();
+
+        // Real-time "Inside" Counts based on device position
+        $insideCounts = [];
+        $devicesInsideAny = [];
+
+        $devicesWithPos = TcDevice::with('position')
+            ->whereIn('id', $deviceIds->all())
+            ->get();
+
+        foreach ($devicesWithPos as $dev) {
+            if (!$dev->position || empty($dev->position->geofenceids)) continue;
+
+            // geofenceids is comma-separated string in Traccar (e.g. "1, 2")
+            $gids = explode(',', $dev->position->geofenceids);
+            $inAllowed = false;
+
+            foreach ($gids as $gidStr) {
+                $gid = (int) trim($gidStr);
+                if ($gid > 0 && in_array($gid, $allowedIds->all())) {
+                    if (!isset($insideCounts[$gid])) $insideCounts[$gid] = 0;
+                    $insideCounts[$gid]++;
+                    $inAllowed = true;
+                }
+            }
+            if ($inAllowed) {
+                $devicesInsideAny[] = $dev->id;
+            }
+        }
+
+        $vehiclesInAnyZone = count(array_unique($devicesInsideAny));
 
         $zoneRows = TcGeofence::query()->whereIn('id', $allowedIds->all())->get()->keyBy('id');
         $localZones = Zones::whereIn('geofence_id', $allowedIds->all())->get()->keyBy('geofence_id');
 
-        $zones = $allowedIds->map(function ($gid) use ($zoneRows, $byZoneCounts, $totalDevices, $localZones) {
+        $zones = $allowedIds->map(function ($gid) use ($zoneRows, $assignedCounts, $insideCounts, $totalDevices, $localZones) {
             $gf = $zoneRows->get((int) $gid);
             if (!$gf) return null;
 
             $localZone = $localZones->get((int) $gid);
-            $count = $byZoneCounts[(int) $gid] ?? 0;
-            $percent = $totalDevices > 0 ? (int) floor(($count / $totalDevices) * 100) : 0;
+            $assigned = $assignedCounts[(int) $gid] ?? 0;
+            $inside = $insideCounts[(int) $gid] ?? 0;
+            $percent = $totalDevices > 0 ? (int) floor(($assigned / $totalDevices) * 100) : 0;
 
             return [
                 'id' => (int) $gid,
@@ -239,11 +269,14 @@ class MonitoringController extends Controller
                 'created_at' => $localZone ? $localZone->created_at : null,
                 'updated_at' => $localZone ? $localZone->updated_at : null,
                 'status' => $localZone ? $localZone->status : 'active',
-                'count' => $count,
+                'count' => $assigned, // Backward compatibility (Assign Vehicles)
+                'assigned_count' => $assigned,
+                'inside_count' => $inside,
                 'percent' => $percent,
                 'vehicles' => [], // Empty to improve performance
             ];
         })->filter()->values()->all();
+
 
         return response()->json([
             'zones' => $zones,

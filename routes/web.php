@@ -242,3 +242,5 @@ Route::middleware(['auth'])->prefix('/web/notifications')->group(function () {
     Route::post('/', [\App\Http\Controllers\NotificationController::class, 'store']);
     Route::post('/assign', [\App\Http\Controllers\NotificationController::class, 'assign']);
 });
+
+
