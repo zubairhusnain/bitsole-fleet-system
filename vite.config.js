@@ -2,8 +2,17 @@ import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
+import { readFileSync } from 'fs';
+
+// Read package.json to get the version
+const packageJson = JSON.parse(readFileSync('./package.json'));
+const version = packageJson.version;
 
 export default defineConfig({
+    define: {
+        'import.meta.env.VITE_APP_VERSION': JSON.stringify(version),
+        'import.meta.env.VITE_BUILD_TIMESTAMP': JSON.stringify(new Date().toISOString()),
+    },
     plugins: [
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.js'],

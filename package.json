@@ -4,7 +4,9 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "watch": "vite build --watch",
+        "dev": "vite",
+        "release": "npm version patch && vite build"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

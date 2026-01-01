@@ -16,14 +16,13 @@
           <div class="col-12 col-md-4">
             <label class="form-label small fw-semibold text-muted">Duration</label>
             <div class="input-group">
-              <input v-model="duration" type="text" class="form-control" placeholder="yyyy-mm-dd to yyyy-mm-dd" />
-              <span class="input-group-text bg-white"><i class="bi bi-calendar3"></i></span>
+              <input v-model="duration" type="text" class="form-control" placeholder="dd/mm/yyyy - dd/mm/yyyy" />
             </div>
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label small fw-semibold text-muted">Vehicle</label>
             <select v-model="vehicle" class="form-select text-muted">
-              <option value="">--Select Vehicle--</option>
+              <option value="">--Select an Vehicle--</option>
               <option>VGPS2563</option>
               <option>VHCL-1006</option>
               <option>VHCL-1009</option>
@@ -43,7 +42,7 @@
             </select>
           </div>
           <div class="col-12 col-md-1 text-md-end">
-            <button class="btn btn-primary w-100">Submit</button>
+            <button class="btn btn-primary w-100">Search</button>
           </div>
         </div>
       </div>
@@ -68,16 +67,16 @@
 
 <script setup>
 import { ref } from 'vue';
-import TripSummary from './components/trip-analysis/TripSummary.vue';
 import DailyBreakdown from './components/trip-analysis/DailyBreakdown.vue';
 import DailyBreakdownMap from './components/trip-analysis/DailyBreakdownMap.vue';
 import DailySummary from './components/trip-analysis/DailySummary.vue';
 import DailySummaryList from './components/trip-analysis/DailySummaryList.vue';
 import MonthlySummary from './components/trip-analysis/MonthlySummary.vue';
 import MonthlySummaryList from './components/trip-analysis/MonthlySummaryList.vue';
+import TripSummary from './components/trip-analysis/TripSummary.vue';
 
-const duration = ref('2025-08-26 to 2025-08-31');
-const vehicle = ref('VGPS2563');
+const duration = ref('');
+const vehicle = ref('');
 const viewType = ref('Trip Summary');
 
 const rowsTripSummary = ref([
@@ -86,70 +85,100 @@ const rowsTripSummary = ref([
     distTotal: '5680.5', distAvg: '175.6',
     durTotal: '145h 30m', durAvg: '4h 15m',
     idleTotal: '12h 15m', idleAvg: '0h 25m',
-    util: '45.5%', avgFuel: '12.5 L'
+    util: '45.5%',
+    avgLitres: '412.75', avgKmL: '12.5',
+    fuelRefill: '320 L', fuelRefillFreq: '12',
+    speed: '0 km/h'
   },
   {
     key: 2, vehicleId: 'VHCL-1003', vehicleName: 'Stealth Chaser X',
     distTotal: '3000.8', distAvg: '130.0',
     durTotal: '98h 10m', durAvg: '3h 45m',
     idleTotal: '8h 40m', idleAvg: '0h 20m',
-    util: '38.2%', avgFuel: '11.8 L'
+    util: '38.2%',
+    avgLitres: '298.90', avgKmL: '10.2',
+    fuelRefill: '154 L', fuelRefillFreq: '10',
+    speed: '0 km/h'
   },
   {
     key: 3, vehicleId: 'VHCL-1004', vehicleName: 'Lunar Explorer 5',
     distTotal: '4550.0', distAvg: '140.2',
     durTotal: '112h 20m', durAvg: '4h 05m',
     idleTotal: '10h 30m', idleAvg: '0h 22m',
-    util: '42.1%', avgFuel: '13.2 L'
+    util: '42.1%',
+    avgLitres: '376.85', avgKmL: '11.5',
+    fuelRefill: '245 L', fuelRefillFreq: '9',
+    speed: '0 km/h'
   },
   {
     key: 4, vehicleId: 'VHCL-1005', vehicleName: 'Raptor GT',
     distTotal: '5000.4', distAvg: '160.4',
     durTotal: '130h 45m', durAvg: '4h 30m',
     idleTotal: '11h 15m', idleAvg: '0h 24m',
-    util: '48.9%', avgFuel: '14.5 L'
+    util: '48.9%',
+    avgLitres: '450.00', avgKmL: '11.1',
+    fuelRefill: '290 L', fuelRefillFreq: '11',
+    speed: '0 km/h'
   },
   {
     key: 5, vehicleId: 'VHCL-1006', vehicleName: 'Shadow Hunter 12',
     distTotal: '6200.7', distAvg: '190.5',
     durTotal: '155h 10m', durAvg: '5h 00m',
     idleTotal: '14h 20m', idleAvg: '0h 28m',
-    util: '52.3%', avgFuel: '15.1 L'
+    util: '52.3%',
+    avgLitres: '520.25', avgKmL: '11.9',
+    fuelRefill: '410 L', fuelRefillFreq: '14',
+    speed: '0 km/h'
   },
   {
     key: 6, vehicleId: 'VHCL-1007', vehicleName: 'Volt Fusion R',
     distTotal: '4500.1', distAvg: '145.8',
     durTotal: '115h 30m', durAvg: '4h 10m',
     idleTotal: '9h 45m', idleAvg: '0h 21m',
-    util: '40.5%', avgFuel: '10.5 L'
+    util: '40.5%',
+    avgLitres: '389.90', avgKmL: '11.5',
+    fuelRefill: '123 L', fuelRefillFreq: '7',
+    speed: '0 km/h'
   },
   {
     key: 7, vehicleId: 'VHCL-1008', vehicleName: 'Quantum Leap 6',
     distTotal: '4700.3', distAvg: '155.4',
     durTotal: '122h 40m', durAvg: '4h 25m',
     idleTotal: '10h 50m', idleAvg: '0h 23m',
-    util: '43.8%', avgFuel: '12.8 L'
+    util: '43.8%',
+    avgLitres: '395.75', avgKmL: '11.8',
+    fuelRefill: '200 L', fuelRefillFreq: '8',
+    speed: '0 km/h'
   },
   {
     key: 8, vehicleId: 'VHCL-1009', vehicleName: 'Meteor Strike 11',
     distTotal: '5200.2', distAvg: '185.0',
     durTotal: '135h 20m', durAvg: '4h 50m',
     idleTotal: '12h 10m', idleAvg: '0h 26m',
-    util: '49.2%', avgFuel: '14.0 L'
+    util: '49.2%',
+    avgLitres: '460.80', avgKmL: '11.3',
+    fuelRefill: '370 L', fuelRefillFreq: '13',
+    speed: '0 km/h'
   },
   {
     key: 9, vehicleId: 'VHCL-1010', vehicleName: 'Apex Predator S',
     distTotal: '5900.6', distAvg: '210.7',
     durTotal: '150h 00m', durAvg: '5h 15m',
     idleTotal: '13h 30m', idleAvg: '0h 27m',
-    util: '55.6%', avgFuel: '16.2 L'
+    util: '55.6%',
+    avgLitres: '510.55', avgKmL: '11.6',
+    fuelRefill: '500 L', fuelRefillFreq: '15',
+    speed: '0 km/h'
   },
   {
     key: 10, vehicleId: 'VHCL-1011', vehicleName: 'Falcon Cruiser Z',
     distTotal: '5300.9', distAvg: '195.2',
     durTotal: '140h 15m', durAvg: '5h 05m',
     idleTotal: '12h 45m', idleAvg: '0h 26m',
-    util: '50.1%', avgFuel: '14.8 L'
+    util: '50.1%',
+    avgLitres: '485.60', avgKmL: '10.9',
+    fuelRefill: '380 L', fuelRefillFreq: '12',
+    speed: '0 km/h'
   }
 ]);
 

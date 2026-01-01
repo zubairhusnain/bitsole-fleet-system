@@ -307,7 +307,7 @@
 
         <!--begin::Footer-->
         <footer class="app-footer">
-            <div class="float-end d-none d-sm-inline">Anything you want</div>
+            <div class="float-end d-none d-sm-inline">v{{ version }}</div>
             <strong>
                 Copyright &copy; {{ year }} {{ appName }}.
             </strong>
@@ -333,6 +333,7 @@ const sidebarOpen = ref(false);
 const isProd = import.meta.env.PROD;
 const appName = document.title || 'Omayer Fleet System';
 const year = new Date().getFullYear();
+const version = import.meta.env.VITE_APP_VERSION || '1.0.0';
 const unreadCount = ref(0);
 const myDeviceIds = ref([]);
 let echoChannel = null;
@@ -442,6 +443,7 @@ const listenForAlerts = () => {
         });
     }
 };
+
 
 // Dev-only broadcast ping to ensure updates flow (mirrors LiveTracking)
 let broadcastPing = null;
