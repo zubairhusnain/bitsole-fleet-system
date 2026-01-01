@@ -31,7 +31,15 @@
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label small fw-semibold text-muted">View Type</label>
-            <input v-model="viewType" type="text" class="form-control" placeholder="Summery" />
+            <select v-model="viewType" class="form-select text-muted">
+              <option>Trip Summary</option>
+              <option>Daily Breakdown</option>
+              <option>Daily Breakdown (with map)</option>
+              <option>Daily Summary</option>
+              <option>Daily Summary List</option>
+              <option>Monthly Summary</option>
+              <option>Monthly Summary List</option>
+            </select>
           </div>
           <div class="col-12 col-md-1 text-md-end">
             <button class="btn btn-primary w-100">Search</button>
@@ -42,7 +50,7 @@
 
     <DailyBreakdown v-if="viewType === 'Daily Breakdown'" :rowsDailyTrips="rowsDailyTrips" />
 
-    <TripSummary v-else-if="viewType === 'Summery'" :rowsTripSummary="rowsTripSummary" />
+    <TripSummary v-else-if="viewType === 'Trip Summary'" :rowsTripSummary="rowsTripSummary" />
 
     <DailySummaryList v-else-if="viewType === 'Daily Summary List'" :rowsDailyVehicleList="rowsDailyVehicleList" />
 
@@ -69,7 +77,7 @@ import TripSummary from './components/trip-analysis/TripSummary.vue';
 
 const duration = ref('');
 const vehicle = ref('');
-const viewType = ref('Summery');
+const viewType = ref('Trip Summary');
 
 const rowsTripSummary = ref([
   {
