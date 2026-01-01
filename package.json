@@ -8,6 +8,7 @@
         "dev": "vite",
         "release": "npm version patch && vite build"
     },
+    "version": "1.0.0",
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
         "@vitejs/plugin-vue": "^5.2.4",

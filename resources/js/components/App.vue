@@ -307,7 +307,7 @@
 
         <!--begin::Footer-->
         <footer class="app-footer">
-            <div class="float-end d-none d-sm-inline">v{{ version }}</div>
+            <div class="float-end d-none d-sm-inline">Version {{ version }}</div>
             <strong>
                 Copyright &copy; {{ year }} {{ appName }}.
             </strong>
