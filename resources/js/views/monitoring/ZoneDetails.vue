@@ -121,9 +121,9 @@
                 </td>
                 <td class="text-end pe-4">
                   <div class="btn-group btn-group-sm">
-                    <RouterLink :to="`/vehicles/${vehicle.id}`" class="btn btn-outline-primary rounded-circle me-1" title="View" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+                    <button @click="showDetails(vehicle)" class="btn btn-outline-primary rounded-circle me-1" title="View" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
                       <i class="bi bi-eye"></i>
-                    </RouterLink>
+                    </button>
                     <RouterLink :to="`/vehicles/${vehicle.id}/edit`" class="btn btn-outline-secondary rounded-circle" title="Edit" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
                         <i class="bi bi-pencil-square"></i>
                     </RouterLink>
@@ -156,6 +156,139 @@
         </nav>
       </div>
     </div>
+    <!-- Vehicle Details Modal (Custom Implementation) -->
+    <div v-if="showDetailsModal" class="driver-modal-overlay" @click.self="closeModal">
+      <div class="driver-modal overflow-hidden position-relative" role="dialog" aria-modal="true" style="max-width: 800px;">
+        <div class="modal-body p-0" v-if="selectedVehicle">
+
+            <!-- Close Button -->
+            <button type="button" class="btn-close position-absolute top-0 end-0 m-3 z-3" @click="closeModal" aria-label="Close"></button>
+
+            <!-- Header Image -->
+            <div class="p-3">
+                <div class="position-relative bg-light rounded-4 overflow-hidden" style="height: 250px;">
+                    <img v-if="selectedVehicle.photos && selectedVehicle.photos.length"
+                         :src="photoUrl(selectedVehicle.photos[0])"
+                         class="w-100 h-100 object-fit-cover"
+                         alt="Vehicle Image"
+                         onerror="this.src='https://placehold.co/800x400/e9ecef/6c757d?text=Vehicle+Image'">
+                    <img v-else src="https://placehold.co/800x400/e9ecef/6c757d?text=Vehicle+Image"
+                         class="w-100 h-100 object-fit-cover"
+                         alt="Vehicle Placeholder"
+                         onerror="this.style.display='none'">
+                </div>
+            </div>
+
+            <div class="px-4 pb-4">
+                <!-- Title -->
+                <h5 class="fw-bold mb-4 text-dark">Vehicle Status Information</h5>
+
+                <!-- Grid -->
+                <div class="row g-4">
+                    <!-- Row 1 -->
+                    <div class="col-6 col-md-3">
+                        <div class="fw-bold mb-1 text-dark">Vehicle ID</div>
+                        <div class="text-muted">{{ selectedVehicle.vehicle_no || selectedVehicle.name }}</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="fw-bold mb-1 text-dark">Device ID</div>
+                        <div class="text-muted">{{ selectedVehicle.uniqueid }}</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="fw-bold mb-1 text-dark">Vehicle Type</div>
+                        <div class="text-muted">{{ selectedVehicle.type }}</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="fw-bold mb-1 text-dark">Model</div>
+                        <div class="text-muted">{{ selectedVehicle.model }}</div>
+                    </div>
+
+                    <!-- Row 2 -->
+                    <div class="col-6 col-md-3">
+                        <div class="fw-bold mb-1 text-dark">Ignition</div>
+                        <div class="text-muted">{{ selectedVehicle.ignition ? 'On' : 'Off' }}</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="fw-bold mb-1 text-dark">Last Ignition On</div>
+                        <div class="text-muted">{{ selectedVehicle.last_ignition_on || 'N/A' }}</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="fw-bold mb-1 text-dark">Last Ignition Off</div>
+                        <div class="text-muted">{{ selectedVehicle.last_ignition_off || 'N/A' }}</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="fw-bold mb-1 text-dark">Speed</div>
+                        <div class="text-muted">{{ selectedVehicle.speed }} km/h</div>
+                    </div>
+
+                    <!-- Row 3 -->
+                    <div class="col-6 col-md-3">
+                        <div class="fw-bold mb-1 text-dark">Zone Name</div>
+                        <div class="text-muted">{{ zoneName }}</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="fw-bold mb-1 text-dark">Last Report</div>
+                        <div class="text-muted">{{ selectedVehicle.last_update }}</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="fw-bold mb-1 text-dark">Status</div>
+                        <div :class="{
+                            'text-success fw-bold': selectedVehicle.status === 'Online',
+                            'text-danger fw-bold': selectedVehicle.status === 'Offline',
+                            'text-muted': !['Online', 'Offline'].includes(selectedVehicle.status)
+                        }">
+                            {{ selectedVehicle.status || 'N/A' }}
+                        </div>
+                    </div>
+
+                    <!-- Row 4 -->
+                    <div class="col-12">
+                        <div class="fw-bold mb-1 text-dark">Location</div>
+                        <a :href="`https://maps.google.com/?q=${selectedVehicle.lat},${selectedVehicle.lng}`" target="_blank" class="text-decoration-none text-info">
+                            {{ selectedVehicle.address || `${selectedVehicle.lat}, ${selectedVehicle.lng}` }}
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-body p-5 text-center" v-else>
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Popup -->
+    <div v-if="showAlertStatusPopup" class="driver-modal-overlay" @click.self="closeAlertStatusPopup">
+      <div class="driver-modal overflow-hidden" role="dialog" aria-modal="true" style="max-width: 400px;">
+        <div class="modal-header">
+          <h5 class="fw-bold mb-0">Change Status</h5>
+          <button type="button" class="btn-close" @click="closeAlertStatusPopup"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Alerts</label>
+            <select v-model="selectedAlertStatus" class="form-select">
+              <option value="" disabled>--Select Alerts Status--</option>
+              <option value="enabled">Enable Alerts</option>
+              <option value="disabled">Disable Alerts</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Maintenance</label>
+            <select v-model="selectedMaintenanceStatus" class="form-select">
+              <option value="" disabled>--Select Maintenance Status--</option>
+              <option value="enabled">Enable Maintenance</option>
+              <option value="disabled">Disable Maintenance</option>
+            </select>
+          </div>
+          <button class="btn btn-primary w-100" @click="updateAlertStatus" :disabled="submittingStatus">
+            {{ submittingStatus ? 'Updating...' : 'Update Status' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -178,13 +311,194 @@ const vehicles = ref([]);
 const zonePolygon = ref([]);
 const zoneCircle = ref(null);
 const center = ref([0, 0]);
-const zoom = ref(13);
+const zoom = ref(5);
 const mapReady = ref(false);
 const error = ref('');
 const loading = ref(true);
 const mapType = ref('osm');
 const mapKey = ref(0);
 const mapRef = ref(null);
+
+// Modal State
+const selectedVehicle = ref(null);
+const showDetailsModal = ref(false);
+const showAlertStatusPopup = ref(false);
+const selectedAlertStatus = ref('');
+const selectedMaintenanceStatus = ref('');
+const alertStatusTargetId = ref(null);
+const submittingStatus = ref(false);
+
+// Helper for date formatting
+const formatDate = (dateStr) => {
+    if (!dateStr || dateStr === 'N/A') return 'N/A';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'N/A';
+    // Format: DD/MM/YYYY - HH:mm
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year}-${hours}:${minutes}`;
+};
+
+const parseAttrs = (a) => {
+    if (!a) return {};
+    if (typeof a === 'object') return a;
+    try { return JSON.parse(a); } catch { return {}; }
+};
+
+const photoUrl = (p) => {
+    if (!p && p !== 0) return '';
+    const raw = String(p).trim();
+    if (!raw) return '';
+    if (raw.startsWith('http') || raw.startsWith('data:')) return raw;
+    if (raw.startsWith('/')) return raw; // already absolute from root
+    if (raw.startsWith('storage/')) return `/${raw}`;
+    if (raw.startsWith('public/')) return `/${raw.replace(/^public\//, 'storage/')}`;
+    // default: treat as a public disk path under storage
+    return `/storage/${raw.replace(/^\/*/, '')}`;
+};
+
+const showDetails = async (vehicle) => {
+    if (!vehicle || !vehicle.id) return;
+
+    // Set initial state
+    selectedVehicle.value = null;
+    showDetailsModal.value = true;
+
+    try {
+        const { data } = await axios.get(`/web/monitoring/vehicles/${vehicle.id}`);
+
+        const tc = data.tc_device || data.tcDevice || {};
+        const pos = tc.position || {};
+        const attrs = parseAttrs(pos.attributes);
+        const deviceAttrs = parseAttrs(tc.attributes);
+        const allAttrs = { ...deviceAttrs, ...attrs };
+
+        // Helper to extract photos (logic from Detail.vue)
+        const getPhotos = () => {
+            const out = [];
+            const toPath = (it) => {
+                if (!it && it !== 0) return '';
+                if (Array.isArray(it)) return it.map(toPath).filter(Boolean);
+                if (typeof it === 'string') {
+                    const s = it.trim();
+                    if (!s) return '';
+                    if ((s.startsWith('[') && s.endsWith(']')) || (s.startsWith('{') && s.endsWith('}'))) {
+                        try {
+                            const parsed = JSON.parse(s);
+                            return toPath(parsed);
+                        } catch { }
+                    }
+                    return s;
+                }
+                if (typeof it === 'number') return String(it);
+                if (typeof it === 'object') {
+                    const cand = it.url ?? it.path ?? it.src ?? it.image ?? it.photo;
+                    return typeof cand === 'string' ? cand.trim() : '';
+                }
+                return '';
+            };
+
+            const pick = (keys) => {
+                for (const k of keys) {
+                    if (allAttrs[k] != null && allAttrs[k] !== '') return allAttrs[k];
+                }
+                return null;
+            };
+
+            const arrLike = pick(['photos', 'images']);
+            const arrResolved = toPath(arrLike);
+            if (Array.isArray(arrResolved)) out.push(...arrResolved);
+            else if (typeof arrResolved === 'string' && arrResolved) out.push(arrResolved);
+
+            const single = toPath(pick(['photo', 'image', 'vehiclePhoto', 'vehicleImage']));
+            if (Array.isArray(single)) out.push(...single);
+            else if (typeof single === 'string' && single) out.push(single);
+
+            return Array.from(new Set(out.filter(v => typeof v === 'string' && v.trim() !== '')));
+        };
+
+        selectedVehicle.value = {
+            id: data.device_id || data.id,
+            // Use vehicle_id_attr if available, otherwise fallback to name, then 'Unknown'
+            vehicle_no: data.vehicle_no || data.vehicle_id_attr || data.name,
+            name: data.vehicle_id_attr || tc.name || data.name || 'Unknown',
+            uniqueid: tc.uniqueid || data.uniqueid || 'N/A',
+            plate: data.plate || tc.plate || 'N/A',
+            lat: parseFloat(pos.latitude) || 0,
+            lng: parseFloat(pos.longitude) || 0,
+            speed: pos.speed != null ? Number((parseFloat(pos.speed) * 1.852).toFixed(1)) : 0,
+            driver_name: data.driver_name || tc.driverUniqueId || 'N/A',
+            last_update: formatDate(pos.servertime || pos.fixtime),
+            fuel: attrs.fuel || 0,
+            odometer: attrs.odometer || 0,
+            ignition: attrs.ignition || false,
+            group: data.group || 'Default Group',
+            model: tc.model || data.model || 'Unknown',
+            type: deviceAttrs.type || 'Unknown',
+            owner: data.manager ? data.manager.name : (data.group || 'N/A'),
+            maintenance_count: data.maintenance_count || 0,
+            alert_count: data.alert_count || 0,
+            blocked: data.blocked,
+            last_ignition_on: formatDate(data.last_ignition_on),
+            last_ignition_off: formatDate(data.last_ignition_off),
+            address: pos.address,
+            // Format maintenance string
+            maintenance: data.maintenance_count > 0 ? `${data.maintenance_count} Due` : 'N/A',
+            alert_status: deviceAttrs.alert_status || '',
+            maintenance_status: deviceAttrs.maintenance_status || '',
+            status: (data.status && data.status.toLowerCase() === 'online') ||
+                   (tc.status && tc.status.toLowerCase() === 'online') ||
+                   (vehicle.status && vehicle.status.toLowerCase() === 'online') ? 'Online' : 'Offline',
+            photos: getPhotos()
+        };
+    } catch (e) {
+        console.error("Failed to fetch vehicle details", e);
+        // Fallback to passed vehicle object if API fails
+        selectedVehicle.value = {
+            ...vehicle,
+            last_update: formatDate(vehicle.last_update),
+            last_ignition_on: 'N/A',
+            last_ignition_off: 'N/A',
+            status: vehicle.status && vehicle.status.toLowerCase() === 'online' ? 'Online' : 'Offline'
+        };
+    }
+};
+
+const closeModal = () => {
+    showDetailsModal.value = false;
+};
+
+const openAlertStatusPopup = (vehicle) => {
+    if (!vehicle) return;
+    alertStatusTargetId.value = vehicle.id;
+    selectedAlertStatus.value = vehicle.alert_status || '';
+    selectedMaintenanceStatus.value = vehicle.maintenance_status || '';
+    showAlertStatusPopup.value = true;
+};
+
+const closeAlertStatusPopup = () => {
+    showAlertStatusPopup.value = false;
+};
+
+const updateAlertStatus = async () => {
+    if (!alertStatusTargetId.value) return;
+    try {
+        submittingStatus.value = true;
+        await axios.post(`/web/monitoring/vehicles/${alertStatusTargetId.value}/alert-status`, {
+            alert_status: selectedAlertStatus.value || null,
+            maintenance_status: selectedMaintenanceStatus.value || null
+        });
+        closeAlertStatusPopup();
+    } catch (e) {
+        console.error("Failed to update alert status", e);
+        alert("Failed to update alert status. Please try again.");
+    } finally {
+        submittingStatus.value = false;
+    }
+};
 
 // Pagination
 const currentPage = ref(1);
@@ -256,23 +570,36 @@ const onMapReady = (map) => {
         }
 
         if (zoneCircle.value) {
-            // Fit bounds to circle using Leaflet helper
+            // Manual bounds calculation to avoid L.circle dependency issues
             try {
-                const cb = L.circle(zoneCircle.value.center, { radius: zoneCircle.value.radius }).getBounds();
-                bounds.extend(cb);
+                const { center, radius } = zoneCircle.value;
+                const [lat, lng] = center;
+                // Meters to degrees approximation
+                const latDeg = radius / 111320;
+                const lngDeg = radius / (40075000 * Math.cos(lat * Math.PI / 180) / 360);
+
+                bounds.extend([lat - latDeg, lng - lngDeg]);
+                bounds.extend([lat + latDeg, lng + lngDeg]);
             } catch {
                 bounds.extend(zoneCircle.value.center);
             }
         }
 
-        if (hasZoneLocation.value) {
+        if (hasZoneLocation.value && !bounds.isValid()) {
              bounds.extend(center.value);
         }
 
         // Do not include vehicles in initial bounds to avoid jump away from zone
 
         if (bounds.isValid()) {
-            mapInstance.fitBounds(bounds, { padding: [50, 50] });
+            const sw = bounds.getSouthWest();
+            const ne = bounds.getNorthEast();
+            // If bounds are effectively a point
+            if (Math.abs(sw.lat - ne.lat) < 0.0001 && Math.abs(sw.lng - ne.lng) < 0.0001) {
+                mapInstance.setView(sw, 15);
+            } else {
+                mapInstance.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+            }
         } else if (zoneCircle.value) {
             mapInstance.setView(zoneCircle.value.center, 13);
         } else if (hasZoneLocation.value) {
@@ -456,9 +783,10 @@ onMounted(async () => {
     // Parse WKT area first
     const parsed = parseWKTArea(gf?.area || '');
     if (parsed && parsed.type === 'circle' && parsed.lat != null && parsed.lng != null) {
-      const radius = Number.isFinite(parsed.radius)
-        ? parsed.radius
-        : (typeof attrs?.radius === 'number' ? attrs.radius : 1000);
+      const rVal = parsed.radius ?? attrs?.radius;
+      const rNum = Number(rVal);
+      const radius = Number.isFinite(rNum) && rNum > 0 ? rNum : 1000;
+
       zoneCircle.value = { center: [parsed.lat, parsed.lng], radius };
       center.value = [parsed.lat, parsed.lng];
     } else if (parsed && (parsed.type === 'polygon' || parsed.type === 'route') && Array.isArray(parsed.coordinates) && parsed.coordinates.length >= (parsed.type === 'route' ? 2 : 3)) {
@@ -470,11 +798,13 @@ onMounted(async () => {
       // Fallback: attributes circle
       const lat = Number(attrs?.lat);
       const lng = Number(attrs?.long || attrs?.lng);
-      const rad = Number(attrs?.radius);
+      const rNum = Number(attrs?.radius);
+      const rad = Number.isFinite(rNum) && rNum > 0 ? rNum : 1000;
+
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
         zoneCircle.value = {
           center: [lat, lng],
-          radius: Number.isFinite(rad) ? rad : 1000
+          radius: rad
         };
         center.value = [lat, lng];
       }
@@ -511,3 +841,18 @@ onMounted(async () => {
   }
 });
 </script>
+
+<style scoped>
+/* Custom Modal Styles from DriverDetailModal.vue */
+.driver-modal-overlay { position: fixed; inset: 0; background: rgba(9, 12, 28, 0.4); backdrop-filter: blur(2px); z-index: 1050; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 24px; }
+.driver-modal { background: #fff; border-radius: 16px; box-shadow: 0 10px 24px rgba(0,0,0,.15); width: 100%; max-width: 600px; font-family: var(--font-sans); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e9ecef; }
+.modal-body { padding: 16px; }
+
+@media (max-width: 576px) {
+  .driver-modal { border-radius: 0; max-width: none; height: 100vh; }
+  .modal-body { padding: 12px; }
+}
+
+.modal-header h5 { font-size: 1.25rem; }
+</style>
