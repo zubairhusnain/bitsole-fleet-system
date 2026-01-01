@@ -167,10 +167,15 @@
             <!-- Header Image -->
             <div class="p-3">
                 <div class="position-relative bg-light rounded-4 overflow-hidden" style="height: 250px;">
-                    <img :src="selectedVehicle.image_url || '/assets/images/vehicle-placeholder.jpg'"
+                    <img v-if="selectedVehicle.photos && selectedVehicle.photos.length"
+                         :src="photoUrl(selectedVehicle.photos[0])"
                          class="w-100 h-100 object-fit-cover"
                          alt="Vehicle Image"
                          onerror="this.src='https://placehold.co/800x400/e9ecef/6c757d?text=Vehicle+Image'">
+                    <img v-else src="https://placehold.co/800x400/e9ecef/6c757d?text=Vehicle+Image"
+                         class="w-100 h-100 object-fit-cover"
+                         alt="Vehicle Placeholder"
+                         onerror="this.style.display='none'">
                 </div>
             </div>
 
@@ -343,6 +348,18 @@ const parseAttrs = (a) => {
     try { return JSON.parse(a); } catch { return {}; }
 };
 
+const photoUrl = (p) => {
+    if (!p && p !== 0) return '';
+    const raw = String(p).trim();
+    if (!raw) return '';
+    if (raw.startsWith('http') || raw.startsWith('data:')) return raw;
+    if (raw.startsWith('/')) return raw; // already absolute from root
+    if (raw.startsWith('storage/')) return `/${raw}`;
+    if (raw.startsWith('public/')) return `/${raw.replace(/^public\//, 'storage/')}`;
+    // default: treat as a public disk path under storage
+    return `/storage/${raw.replace(/^\/*/, '')}`;
+};
+
 const showDetails = async (vehicle) => {
     if (!vehicle || !vehicle.id) return;
 
@@ -357,6 +374,51 @@ const showDetails = async (vehicle) => {
         const pos = tc.position || {};
         const attrs = parseAttrs(pos.attributes);
         const deviceAttrs = parseAttrs(tc.attributes);
+        const allAttrs = { ...deviceAttrs, ...attrs };
+
+        // Helper to extract photos (logic from Detail.vue)
+        const getPhotos = () => {
+            const out = [];
+            const toPath = (it) => {
+                if (!it && it !== 0) return '';
+                if (Array.isArray(it)) return it.map(toPath).filter(Boolean);
+                if (typeof it === 'string') {
+                    const s = it.trim();
+                    if (!s) return '';
+                    if ((s.startsWith('[') && s.endsWith(']')) || (s.startsWith('{') && s.endsWith('}'))) {
+                        try {
+                            const parsed = JSON.parse(s);
+                            return toPath(parsed);
+                        } catch { }
+                    }
+                    return s;
+                }
+                if (typeof it === 'number') return String(it);
+                if (typeof it === 'object') {
+                    const cand = it.url ?? it.path ?? it.src ?? it.image ?? it.photo;
+                    return typeof cand === 'string' ? cand.trim() : '';
+                }
+                return '';
+            };
+
+            const pick = (keys) => {
+                for (const k of keys) {
+                    if (allAttrs[k] != null && allAttrs[k] !== '') return allAttrs[k];
+                }
+                return null;
+            };
+
+            const arrLike = pick(['photos', 'images']);
+            const arrResolved = toPath(arrLike);
+            if (Array.isArray(arrResolved)) out.push(...arrResolved);
+            else if (typeof arrResolved === 'string' && arrResolved) out.push(arrResolved);
+
+            const single = toPath(pick(['photo', 'image', 'vehiclePhoto', 'vehicleImage']));
+            if (Array.isArray(single)) out.push(...single);
+            else if (typeof single === 'string' && single) out.push(single);
+
+            return Array.from(new Set(out.filter(v => typeof v === 'string' && v.trim() !== '')));
+        };
 
         selectedVehicle.value = {
             id: data.device_id || data.id,
@@ -387,9 +449,10 @@ const showDetails = async (vehicle) => {
             maintenance: data.maintenance_count > 0 ? `${data.maintenance_count} Due` : 'N/A',
             alert_status: deviceAttrs.alert_status || '',
             maintenance_status: deviceAttrs.maintenance_status || '',
-            status: (data.status && data.status.toLowerCase() === 'online') || 
-                   (tc.status && tc.status.toLowerCase() === 'online') || 
-                   (vehicle.status && vehicle.status.toLowerCase() === 'online') ? 'Online' : 'Offline'
+            status: (data.status && data.status.toLowerCase() === 'online') ||
+                   (tc.status && tc.status.toLowerCase() === 'online') ||
+                   (vehicle.status && vehicle.status.toLowerCase() === 'online') ? 'Online' : 'Offline',
+            photos: getPhotos()
         };
     } catch (e) {
         console.error("Failed to fetch vehicle details", e);

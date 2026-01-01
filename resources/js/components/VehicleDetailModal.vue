@@ -5,7 +5,7 @@
         <!-- Header Image -->
         <div class="position-relative bg-light" style="height: 250px;">
           <!-- Using a placeholder image or vehicle image if available -->
-          <img :src="vehicle.image_url || '/assets/images/vehicle-placeholder.jpg'"
+          <img :src="vehicle.image_url || 'https://placehold.co/800x400/e9ecef/6c757d?text=Vehicle+Image'"
                class="w-100 h-100 object-fit-cover"
                alt="Vehicle Image"
                onerror="this.src='https://placehold.co/800x400/e9ecef/6c757d?text=Vehicle+Image'">
