@@ -65,16 +65,16 @@
 
   </div>
 </template>
-
+ 
 <script setup>
 import { ref } from 'vue';
-import TripSummary from './components/trip-analysis/TripSummary.vue';
 import DailyBreakdown from './components/trip-analysis/DailyBreakdown.vue';
 import DailyBreakdownMap from './components/trip-analysis/DailyBreakdownMap.vue';
 import DailySummary from './components/trip-analysis/DailySummary.vue';
 import DailySummaryList from './components/trip-analysis/DailySummaryList.vue';
 import MonthlySummary from './components/trip-analysis/MonthlySummary.vue';
 import MonthlySummaryList from './components/trip-analysis/MonthlySummaryList.vue';
+import TripSummary from './components/trip-analysis/TripSummary.vue';
 
 const duration = ref('2025-08-26 to 2025-08-31');
 const vehicle = ref('VGPS2563');
@@ -85,71 +85,101 @@ const rowsTripSummary = ref([
     key: 1, vehicleId: 'VHCL-1002', vehicleName: 'Turbo Hawk ZR',
     distTotal: '5680.5', distAvg: '175.6',
     durTotal: '145h 30m', durAvg: '4h 15m',
+    stopTotal: '120h 15m', stopAvg: '3h 45m',
     idleTotal: '12h 15m', idleAvg: '0h 25m',
-    util: '45.5%', avgFuel: '12.5 L'
+    speedMax: '110 km/h', speedAvg: '65 km/h',
+    fuelTotal: '450.5 L', avgFuel: '7.9 L/100km',
+    util: '45.5%'
   },
   {
     key: 2, vehicleId: 'VHCL-1003', vehicleName: 'Stealth Chaser X',
     distTotal: '3000.8', distAvg: '130.0',
     durTotal: '98h 10m', durAvg: '3h 45m',
+    stopTotal: '150h 20m', stopAvg: '5h 30m',
     idleTotal: '8h 40m', idleAvg: '0h 20m',
-    util: '38.2%', avgFuel: '11.8 L'
+    speedMax: '105 km/h', speedAvg: '60 km/h',
+    fuelTotal: '280.2 L', avgFuel: '9.3 L/100km',
+    util: '38.2%'
   },
   {
     key: 3, vehicleId: 'VHCL-1004', vehicleName: 'Lunar Explorer 5',
     distTotal: '4550.0', distAvg: '140.2',
     durTotal: '112h 20m', durAvg: '4h 05m',
+    stopTotal: '130h 40m', stopAvg: '4h 45m',
     idleTotal: '10h 30m', idleAvg: '0h 22m',
-    util: '42.1%', avgFuel: '13.2 L'
+    speedMax: '115 km/h', speedAvg: '68 km/h',
+    fuelTotal: '390.0 L', avgFuel: '8.5 L/100km',
+    util: '42.1%'
   },
   {
     key: 4, vehicleId: 'VHCL-1005', vehicleName: 'Raptor GT',
     distTotal: '5000.4', distAvg: '160.4',
     durTotal: '130h 45m', durAvg: '4h 30m',
+    stopTotal: '110h 15m', stopAvg: '3h 50m',
     idleTotal: '11h 15m', idleAvg: '0h 24m',
-    util: '48.9%', avgFuel: '14.5 L'
+    speedMax: '120 km/h', speedAvg: '70 km/h',
+    fuelTotal: '420.4 L', avgFuel: '8.4 L/100km',
+    util: '48.9%'
   },
   {
     key: 5, vehicleId: 'VHCL-1006', vehicleName: 'Shadow Hunter 12',
     distTotal: '6200.7', distAvg: '190.5',
     durTotal: '155h 10m', durAvg: '5h 00m',
+    stopTotal: '95h 30m', stopAvg: '3h 10m',
     idleTotal: '14h 20m', idleAvg: '0h 28m',
-    util: '52.3%', avgFuel: '15.1 L'
+    speedMax: '125 km/h', speedAvg: '72 km/h',
+    fuelTotal: '510.8 L', avgFuel: '8.2 L/100km',
+    util: '52.3%'
   },
   {
     key: 6, vehicleId: 'VHCL-1007', vehicleName: 'Volt Fusion R',
     distTotal: '4500.1', distAvg: '145.8',
     durTotal: '115h 30m', durAvg: '4h 10m',
+    stopTotal: '140h 20m', stopAvg: '5h 00m',
     idleTotal: '9h 45m', idleAvg: '0h 21m',
-    util: '40.5%', avgFuel: '10.5 L'
+    speedMax: '108 km/h', speedAvg: '62 km/h',
+    fuelTotal: '360.5 L', avgFuel: '8.0 L/100km',
+    util: '40.5%'
   },
   {
     key: 7, vehicleId: 'VHCL-1008', vehicleName: 'Quantum Leap 6',
     distTotal: '4700.3', distAvg: '155.4',
     durTotal: '122h 40m', durAvg: '4h 25m',
+    stopTotal: '125h 10m', stopAvg: '4h 30m',
     idleTotal: '10h 50m', idleAvg: '0h 23m',
-    util: '43.8%', avgFuel: '12.8 L'
+    speedMax: '112 km/h', speedAvg: '66 km/h',
+    fuelTotal: '395.2 L', avgFuel: '8.4 L/100km',
+    util: '43.8%'
   },
   {
     key: 8, vehicleId: 'VHCL-1009', vehicleName: 'Meteor Strike 11',
     distTotal: '5200.2', distAvg: '185.0',
     durTotal: '135h 20m', durAvg: '4h 50m',
+    stopTotal: '115h 40m', stopAvg: '4h 10m',
     idleTotal: '12h 10m', idleAvg: '0h 26m',
-    util: '49.2%', avgFuel: '14.0 L'
+    speedMax: '118 km/h', speedAvg: '69 km/h',
+    fuelTotal: '440.6 L', avgFuel: '8.5 L/100km',
+    util: '49.2%'
   },
   {
     key: 9, vehicleId: 'VHCL-1010', vehicleName: 'Apex Predator S',
     distTotal: '5900.6', distAvg: '210.7',
     durTotal: '150h 00m', durAvg: '5h 15m',
+    stopTotal: '100h 50m', stopAvg: '3h 30m',
     idleTotal: '13h 30m', idleAvg: '0h 27m',
-    util: '55.6%', avgFuel: '16.2 L'
+    speedMax: '122 km/h', speedAvg: '71 km/h',
+    fuelTotal: '490.8 L', avgFuel: '8.3 L/100km',
+    util: '55.6%'
   },
   {
     key: 10, vehicleId: 'VHCL-1011', vehicleName: 'Falcon Cruiser Z',
     distTotal: '5300.9', distAvg: '195.2',
     durTotal: '140h 15m', durAvg: '5h 05m',
+    stopTotal: '118h 25m', stopAvg: '4h 15m',
     idleTotal: '12h 45m', idleAvg: '0h 26m',
-    util: '50.1%', avgFuel: '14.8 L'
+    speedMax: '116 km/h', speedAvg: '67 km/h',
+    fuelTotal: '455.4 L', avgFuel: '8.6 L/100km',
+    util: '50.1%'
   }
 ]);
 
