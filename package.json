@@ -6,7 +6,7 @@
         "build": "vite build",
         "watch": "vite build --watch",
         "dev": "vite",
-        "release": "npm version patch && vite build"
+        "release": "npm version patch --no-git-tag-version && vite build"
     },
     "version": "1.0.0",
     "devDependencies": {
