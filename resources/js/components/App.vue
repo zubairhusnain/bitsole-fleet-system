@@ -181,7 +181,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item d-testingmode" :class="{ 'menu-open': route.path.startsWith('/reports') }" v-if="!isAdminOrDistributor && hasPerm('reports','read')">
+                        <li class="nav-item" :class="{ 'd-testingmode': !isLocalMode, 'menu-open': route.path.startsWith('/reports') }" v-if="!isAdminOrDistributor && hasPerm('reports','read')">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/reports') }">
                                 <i class="nav-icon bi bi-bar-chart"></i>
                                 <p>
@@ -339,6 +339,7 @@ const myDeviceIds = ref([]);
 let echoChannel = null;
 
 const isTestingMode = ref(false);
+const isLocalMode = ref(false);
 provide('isTestingMode', isTestingMode);
 
 const checkTestingMode = () => {
@@ -351,6 +352,7 @@ const checkTestingMode = () => {
 
     if (envTestingMode === 'true') {
         isTestingMode.value = true;
+        isLocalMode.value = true;
     } else if (q === '1') {
         console.log('testingMode on hai');
         localStorage.setItem('testingMode', '1');
