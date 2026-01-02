@@ -51,9 +51,14 @@ export function formatOdometer(rawAttrs, ctx = {}) {
     attrsLower[key.toLowerCase()] = attrs[key];
   }
 
+  const parseNum = (val) => {
+    const n = typeof val === 'string' ? parseFloat(val) : (typeof val === 'number' ? val : null);
+    return Number.isFinite(n) ? n : null;
+  };
+
   let keyFound = null;
   // REMOVED pre-check for 16 to respect orderedKeys priority
-  for (const k of orderedKeys) {
+  for (const k of orderedKeys) { 
     // For numeric IO keys, check both raw and io-prefixed variants
     let val;
     if (k === '389' || k === '87' || k === '50' || k === '16') {
@@ -64,12 +69,16 @@ export function formatOdometer(rawAttrs, ctx = {}) {
     }
 
     const exists = val != null && val !== '';
-    if (keyFound == null && exists) { keyFound = k; break; }
+
+    if (exists) {
+        // Condition: Check for > -1 for ALL keys (especially IO IDs and priority keys)
+        const n = parseNum(val);
+        if (n !== null && n <= -1) continue;
+
+        if (keyFound == null) { keyFound = k; break; }
+    }
   }
-  const parseNum = (val) => {
-    const n = typeof val === 'string' ? parseFloat(val) : (typeof val === 'number' ? val : null);
-    return Number.isFinite(n) ? n : null;
-  };
+
   const getAttrVal = (k) => {
     if (k === '389' || k === '87' || k === '50' || k === '16') return getIoVal(k);
     return attrs[k] ?? attrsLower[k.toLowerCase()];
@@ -138,6 +147,11 @@ export function formatFuel(rawAttrs, ctx = {}) {
   const io242 = attrs['io242'] ?? attrs['242'];
   const io243 = attrs['io243'] ?? attrs['243'];
 
+  // Specific CAN/OBD keys
+  const canFuelPercentage89 = lower['can_fuelpercentage_89'] ?? attrs['CAN_FuelPercentage_89'];
+  const canFuelLeter84 = lower['can_fuelleter_84'] ?? attrs['CAN_FuelLeter_84'];
+  const obdFuelLeter48 = lower['obd_fuelleter_48'] ?? attrs['OBD_FuelLeter_48'];
+
   const percentKeyName = null;
   const litersKeyName = null;
   const analogKeyName = null;
@@ -147,6 +161,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
   let percentKeyUsed = null;
   {
     const candidates = [
+      { key: 'CAN_FuelPercentage_89', val: canFuelPercentage89 },
       { key: 'fuelPercent', val: percentFuelPercent },
       { key: 'fuelLevel', val: percentFuelLevel },
       { key: 'fuel_percent', val: percentFuelPercentage },
@@ -155,6 +170,9 @@ export function formatFuel(rawAttrs, ctx = {}) {
     ];
     for (const c of candidates) {
       const n = num(c.val);
+      // Check for > -1 for ALL candidates
+      if (n !== null && n <= -1) continue;
+
       if (n != null) { percent = Math.max(0, Math.min(100, Math.round(n))); percentKeyUsed = c.key; break; }
     }
   }
@@ -168,6 +186,8 @@ export function formatFuel(rawAttrs, ctx = {}) {
   let litersWasMinusOne = false;
   {
     const candidates = [
+      { key: 'CAN_FuelLeter_84', val: canFuelLeter84 },
+      { key: 'OBD_FuelLeter_48', val: obdFuelLeter48 },
       { key: 'fuelLiter', val: litersFuelLiter },
       { key: 'fuelLiters', val: litersFuelLiters },
       { key: 'fuel', val: litersFuel },
@@ -175,6 +195,9 @@ export function formatFuel(rawAttrs, ctx = {}) {
     ];
     for (const c of candidates) {
       const n = num(c.val);
+      // Check for > -1 for ALL candidates
+      if (n !== null && n <= -1) continue;
+
       if (n != null) { liters = Math.round(n * 10) / 10; litersKeyUsed = c.key; break; }
     }
   }
@@ -207,6 +230,10 @@ export function formatFuel(rawAttrs, ctx = {}) {
     ];
     for (const c of rawCandidates) {
       const n = typeof c.val === 'string' ? parseFloat(c.val) : (typeof c.val === 'number' ? c.val : null);
+
+      // Check for > -1 for ALL candidates
+      if (Number.isFinite(n) && n <= -1) continue;
+
       if (Number.isFinite(n)) { raw = n; rawKeyUsed = c.key; break; }
     }
   }
@@ -234,7 +261,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
     for (const [k, v] of Object.entries(lower)) {
       if (!k.includes('fuel')) continue;
       const n = typeof v === 'string' ? parseFloat(v) : (typeof v === 'number' ? v : null);
-      if (Number.isFinite(n)) { raw = n; rawKeyUsed = k; break; }
+      if (Number.isFinite(n) && n > -1) { raw = n; rawKeyUsed = k; break; }
     }
   }
 
