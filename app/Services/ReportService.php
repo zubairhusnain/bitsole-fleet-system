@@ -4,8 +4,12 @@ namespace App\Services;
 
 use App\Helpers\Curl;
 use App\Models\Devices;
-use Illuminate\Support\Facades\Cache; 
- 
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
+
 /**
  * Class ReportService
  * @package App\Services
@@ -242,33 +246,45 @@ class ReportService
         $commonQuery = "from={$from}&to={$to}";
         $fullQuery = "{$deviceQuery}&{$commonQuery}";
 
-        $headers = ['Content-Type: application/json', 'Accept: application/json'];
-
-        // Trips
-        $tripsResponse = static::curl("/api/reports/trips?$fullQuery", 'GET', $sessionId, '', $headers);
-        $allTrips = json_decode($tripsResponse->response ?? '[]', true);
-
-        // Summary
-        $summaryResponse = static::curl("/api/reports/summary?$fullQuery", 'GET', $sessionId, '', $headers);
-        $allSummary = json_decode($summaryResponse->response ?? '[]', true);
-
-        // Stops
-        $stopsResponse = static::curl("/api/reports/stops?$fullQuery", 'GET', $sessionId, '', $headers);
-        $allStops = json_decode($stopsResponse->response ?? '[]', true);
-
-        // Events (include fuelIncrease for refills)
+        $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
         $eventTypes = 'harshBraking,harshAcceleration,overspeed,fuelIncrease';
-        $eventsResponse = static::curl("/api/reports/events?$fullQuery&type=" . urlencode($eventTypes), 'GET', $sessionId, '', $headers);
-        $allEvents = json_decode($eventsResponse->response ?? '[]', true);
+
+        $headers = [
+            'Cookie' => $sessionId,
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json'
+        ];
+
+        // Execute requests in parallel using HTTP Pool
+        $responses = Http::pool(fn (Pool $pool) => [
+            $pool->as('summary')->withHeaders($headers)->get("{$baseUrl}/api/reports/summary?{$fullQuery}"),
+            $pool->as('stops')->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
+            $pool->as('events')->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$fullQuery}&type=" . urlencode($eventTypes)),
+        ]);
+
+        // Debug logging
+        foreach ($responses as $key => $response) {
+            if (!$response->ok()) {
+                Log::error("ReportService API Error [{$key}]", [
+                    'url' => "{$baseUrl}/api/reports/{$key}",
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                    'query' => $fullQuery
+                ]);
+            }
+        }
+
+        $allSummary = $responses['summary']->ok() ? $responses['summary']->json() : [];
+        $allStops = $responses['stops']->ok() ? $responses['stops']->json() : [];
+        $allEvents = $responses['events']->ok() ? $responses['events']->json() : [];
+
         // Group data by deviceId
-        $tripsByDevice = collect($allTrips)->groupBy('deviceId');
         $stopsByDevice = collect($allStops)->groupBy('deviceId');
         $eventsByDevice = collect($allEvents)->groupBy('deviceId');
 
         // Process summary
-        $reportData = collect($allSummary)->map(function ($item) use ($tripsByDevice, $stopsByDevice, $eventsByDevice, $days) {
+        $reportData = collect($allSummary)->map(function ($item) use ($stopsByDevice, $eventsByDevice, $days) {
             $deviceId = $item['deviceId'];
-            $deviceTrips = $tripsByDevice->get($deviceId, collect([]));
             $deviceStops = $stopsByDevice->get($deviceId, collect([]));
             $deviceEvents = $eventsByDevice->get($deviceId, collect([]));
 
@@ -335,7 +351,7 @@ class ReportService
                 'idleAvg' => $idleAvgStr,
                 'util' => $utilPct . '%',
                 'avgLitres' => $avgLitresPerDay,
-                'avgKmL' => $avgKmL,
+                'avgKmL' => $avgKmL, 
                 'fuelRefill' => round($refillTotal, 1) . ' L',
                 'fuelRefillFreq' => $refillCount,
                 'speed' => $avgSpeed . ' km/h'
@@ -664,7 +680,7 @@ class ReportService
         }
         // dd($events);
         // Format events data
-        $formattedEvents = [];
+        $formattedEvents = []; 
         if (is_array($events)) {
             foreach ($events as $event) {
                 $formattedEvents[] = [

@@ -47,19 +47,28 @@
       </div>
     </div>
 
-    <DailyBreakdown v-if="viewType === 'Daily Breakdown'" :rowsDailyTrips="rowsDailyTrips" />
+    <!-- Loading State -->
+    <div v-if="loading" class="d-flex align-items-center justify-content-center py-5">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
 
-    <TripSummary v-else-if="viewType === 'Trip Summary'" :rowsTripSummary="rowsTripSummary" @view-details="handleViewDetails" />
+    <template v-else>
+      <DailyBreakdown v-if="viewType === 'Daily Breakdown'" :rowsDailyTrips="rowsDailyTrips" />
 
-    <DailySummaryList v-else-if="viewType === 'Daily Summary List'" :rowsDailyVehicleList="rowsDailyVehicleList" />
+      <TripSummary v-else-if="viewType === 'Trip Summary'" :rowsTripSummary="rowsTripSummary" @view-details="handleViewDetails" />
 
-    <DailyBreakdownMap v-else-if="viewType === 'Daily Breakdown (with map)'" :rowsDailyBreakdown="rowsDailyBreakdown" />
+      <DailySummaryList v-else-if="viewType === 'Daily Summary List'" :rowsDailyVehicleList="rowsDailyVehicleList" />
 
-    <DailySummary v-else-if="viewType === 'Daily Summary'" :rowsDailySummary="rowsDailySummary" />
+      <DailyBreakdownMap v-else-if="viewType === 'Daily Breakdown (with map)'" :rowsDailyBreakdown="rowsDailyBreakdown" />
 
-    <MonthlySummary v-else-if="viewType === 'Monthly Summary'" :rowsMonthlySummary="rowsMonthlySummary" />
+      <DailySummary v-else-if="viewType === 'Daily Summary'" :rowsDailySummary="rowsDailySummary" />
 
-    <MonthlySummaryList v-else-if="viewType === 'Monthly Summary List'" :rowsMonthlyVehicleList="rowsMonthlyVehicleList" />
+      <MonthlySummary v-else-if="viewType === 'Monthly Summary'" :rowsMonthlySummary="rowsMonthlySummary" />
+
+      <MonthlySummaryList v-else-if="viewType === 'Monthly Summary List'" :rowsMonthlyVehicleList="rowsMonthlyVehicleList" />
+    </template>
 
   </div>
 </template>
@@ -78,6 +87,7 @@ const duration = ref('');
 const vehicle = ref('');
 const vehicles = ref([]);
 const viewType = ref('Trip Summary');
+const loading = ref(false);
 
 const rowsTripSummary = ref([]);
 const rowsDailyTrips = ref([]);
@@ -140,6 +150,7 @@ const handleSearch = async () => {
     params.device_ids = [vehicle.value];
   }
 
+  loading.value = true;
   try {
     if (viewType.value === 'Trip Summary') {
       const response = await window.axios.get('/web/reports/trip-summary', { params });
@@ -173,6 +184,8 @@ const handleSearch = async () => {
     else if (viewType.value === 'Daily Summary List') rowsDailyVehicleList.value = [];
     else if (viewType.value === 'Monthly Summary') rowsMonthlySummary.value = [];
     else if (viewType.value === 'Monthly Summary List') rowsMonthlyVehicleList.value = [];
+  } finally {
+    loading.value = false;
   }
 };
 
