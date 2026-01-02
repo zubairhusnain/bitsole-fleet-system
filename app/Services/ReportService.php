@@ -247,6 +247,11 @@ class ReportService
         $fullQuery = "{$deviceQuery}&{$commonQuery}";
 
         $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
+        if (empty($baseUrl)) {
+            Log::error('ReportService: Traccar Host URL is not configured.');
+            return [];
+        }
+
         $eventTypes = 'harshBraking,harshAcceleration,overspeed,fuelIncrease';
 
         $headers = [
@@ -255,16 +260,24 @@ class ReportService
             'Content-Type' => 'application/json'
         ];
 
-        // Execute requests in parallel using HTTP Pool
-        $responses = Http::pool(fn (Pool $pool) => [
-            $pool->as('summary')->withHeaders($headers)->get("{$baseUrl}/api/reports/summary?{$fullQuery}"),
-            $pool->as('stops')->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
-            $pool->as('events')->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$fullQuery}&type=" . urlencode($eventTypes)),
-        ]);
+        try {
+            // Execute requests in parallel using HTTP Pool
+            $responses = Http::pool(fn (Pool $pool) => [
+                $pool->as('summary')->withHeaders($headers)->get("{$baseUrl}/api/reports/summary?{$fullQuery}"),
+                $pool->as('stops')->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
+                $pool->as('events')->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$fullQuery}&type=" . urlencode($eventTypes)),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('ReportService: Failed to fetch fleet summary', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return [];
+        }
 
         // Debug logging
         foreach ($responses as $key => $response) {
-            if (!$response->ok()) {
+            if ($response instanceof \Illuminate\Http\Client\Response && !$response->ok()) {
                 Log::error("ReportService API Error [{$key}]", [
                     'url' => "{$baseUrl}/api/reports/{$key}",
                     'status' => $response->status(),
@@ -273,10 +286,14 @@ class ReportService
                 ]);
             }
         }
+ 
+        $summaryRes = $responses['summary'] ?? null;
+        $stopsRes = $responses['stops'] ?? null;
+        $eventsRes = $responses['events'] ?? null;
 
-        $allSummary = $responses['summary']->ok() ? $responses['summary']->json() : [];
-        $allStops = $responses['stops']->ok() ? $responses['stops']->json() : [];
-        $allEvents = $responses['events']->ok() ? $responses['events']->json() : [];
+        $allSummary = ($summaryRes instanceof \Illuminate\Http\Client\Response && $summaryRes->ok()) ? $summaryRes->json() : [];
+        $allStops = ($stopsRes instanceof \Illuminate\Http\Client\Response && $stopsRes->ok()) ? $stopsRes->json() : [];
+        $allEvents = ($eventsRes instanceof \Illuminate\Http\Client\Response && $eventsRes->ok()) ? $eventsRes->json() : [];
 
         // Group data by deviceId
         $stopsByDevice = collect($allStops)->groupBy('deviceId');
@@ -351,7 +368,7 @@ class ReportService
                 'idleAvg' => $idleAvgStr,
                 'util' => $utilPct . '%',
                 'avgLitres' => $avgLitresPerDay,
-                'avgKmL' => $avgKmL, 
+                'avgKmL' => $avgKmL,
                 'fuelRefill' => round($refillTotal, 1) . ' L',
                 'fuelRefillFreq' => $refillCount,
                 'speed' => $avgSpeed . ' km/h'
@@ -680,7 +697,7 @@ class ReportService
         }
         // dd($events);
         // Format events data
-        $formattedEvents = []; 
+        $formattedEvents = [];
         if (is_array($events)) {
             foreach ($events as $event) {
                 $formattedEvents[] = [
