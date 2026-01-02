@@ -243,4 +243,14 @@ Route::middleware(['auth'])->prefix('/web/notifications')->group(function () {
     Route::post('/assign', [\App\Http\Controllers\NotificationController::class, 'assign']);
 });
 
+// Reports
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/reports')->group(function () {
+    Route::get('/trip-summary', [\App\Http\Controllers\ReportController::class, 'tripSummary']);
+    Route::get('/daily-trips', [\App\Http\Controllers\ReportController::class, 'dailyTrips']);
+    Route::get('/daily-summary', [\App\Http\Controllers\ReportController::class, 'dailySummary']);
+    Route::get('/monthly-summary', [\App\Http\Controllers\ReportController::class, 'monthlySummary']);
+    Route::get('/daily-breakdown-map', [\App\Http\Controllers\ReportController::class, 'dailyBreakdownMap']);
+    Route::get('/device-options', [\App\Http\Controllers\ReportController::class, 'deviceOptions']);
+});
+
 

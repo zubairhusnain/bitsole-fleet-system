@@ -25,20 +25,9 @@
               </tr>
             </tbody>
           </table>
-        </div>
+        </div>  
         <div class="d-flex justify-content-between align-items-center p-2 small text-muted">
-          <div>Showing 1 to 18 of 1079 results</div>
-          <nav>
-            <ul class="pagination pagination-sm mb-0">
-              <li class="page-item disabled"><span class="page-link">&lt;</span></li>
-              <li class="page-item active"><span class="page-link">1</span></li>
-              <li class="page-item"><span class="page-link">2</span></li>
-              <li class="page-item"><span class="page-link">3</span></li>
-              <li class="page-item"><span class="page-link">4</span></li>
-              <li class="page-item"><span class="page-link">5</span></li>
-              <li class="page-item"><span class="page-link">&gt;</span></li>
-            </ul>
-          </nav>
+          <div>Showing {{ rowsDailySummary.length }} results</div>
         </div>
       </div>
     </div>

@@ -46,23 +46,15 @@
                 <td class="text-center">{{ r.fuelRefillFreq }}</td>
                 <td class="text-center">{{ r.speed }}</td>
                 <td class="text-center">
-                  <button class="btn btn-sm btn-link text-primary p-0 me-2"><i class="bi bi-eye"></i></button>
-                  <button class="btn btn-sm btn-link text-danger p-0"><i class="bi bi-trash"></i></button>
+                  <button class="btn btn-sm btn-link text-primary p-0" @click="$emit('view-details', r)" title="View Details"><i class="bi bi-eye"></i></button>
                 </td>
-              </tr>
+              </tr> 
             </tbody>
           </table>
         </div>
       </div>
       <div class="card-footer d-flex align-items-center py-2 bg-white border-top">
-          <div class="text-muted small me-auto">Showing 1 to {{ rowsTripSummary.length }} of {{ rowsTripSummary.length }} results</div>
-          <nav aria-label="Pagination" class="ms-auto">
-            <ul class="pagination pagination-sm mb-0 pagination-app">
-              <li class="page-item disabled"><button class="page-link"><i class="bi bi-chevron-left"></i></button></li>
-              <li class="page-item active"><button class="page-link">1</button></li>
-              <li class="page-item"><button class="page-link"><i class="bi bi-chevron-right"></i></button></li>
-            </ul>
-          </nav>
+          <div class="text-muted small me-auto">Showing {{ rowsTripSummary.length }} results</div>
       </div>
     </div>
   </div>
@@ -75,6 +67,8 @@ defineProps({
     required: true
   }
 });
+
+defineEmits(['view-details']);
 </script>
 
 <style scoped>
