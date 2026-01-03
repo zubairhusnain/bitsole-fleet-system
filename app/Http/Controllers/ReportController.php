@@ -80,6 +80,17 @@ class ReportController extends Controller
         return $this->reportService->fetchMonthlySummary($request, $deviceIds);
     }
 
+    public function assetActivity(Request $request)
+    {
+        $request->validate([
+            'from_date' => 'required|date',
+            'to_date' => 'required|date',
+        ]);
+        $deviceIds = $this->getDeviceIds($request);
+        if (empty($deviceIds)) return response()->json([]);
+        return $this->reportService->fetchAssetActivity($request, $deviceIds);
+    }
+
     public function deviceOptions(Request $request)
     {
         $user = $request->user();

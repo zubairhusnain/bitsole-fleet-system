@@ -1155,44 +1155,224 @@ class ReportService
 
         return $formattedEvents;
     }
+    public function fetchAssetActivity($request, $deviceIds)
+    {
+        $sessionId = $request->user()->traccarSession ?? session('cookie');
+
+        // We expect a single vehicle for this detailed report
+        $deviceId = $deviceIds[0] ?? null;
+        if (!$deviceId) return [];
+
+        $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
+        $toStr = $request->to_date;
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
+            $toStr .= ' 23:59:59';
+        }
+        $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
+
+        $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
+        if (empty($baseUrl)) return [];
+
+        $headers = [
+            'Cookie' => $sessionId,
+            'Accept' => 'application/json'
+        ];
+
+        $queryString = "deviceId={$deviceId}&from={$from}&to={$to}";
+
+        try {
+            $responses = Http::pool(fn (Pool $pool) => [
+                $pool->as('route')->withHeaders($headers)->get("{$baseUrl}/api/reports/route?{$queryString}"),
+                $pool->as('events')->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$queryString}"),
+                $pool->as('summary')->withHeaders($headers)->get("{$baseUrl}/api/reports/summary?{$queryString}"),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('fetchAssetActivity exception', ['error' => $e->getMessage()]);
+            return [];
+        }
+
+        $route = ($responses['route']->ok()) ? $responses['route']->json() : [];
+        $events = ($responses['events']->ok()) ? $responses['events']->json() : [];
+        $summaryData = ($responses['summary']->ok()) ? $responses['summary']->json() : [];
+        $summaryItem = $summaryData[0] ?? [];
+
+        // Normalize Data for Merging
+        $merged = collect();
+
+        // 1. Process Route (Positions)
+        foreach ($route as $pos) {
+            $time = $pos['fixTime'] ?? $pos['deviceTime'];
+            $merged->push([
+                'type' => 'position',
+                'raw' => $pos,
+                'timestamp' => $time,
+                'epoch' => strtotime($time),
+            ]);
+        }
+
+        // 2. Process Events
+        foreach ($events as $evt) {
+            $time = $evt['eventTime'] ?? $evt['serverTime'];
+            $merged->push([
+                'type' => 'event',
+                'raw' => $evt,
+                'timestamp' => $time,
+                'epoch' => strtotime($time),
+            ]);
+        }
+
+        // 3. Sort by Time
+        $sorted = $merged->sortBy('epoch')->values();
+
+        // 4. Map to Display Format
+        $rows = $sorted->map(function ($item, $index) {
+            $raw = $item['raw'];
+            $isPos = $item['type'] === 'position';
+
+            $dt = strtotime($item['timestamp']);
+            $date = date('d-m-Y', $dt);
+            $day = date('l', $dt); // Monday
+            $time = date('H:i:s', $dt);
+
+            $attrs = $raw['attributes'] ?? [];
+
+            // Status
+            $status = $isPos ? 'Position Log' : $this->formatEventDescription($raw);
+
+            // Location
+            $lat = $isPos ? ($raw['latitude'] ?? 0) : 0;
+            $lon = $isPos ? ($raw['longitude'] ?? 0) : 0;
+            // Round coords
+            $lat = $lat ? round($lat, 5) : '';
+            $lon = $lon ? round($lon, 5) : '';
+
+            $location = $raw['address'] ?? '';
+
+            // Speed
+            $speedKnots = $raw['speed'] ?? 0;
+            $speedKph = round($speedKnots * 1.852, 0);
+
+            // Direction
+            $course = $raw['course'] ?? 0;
+
+            // GSM/GPS
+            $gsm = $attrs['rssi'] ?? null;
+            $gps = $attrs['sat'] ?? null;
+
+            // Power
+            $power = $attrs['power'] ?? $attrs['battery'] ?? null;
+            if ($power) $power = round($power, 1) . 'V';
+
+            // Ignition
+            $ignition = $attrs['ignition'] ?? null; // boolean
+
+            // Fuel
+            $fuel = $attrs['fuel'] ?? null;
+            if ($fuel) $fuel = round($fuel, 1) . ' L';
+
+            return [
+                'key' => $index,
+                'groupDate' => "$date $day",
+                'date' => $date,
+                'time' => $time,
+                'status' => $status,
+                'lat' => $lat,
+                'lon' => $lon,
+                'location' => $location,
+                'direction' => $course,
+                'speed' => $speedKph . ' km/h',
+                'gsm' => $gsm,
+                'gps' => $gps,
+                'power' => $power,
+                'ignition' => $ignition,
+                'fuel' => $fuel,
+                'isEvent' => !$isPos,
+                'rawType' => $isPos ? 'position' : ($raw['type'] ?? '')
+            ];
+        });
+
+        // Header Info
+        $lastRow = $sorted->last();
+        $lastTime = $lastRow ? date('Y-m-d H:i:s', $lastRow['epoch']) : 'N/A';
+
+        $lastPos = $sorted->where('type', 'position')->last();
+        $lastAddress = $lastPos['raw']['address'] ?? '';
+        if (!$lastAddress && $lastPos) {
+            $lastAddress = round($lastPos['raw']['latitude'], 5) . ', ' . round($lastPos['raw']['longitude'], 5);
+        }
+
+        $header = [
+            'vehicleId' => $summaryItem['deviceName'] ?? ($deviceId ?? 'N/A'),
+            'deviceId' => $deviceId,
+            'duration' => date('Y/m/d H:i', strtotime($from)) . ' - ' . date('Y/m/d H:i', strtotime($to)),
+            'lastReport' => $lastTime,
+            'lastLocation' => $lastAddress,
+        ];
+
+        return [
+            'header' => $header,
+            'rows' => $rows
+        ];
+    }
+
     private function formatEventDescription($event)
     {
-        $type = $event->type ?? 'unknown';
-        $deviceName = $event->deviceName ?? 'Device';
+        $isObj = is_object($event);
+        $type = $isObj ? ($event->type ?? 'unknown') : ($event['type'] ?? 'unknown');
+        $deviceName = $isObj ? ($event->deviceName ?? 'Device') : ($event['deviceName'] ?? 'Device');
+        $attributes = $isObj ? ($event->attributes ?? []) : ($event['attributes'] ?? []);
+        // Handle JSON string attributes if necessary
+        if (is_string($attributes)) {
+            $attributes = json_decode($attributes, true) ?? [];
+        }
 
         switch ($type) {
             case 'overspeed':
-                $speed = isset($event->speed) ? round($event->speed * 1.852, 1) : 'Unknown';
-                return "{$deviceName} exceeded speed limit at {$speed} km/h";
+                $speed = $isObj ? ($event->speed ?? 0) : ($event['speed'] ?? 0);
+                $speedKph = round($speed * 1.852, 1);
+                return "Exceeded speed limit ({$speedKph} km/h)";
+
+            case 'deviceOverspeed':
+                 $speed = $isObj ? ($event->speed ?? 0) : ($event['speed'] ?? 0);
+                 $speedKph = round($speed * 1.852, 1);
+                 return "Device overspeed ({$speedKph} km/h)";
 
             case 'harshBraking':
-                return "{$deviceName} performed harsh braking";
+                return "Harsh braking detected";
 
             case 'harshAcceleration':
-                return "{$deviceName} performed harsh acceleration";
+                return "Harsh acceleration detected";
 
             case 'ignitionOn':
-                return "{$deviceName} ignition turned on";
+                return "Ignition turned ON";
 
             case 'ignitionOff':
-                return "{$deviceName} ignition turned off";
+                return "Ignition turned OFF";
 
             case 'geofenceEnter':
-                return "{$deviceName} entered geofence zone";
+                return "Entered geofence";
 
             case 'geofenceExit':
-                return "{$deviceName} exited geofence zone";
+                return "Exited geofence";
+
+            case 'deviceStopped':
+                return "Device stopped";
+
+            case 'deviceOnline':
+                return "Device online";
+
+            case 'deviceOffline':
+                return "Device offline";
+
+            case 'deviceMoving':
+                return "Device moving";
 
             case 'alarm':
-                $alarm = 'Unknown alarm';
-                if (isset($event->attributes)) {
-                    $attributes = is_string($event->attributes) ? json_decode($event->attributes, true) : $event->attributes;
-                    $alarm = $attributes['alarms'] ?? 'Unknown alarm';
-                }
-                return "{$deviceName} alarm: {$alarm}";
+                $alarmKey = $attributes['alarm'] ?? 'general';
+                return "Alarm: " . ucfirst($alarmKey);
 
             default:
-                return "{$deviceName} event: {$type}";
+                return ucfirst(preg_replace('/(?<!\ )[A-Z]/', ' $0', $type));
         }
     }
 

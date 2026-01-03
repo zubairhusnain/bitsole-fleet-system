@@ -249,6 +249,7 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/daily-trips', [\App\Http\Controllers\ReportController::class, 'dailyTrips']);
     Route::get('/daily-summary', [\App\Http\Controllers\ReportController::class, 'dailySummary']);
     Route::get('/monthly-summary', [\App\Http\Controllers\ReportController::class, 'monthlySummary']);
+    Route::get('/asset-activity', [\App\Http\Controllers\ReportController::class, 'assetActivity']);
     Route::get('/daily-breakdown-map', [\App\Http\Controllers\ReportController::class, 'dailyBreakdownMap']);
     Route::get('/device-options', [\App\Http\Controllers\ReportController::class, 'deviceOptions']);
 });
