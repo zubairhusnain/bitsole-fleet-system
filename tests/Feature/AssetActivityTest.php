@@ -66,25 +66,28 @@ class AssetActivityTest extends TestCase
          $device->distributor_id = $user->id; // Make it accessible if user is distributor, or link it
          $device->save();
 
-        // If user is normal user, we need to attach
-        // But factory user role?
-        // Let's make user Admin to simplify accessibility check?
-        // Or assume factory user is default role.
-
-        // If scopeAccessibleByUser logic:
-        // if role is ADMIN (1), returns all.
-
         $user->role = 3; // Admin
          $user->save();
 
         $this->actingAs($user);
 
-        // Test without device_ids (All Vehicles)
-        // We need to ensure the user has access to at least one device, otherwise it returns empty 200.
-
         $response = $this->get('/web/reports/asset-activity?from_date=2024-05-16T00:00&to_date=2024-05-16T23:59');
 
-        // If this fails with 500, we found the issue.
         $response->assertStatus(200);
+    }
+
+    public function test_asset_activity_date_range_limit()
+    {
+        $user = \App\Models\User::factory()->create();
+        $this->actingAs($user);
+
+        // Request 32 days
+        $from = '2024-01-01';
+        $to = '2024-02-02'; // 32 days
+
+        $response = $this->get("/web/reports/asset-activity?from_date=$from&to_date=$to");
+
+        $response->assertStatus(422);
+        $response->assertJson(['message' => 'Date range cannot exceed 31 days.']);
     }
 }

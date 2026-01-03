@@ -1211,15 +1211,15 @@ class ReportService
             $e = $responses["events_{$i}"] ?? null;
             $s = $responses["summary_{$i}"] ?? null;
 
-            if ($r && $r->ok()) {
+            if ($r instanceof \Illuminate\Http\Client\Response && $r->ok()) {
                 $data = $r->json();
                 if (is_array($data)) $route = array_merge($route, $data);
             }
-            if ($e && $e->ok()) {
+            if ($e instanceof \Illuminate\Http\Client\Response && $e->ok()) {
                 $data = $e->json();
                 if (is_array($data)) $events = array_merge($events, $data);
             }
-            if ($s && $s->ok()) {
+            if ($s instanceof \Illuminate\Http\Client\Response && $s->ok()) {
                 $data = $s->json();
                 if (is_array($data)) $summaryData = array_merge($summaryData, $data);
             }

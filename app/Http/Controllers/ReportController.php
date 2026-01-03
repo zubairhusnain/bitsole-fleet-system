@@ -84,8 +84,16 @@ class ReportController extends Controller
     {
         $request->validate([
             'from_date' => 'required|date',
-            'to_date' => 'required|date',
+            'to_date' => 'required|date|after_or_equal:from_date',
         ]);
+
+        // Limit date range to 31 days to prevent server overload
+        $from = \Carbon\Carbon::parse($request->from_date);
+        $to = \Carbon\Carbon::parse($request->to_date);
+        if ($from->diffInDays($to) > 31) {
+            return response()->json(['message' => 'Date range cannot exceed 31 days.'], 422);
+        }
+
         $deviceIds = $this->getDeviceIds($request);
         if (empty($deviceIds)) return response()->json([]);
         return $this->reportService->fetchAssetActivity($request, $deviceIds);
