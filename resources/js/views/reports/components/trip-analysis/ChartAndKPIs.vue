@@ -1,87 +1,153 @@
 <template>
   <div class="row g-3 mb-3">
+    <!-- Combo Chart Section -->
     <div class="col-12 col-lg-6">
-      <div class="card border rounded-3 shadow-0 h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center gap-3 mb-2">
-             <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#e83e8c;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Trip Duration</span></div>
-             <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#0b0f28;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Idle Duration</span></div>
-             <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#339af0;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Distance</span></div>
-          </div> 
-          <!-- Timeline Chart -->
-          <div class="h-100 d-flex flex-column justify-content-center bg-white rounded" style="min-height: 220px;">
-             <div v-if="!trips.length" class="d-flex align-items-center justify-content-center h-100 bg-light rounded">
-                <span class="text-muted small">No trip data available for chart</span>
+      <div class="card border rounded-3 shadow-sm h-100">
+        <div class="card-body d-flex flex-column">
+          <!-- Legend -->
+          <div class="d-flex align-items-center justify-content-center gap-3 mb-4">
+             <div class="d-flex align-items-center gap-1"><span style="width:12px;height:12px;background:#e83e8c;display:inline-block;border-radius:2px;"></span> <span class="small fw-semibold text-muted">Trip Duration</span></div>
+             <div class="d-flex align-items-center gap-1"><span style="width:12px;height:12px;background:#0b0f28;display:inline-block;border-radius:2px;"></span> <span class="small fw-semibold text-muted">Idle Duration</span></div>
+             <div class="d-flex align-items-center gap-1"><span style="width:12px;height:12px;background:#339af0;display:inline-block;border-radius:2px;"></span> <span class="small fw-semibold text-muted">Distance</span></div>
+          </div>
+
+          <!-- Chart Container -->
+          <div class="flex-grow-1 position-relative" style="min-height: 250px;">
+             <div v-if="!chartData.length" class="d-flex align-items-center justify-content-center h-100 bg-light rounded">
+                <span class="text-muted small">No data available for chart</span>
              </div>
-             <div v-else class="px-4 py-3 h-100 d-flex flex-column">
-                <h6 class="small fw-bold text-muted mb-4">Activity Timeline</h6>
-                <div class="flex-grow-1 position-relative">
-                   <!-- Base Line -->
-                   <div class="position-absolute w-100 bg-light rounded" style="height: 20px; top: 50%; transform: translateY(-50%);"></div>
 
-                   <!-- Trip Segments -->
-                   <div v-for="(seg, idx) in timelineSegments" :key="idx"
-                        class="position-absolute rounded shadow-sm"
-                        :style="{
-                           left: seg.left,
-                           width: seg.width,
-                           height: '20px',
-                           top: '50%',
-                           transform: 'translateY(-50%)',
-                           backgroundColor: '#e83e8c',
-                           cursor: 'pointer'
-                        }"
-                        :title="`${seg.data.startTime} - ${seg.data.endTime} (${seg.data.distance})`"
-                   ></div>
-                </div>
+             <div v-else class="h-100 w-100 position-relative">
+                <!-- SVG Chart -->
+                <svg class="w-100 h-100" viewBox="0 0 100 60" preserveAspectRatio="none">
+                    <!-- Y-Axis Grid Lines (Left - Distance) -->
+                    <g class="grid-lines">
+                        <line v-for="i in 5" :key="'grid-'+i" x1="10" :y1="10 + (i-1)*10" x2="90" :y2="10 + (i-1)*10" stroke="#f0f0f0" stroke-width="0.5" />
+                    </g>
 
-                <!-- Time Labels -->
-                <div class="d-flex justify-content-between mt-2 text-muted" style="font-size: 10px;">
-                   <span>{{ formatTimeLabel(chartRange.min) }}</span>
-                   <span>{{ formatTimeLabel((chartRange.min + chartRange.max) / 2) }}</span>
-                   <span>{{ formatTimeLabel(chartRange.max) }}</span>
-                </div>
+                    <!-- Data Bars (Distance) -->
+                    <g class="bars">
+                        <rect v-for="(d, i) in chartData" :key="'bar-'+i"
+                              :x="getX(i) - 2"
+                              :y="getYDistance(d.distance)"
+                              width="4"
+                              :height="50 - getYDistance(d.distance)"
+                              fill="#339af0"
+                              opacity="0.8"
+                              rx="0.5"
+                        >
+                            <title>Distance: {{ formatDistance(d.distance) }}</title>
+                        </rect>
+                    </g>
+
+                    <!-- Trip Duration Line -->
+                    <polyline :points="tripLinePoints" fill="none" stroke="#e83e8c" stroke-width="0.8" />
+                    <circle v-for="(d, i) in chartData" :key="'trip-dot-'+i"
+                            :cx="getX(i)" :cy="getYDuration(d.tripDuration)" r="1.5" fill="#e83e8c" stroke="#fff" stroke-width="0.5">
+                        <title>Trip: {{ formatDuration(d.tripDuration) }}</title>
+                    </circle>
+
+                    <!-- Idle Duration Line -->
+                    <polyline :points="idleLinePoints" fill="none" stroke="#0b0f28" stroke-width="0.8" />
+                    <circle v-for="(d, i) in chartData" :key="'idle-dot-'+i"
+                            :cx="getX(i)" :cy="getYDuration(d.idleDuration)" r="1.5" fill="#0b0f28" stroke="#fff" stroke-width="0.5">
+                        <title>Idle: {{ formatDuration(d.idleDuration) }}</title>
+                    </circle>
+
+                    <!-- X-Axis Labels -->
+                    <g class="x-labels">
+                        <text v-for="(d, i) in chartData" :key="'label-'+i"
+                              :x="getX(i)" y="56"
+                              font-size="2.5" text-anchor="middle" fill="#6c757d">{{ formatDateLabel(d.date) }}</text>
+                    </g>
+
+                    <!-- Left Y-Axis Labels (Distance) -->
+                    <text x="8" y="10" font-size="2.5" text-anchor="end" fill="#6c757d">{{ Math.round(maxDistance) }}</text>
+                    <text x="8" y="30" font-size="2.5" text-anchor="end" fill="#6c757d">{{ Math.round(maxDistance/2) }}</text>
+                    <text x="8" y="50" font-size="2.5" text-anchor="end" fill="#6c757d">0</text>
+                    <!-- Label -->
+                    <text x="2" y="30" font-size="2.5" text-anchor="middle" transform="rotate(-90, 2, 30)" fill="#6c757d">(Kilo-meters)</text>
+
+                    <!-- Right Y-Axis Labels (Duration) -->
+                    <text x="92" y="10" font-size="2.5" text-anchor="start" fill="#6c757d">{{ Math.round(maxDuration/60000) }}</text>
+                    <text x="92" y="30" font-size="2.5" text-anchor="start" fill="#6c757d">{{ Math.round((maxDuration/2)/60000) }}</text>
+                    <text x="92" y="50" font-size="2.5" text-anchor="start" fill="#6c757d">0</text>
+                    <!-- Label -->
+                    <text x="98" y="30" font-size="2.5" text-anchor="middle" transform="rotate(90, 98, 30)" fill="#6c757d">(Minutes)</text>
+                </svg>
              </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Total Duration & Summary Section -->
     <div class="col-12 col-lg-6">
-      <div class="card border rounded-3 shadow-0 h-100">
-        <div class="card-body">
-          <div class="row g-3 h-100">
-            <div class="col-12 col-md-5">
-              <div class="h-100 d-flex flex-column justify-content-center">
-                <div class="small text-muted mb-1">Total Duration</div>
-                <div class="display-6 fw-bold mb-3">{{ formatDuration(totalTimeMs) }}</div>
+      <div class="row g-3 h-100">
+        <!-- Total Duration Card -->
+        <div class="col-12 col-md-5">
+           <div class="card border rounded-3 shadow-sm h-100">
+             <div class="card-body d-flex flex-column justify-content-center">
+                <div class="small fw-bold text-muted mb-1">Total Duration</div>
+                <div class="display-6 fw-bold mb-3 text-dark">{{ formatDuration(totalTimeMs) }}</div>
 
-                <div class="progress mb-1" style="height: 8px;">
+                <!-- Progress Bar -->
+                <div class="progress mb-4" style="height: 6px;">
                   <div class="progress-bar" :style="{width: tripPct + '%', backgroundColor: '#e83e8c'}"></div>
-                </div>
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                   <div class="small fw-semibold" style="color: #e83e8c;">Trip Duration</div>
-                   <div class="fw-bold">{{ formatDuration(summary?.totalDuration) }}</div>
-                </div>
-
-                <div class="progress mb-1" style="height: 8px;">
                   <div class="progress-bar" :style="{width: idlePct + '%', backgroundColor: '#0b0f28'}"></div>
                 </div>
-                <div class="d-flex justify-content-between align-items-center">
-                   <div class="small fw-semibold" style="color: #0b0f28;">Idle Duration</div>
-                   <div class="fw-bold">{{ formatDuration(summary?.totalIdle) }}</div>
+
+                <!-- Stacked Info Blocks -->
+                <div class="d-flex flex-column gap-3">
+                    <div class="p-3 border rounded bg-white shadow-sm">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span style="width:8px;height:8px;background:#e83e8c;border-radius:50%;display:inline-block;"></span>
+                            <span class="small fw-bold text-muted">Trip Duration</span>
+                        </div>
+                        <div class="h5 fw-bold mb-0">{{ formatDuration(summary?.totalDuration) }}</div>
+                    </div>
+                    <div class="p-3 border rounded bg-white shadow-sm">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span style="width:8px;height:8px;background:#0b0f28;border-radius:50%;display:inline-block;"></span>
+                            <span class="small fw-bold text-muted">Idle Duration</span>
+                        </div>
+                        <div class="h5 fw-bold mb-0">{{ formatDuration(summary?.totalIdle) }}</div>
+                    </div>
                 </div>
-              </div>
-            </div>
-            <div class="col-12 col-md-7 border-start">
-              <div class="ps-md-3 h-100 d-flex flex-column justify-content-center">
-                <h6 class="fw-bold mb-3">Summary</h6>
-                <div class="d-flex justify-content-between mb-2"><span class="small text-muted">Total Distance (km)</span><span class="fw-semibold">{{ formatDistance(summary?.totalDistance) }}</span></div>
-                <div class="d-flex justify-content-between mb-2"><span class="small text-muted">Total Trip Duration (hr)</span><span class="fw-semibold">{{ formatDuration(summary?.totalDuration) }}</span></div>
-                <div class="d-flex justify-content-between mb-2"><span class="small text-muted">Total Idling (hr)</span><span class="fw-semibold">{{ formatDuration(summary?.totalIdle) }}</span></div>
-                <div class="d-flex justify-content-between mb-2"><span class="small text-muted">Idling Percentage vs Trip Duration</span><span class="fw-semibold">{{ idlePct.toFixed(2) }}%</span></div>
-                <div class="d-flex justify-content-between mb-2"><span class="small text-muted">Max Speed</span><span class="fw-semibold">{{ Math.round(summary?.maxSpeed || 0) }} km/h</span></div>
-                <div class="d-flex justify-content-between"><span class="small text-muted">Total Fuel Usage (litre)</span><span class="fw-semibold">{{ (summary?.totalFuel || 0).toFixed(1) }} Litre</span></div>
-              </div>
+             </div>
+           </div>
+        </div>
+
+        <!-- Summary Card -->
+        <div class="col-12 col-md-7">
+          <div class="card border rounded-3 shadow-sm h-100">
+            <div class="card-body d-flex flex-column justify-content-center">
+                <h5 class="fw-bold mb-4">Summary</h5>
+
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
+                    <span class="small fw-semibold text-muted">Total Distance (km)</span>
+                    <span class="fw-bold">{{ formatDistance(summary?.totalDistance) }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
+                    <span class="small fw-semibold text-muted">Total Trip Duration (hr)</span>
+                    <span class="fw-bold">{{ formatDuration(summary?.totalDuration) }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
+                    <span class="small fw-semibold text-muted">Total Idling (hr)</span>
+                    <span class="fw-bold">{{ formatDuration(summary?.totalIdle) }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
+                    <span class="small fw-semibold text-muted">Idling Percentage vs Trip Duration</span>
+                    <span class="fw-bold">{{ idlePct.toFixed(2) }}%</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
+                    <span class="small fw-semibold text-muted">Average Fuel Consumption (km/litre)</span>
+                    <span class="fw-bold">{{ (summary?.avgKmL || 0) }} Km/l</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2">
+                    <span class="small fw-semibold text-muted">Total Fuel Usage (litre)</span>
+                    <span class="fw-bold">{{ (summary?.totalFuel || 0).toFixed(1) }} Litre</span>
+                </div>
             </div>
           </div>
         </div>
@@ -102,112 +168,15 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  stops: {
+    type: Array,
+    default: () => []
+  },
   startDate: String,
   endDate: String
 });
 
-const chartRange = computed(() => {
-  // 1. If explicit date range is provided (and valid), use it.
-  if (props.startDate && props.endDate) {
-      const min = new Date(props.startDate).getTime();
-      const max = new Date(props.endDate).getTime();
-      if (!isNaN(min) && !isNaN(max) && max > min) {
-          return { min, max };
-      }
-  }
-
-  // 2. Fallback to computing from trips
-  if (!props.trips || !props.trips.length) return { min: 0, max: 0 };
-
-  // Use ISO fields if available, otherwise formatted strings might fail in new Date()
-  const times = props.trips.flatMap(t => {
-      const s = t.startTimeIso || t.startTime;
-      const e = t.endTimeIso || t.endTime;
-      return [new Date(s).getTime(), new Date(e).getTime()];
-  });
-
-  let min = Math.min(...times);
-  let max = Math.max(...times);
-
-  // If we only have invalid dates (NaN), default to now
-  if (isNaN(min) || isNaN(max)) {
-      const now = Date.now();
-      return { min: now, max: now + 86400000 };
-  }
-
-  // If fallback logic is used, and it looks like a single day, clamp to 00:00-23:59
-  const firstDate = new Date(min);
-  const startOfDay = new Date(firstDate).setHours(0,0,0,0);
-  const endOfDay = new Date(firstDate).setHours(23,59,59,999);
-
-  // If the span is small (less than a day), expand to full day context
-  if ((max - min) < 86400000) {
-      return { min: startOfDay, max: endOfDay };
-  }
-
-  return { min, max };
-});
-
-const timelineSegments = computed(() => {
-  if (!props.trips || !props.trips.length) return [];
-
-  const { min, max } = chartRange.value;
-  const totalDuration = max - min;
-
-  if (totalDuration <= 0) return [];
-
-  return props.trips.map(t => {
-      const s = t.startTimeIso || t.startTime;
-      const e = t.endTimeIso || t.endTime;
-
-      const start = new Date(s).getTime();
-      const end = new Date(e).getTime();
-
-      if (isNaN(start) || isNaN(end)) return null;
-
-      // Clamp values
-      const safeStart = Math.max(start, min);
-      const safeEnd = Math.min(end, max);
-
-      // If segment is outside range, skip
-      if (safeEnd < min || safeStart > max) return null;
-
-      const left = ((safeStart - min) / totalDuration) * 100;
-      const width = ((safeEnd - safeStart) / totalDuration) * 100;
-
-      return {
-          left: `${left}%`,
-          width: `${width}%`,
-          data: t
-      };
-  }).filter(Boolean);
-});
-
-const formatTimeLabel = (ts) => {
-   if (!ts) return '';
-   const d = new Date(ts);
-   if (isNaN(d.getTime())) return '';
-
-   // If range > 24h, show date + time
-   const range = chartRange.value.max - chartRange.value.min;
-   if (range > 86400000) {
-       return d.toLocaleDateString([], {month: 'short', day: 'numeric'}) + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-   }
-   return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-};
-
-const totalTimeMs = computed(() => (props.summary?.totalDuration || 0) + (props.summary?.totalIdle || 0));
-
-const tripPct = computed(() => {
-  if (!totalTimeMs.value) return 0;
-  return (props.summary?.totalDuration / totalTimeMs.value) * 100;
-});
-
-const idlePct = computed(() => {
-  if (!totalTimeMs.value) return 0;
-  return (props.summary?.totalIdle / totalTimeMs.value) * 100;
-});
-
+// Helper to format duration
 const formatDuration = (ms) => {
   if (!ms) return '0s';
   const sec = Math.floor(ms / 1000);
@@ -224,4 +193,94 @@ const formatDistance = (m) => {
   if (!m) return '0 KM';
   return (m / 1000).toFixed(2) + ' KM';
 };
+
+// Total Time for Progress Bar
+const totalTimeMs = computed(() => (props.summary?.totalDuration || 0) + (props.summary?.totalIdle || 0));
+
+const tripPct = computed(() => {
+  if (!totalTimeMs.value) return 0;
+  return (props.summary?.totalDuration / totalTimeMs.value) * 100;
+});
+
+const idlePct = computed(() => {
+  if (!totalTimeMs.value) return 0;
+  return (props.summary?.totalIdle / totalTimeMs.value) * 100;
+});
+
+// Chart Data Processing
+const chartData = computed(() => {
+    const dataMap = {};
+
+    // Process Trips
+    props.trips.forEach(t => {
+        const d = (t.startTimeIso || '').split('T')[0];
+        if (!d) return;
+        if (!dataMap[d]) dataMap[d] = { date: d, distance: 0, tripDuration: 0, idleDuration: 0 };
+        dataMap[d].distance += (t.distance_m || 0);
+        dataMap[d].tripDuration += (t.duration_ms || 0);
+    });
+
+    // Process Stops (Idle)
+    props.stops.forEach(s => {
+        const d = (s.startTimeIso || '').split('T')[0];
+        if (!d) return;
+        if (!dataMap[d]) dataMap[d] = { date: d, distance: 0, tripDuration: 0, idleDuration: 0 };
+        dataMap[d].idleDuration += (s.duration_ms || 0);
+    });
+
+    return Object.values(dataMap).sort((a, b) => a.date.localeCompare(b.date));
+});
+
+// Chart Scaling
+const maxDistance = computed(() => {
+    if (!chartData.value.length) return 100;
+    const max = Math.max(...chartData.value.map(d => d.distance));
+    return max > 0 ? max * 1.1 : 100; // Add 10% padding
+});
+
+const maxDuration = computed(() => {
+    if (!chartData.value.length) return 3600000;
+    const max = Math.max(...chartData.value.map(d => Math.max(d.tripDuration, d.idleDuration)));
+    return max > 0 ? max * 1.1 : 3600000;
+});
+
+// Chart Drawing Helpers
+const getX = (index) => {
+    const count = chartData.value.length;
+    const padding = 10;
+    const width = 80; // 90 - 10
+    const step = width / (count > 1 ? count - 1 : 1);
+    return padding + (index * step);
+};
+
+const getYDistance = (val) => {
+    const height = 40; // 50 - 10
+    const ratio = val / maxDistance.value;
+    return 50 - (ratio * height);
+};
+
+const getYDuration = (val) => {
+    const height = 40;
+    const ratio = val / maxDuration.value;
+    return 50 - (ratio * height);
+};
+
+const tripLinePoints = computed(() => {
+    return chartData.value.map((d, i) => `${getX(i)},${getYDuration(d.tripDuration)}`).join(' ');
+});
+
+const idleLinePoints = computed(() => {
+    return chartData.value.map((d, i) => `${getX(i)},${getYDuration(d.idleDuration)}`).join(' ');
+});
+
+const formatDateLabel = (isoDate) => {
+    if (!isoDate) return '';
+    const d = new Date(isoDate);
+    return `${d.getDate()}/${d.getMonth()+1}`;
+};
+
 </script>
+
+<style scoped>
+.display-6 { font-size: 2.5rem; }
+</style>

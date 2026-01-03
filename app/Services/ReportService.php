@@ -455,6 +455,17 @@ class ReportService
             ];
         });
 
+        $stopsFormatted = collect($allStops)->map(function ($stop) {
+            return [
+                'startTime' => date('h:i A', strtotime($stop['startTime'])),
+                'startTimeIso' => $stop['startTime'],
+                'endTime' => date('h:i A', strtotime($stop['endTime'])),
+                'endTimeIso' => $stop['endTime'],
+                'duration_ms' => $stop['duration'] ?? 0,
+                'address' => $stop['address'] ?? 'N/A'
+            ];
+        });
+
         // Calculate Summary
         $totalDistance = collect($allTrips)->sum('distance');
         $totalDuration = collect($allTrips)->sum('duration');
@@ -475,6 +486,7 @@ class ReportService
 
         return [
             'rows' => $rows,
+            'stops' => $stopsFormatted,
             'summary' => [
                 'totalDistance' => $totalDistance, // meters
                 'totalDuration' => $totalDuration, // ms

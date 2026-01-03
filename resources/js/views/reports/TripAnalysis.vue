@@ -59,10 +59,10 @@
     </div>
 
     <template v-else>
-      <DailyBreakdown v-if="viewType === 'Daily Breakdown'" :rowsDailyTrips="rowsDailyTrips" :summaryData="dailySummaryData" :vehicleInfo="selectedVehicleInfo" :startDate="startDate" :endDate="endDate" />
+      <DailyBreakdown v-if="viewType === 'Daily Breakdown'" :rowsDailyTrips="rowsDailyTrips" :rowsDailyStops="rowsDailyStops" :summaryData="dailySummaryData" :vehicleInfo="selectedVehicleInfo" :startDate="startDate" :endDate="endDate" />
 
       <TripSummary v-else-if="viewType === 'Trip Summary'" :rowsTripSummary="rowsTripSummary" @view-details="handleViewDetails" />
- 
+
       <DailySummaryList v-else-if="viewType === 'Daily Summary List'" :rowsDailyVehicleList="rowsDailyVehicleList" />
 
       <DailyBreakdownMap v-else-if="viewType === 'Daily Breakdown (with map)'" :rowsDailyBreakdown="rowsDailyBreakdown" />
@@ -96,6 +96,7 @@ const loading = ref(false);
 
 const rowsTripSummary = ref([]);
 const rowsDailyTrips = ref([]);
+const rowsDailyStops = ref([]);
 const rowsDailyBreakdown = ref([]);
 const rowsDailySummary = ref([]);
 const rowsDailyVehicleList = ref([]);
@@ -170,6 +171,7 @@ const handleSearch = async () => {
     } else if (viewType.value === 'Daily Breakdown') {
       const response = await window.axios.get('/web/reports/daily-trips', { params });
       rowsDailyTrips.value = response.data.rows;
+      rowsDailyStops.value = response.data.stops || [];
       dailySummaryData.value = response.data.summary;
     } else if (viewType.value === 'Daily Breakdown (with map)') {
       const response = await window.axios.get('/web/reports/daily-breakdown-map', { params });
