@@ -59,7 +59,7 @@
     </div>
 
     <template v-else>
-      <DailyBreakdown v-if="viewType === 'Daily Breakdown'" :rowsDailyTrips="rowsDailyTrips" />
+      <DailyBreakdown v-if="viewType === 'Daily Breakdown'" :rowsDailyTrips="rowsDailyTrips" :summaryData="dailySummaryData" :vehicleInfo="selectedVehicleInfo" :startDate="startDate" :endDate="endDate" />
 
       <TripSummary v-else-if="viewType === 'Trip Summary'" :rowsTripSummary="rowsTripSummary" @view-details="handleViewDetails" />
 
@@ -78,7 +78,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import DailyBreakdown from './components/trip-analysis/DailyBreakdown.vue';
 import DailyBreakdownMap from './components/trip-analysis/DailyBreakdownMap.vue';
 import DailySummary from './components/trip-analysis/DailySummary.vue';
@@ -101,6 +101,12 @@ const rowsDailySummary = ref([]);
 const rowsDailyVehicleList = ref([]);
 const rowsMonthlySummary = ref([]);
 const rowsMonthlyVehicleList = ref([]);
+const dailySummaryData = ref(null);
+
+const selectedVehicleInfo = computed(() => {
+    if (!vehicle.value) return null;
+    return vehicles.value.find(v => v.device_id == vehicle.value) || null;
+});
 
 const fetchVehicles = async () => {
   try {
@@ -162,7 +168,8 @@ const handleSearch = async () => {
       rowsTripSummary.value = response.data;
     } else if (viewType.value === 'Daily Breakdown') {
       const response = await window.axios.get('/web/reports/daily-trips', { params });
-      rowsDailyTrips.value = response.data;
+      rowsDailyTrips.value = response.data.rows;
+      dailySummaryData.value = response.data.summary;
     } else if (viewType.value === 'Daily Breakdown (with map)') {
       const response = await window.axios.get('/web/reports/daily-breakdown-map', { params });
       rowsDailyBreakdown.value = response.data;

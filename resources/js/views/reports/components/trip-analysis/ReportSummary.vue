@@ -4,20 +4,20 @@
     <div class="card-body pt-0">
       <div class="row g-3">
         <div class="col-12 col-md-3">
-          <div class="small text-muted">Vehicle ID</div>
-          <div class="fw-semibold">VGPS2563</div>
+          <div class="small text-muted">Vehicle Name</div>
+          <div class="fw-semibold">{{ vehicle?.name || '-' }}</div>
         </div>
         <div class="col-12 col-md-3">
           <div class="small text-muted">Device ID</div>
-          <div class="fw-semibold">#34939829</div>
+          <div class="fw-semibold">{{ vehicle?.device_id || '-' }}</div>
         </div>
         <div class="col-12 col-md-3">
           <div class="small text-muted">Duration</div>
-          <div class="fw-semibold">2025-08-26 00:00 - 2025-08-31 23:59</div>
+          <div class="fw-semibold">{{ formatTime(dateRange?.start) }} - {{ formatTime(dateRange?.end) }}</div>
         </div>
         <div class="col-12 col-md-3">
           <div class="small text-muted">View Type</div>
-          <div class="fw-semibold">Summary</div>
+          <div class="fw-semibold">Daily Breakdown</div>
         </div>
         <div class="col-12">
           <div class="small text-muted">Remarks</div>
@@ -29,5 +29,14 @@
 </template>
 
 <script setup>
-// Props could be added here if we want to make it dynamic later
+defineProps({
+  summary: Object,
+  vehicle: Object,
+  dateRange: Object
+});
+
+const formatTime = (t) => {
+  if (!t) return '';
+  return t.replace('T', ' ');
+};
 </script>

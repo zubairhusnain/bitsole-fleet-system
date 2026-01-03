@@ -178,7 +178,7 @@ class ReportService
         // If it looks like a simple date (YYYY-MM-DD), append end of day time
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
             $toStr .= ' 23:59:59';
-        } 
+        }
         $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
 
         // Allow filtering events to reduce payload; default to harsh + overspeed
@@ -407,12 +407,39 @@ class ReportService
         }
         $deviceQuery = implode('&', $queryParams);
         $fullQuery = "{$deviceQuery}&from={$from}&to={$to}";
-        $headers = ['Content-Type: application/json', 'Accept: application/json'];
 
-        $tripsResponse = static::curl("/api/reports/trips?$fullQuery", 'GET', $sessionId, '', $headers);
-        $allTrips = json_decode($tripsResponse->response ?? '[]', true);
+        $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
+        if (empty($baseUrl)) {
+             Log::error('ReportService: Traccar Host URL is not configured.');
+             return [
+                 'rows' => [],
+                 'summary' => []
+             ];
+        }
 
-        return collect($allTrips)->map(function ($trip, $index) {
+        $headers = [
+            'Cookie' => $sessionId,
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json'
+        ];
+
+        try {
+            $responses = Http::pool(fn (Pool $pool) => [
+                $pool->as('trips')->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
+                $pool->as('stops')->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
+            ]);
+        } catch (\Exception $e) {
+             Log::error('fetchDailyTrips exception', ['error' => $e->getMessage()]);
+             return [
+                 'rows' => [],
+                 'summary' => []
+             ];
+        }
+
+        $allTrips = ($responses['trips']->ok()) ? $responses['trips']->json() : [];
+        $allStops = ($responses['stops']->ok()) ? $responses['stops']->json() : [];
+
+        $rows = collect($allTrips)->map(function ($trip, $index) {
             return [
                 'key' => $index + 1,
                 'date' => date('d/m/Y', strtotime($trip['startTime'])),
@@ -420,9 +447,41 @@ class ReportService
                 'startLocation' => $trip['startAddress'] ?? 'N/A',
                 'endTime' => date('h:i A', strtotime($trip['endTime'])),
                 'endLocation' => $trip['endAddress'] ?? 'N/A',
-                'distance' => round(($trip['distance'] ?? 0) / 1000, 2) . ' KM'
+                'distance' => round(($trip['distance'] ?? 0) / 1000, 2) . ' KM',
+                // Raw values for calculation if needed
+                'distance_m' => $trip['distance'] ?? 0,
+                'duration_ms' => $trip['duration'] ?? 0
             ];
         });
+
+        // Calculate Summary
+        $totalDistance = collect($allTrips)->sum('distance');
+        $totalDuration = collect($allTrips)->sum('duration');
+        $totalIdle = collect($allStops)->sum('duration');
+        $maxSpeed = collect($allTrips)->max('maxSpeed') ?? 0;
+
+        // Fuel (if available in trip attributes)
+        $totalFuel = 0;
+        foreach ($allTrips as $trip) {
+            $startFuel = data_get($trip, 'start.attributes.fuel', 0);
+            $endFuel = data_get($trip, 'end.attributes.fuel', 0);
+             if ($startFuel && $endFuel && $startFuel >= $endFuel) {
+                $totalFuel += ($startFuel - $endFuel);
+            } else {
+                 $totalFuel += data_get($trip, 'spentFuel', 0);
+            }
+        }
+
+        return [
+            'rows' => $rows,
+            'summary' => [
+                'totalDistance' => $totalDistance, // meters
+                'totalDuration' => $totalDuration, // ms
+                'totalIdle' => $totalIdle, // ms
+                'maxSpeed' => $maxSpeed * 1.852, // knots to km/h
+                'totalFuel' => $totalFuel
+            ]
+        ];
     }
 
     public function fetchDailySummary($request, $deviceIds)
@@ -442,14 +501,31 @@ class ReportService
         }
         $deviceQuery = implode('&', $queryParams);
         $fullQuery = "{$deviceQuery}&from={$from}&to={$to}";
-        $headers = ['Content-Type: application/json', 'Accept: application/json'];
 
-        // We need trips and stops to calculate daily stats
-        $tripsResponse = static::curl("/api/reports/trips?$fullQuery", 'GET', $sessionId, '', $headers);
-        $allTrips = json_decode($tripsResponse->response ?? '[]', true);
+        $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
+        if (empty($baseUrl)) {
+             Log::error('ReportService: Traccar Host URL is not configured.');
+             return [];
+        }
 
-        $stopsResponse = static::curl("/api/reports/stops?$fullQuery", 'GET', $sessionId, '', $headers);
-        $allStops = json_decode($stopsResponse->response ?? '[]', true);
+        $headers = [
+            'Cookie' => $sessionId,
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json'
+        ];
+
+        try {
+            $responses = Http::pool(fn (Pool $pool) => [
+                $pool->as('trips')->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
+                $pool->as('stops')->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('fetchDailySummary exception', ['error' => $e->getMessage()]);
+            return [];
+        }
+
+        $allTrips = ($responses['trips']->ok()) ? $responses['trips']->json() : [];
+        $allStops = ($responses['stops']->ok()) ? $responses['stops']->json() : [];
 
         // Group by Date (and Device if needed, but DailySummary view usually is per vehicle or list of vehicles)
         // If multiple vehicles, we might want to return a list with vehicle name.
@@ -535,13 +611,31 @@ class ReportService
         }
         $deviceQuery = implode('&', $queryParams);
         $fullQuery = "{$deviceQuery}&from={$from}&to={$to}";
-        $headers = ['Content-Type: application/json', 'Accept: application/json'];
 
-        $tripsResponse = static::curl("/api/reports/trips?$fullQuery", 'GET', $sessionId, '', $headers);
-        $allTrips = json_decode($tripsResponse->response ?? '[]', true);
+        $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
+        if (empty($baseUrl)) {
+             Log::error('ReportService: Traccar Host URL is not configured.');
+             return [];
+        }
 
-        $stopsResponse = static::curl("/api/reports/stops?$fullQuery", 'GET', $sessionId, '', $headers);
-        $allStops = json_decode($stopsResponse->response ?? '[]', true);
+        $headers = [
+            'Cookie' => $sessionId,
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json'
+        ];
+
+        try {
+            $responses = Http::pool(fn (Pool $pool) => [
+                $pool->as('trips')->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
+                $pool->as('stops')->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('fetchMonthlySummary exception', ['error' => $e->getMessage()]);
+            return [];
+        }
+
+        $allTrips = ($responses['trips']->ok()) ? $responses['trips']->json() : [];
+        $allStops = ($responses['stops']->ok()) ? $responses['stops']->json() : [];
 
         $trips = collect($allTrips);
         $stops = collect($allStops);
@@ -618,19 +712,35 @@ class ReportService
         foreach ($deviceIds as $id) { $queryParams[] = "deviceId={$id}"; }
         $deviceQuery = implode('&', $queryParams);
         $fullQuery = "{$deviceQuery}&from={$from}&to={$to}";
-        $headers = ['Content-Type: application/json', 'Accept: application/json'];
 
-        $tripsResp = static::curl("/api/reports/trips?$fullQuery", 'GET', $sessionId, '', $headers);
-        $trips = collect(json_decode($tripsResp->response ?? '[]', true));
+        $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
+        if (empty($baseUrl)) {
+             Log::error('ReportService: Traccar Host URL is not configured.');
+             return [];
+        }
 
-        $eventsResp = static::curl("/api/reports/events?$fullQuery", 'GET', $sessionId, '', $headers);
-        $events = collect(json_decode($eventsResp->response ?? '[]', true));
+        $headers = [
+            'Cookie' => $sessionId,
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json'
+        ];
 
-        $stopsResp = static::curl("/api/reports/stops?$fullQuery", 'GET', $sessionId, '', $headers);
-        $stops = collect(json_decode($stopsResp->response ?? '[]', true));
+        try {
+            $responses = Http::pool(fn (Pool $pool) => [
+                $pool->as('trips')->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
+                $pool->as('events')->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$fullQuery}"),
+                $pool->as('stops')->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
+                $pool->as('route')->withHeaders($headers)->get("{$baseUrl}/api/reports/route?{$fullQuery}"),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('fetchDailyBreakdownMap exception', ['error' => $e->getMessage()]);
+            return [];
+        }
 
-        $routeResp = static::curl("/api/reports/route?$fullQuery", 'GET', $sessionId, '', $headers);
-        $routes = collect(json_decode($routeResp->response ?? '[]', true));
+        $trips = collect(($responses['trips']->ok()) ? $responses['trips']->json() : []);
+        $events = collect(($responses['events']->ok()) ? $responses['events']->json() : []);
+        $stops = collect(($responses['stops']->ok()) ? $responses['stops']->json() : []);
+        $routes = collect(($responses['route']->ok()) ? $responses['route']->json() : []);
 
         $grouped = $trips->groupBy(function($t) {
              return date('Y-m-d', strtotime($t['startTime'])) . '_' . $t['deviceId'];

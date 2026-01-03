@@ -1,7 +1,7 @@
 <template>
   <div>
-    <ReportSummary />
-    <ChartAndKPIs />
+    <ReportSummary :summary="summaryData" :vehicle="vehicleInfo" :dateRange="{start: startDate, end: endDate}" />
+    <ChartAndKPIs :summary="summaryData" />
     <div class="card border rounded-3 shadow-0">
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -44,7 +44,17 @@ defineProps({
   rowsDailyTrips: {
     type: Array,
     required: true
-  }
+  },
+  summaryData: {
+    type: Object,
+    default: () => ({})
+  },
+  vehicleInfo: {
+    type: Object,
+    default: () => null
+  },
+  startDate: String,
+  endDate: String
 });
 </script>
 
