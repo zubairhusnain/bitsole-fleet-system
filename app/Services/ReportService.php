@@ -799,19 +799,46 @@ class ReportService
             $timeline = [];
 
             foreach ($dayTrips as $trip) {
+                $durMs = $trip['duration'] ?? 0;
+                $durSec = floor($durMs / 1000);
+                $h = floor($durSec / 3600);
+                $m = floor(($durSec % 3600) / 60);
+                $s = $durSec % 60;
+                $durStr = ($h > 0) ? sprintf('%dh %dm %ds', $h, $m, $s) : sprintf('%dm %ds', $m, $s);
+
+                // Aggregate events for this trip
+                $tripStart = strtotime($trip['startTime']);
+                $tripEnd = strtotime($trip['endTime']);
+
+                $tripEvents = $dayEvents->filter(function($e) use ($tripStart, $tripEnd) {
+                    $t = strtotime($e['eventTime']);
+                    return $t >= $tripStart && $t <= $tripEnd;
+                });
+
+                $svCount = $tripEvents->where('type', 'overspeed')->count();
+                $haCount = $tripEvents->where('type', 'harshAcceleration')->count();
+                $hbCount = $tripEvents->where('type', 'harshBraking')->count();
+
+                $badges = [];
+                if ($svCount > 0) $badges[] = "$svCount SV";
+                if ($haCount > 0) $badges[] = "$haCount HA";
+                if ($hbCount > 0) $badges[] = "$hbCount HB";
+                $alertBadge = implode(', ', $badges);
+
                 $timeline[] = [
-                    'time_sort' => strtotime($trip['startTime']),
-                    'time' => date('h:i A', strtotime($trip['startTime'])),
+                    'time_sort' => $tripStart,
+                    'time' => date('h:i A', $tripStart),
                     'location' => $trip['startAddress'] ?? '',
-                    'dist' => round(($trip['distance'] ?? 0)/1000, 1) . 'KM',
-                    'dur' => gmdate('H\h i\m', ($trip['duration'] ?? 0)/1000),
+                    'dist' => round(($trip['distance'] ?? 0)/1000, 2) . 'KM',
+                    'dur' => $durStr,
+                    'alert' => $alertBadge,
                     'type' => 'start',
                     'lat' => $trip['startLat'] ?? 0,
                     'lon' => $trip['startLon'] ?? 0
                 ];
                 $timeline[] = [
-                    'time_sort' => strtotime($trip['endTime']),
-                    'time' => date('h:i A', strtotime($trip['endTime'])),
+                    'time_sort' => $tripEnd,
+                    'time' => date('h:i A', $tripEnd),
                     'location' => $trip['endAddress'] ?? '',
                     'type' => 'end',
                     'lat' => $trip['endLat'] ?? 0,
@@ -819,6 +846,7 @@ class ReportService
                 ];
             }
 
+            // Events (Hidden in list, visible on map)
             foreach ($dayEvents as $event) {
                 if ($event['type'] == 'deviceOnline' || $event['type'] == 'deviceOffline') continue;
 
@@ -831,65 +859,93 @@ class ReportService
                 $lon = $closest['longitude'] ?? 0;
                 $addr = $closest['address'] ?? '';
 
-                // Friendly event name
-                $friendlyName = ucfirst(preg_replace('/(?<!^)[A-Z]/', ' $0', $event['type']));
+                $friendlyName = $event['type'];
+                if ($event['type'] == 'overspeed') $friendlyName = 'Overspeed';
+                if ($event['type'] == 'harshAcceleration') $friendlyName = 'Harsh Acceleration';
+                if ($event['type'] == 'harshBraking') $friendlyName = 'Harsh Braking';
 
                 $timeline[] = [
                     'time_sort' => $eventTs,
                     'time' => date('h:i A', $eventTs),
                     'location' => $addr,
-                    'alert' => $friendlyName, // e.g. "Harsh Braking"
+                    'alert' => $friendlyName,
                     'type' => 'alert',
                     'lat' => $lat,
-                    'lon' => $lon
+                    'lon' => $lon,
+                    'hidden' => true
                 ];
             }
 
-            // Add Stops to Timeline
+            // Stops
             foreach ($dayStops as $stop) {
                 $stopTs = strtotime($stop['startTime']);
                 $timeline[] = [
                     'time_sort' => $stopTs,
                     'time' => date('h:i A', $stopTs),
                     'location' => $stop['address'] ?? '',
-                    'dur' => gmdate('H\h i\m', ($stop['duration'] ?? 0)/1000),
-                    'type' => 'stop', // New type
+                    'type' => 'stop',
                     'lat' => $stop['latitude'] ?? 0,
                     'lon' => $stop['longitude'] ?? 0
                 ];
             }
 
-            usort($timeline, function($a, $b) { return $a['time_sort'] <=> $b['time_sort']; });
+            // Sort timeline
+            usort($timeline, function($a, $b) {
+                return $a['time_sort'] <=> $b['time_sort'];
+            });
 
+            // Route points
+            $routePoints = $dayRoutes->map(function($r) {
+                return [$r['latitude'], $r['longitude'], strtotime($r['fixTime']) * 1000];
+            })->values()->all();
+
+            // Summary
             $totalDist = $dayTrips->sum('distance');
             $totalDur = $dayTrips->sum('duration');
             $totalIdle = $dayStops->sum('duration');
 
-            // Format route for map: [[lat, lon, timestamp], ...]
-            $routePoints = $dayRoutes->map(function($r) {
-                return [
-                    $r['latitude'],
-                    $r['longitude'],
-                    strtotime($r['fixTime']) * 1000 // ms for JS
-                ];
-            })->values()->all();
+            // Format Duration
+            $durSec = floor($totalDur / 1000);
+            $h = floor($durSec / 3600);
+            $m = floor(($durSec % 3600) / 60);
+            $s = $durSec % 60;
+            $formattedDur = sprintf('%dh %dm %ds', $h, $m, $s);
+
+            // Format Idle
+            $idleSec = floor($totalIdle / 1000);
+            $ih = floor($idleSec / 3600);
+            $im = floor(($idleSec % 3600) / 60);
+            $is = $idleSec % 60;
+            $formattedIdle = sprintf('%dh %dm %ds', $ih, $im, $is);
+
+            // Behav Badges
+            $totalSV = $dayEvents->where('type', 'overspeed')->count();
+            $totalHA = $dayEvents->where('type', 'harshAcceleration')->count();
+            $totalHB = $dayEvents->where('type', 'harshBraking')->count();
+
+            $badges = [];
+            if ($totalSV > 0) $badges[] = "$totalSV SV";
+            if ($totalHA > 0) $badges[] = "$totalHA HA";
+            if ($totalHB > 0) $badges[] = "$totalHB HB";
+            $behavStr = empty($badges) ? '0' : implode(', ', $badges);
 
             return [
                 'key' => $key,
-                'date' => date('d/m/Y - l', strtotime($date)) . ' (' . $deviceName . ')',
+                'date' => date('d/m/Y - l', strtotime($date)),
                 'distance' => round($totalDist/1000, 2) . ' KM',
-                'isOpen' => false,
+                'isOpen' => true,
                 'summary' => [
                     'date' => date('d/m/Y - l', strtotime($date)),
                     'dist' => round($totalDist/1000, 2) . ' km',
-                    'dur' => gmdate('H\h i\m s\s', $totalDur/1000),
-                    'idle' => gmdate('H\h i\m s\s', $totalIdle/1000),
-                    'behav' => $dayEvents->count() . ' Events'
+                    'dur' => $formattedDur,
+                    'idle' => $formattedIdle,
+                    'behav' => $behavStr
                 ],
                 'timeline' => $timeline,
                 'route' => $routePoints
             ];
         });
+
 
         return $result->values();
     }

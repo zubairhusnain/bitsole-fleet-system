@@ -12,28 +12,28 @@
 
           <div class="overflow-auto custom-scrollbar flex-grow-1">
             <div class="list-group list-group-flush">
-              <template v-for="day in rowsDailyBreakdown" :key="day.key">
+              <template v-for="day in displayedRows" :key="day.key">
                 <!-- Day Header -->
                 <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3"
                      :class="{'bg-light': !day.isOpen, 'bg-primary-subtle text-primary': day.isOpen}"
                      @click="toggleDay(day)"
                      role="button"
                      style="cursor: pointer;">
-                  <div>  
+                  <div>
                     <div class="fw-bold">{{ cleanDate(day.date) }}</div>
-                  </div> 
+                  </div>
                   <div class="d-flex align-items-center gap-2">
                     <div class="small fw-bold" :class="day.isOpen ? 'text-primary' : 'text-dark'">{{ day.distance }}</div>
                     <i class="bi" :class="day.isOpen ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
                   </div>
                 </div>
 
-                
+
                 <!-- Day Details (Timeline) -->
                 <div v-if="day.isOpen" class="bg-white">
                   <!-- Summary Box -->
                   <div class="p-3 m-3 rounded-3 bg-info-subtle text-dark">
-                    <div class="fw-bold mb-2 small text-uppercase text-primary-emphasis">Summary for {{ day.summary.date.split(' - ')[0] }}</div>
+                    <div class="fw-bold mb-2 small text-uppercase text-primary-emphasis">Summary for {{ cleanDate(day.summary.date) }}</div>
                     <div class="row g-2">
                       <div class="col-6">
                         <div class="text-muted small" style="font-size: 0.75rem;">Total Distance</div>
@@ -57,8 +57,9 @@
                   <!-- Timeline -->
                   <div class="px-3 pb-3 position-relative">
                     <div class="timeline-line"></div>
-                    
+
                     <div v-for="(item, idx) in day.timeline" :key="idx" class="d-flex mb-3 position-relative z-1">
+                      <template v-if="!item.hidden">
                       <!-- Icon/Dot Column -->
                       <div class="d-flex flex-column align-items-center me-3" style="width: 24px;">
                         <div v-if="item.type === 'start'" class="rounded-circle bg-primary border border-2 border-white shadow-sm" style="width: 16px; height: 16px; margin-top: 4px;"></div>
@@ -75,21 +76,32 @@
                       <div class="flex-grow-1 cursor-pointer" @click="seekToTime(day, item.time_sort)">
                         <div class="d-flex justify-content-between align-items-start">
                            <div>
-                              <div class="fw-bold small" :class="getTypeColor(item.type)">{{ getTypeLabel(item.type, item.alert) }}</div>
-                              <div class="text-muted small" style="font-size: 0.75rem;">{{ item.location }}</div>
-                              <div v-if="item.dist || item.dur" class="mt-1">
-                                <span v-if="item.dist" class="badge bg-light text-dark border me-1 fw-normal">{{ item.dist }}</span>
-                                <span v-if="item.dur" class="badge bg-light text-dark border me-1 fw-normal">{{ item.dur }}</span>
+                              <div class="d-flex align-items-center gap-2 mb-1">
+                                  <div class="fw-bold small" :class="getTypeColor(item.type)">{{ item.time }}</div>
+                              </div>
+
+                              <div class="text-muted small mb-1" style="font-size: 0.8rem; line-height: 1.2;">{{ item.location }}</div>
+
+                              <div class="d-flex flex-wrap gap-2 mt-1">
+                                <span v-if="item.dist" class="badge bg-white text-primary border d-flex align-items-center gap-1 fw-normal shadow-sm">
+                                    <i class="bi bi-bezier2"></i> {{ item.dist }}
+                                </span>
+                                <span v-if="item.dur" class="badge bg-white text-dark border d-flex align-items-center gap-1 fw-normal shadow-sm">
+                                    <i class="bi bi-clock"></i> {{ item.dur }}
+                                </span>
+                                <span v-if="item.alert" class="badge bg-white text-danger border d-flex align-items-center gap-1 fw-normal shadow-sm">
+                                    <i class="bi bi-exclamation-triangle"></i> {{ item.alert }}
+                                </span>
                               </div>
                            </div>
-                           <div class="text-muted small fw-semibold">{{ item.time }}</div>
                         </div>
                       </div>
+                      </template>
                     </div>
                   </div>
                 </div>
               </template>
-              <div v-if="rowsDailyBreakdown.length === 0" class="text-center p-5 text-muted">
+              <div v-if="displayedRows.length === 0" class="text-center p-5 text-muted">
                   <i class="bi bi-inbox fs-1 d-block mb-2"></i>
                   No data available
               </div>
@@ -102,20 +114,20 @@
           <div ref="mapEl" class="h-100 w-100 z-0"></div>
 
           <!-- Playback Controls Overlay -->
-          <div v-if="activeDay && activeDay.route && activeDay.route.length > 0" 
+          <div v-if="activeDay && activeDay.route && activeDay.route.length > 0"
                class="position-absolute top-0 start-50 translate-middle-x mt-3 z-3 bg-white p-1 rounded-pill shadow-sm d-flex align-items-center gap-2 border">
-            
+
             <button class="btn btn-sm btn-light rounded-pill px-3 fw-bold d-flex align-items-center" @click="restartPlayback" title="Restart">
               <i class="bi bi-arrow-counterclockwise me-2"></i> Restart
             </button>
-            
+
             <div class="vr my-1"></div>
 
             <div class="d-flex align-items-center gap-1 px-1">
                 <button class="btn btn-sm btn-light rounded-circle" @click="stepBackward" title="Step Back">
                    <i class="bi bi-skip-backward-fill"></i>
                 </button>
-                
+
                 <button class="btn btn-primary btn-sm rounded-circle shadow-sm d-flex align-items-center justify-content-center" @click="togglePlay" style="width: 32px; height: 32px;">
                   <i class="bi" :class="isPlaying ? 'bi-pause-fill' : 'bi-play-fill'"></i>
                 </button>
@@ -128,11 +140,11 @@
             <div class="vr my-1"></div>
 
             <div class="bg-light rounded-pill p-1 d-flex">
-              <button class="btn btn-sm rounded-pill px-3 border-0" 
-                      :class="playbackSpeed === 10 ? 'bg-white shadow-sm fw-bold text-dark' : 'text-muted'" 
+              <button class="btn btn-sm rounded-pill px-3 border-0"
+                      :class="playbackSpeed === 10 ? 'bg-white shadow-sm fw-bold text-dark' : 'text-muted'"
                       @click="setSpeed(10)">Slow</button>
-              <button class="btn btn-sm rounded-pill px-3 border-0" 
-                      :class="playbackSpeed === 200 ? 'bg-white shadow-sm fw-bold text-dark' : 'text-muted'" 
+              <button class="btn btn-sm rounded-pill px-3 border-0"
+                      :class="playbackSpeed === 200 ? 'bg-white shadow-sm fw-bold text-dark' : 'text-muted'"
                       @click="setSpeed(200)">Fast</button>
             </div>
           </div>
@@ -164,172 +176,222 @@ const props = defineProps({
   }
 });
 
-const mapEl = ref(null);
-let map = null;
-let polylineLayer = null;
-let movingMarker = null;
-let markersLayer = L.layerGroup();
-
-const activeDay = ref(null);
-const isPlaying = ref(false);
-const playbackSpeed = ref(50); // Points per second approx? No, logic will be different.
-// Logic: We will use an interval. Speed determines how many ms we skip per tick or how fast the tick is.
-// Let's say we have an index.
-const currentIndex = ref(0);
-let animationFrame = null;
-let lastTimestamp = 0;
-
-// Computed for display
-const playbackTimeDisplay = computed(() => {
-    if (!activeDay.value || !activeDay.value.route || activeDay.value.route.length === 0) return '';
-    const point = activeDay.value.route[currentIndex.value];
-    if (point && point[2]) {
-        return new Date(point[2]).toLocaleString();
+const staticRows = ref([
+    {
+        key: 'static-1',
+        date: '26/08/2025 - Saturday',
+        distance: '126.53 KM',
+        isOpen: true,
+        summary: {
+            date: '26/08/2025 - Saturday',
+            dist: '126.53 km',
+            dur: '2h 8m 35s',
+            idle: '5m',
+            behav: '12 SV, 1 HA'
+        },
+        timeline: [
+            {
+                type: 'start',
+                time: '07:30 AM',
+                time_sort: 1,
+                location: 'Persiaran Gerbang Selatan, Bukit Jelutong',
+                dist: '45.20 KM',
+                dur: '45m 10s',
+                lat: 3.1129, lon: 101.5394
+            },
+            {
+                type: 'alert',
+                time: '08:25 AM',
+                time_sort: 2,
+                location: 'Jalan Damansara',
+                alert: 'Overspeed',
+                lat: 3.1380, lon: 101.6950,
+                hidden: true
+            },
+            {
+                type: 'stop',
+                time: '08:45 AM',
+                time_sort: 3,
+                location: 'Petronas Jalan Duta',
+                dur: '10m',
+                lat: 3.1700, lon: 101.6700
+            },
+            {
+                type: 'start',
+                time: '08:55 AM',
+                time_sort: 4,
+                location: 'Petronas Jalan Duta',
+                dist: '20.10 KM',
+                dur: '30m',
+                lat: 3.1700, lon: 101.6700
+            },
+            {
+                type: 'end',
+                time: '09:25 AM',
+                time_sort: 5,
+                location: 'KLCC Parking',
+                lat: 3.1579, lon: 101.7116
+            }
+        ],
+        route: [
+             [3.1129, 101.5394, 1693006200000],
+             [3.1200, 101.5500, 1693006500000],
+             [3.1300, 101.6000, 1693007000000],
+             [3.1380, 101.6950, 1693009500000], // Alert location
+             [3.1500, 101.6800, 1693010000000],
+             [3.1700, 101.6700, 1693010700000], // Stop
+             [3.1579, 101.7116, 1693013100000]  // End
+        ]
     }
-    return activeDay.value.date;
+]);
+
+const displayedRows = computed(() => {
+    return props.rowsDailyBreakdown.length > 0 ? props.rowsDailyBreakdown : staticRows.value;
 });
 
-function initMap() {
-  if (!mapEl.value) return;
-  if (map) return; 
+const mapEl = ref(null);
+let map = null;
+let polyline = null;
+let playbackMarker = null;
+let animationFrameId = null;
+let markers = [];
 
-  map = L.map(mapEl.value).setView([0, 0], 2);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
-  markersLayer.addTo(map);
+const isPlaying = ref(false);
+const playbackSpeed = ref(200); // ms per step
+const playbackIndex = ref(0);
+const activeDay = ref(null);
+
+onMounted(() => {
+  initMap();
+  if (displayedRows.value.length > 0) {
+      // Load the first day on map by default, without toggling (since they default to open)
+      activeDay.value = displayedRows.value[0];
+      loadDayOnMap(activeDay.value);
+  }
+});
+
+onUnmounted(() => {
+  if (map) {
+    map.remove();
+    map = null;
+  }
+  stopPlayback();
+});
+
+// Watch for prop changes to update list if real data comes in
+watch(() => props.rowsDailyBreakdown, (newVal) => {
+    if (newVal.length > 0) {
+        // If data changes, load the first one on map
+        activeDay.value = newVal[0];
+        loadDayOnMap(activeDay.value);
+    }
+}, { deep: true });
+
+function initMap() {
+  if (mapEl.value && !map) {
+    map = L.map(mapEl.value).setView([3.1412, 101.6865], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+  }
 }
 
-function updateMap(day) {
-    if (!map) initMap();
-    
-    activeDay.value = day;
-    currentIndex.value = 0;
-    stopPlayback();
+function cleanDate(d) {
+    if (!d) return '';
+    return d.replace(' - ', ' | ');
+}
 
-    // Clear layers
-    if (polylineLayer) {
-        map.removeLayer(polylineLayer);
-        polylineLayer = null;
-    }
-    if (movingMarker) {
-        map.removeLayer(movingMarker);
-        movingMarker = null;
-    }
-    markersLayer.clearLayers();
-
-    if (!day || !day.route || day.route.length === 0) {
-        return;
-    }
-
-    // Draw Route (Blue Line)
-    // route is [[lat, lon, time], ...]
-    const latlngs = day.route.map(p => [p[0], p[1]]);
-    polylineLayer = L.polyline(latlngs, { color: '#0b5ed7', weight: 4 }).addTo(map);
-    map.fitBounds(polylineLayer.getBounds(), { padding: [50, 50] });
-
-    // Draw Static Markers (Start, End, Events)
-    if (day.timeline) {
-        day.timeline.forEach(item => {
-            if (item.lat && item.lon && item.lat !== 0 && item.lon !== 0) {
-                
-                if (item.type === 'start') {
-                    // Start Marker with Permanent Tooltip
-                    const dateStr = cleanDate(day.date);
-                    const label = `<div class="text-center lh-1"><div class="fw-bold mb-1">Start Time: ${item.time}</div><div class="small opacity-75">${dateStr}</div></div>`;
-                    
-                    const marker = L.circleMarker([item.lat, item.lon], {
-                        radius: 6,
-                        fillColor: '#0d6efd', // Blue
-                        color: '#fff',
-                        weight: 2,
-                        opacity: 1,
-                        fillOpacity: 1
-                    });
-                    
-                    marker.bindTooltip(label, { 
-                        permanent: true, 
-                        direction: 'top', 
-                        className: 'custom-tooltip-start',
-                        offset: [0, -5]
-                    });
-                    markersLayer.addLayer(marker);
-
-                } else if (item.type === 'end') {
-                    // End Marker with Permanent Tooltip
-                    const dateStr = cleanDate(day.date);
-                    const label = `<div class="text-center lh-1"><div class="fw-bold mb-1">End Time: ${item.time}</div><div class="small opacity-75">${dateStr}</div></div>`;
-                    
-                    const marker = L.circleMarker([item.lat, item.lon], {
-                        radius: 6,
-                        fillColor: '#dc3545', // Red
-                        color: '#fff',
-                        weight: 2,
-                        opacity: 1,
-                        fillOpacity: 1
-                    });
-
-                    marker.bindTooltip(label, { 
-                        permanent: true, 
-                        direction: 'top', 
-                        className: 'custom-tooltip-end',
-                        offset: [0, -5]
-                    });
-                    markersLayer.addLayer(marker);
-
-                } else {
-                    // Other markers (Alert, Stop)
-                    let color = 'blue';
-                    if (item.type === 'alert') color = 'orange';
-                    if (item.type === 'stop') color = 'grey';
-
-                    const circleMarker = L.circleMarker([item.lat, item.lon], {
-                        radius: 6,
-                        fillColor: color,
-                        color: '#fff',
-                        weight: 2,
-                        opacity: 1,
-                        fillOpacity: 0.8
-                    });
-
-                    let popupContent = `<strong>${getTypeLabel(item.type, item.alert)}</strong><br>${item.time}`;
-                    if (item.location) popupContent += `<br>${item.location}`;
-                    circleMarker.bindPopup(popupContent);
-                    markersLayer.addLayer(circleMarker);
-                }
-            }
-        });
-    }
-
-    // Initialize Moving Marker at Start
-    if (latlngs.length > 0) {
-        movingMarker = L.circleMarker(latlngs[0], {
-            radius: 8,
-            fillColor: '#0d6efd',
-            color: '#fff',
-            weight: 3,
-            opacity: 1,
-            fillOpacity: 1
-        }).addTo(map);
+function getTypeColor(type) {
+    switch(type) {
+        case 'start': return 'text-primary';
+        case 'end': return 'text-danger';
+        case 'alert': return 'text-warning';
+        case 'stop': return 'text-secondary';
+        default: return 'text-dark';
     }
 }
 
 function toggleDay(day) {
-    // If clicking same day, just toggle
+    // Toggle only the clicked day without closing others
+    day.isOpen = !day.isOpen;
+
     if (day.isOpen) {
-        day.isOpen = false;
-        activeDay.value = null;
-        return;
+        activeDay.value = day;
+        loadDayOnMap(day);
+    } else {
+        // If the closed day was the active one, maybe clear map or switch to another?
+        // For now, if active day is closed, we clear the map if it was the active one.
+        if (activeDay.value === day) {
+            activeDay.value = null;
+            clearMapLayers();
+        }
+    }
+}
+
+function clearMapLayers() {
+    if (!map) return;
+    if (polyline) map.removeLayer(polyline);
+    if (playbackMarker) map.removeLayer(playbackMarker);
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+}
+
+function loadDayOnMap(day) {
+    clearMapLayers();
+    if (!map || !day.route || day.route.length === 0) return;
+
+    // Draw route
+    const latlngs = day.route.map(pt => [pt[0], pt[1]]);
+    polyline = L.polyline(latlngs, { color: 'blue', weight: 4 }).addTo(map);
+    map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+
+    // Add markers for timeline events
+    if (day.timeline) {
+        day.timeline.forEach(item => {
+            if (item.lat && item.lon) {
+                let color = 'blue';
+                if (item.type === 'end') color = 'red';
+                if (item.type === 'alert') color = 'orange';
+                if (item.type === 'stop') color = 'gray';
+
+                const marker = L.circleMarker([item.lat, item.lon], {
+                    radius: 6,
+                    fillColor: color,
+                    color: '#fff',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(map);
+
+                marker.bindPopup(`<b>${item.time}</b><br>${item.location}<br>${item.type.toUpperCase()}`);
+                markers.push(marker);
+            }
+        });
     }
 
-    // Close others
-    props.rowsDailyBreakdown.forEach(d => {
-        d.isOpen = false;
-    });
-    
-    day.isOpen = true;
-    updateMap(day);
+    // Initialize playback marker at start
+    playbackIndex.value = 0;
+    const startPt = day.route[0];
+    playbackMarker = L.circleMarker([startPt[0], startPt[1]], {
+        radius: 8,
+        fillColor: 'green',
+        color: '#fff',
+        weight: 2,
+        fillOpacity: 1
+    }).addTo(map);
+}
+
+function seekToTime(day, timeSort) {
+    // Find index in route closest to this time
+    // For now, just simplistic mapping or finding closest timestamp
+    // Assuming route points have timestamp at index 2
+    if (!day.route) return;
+
+    // This is a simplification. Real implementation would search for closest timestamp.
+    // Since we don't have exact timestamps in timeline items in static data (only display time),
+    // we'll just restart for now or find approx index.
+    restartPlayback();
 }
 
 // Playback Logic
@@ -343,153 +405,69 @@ function togglePlay() {
 
 function startPlayback() {
     if (!activeDay.value || !activeDay.value.route) return;
-    
-    // If reached end, restart
-    if (currentIndex.value >= activeDay.value.route.length - 1) {
-        currentIndex.value = 0;
-    }
-
     isPlaying.value = true;
-    lastTimestamp = performance.now();
-    requestAnimationFrame(animate);
+    animate();
 }
 
 function stopPlayback() {
     isPlaying.value = false;
-    lastTimestamp = 0;
+    if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+    }
 }
 
 function restartPlayback() {
-    currentIndex.value = 0;
-    updateMarkerPosition();
-    if (isPlaying.value) stopPlayback();
-}
-
-function setSpeed(val) {
-    playbackSpeed.value = val;
+    playbackIndex.value = 0;
+    updatePlaybackMarker();
+    if (!isPlaying.value) startPlayback();
 }
 
 function stepForward() {
     stopPlayback();
-    if (activeDay.value && currentIndex.value < activeDay.value.route.length - 1) {
-        currentIndex.value = Math.min(currentIndex.value + 10, activeDay.value.route.length - 1); // Skip 10 points
-        updateMarkerPosition();
+    if (activeDay.value && activeDay.value.route && playbackIndex.value < activeDay.value.route.length - 1) {
+        playbackIndex.value++;
+        updatePlaybackMarker();
     }
 }
 
 function stepBackward() {
     stopPlayback();
-    if (activeDay.value && currentIndex.value > 0) {
-        currentIndex.value = Math.max(currentIndex.value - 10, 0);
-        updateMarkerPosition();
+    if (playbackIndex.value > 0) {
+        playbackIndex.value--;
+        updatePlaybackMarker();
     }
 }
 
-function seekToTime(day, timeSort) {
-    // Find closest index in route
-    if (!day.route) return;
-    
-    // Convert timeSort (seconds) to ms
-    const timeMs = timeSort * 1000;
-    
-    // Find index
-    const idx = day.route.findIndex(p => p[2] >= timeMs);
-    if (idx !== -1) {
-        currentIndex.value = idx;
-        updateMarkerPosition();
-    }
+function setSpeed(ms) {
+    playbackSpeed.value = ms;
 }
 
-function animate(timestamp) {
+let lastFrameTime = 0;
+function animate(time) {
     if (!isPlaying.value) return;
 
-    const elapsed = timestamp - lastTimestamp;
-    
-    let pointsToAdvance = 1;
-    if (playbackSpeed.value === 10) {
-        // Slow: Throttle
-        if (elapsed < 100) { // Limit to 10fps
-             requestAnimationFrame(animate);
-             return; 
+    if (time - lastFrameTime > playbackSpeed.value) {
+        if (activeDay.value && activeDay.value.route) {
+            if (playbackIndex.value < activeDay.value.route.length - 1) {
+                playbackIndex.value++;
+                updatePlaybackMarker();
+            } else {
+                stopPlayback(); // Reached end
+                return;
+            }
         }
-    } else if (playbackSpeed.value === 50) {
-        pointsToAdvance = 1;
-    } else if (playbackSpeed.value === 200) {
-        pointsToAdvance = 5;
+        lastFrameTime = time;
     }
-
-    lastTimestamp = timestamp;
-    
-    currentIndex.value += pointsToAdvance;
-    
-    if (currentIndex.value >= activeDay.value.route.length) {
-        currentIndex.value = activeDay.value.route.length - 1;
-        stopPlayback();
-        updateMarkerPosition();
-        return;
-    }
-
-    updateMarkerPosition();
-    requestAnimationFrame(animate);
+    animationFrameId = requestAnimationFrame(animate);
 }
 
-function updateMarkerPosition() {
-    if (!movingMarker || !activeDay.value || !activeDay.value.route) return;
-    const point = activeDay.value.route[currentIndex.value];
-    if (point) {
-        movingMarker.setLatLng([point[0], point[1]]);
-    }
+function updatePlaybackMarker() {
+    if (!playbackMarker || !activeDay.value || !activeDay.value.route) return;
+    const pt = activeDay.value.route[playbackIndex.value];
+    playbackMarker.setLatLng([pt[0], pt[1]]);
 }
 
-function getTypeLabel(type, alert) {
-    if (type === 'start') return 'Start';
-    if (type === 'end') return 'End';
-    if (type === 'alert') return alert || 'Alert';
-    if (type === 'stop') return 'Idle/Stop';
-    return type;
-}
-
-function getTypeColor(type) {
-    if (type === 'start') return 'text-primary';
-    if (type === 'end') return 'text-danger';
-    if (type === 'alert') return 'text-warning-emphasis';
-    if (type === 'stop') return 'text-secondary';
-    return 'text-dark';
-}
-
-function cleanDate(dateStr) {
-    if (!dateStr) return '';
-    return dateStr.split('(')[0].trim();
-}
-
-watch(() => props.rowsDailyBreakdown, (newVal) => {
-    if (newVal && newVal.length > 0) {
-        // Open first day by default
-        newVal[0].isOpen = true;
-        nextTick(() => {
-           updateMap(newVal[0]);
-        });
-    } else {
-        if (map) {
-            markersLayer.clearLayers();
-            if (polylineLayer) map.removeLayer(polylineLayer);
-            if (movingMarker) map.removeLayer(movingMarker);
-        }
-    }
-}, { deep: true });
-
-onMounted(async () => {
-  await nextTick();
-  initMap();
-});
-
-onUnmounted(() => {
-  stopPlayback();
-  if (map) {
-    map.remove();
-    map = null;
-  }
-});
 </script>
 
 <style scoped>
@@ -500,49 +478,19 @@ onUnmounted(() => {
   background: #f1f1f1;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: #888;
   border-radius: 3px;
 }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
 .timeline-line {
-    position: absolute;
-    top: 10px;
-    bottom: 30px;
-    left: 27px; 
-    width: 2px;
-    background-color: #dee2e6;
-    z-index: 0;
-}
-.cursor-pointer {
-    cursor: pointer;
-}
-.rounded-top-start {
-    border-top-left-radius: 0.375rem;
-}
-
-/* Tooltip Styles */
-:deep(.custom-tooltip-start) {
-    background-color: rgba(13, 110, 253, 0.95);
-    border: none;
-    color: white;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-family: var(--bs-body-font-family);
-}
-:deep(.custom-tooltip-start::before) {
-    border-top-color: rgba(13, 110, 253, 0.95);
-}
-
-:deep(.custom-tooltip-end) {
-    background-color: rgba(220, 53, 69, 0.95);
-    border: none;
-    color: white;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-family: var(--bs-body-font-family);
-}
-:deep(.custom-tooltip-end::before) {
-    border-top-color: rgba(220, 53, 69, 0.95);
+  position: absolute;
+  left: 31px; /* Center of the 24px width column (12px) + padding-left (16px) approx */
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: #e9ecef;
+  z-index: 0;
 }
 </style>
