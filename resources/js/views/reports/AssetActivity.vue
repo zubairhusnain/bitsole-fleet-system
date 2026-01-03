@@ -166,13 +166,28 @@
         </div>
       </div>
       <div class="card-footer d-flex align-items-center py-2" v-if="rows.length">
-        <div class="text-muted small me-auto">Showing {{ rows.length }} results</div>
-        <!-- Pagination Placeholder -->
-        <nav aria-label="Pagination" class="ms-auto">
+        <div class="text-muted small me-auto">
+          Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, filteredRows.length) }} of {{ filteredRows.length }} results
+        </div>
+        <div class="me-3">
+          <select v-model="itemsPerPage" class="form-select form-select-sm" style="width: auto; display: inline-block;">
+            <option :value="50">50</option>
+            <option :value="100">100</option>
+            <option :value="200">200</option>
+            <option :value="500">500</option>
+          </select>
+        </div>
+        <nav aria-label="Pagination" class="ms-auto" v-if="totalPages > 1">
           <ul class="pagination pagination-sm mb-0 pagination-app">
-            <li class="page-item disabled"><button class="page-link">‹</button></li>
-            <li class="page-item active"><button class="page-link">1</button></li>
-            <li class="page-item"><button class="page-link">›</button></li>
+            <li class="page-item" :class="{ disabled: currentPage === 1 }">
+              <button class="page-link" @click="currentPage--">‹</button>
+            </li>
+            <li class="page-item disabled">
+              <span class="page-link">{{ currentPage }} / {{ totalPages }}</span>
+            </li>
+            <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+              <button class="page-link" @click="currentPage++">›</button>
+            </li>
           </ul>
         </nav>
       </div>
@@ -181,7 +196,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import axios from 'axios';
 
 const startDate = ref('');
@@ -195,6 +210,10 @@ const loading = ref(false);
 const rows = ref([]);
 const headerInfo = ref(null);
 const hasSearched = ref(false);
+
+// Pagination
+const currentPage = ref(1);
+const itemsPerPage = ref(100);
 
 const filteredRows = computed(() => {
   if (!rows.value.length) return [];

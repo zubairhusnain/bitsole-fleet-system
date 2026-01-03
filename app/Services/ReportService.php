@@ -1176,28 +1176,54 @@ class ReportService
             'Accept' => 'application/json'
         ];
 
-        // Build query string for multiple devices
-        $deviceParams = [];
-        foreach ($deviceIds as $id) {
-            $deviceParams[] = "deviceId={$id}";
-        }
-        $deviceQuery = implode('&', $deviceParams);
-        $queryString = "{$deviceQuery}&from={$from}&to={$to}";
-
+        // Chunk device IDs to avoid URL length issues or API limits
+        // 40 devices * ~15 chars = ~600 chars query string, safe for most servers
+        $chunks = array_chunk($deviceIds, 40);
+        
         try {
-            $responses = Http::pool(fn (Pool $pool) => [
-                $pool->as('route')->withHeaders($headers)->get("{$baseUrl}/api/reports/route?{$queryString}"),
-                $pool->as('events')->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$queryString}"),
-                $pool->as('summary')->withHeaders($headers)->get("{$baseUrl}/api/reports/summary?{$queryString}"),
-            ]);
+            $responses = Http::pool(function (Pool $pool) use ($chunks, $baseUrl, $headers, $from, $to) {
+                $requests = [];
+                foreach ($chunks as $i => $chunkIds) {
+                    $deviceParams = [];
+                    foreach ($chunkIds as $id) {
+                        $deviceParams[] = "deviceId={$id}";
+                    }
+                    $deviceQuery = implode('&', $deviceParams);
+                    $queryString = "{$deviceQuery}&from={$from}&to={$to}";
+
+                    $requests[] = $pool->as("route_{$i}")->withHeaders($headers)->get("{$baseUrl}/api/reports/route?{$queryString}");
+                    $requests[] = $pool->as("events_{$i}")->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$queryString}");
+                    $requests[] = $pool->as("summary_{$i}")->withHeaders($headers)->get("{$baseUrl}/api/reports/summary?{$queryString}");
+                }
+                return $requests;
+            });
         } catch (\Exception $e) {
             Log::error('fetchAssetActivity exception', ['error' => $e->getMessage()]);
             return [];
         }
 
-        $route = ($responses['route']->ok()) ? $responses['route']->json() : [];
-        $events = ($responses['events']->ok()) ? $responses['events']->json() : [];
-        $summaryData = ($responses['summary']->ok()) ? $responses['summary']->json() : [];
+        $route = [];
+        $events = [];
+        $summaryData = [];
+
+        foreach ($chunks as $i => $chunk) {
+            $r = $responses["route_{$i}"] ?? null;
+            $e = $responses["events_{$i}"] ?? null;
+            $s = $responses["summary_{$i}"] ?? null;
+
+            if ($r && $r->ok()) {
+                $data = $r->json();
+                if (is_array($data)) $route = array_merge($route, $data);
+            }
+            if ($e && $e->ok()) {
+                $data = $e->json();
+                if (is_array($data)) $events = array_merge($events, $data);
+            }
+            if ($s && $s->ok()) {
+                $data = $s->json();
+                if (is_array($data)) $summaryData = array_merge($summaryData, $data);
+            }
+        }
 
         // Map deviceId to deviceName
         $deviceMap = [];
