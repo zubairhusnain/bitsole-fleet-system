@@ -25,7 +25,7 @@
           </tbody> 
         </table>
       </div> 
-    </div> 
+    </div>  
     <div class="card-footer d-flex align-items-center py-2 bg-white border-top">
       <div class="text-muted small me-auto">Showing {{ rowsDailyVehicleList.length }} results</div>
     </div>

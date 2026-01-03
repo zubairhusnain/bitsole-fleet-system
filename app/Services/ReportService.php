@@ -173,7 +173,13 @@ class ReportService
 
         // Format the timestamps
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
-        $to = date('Y-m-d\TH:i:00\Z', strtotime($request->to_date . ' 23:59:59'));
+
+        $toStr = $request->to_date;
+        // If it looks like a simple date (YYYY-MM-DD), append end of day time
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
+            $toStr .= ' 23:59:59';
+        } 
+        $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
 
         // Allow filtering events to reduce payload; default to harsh + overspeed
         $eventTypes = trim((string)($request->event_types ?? 'harshBraking,harshAcceleration,overspeed'));
@@ -231,7 +237,13 @@ class ReportService
 
         // Format the timestamps
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
-        $to = date('Y-m-d\TH:i:00\Z', strtotime($request->to_date . ' 23:59:59'));
+
+        $toStr = $request->to_date;
+        // If it looks like a simple date (YYYY-MM-DD), append end of day time
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
+            $toStr .= ' 23:59:59';
+        }
+        $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
 
         // Calculate days for averaging
         $diff = strtotime($request->to_date) - strtotime($request->from_date);
@@ -286,7 +298,7 @@ class ReportService
                 ]);
             }
         }
- 
+
         $summaryRes = $responses['summary'] ?? null;
         $stopsRes = $responses['stops'] ?? null;
         $eventsRes = $responses['events'] ?? null;
@@ -382,7 +394,12 @@ class ReportService
     {
         $sessionId = $request->user()->traccarSession ?? session('cookie');
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
-        $to = date('Y-m-d\TH:i:00\Z', strtotime($request->to_date . ' 23:59:59'));
+
+        $toStr = $request->to_date;
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
+            $toStr .= ' 23:59:59';
+        }
+        $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
 
         $queryParams = [];
         foreach ($deviceIds as $id) {
@@ -412,7 +429,12 @@ class ReportService
     {
         $sessionId = $request->user()->traccarSession ?? session('cookie');
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
-        $to = date('Y-m-d\TH:i:00\Z', strtotime($request->to_date . ' 23:59:59'));
+
+        $toStr = $request->to_date;
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
+            $toStr .= ' 23:59:59';
+        }
+        $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
 
         $queryParams = [];
         foreach ($deviceIds as $id) {
@@ -437,21 +459,32 @@ class ReportService
         $trips = collect($allTrips);
         $stops = collect($allStops);
 
+        $groupBy = $request->group_by ?? 'vehicle_date';
+
         // Group by Date and Device
-        $grouped = $trips->groupBy(function($item) {
-             return date('Y-m-d', strtotime($item['startTime'])) . '_' . $item['deviceId'];
-        });
-
-        // Also need to account for days with stops but no trips? Usually they go together or stops happen during trips.
-        // Traccar reports usually separate them.
-        // Let's iterate through days in range?
-        // Or just process existing data.
-
-        $result = $grouped->map(function ($dayTrips, $key) use ($stops) {
-            list($date, $deviceId) = explode('_', $key);
-            $dayStops = $stops->filter(function($stop) use ($date, $deviceId) {
-                return $stop['deviceId'] == $deviceId && date('Y-m-d', strtotime($stop['startTime'])) == $date;
+        if ($groupBy === 'date') {
+            $grouped = $trips->groupBy(function($item) {
+                 return date('Y-m-d', strtotime($item['startTime']));
             });
+        } else {
+            $grouped = $trips->groupBy(function($item) {
+                 return date('Y-m-d', strtotime($item['startTime'])) . '_' . $item['deviceId'];
+            });
+        }
+
+        $result = $grouped->map(function ($dayTrips, $key) use ($stops, $groupBy) {
+            if ($groupBy === 'date') {
+                $date = $key;
+                $deviceId = null; // Aggregated
+                $dayStops = $stops->filter(function($stop) use ($date) {
+                    return date('Y-m-d', strtotime($stop['startTime'])) == $date;
+                });
+            } else {
+                list($date, $deviceId) = explode('_', $key);
+                $dayStops = $stops->filter(function($stop) use ($date, $deviceId) {
+                    return $stop['deviceId'] == $deviceId && date('Y-m-d', strtotime($stop['startTime'])) == $date;
+                });
+            }
 
             $distance = $dayTrips->sum('distance');
             $durationMs = $dayTrips->sum('duration');
@@ -468,16 +501,13 @@ class ReportService
             $idleS = floor((($idleMs % 3600000) % 60000) / 1000);
 
             // Idle Pct
-            $totalTime = $durationMs + $idleMs; // Or just duration?
-            // Usually idle pct is Idle / (Drive + Idle) or Idle / 24h?
-            // Mock data shows "11.23%".
-            // Let's use Idle / (Drive + Idle) for now if > 0
+            $totalTime = $durationMs + $idleMs;
             $pct = $totalTime > 0 ? round(($idleMs / $totalTime) * 100, 1) : 0;
 
             return [
                 'date' => date('d/m/Y', strtotime($date)),
-                'vehicleId' => $deviceId, // We need name, but trip doesn't have name always.
-                'vehicle' => $dayTrips->first()['deviceName'] ?? 'Unknown',
+                'vehicleId' => $deviceId ?? 'All',
+                'vehicle' => $deviceId ? ($dayTrips->first()['deviceName'] ?? 'Unknown') : 'All Vehicles',
                 'distance' => round($distance / 1000, 2) . ' KM',
                 'trip' => sprintf('%dh %dm %ds', $durH, $durM, $durS),
                 'idle' => sprintf('%dh %dm %ds', $idleH, $idleM, $idleS),
@@ -492,7 +522,12 @@ class ReportService
     {
         $sessionId = $request->user()->traccarSession ?? session('cookie');
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
-        $to = date('Y-m-d\TH:i:00\Z', strtotime($request->to_date . ' 23:59:59'));
+
+        $toStr = $request->to_date;
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
+            $toStr .= ' 23:59:59';
+        }
+        $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
 
         $queryParams = [];
         foreach ($deviceIds as $id) {
@@ -511,16 +546,32 @@ class ReportService
         $trips = collect($allTrips);
         $stops = collect($allStops);
 
-        // Group by Month and Device
-        $grouped = $trips->groupBy(function($item) {
-             return date('Y-m', strtotime($item['startTime'])) . '_' . $item['deviceId'];
-        });
+        $groupBy = $request->group_by ?? 'vehicle_month';
 
-        $result = $grouped->map(function ($monthTrips, $key) use ($stops) {
-            list($month, $deviceId) = explode('_', $key);
-            $monthStops = $stops->filter(function($stop) use ($month, $deviceId) {
-                return $stop['deviceId'] == $deviceId && date('Y-m', strtotime($stop['startTime'])) == $month;
+        // Group by Month and Device
+        if ($groupBy === 'month') {
+            $grouped = $trips->groupBy(function($item) {
+                 return date('Y-m', strtotime($item['startTime']));
             });
+        } else {
+            $grouped = $trips->groupBy(function($item) {
+                 return date('Y-m', strtotime($item['startTime'])) . '_' . $item['deviceId'];
+            });
+        }
+
+        $result = $grouped->map(function ($monthTrips, $key) use ($stops, $groupBy) {
+            if ($groupBy === 'month') {
+                $month = $key;
+                $deviceId = null;
+                $monthStops = $stops->filter(function($stop) use ($month) {
+                    return date('Y-m', strtotime($stop['startTime'])) == $month;
+                });
+            } else {
+                list($month, $deviceId) = explode('_', $key);
+                $monthStops = $stops->filter(function($stop) use ($month, $deviceId) {
+                    return $stop['deviceId'] == $deviceId && date('Y-m', strtotime($stop['startTime'])) == $month;
+                });
+            }
 
             $distance = $monthTrips->sum('distance');
             $durationMs = $monthTrips->sum('duration');
@@ -540,8 +591,8 @@ class ReportService
 
             return [
                 'date' => $dateStr,
-                'vehicleId' => $deviceId,
-                'vehicle' => $monthTrips->first()['deviceName'] ?? 'Unknown',
+                'vehicleId' => $deviceId ?? 'All',
+                'vehicle' => $deviceId ? ($monthTrips->first()['deviceName'] ?? 'Unknown') : 'All Vehicles',
                 'distance' => round($distance / 1000, 2) . ' KM',
                 'trip' => sprintf('%dd %02dh %02dm', floor($durH/24), $durH%24, $durM),
                 'idle' => sprintf('%dh %dm', $idleH, $idleM),
@@ -556,7 +607,12 @@ class ReportService
     {
         $sessionId = $request->user()->traccarSession ?? session('cookie');
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
-        $to = date('Y-m-d\TH:i:00\Z', strtotime($request->to_date));
+
+        $toStr = $request->to_date;
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
+            $toStr .= ' 23:59:59';
+        }
+        $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
 
         $queryParams = [];
         foreach ($deviceIds as $id) { $queryParams[] = "deviceId={$id}"; }
@@ -576,17 +632,22 @@ class ReportService
         $routeResp = static::curl("/api/reports/route?$fullQuery", 'GET', $sessionId, '', $headers);
         $routes = collect(json_decode($routeResp->response ?? '[]', true));
 
-        $grouped = $trips->groupBy(function($t) { return date('Y-m-d', strtotime($t['startTime'])); });
+        $grouped = $trips->groupBy(function($t) {
+             return date('Y-m-d', strtotime($t['startTime'])) . '_' . $t['deviceId'];
+        });
 
-        $result = $grouped->map(function($dayTrips, $date) use ($events, $stops, $routes) {
-            $dayEvents = $events->filter(function($e) use ($date) {
-                return date('Y-m-d', strtotime($e['eventTime'])) == $date;
+        $result = $grouped->map(function($dayTrips, $key) use ($events, $stops, $routes) {
+            list($date, $deviceId) = explode('_', $key);
+            $deviceName = $dayTrips->first()['deviceName'] ?? 'Unknown';
+
+            $dayEvents = $events->filter(function($e) use ($date, $deviceId) {
+                return $e['deviceId'] == $deviceId && date('Y-m-d', strtotime($e['eventTime'])) == $date;
             });
-            $dayStops = $stops->filter(function($s) use ($date) {
-                return date('Y-m-d', strtotime($s['startTime'])) == $date;
+            $dayStops = $stops->filter(function($s) use ($date, $deviceId) {
+                return $s['deviceId'] == $deviceId && date('Y-m-d', strtotime($s['startTime'])) == $date;
             });
-            $dayRoutes = $routes->filter(function($r) use ($date) {
-                return date('Y-m-d', strtotime($r['fixTime'])) == $date;
+            $dayRoutes = $routes->filter(function($r) use ($date, $deviceId) {
+                return $r['deviceId'] == $deviceId && date('Y-m-d', strtotime($r['fixTime'])) == $date;
             });
 
             // Build timeline
@@ -615,19 +676,25 @@ class ReportService
 
             foreach ($dayEvents as $event) {
                 if ($event['type'] == 'deviceOnline' || $event['type'] == 'deviceOffline') continue;
-                // Events don't always have lat/lon in top level, check?
-                // Traccar events usually don't have lat/lon directly, need to link to positionId or geofenceId.
-                // But sometimes they do if enriched.
-                // We'll leave 0,0 if missing, or maybe try to find closest route point?
-                // For now, let's leave it, map might skip it or we just don't show marker on map for events without loc.
+
+                // Try to find closest route point for location
+                $eventTs = strtotime($event['eventTime']);
+                $closest = $dayRoutes->sortBy(function($r) use ($eventTs) {
+                    return abs(strtotime($r['fixTime']) - $eventTs);
+                })->first();
+
+                $lat = $closest['latitude'] ?? 0;
+                $lon = $closest['longitude'] ?? 0;
+                $addr = $closest['address'] ?? '';
+
                 $timeline[] = [
-                    'time_sort' => strtotime($event['eventTime']),
-                    'time' => date('h:i A', strtotime($event['eventTime'])),
-                    'location' => '',
+                    'time_sort' => $eventTs,
+                    'time' => date('h:i A', $eventTs),
+                    'location' => $addr,
                     'alert' => $event['type'],
                     'type' => 'alert',
-                    'lat' => 0, // Placeholder
-                    'lon' => 0
+                    'lat' => $lat,
+                    'lon' => $lon
                 ];
             }
 
@@ -643,8 +710,8 @@ class ReportService
             })->values()->all();
 
             return [
-                'key' => $date, // Use date as key
-                'date' => date('d/m/Y - l', strtotime($date)),
+                'key' => $key,
+                'date' => date('d/m/Y - l', strtotime($date)) . ' (' . $deviceName . ')',
                 'distance' => round($totalDist/1000, 2) . ' KM',
                 'isOpen' => false,
                 'summary' => [
@@ -683,7 +750,16 @@ class ReportService
 
         // Format the timestamps
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date ?? date('Y-m-d H:i:s', strtotime('-7 days'))));
-        $to = date('Y-m-d\TH:i:00\Z', strtotime(($request->to_date ? $request->to_date . ' 23:59:59' : date('Y-m-d H:i:s'))));
+
+        $toStr = $request->to_date;
+        if (!$toStr) {
+            $to = date('Y-m-d\TH:i:00\Z');
+        } else {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
+                $toStr .= ' 23:59:59';
+            }
+            $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
+        }
 
         $queryString = "deviceId={$deviceId}&from={$from}&to={$to}&type=allEvents";
         $headers = ['Content-Type: application/json', 'Accept: application/json'];
@@ -729,7 +805,16 @@ class ReportService
 
         // Format the timestamps
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date ?? date('Y-m-d H:i:s', strtotime('-7 days'))));
-        $to = date('Y-m-d\TH:i:00\Z', strtotime($request->to_date ?? date('Y-m-d H:i:s')));
+
+        $toStr = $request->to_date;
+        if (!$toStr) {
+            $to = date('Y-m-d\TH:i:00\Z');
+        } else {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
+                $toStr .= ' 23:59:59';
+            }
+            $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
+        }
 
         $queryString = "deviceId={$deviceId}&from={$from}&to={$to}&type=allEvents";
         $headers = ['Content-Type: application/json', 'Accept: application/json'];

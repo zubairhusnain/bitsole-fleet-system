@@ -12,7 +12,7 @@
                 <div>  
                   <div class="fw-bold">{{ day.date }}</div>
                   <div class="text-muted">{{ day.distance }}</div>
-                </div>
+                </div> 
                 <i class="bi" :class="day.isOpen ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
               </div>
 

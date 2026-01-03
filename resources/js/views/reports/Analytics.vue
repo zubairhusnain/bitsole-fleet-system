@@ -8,9 +8,8 @@
       </ol>
     </div>
     <h4 class="mb-3">Analytics Overview</h4>
-
     <div class="card panel border rounded-3 shadow-0 mb-3">
-      <div class="card-header"><h6 class="mb-0">Search Option UU</h6></div>
+      <div class="card-header"><h6 class="mb-0">Search Option </h6></div>
       <div class="card-body">
         <div class="row g-3 align-items-end">
           <div class="col-12 col-md-3">

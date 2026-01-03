@@ -13,14 +13,18 @@
       <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
       <div class="card-body pt-2">
         <div class="row g-3 align-items-end">
-          <div class="col-12 col-md-4">
-            <label class="form-label small fw-semibold text-muted">Duration</label>
-            <div class="input-group">
-              <input v-model="duration" type="text" class="form-control" placeholder="dd/mm/yyyy - dd/mm/yyyy" />
-            </div>
+          <div class="col-12 col-md-2">
+            <label class="form-label small fw-semibold text-muted">Start Date</label>
+            <input v-model="startDate" type="datetime-local" class="form-control" />
+          </div>
+          <div class="col-12 col-md-2">
+            <label class="form-label small fw-semibold text-muted">End Date</label>
+            <input v-model="endDate" type="datetime-local" class="form-control" />
           </div>
           <div class="col-12 col-md-4">
-            <label class="form-label small fw-semibold text-muted">Vehicle</label>
+            <label class="form-label small fw-semibold text-muted">
+              Vehicle <span v-if="viewType === 'Daily Breakdown' || viewType === 'Daily Breakdown (with map)'" class="text-danger">*</span>
+            </label>
             <select v-model="vehicle" class="form-select text-muted">
               <option value="">-- All Vehicles --</option>
               <option v-for="v in vehicles" :key="v.id" :value="v.device_id">
@@ -83,7 +87,8 @@ import MonthlySummary from './components/trip-analysis/MonthlySummary.vue';
 import MonthlySummaryList from './components/trip-analysis/MonthlySummaryList.vue';
 import TripSummary from './components/trip-analysis/TripSummary.vue';
 
-const duration = ref('');
+const startDate = ref('');
+const endDate = ref('');
 const vehicle = ref('');
 const vehicles = ref([]);
 const viewType = ref('Trip Summary');
@@ -112,33 +117,33 @@ const fetchVehicles = async () => {
 };
 
 const handleSearch = async () => {
-  // Parse duration
-  let from = '';
-  let to = '';
-  if (duration.value) {
-    const parts = duration.value.split(' - ');
-    if (parts.length === 2) {
-      const toIso = (d) => {
-        const [day, month, year] = d.split('/');
-        return `${year}-${month}-${day}`;
-      };
-      from = toIso(parts[0]);
-      to = toIso(parts[1]);
-    }
+  let from = startDate.value;
+  let to = endDate.value;
+
+  // Default to today if empty
+  if (!from) {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      // Adjust to local timezone ISO string for input
+      const offset = now.getTimezoneOffset() * 60000;
+      const localISOTime = (new Date(now - offset)).toISOString().slice(0, 16);
+      startDate.value = localISOTime;
+      from = localISOTime;
   }
 
-  // Default to today if empty or invalid
-  if (!from) {
-      const today = new Date().toISOString().split('T')[0];
-      from = today;
-      to = today;
+  if (!to) {
+      const now = new Date();
+      now.setHours(23, 59, 59, 999);
+      const offset = now.getTimezoneOffset() * 60000;
+      const localISOTime = (new Date(now - offset)).toISOString().slice(0, 16);
+      endDate.value = localISOTime;
+      to = localISOTime;
+  }
 
-      // Update display
-      const d = new Date();
-      const dd = String(d.getDate()).padStart(2, '0');
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const yyyy = d.getFullYear();
-      duration.value = `${dd}/${mm}/${yyyy} - ${dd}/${mm}/${yyyy}`;
+  // Validate Device Selection for Breakdown views
+  if (!vehicle.value && (viewType.value === 'Daily Breakdown' || viewType.value === 'Daily Breakdown (with map)')) {
+      alert('Please select a vehicle for this report type.');
+      return;
   }
 
   const params = {
@@ -162,13 +167,15 @@ const handleSearch = async () => {
       const response = await window.axios.get('/web/reports/daily-breakdown-map', { params });
       rowsDailyBreakdown.value = response.data;
     } else if (viewType.value === 'Daily Summary') {
-      const response = await window.axios.get('/web/reports/daily-summary', { params });
+      const p = { ...params, group_by: 'date' };
+      const response = await window.axios.get('/web/reports/daily-summary', { params: p });
       rowsDailySummary.value = response.data;
     } else if (viewType.value === 'Daily Summary List') {
       const response = await window.axios.get('/web/reports/daily-summary', { params });
       rowsDailyVehicleList.value = response.data;
     } else if (viewType.value === 'Monthly Summary') {
-      const response = await window.axios.get('/web/reports/monthly-summary', { params });
+      const p = { ...params, group_by: 'month' };
+      const response = await window.axios.get('/web/reports/monthly-summary', { params: p });
       rowsMonthlySummary.value = response.data;
     } else if (viewType.value === 'Monthly Summary List') {
       const response = await window.axios.get('/web/reports/monthly-summary', { params });
@@ -198,19 +205,21 @@ const handleViewDetails = (row) => {
 onMounted(() => {
   fetchVehicles();
 
-  // Set default duration to last 7 days
+  // Set default duration to last 7 days (Start of day to End of day)
   const end = new Date();
+  end.setHours(23, 59, 59, 999);
+
   const start = new Date();
   start.setDate(end.getDate() - 6);
+  start.setHours(0, 0, 0, 0);
 
-  const formatDate = (date) => {
-      const dd = String(date.getDate()).padStart(2, '0');
-      const mm = String(date.getMonth() + 1).padStart(2, '0');
-      const yyyy = date.getFullYear();
-      return `${dd}/${mm}/${yyyy}`;
+  const toIsoLocal = (date) => {
+      const offset = date.getTimezoneOffset() * 60000;
+      return (new Date(date - offset)).toISOString().slice(0, 16);
   };
 
-  duration.value = `${formatDate(start)} - ${formatDate(end)}`;
+  startDate.value = toIsoLocal(start);
+  endDate.value = toIsoLocal(end);
 
   handleSearch();
 });

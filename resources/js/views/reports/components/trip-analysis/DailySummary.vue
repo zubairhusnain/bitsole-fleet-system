@@ -25,7 +25,7 @@
               </tr>
             </tbody>
           </table>
-        </div>  
+        </div>   
         <div class="d-flex justify-content-between align-items-center p-2 small text-muted">
           <div>Showing {{ rowsDailySummary.length }} results</div>
         </div>

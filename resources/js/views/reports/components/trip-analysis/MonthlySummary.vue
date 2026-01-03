@@ -29,7 +29,7 @@
         <div class="d-flex justify-content-between align-items-center p-2 small text-muted">
           <div>Showing {{ rowsMonthlySummary.length }} results</div>
         </div>
-      </div>
+      </div> 
     </div>
   </div>
 </template>

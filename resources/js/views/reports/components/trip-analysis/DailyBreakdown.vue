@@ -15,7 +15,7 @@
                 <th class="py-2">End Location</th>
                 <th class="py-2 pe-3 text-end">Travelled Dist</th>
               </tr>
-            </thead>  
+            </thead>
             <tbody>
               <tr v-for="r in rowsDailyTrips" :key="r.key">
                 <td class="ps-3"><a href="#" class="text-decoration-none" :class="r.key === 1 ? 'text-primary fw-semibold' : ''">{{ r.date }}</a></td>
