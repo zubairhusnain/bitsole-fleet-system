@@ -23,10 +23,16 @@
                 <td class="ps-3"><a href="#" class="text-decoration-none fw-semibold text-primary">{{ r.date }}</a></td>
                 <td>{{ r.startTime }}</td>
                 <td><a href="#" class="text-decoration-none text-primary">{{ r.startLocation }}</a></td>
-                <td><span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size: 10px;">OUT PIC</span></td>
+                <td>
+                  {{ r.startRemarks !== '-' ? r.startRemarks : '' }}
+                  <span v-if="r.startPic" class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size: 10px;">OUT PIC</span>
+                </td>
                 <td>{{ r.endTime }}</td>
                 <td><a href="#" class="text-decoration-none text-primary">{{ r.endLocation }}</a></td>
-                <td><span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size: 10px;">OUT PIC</span></td>
+                <td>
+                  {{ r.endRemarks !== '-' ? r.endRemarks : '' }}
+                  <span v-if="r.endPic" class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size: 10px;">OUT PIC</span>
+                </td>
                 <td class="text-end pe-3">{{ r.distance }}</td>
               </tr>
             </tbody>

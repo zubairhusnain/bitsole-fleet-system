@@ -426,6 +426,7 @@ class ReportService
             $responses = Http::pool(fn (Pool $pool) => [
                 $pool->as('trips')->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
                 $pool->as('stops')->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
+                $pool->as('events')->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$fullQuery}"),
             ]);
         } catch (\Exception $e) {
              Log::error('fetchDailyTrips exception', ['error' => $e->getMessage()]);
