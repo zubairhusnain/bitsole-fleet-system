@@ -724,6 +724,11 @@ class ReportService
 
     public function fetchDailyBreakdownMap($request, $deviceIds)
     {
+        ini_set('memory_limit', '512M');
+        set_time_limit(120);
+
+        Log::info('fetchDailyBreakdownMap called', ['deviceIds' => $deviceIds]);
+
         $sessionId = $request->user()->traccarSession ?? session('cookie');
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
 
@@ -750,22 +755,42 @@ class ReportService
             'Content-Type' => 'application/json'
         ];
 
+        $trips = collect([]);
+        $events = collect([]);
+        $stops = collect([]);
+        $routes = collect([]);
+
         try {
             $responses = Http::pool(fn (Pool $pool) => [
                 $pool->as('trips')->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
                 $pool->as('events')->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$fullQuery}"),
                 $pool->as('stops')->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
-                $pool->as('route')->withHeaders($headers)->get("{$baseUrl}/api/reports/route?{$fullQuery}"),
             ]);
-        } catch (\Exception $e) {
-            Log::error('fetchDailyBreakdownMap exception', ['error' => $e->getMessage()]);
+
+            $trips = collect(($responses['trips']->ok()) ? $responses['trips']->json() : []);
+            $events = collect(($responses['events']->ok()) ? $responses['events']->json() : []);
+            $stops = collect(($responses['stops']->ok()) ? $responses['stops']->json() : []);
+
+        } catch (\Throwable $e) {
+            Log::error('fetchDailyBreakdownMap base data exception', ['error' => $e->getMessage()]);
             return [];
         }
 
-        $trips = collect(($responses['trips']->ok()) ? $responses['trips']->json() : []);
-        $events = collect(($responses['events']->ok()) ? $responses['events']->json() : []);
-        $stops = collect(($responses['stops']->ok()) ? $responses['stops']->json() : []);
-        $routes = collect(($responses['route']->ok()) ? $responses['route']->json() : []);
+        // Fetch Route separately to avoid failing everything on timeout
+        try {
+            $routeResponse = Http::withHeaders($headers)->timeout(60)->get("{$baseUrl}/api/reports/route?{$fullQuery}");
+            if ($routeResponse->successful()) {
+                $routes = collect($routeResponse->json() ?? []);
+            } else {
+                 Log::error("DailyBreakdownMap Route API Error", [
+                    'status' => $routeResponse->status(),
+                    'body' => substr($routeResponse->body(), 0, 500)
+                ]);
+            }
+        } catch (\Throwable $e) {
+             Log::error('fetchDailyBreakdownMap route exception', ['error' => $e->getMessage()]);
+             // Continue without routes
+        }
 
         $grouped = $trips->groupBy(function($t) {
              return date('Y-m-d', strtotime($t['startTime'])) . '_' . $t['deviceId'];
