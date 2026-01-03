@@ -23,10 +23,10 @@
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label small fw-semibold text-muted">
-              Vehicle <span class="text-danger">*</span>
+              Vehicle <span v-if="isVehicleRequired" class="text-danger">*</span>
             </label>
             <select v-model="vehicle" class="form-select text-muted">
-              <option value="" disabled>-- Select Vehicle --</option>
+              <option value="">-- All Vehicles --</option>
               <option v-for="v in vehicles" :key="v.id" :value="v.device_id">
                 {{ v.name }}
               </option>
@@ -109,8 +109,12 @@ const monthlySummaryTotals = ref({});
 const monthlySummaryChart = ref([]);
 
 const selectedVehicleInfo = computed(() => {
-    if (!vehicle.value) return null;
+    if (!vehicle.value) return { name: 'All Vehicles', device_id: 'all' };
     return vehicles.value.find(v => v.device_id == vehicle.value) || null;
+});
+
+const isVehicleRequired = computed(() => {
+    return ['Daily Breakdown', 'Daily Breakdown (with map)'].includes(viewType.value);
 });
 
 const fetchVehicles = async () => {
@@ -153,8 +157,8 @@ const handleSearch = async () => {
   }
 
   // Validate Device Selection
-  if (!vehicle.value) {
-      alert('Please select a vehicle.');
+  if (!vehicle.value && isVehicleRequired.value) {
+      alert('Please select a vehicle for this report type.');
       return;
   }
 
@@ -239,7 +243,7 @@ onMounted(() => {
   startDate.value = toIsoLocal(start);
   endDate.value = toIsoLocal(end);
 
-  // handleSearch(); // Require user interaction
+  handleSearch();
 });
 </script>
 
