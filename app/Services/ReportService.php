@@ -743,16 +743,47 @@ class ReportService
 
             return [
                 'date' => $dateStr,
+                'dateRaw' => $month, // YYYY-MM for sorting
                 'vehicleId' => $deviceId ?? 'All',
                 'vehicle' => $deviceId ? ($monthTrips->first()['deviceName'] ?? 'Unknown') : 'All Vehicles',
                 'distance' => round($distance / 1000, 2) . ' KM',
+                'distance_m' => $distance,
                 'trip' => sprintf('%dd %02dh %02dm', floor($durH/24), $durH%24, $durM),
+                'trip_ms' => $durationMs,
                 'idle' => sprintf('%dh %dm', $idleH, $idleM),
+                'idle_ms' => $idleMs,
                 'idlePct' => $pct . '%'
             ];
         });
 
-        return $result->values();
+        $rows = $result->values();
+
+        // Calculate Totals for Summary Widget
+        $totalDistance = $rows->sum('distance_m');
+        $totalDuration = $rows->sum('trip_ms');
+        $totalIdle = $rows->sum('idle_ms');
+
+        // Chart Data
+        $chartData = $rows->map(function($r) {
+            return [
+                'date' => $r['dateRaw'],
+                'distance' => $r['distance_m'],
+                'tripDuration' => $r['trip_ms'],
+                'idleDuration' => $r['idle_ms']
+            ];
+        });
+
+        return [
+            'rows' => $rows,
+            'summary' => [
+                'totalDistance' => $totalDistance,
+                'totalDuration' => $totalDuration,
+                'totalIdle' => $totalIdle,
+                'totalFuel' => 0,
+                'avgKmL' => 0
+            ],
+            'chart' => $chartData
+        ];
     }
 
     public function fetchDailyBreakdownMap($request, $deviceIds)

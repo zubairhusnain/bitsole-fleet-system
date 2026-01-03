@@ -1,7 +1,7 @@
 <template>
   <div>
-    <ReportSummary />
-    <ChartAndKPIs />
+    <ReportSummary :summary="summary" :vehicle="vehicle" :dateRange="{start: startDate, end: endDate}" viewType="Monthly Summary" />
+    <ChartAndKPIs :summary="summary" :precomputedChartData="chartData" :startDate="startDate" :endDate="endDate" />
     <div class="card border rounded-3 shadow-0">
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -42,7 +42,21 @@ defineProps({
   rowsMonthlySummary: {
     type: Array,
     required: true
-  }
+  },
+  summary: {
+    type: Object,
+    default: () => ({})
+  },
+  chartData: {
+    type: Array,
+    default: () => []
+  },
+  vehicle: {
+    type: Object,
+    default: () => null
+  },
+  startDate: String,
+  endDate: String
 });
 </script>
 

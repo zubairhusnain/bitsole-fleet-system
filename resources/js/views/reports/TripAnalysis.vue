@@ -39,7 +39,6 @@
               <option>Daily Breakdown</option>
               <option>Daily Breakdown (with map)</option>
               <option>Daily Summary</option>
-              <option>Daily Summary List</option>
               <option>Monthly Summary</option>
               <option>Monthly Summary List</option>
             </select>
@@ -63,13 +62,11 @@
 
       <TripSummary v-else-if="viewType === 'Trip Summary'" :rowsTripSummary="rowsTripSummary" @view-details="handleViewDetails" />
 
-      <DailySummaryList v-else-if="viewType === 'Daily Summary List'" :rowsDailyVehicleList="rowsDailyVehicleList" />
-
       <DailyBreakdownMap v-else-if="viewType === 'Daily Breakdown (with map)'" :rowsDailyBreakdown="rowsDailyBreakdown" />
 
       <DailySummary v-else-if="viewType === 'Daily Summary'" :rowsDailySummary="rowsDailySummary" :summary="dailySummaryTotals" :chartData="dailySummaryChart" :vehicle="selectedVehicleInfo" :startDate="startDate" :endDate="endDate" />
 
-      <MonthlySummary v-else-if="viewType === 'Monthly Summary'" :rowsMonthlySummary="rowsMonthlySummary" />
+      <MonthlySummary v-else-if="viewType === 'Monthly Summary'" :rowsMonthlySummary="rowsMonthlySummary" :summary="monthlySummaryTotals" :chartData="monthlySummaryChart" :vehicle="selectedVehicleInfo" :startDate="startDate" :endDate="endDate" />
 
       <MonthlySummaryList v-else-if="viewType === 'Monthly Summary List'" :rowsMonthlyVehicleList="rowsMonthlyVehicleList" />
     </template>
@@ -105,6 +102,8 @@ const rowsMonthlyVehicleList = ref([]);
 const dailySummaryData = ref(null);
 const dailySummaryTotals = ref({});
 const dailySummaryChart = ref([]);
+const monthlySummaryTotals = ref({});
+const monthlySummaryChart = ref([]);
 
 const selectedVehicleInfo = computed(() => {
     if (!vehicle.value) return null;
@@ -185,12 +184,13 @@ const handleSearch = async () => {
       dailySummaryTotals.value = response.data.summary;
       dailySummaryChart.value = response.data.chart;
     } else if (viewType.value === 'Daily Summary List') {
-      const response = await window.axios.get('/web/reports/daily-summary', { params });
-      rowsDailyVehicleList.value = response.data;
+      // Removed
     } else if (viewType.value === 'Monthly Summary') {
       const p = { ...params, group_by: 'month' };
       const response = await window.axios.get('/web/reports/monthly-summary', { params: p });
-      rowsMonthlySummary.value = response.data;
+      rowsMonthlySummary.value = response.data.rows;
+      monthlySummaryTotals.value = response.data.summary;
+      monthlySummaryChart.value = response.data.chart;
     } else if (viewType.value === 'Monthly Summary List') {
       const response = await window.axios.get('/web/reports/monthly-summary', { params });
       rowsMonthlyVehicleList.value = response.data;
@@ -202,7 +202,6 @@ const handleSearch = async () => {
     else if (viewType.value === 'Daily Breakdown') rowsDailyTrips.value = [];
     else if (viewType.value === 'Daily Breakdown (with map)') rowsDailyBreakdown.value = [];
     else if (viewType.value === 'Daily Summary') rowsDailySummary.value = [];
-    else if (viewType.value === 'Daily Summary List') rowsDailyVehicleList.value = [];
     else if (viewType.value === 'Monthly Summary') rowsMonthlySummary.value = [];
     else if (viewType.value === 'Monthly Summary List') rowsMonthlyVehicleList.value = [];
   } finally {
