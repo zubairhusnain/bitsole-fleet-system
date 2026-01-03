@@ -176,7 +176,7 @@ class ReportService
 
         $toStr = $request->to_date;
         // If it looks like a simple date (YYYY-MM-DD), append end of day time
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) { 
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
             $toStr .= ' 23:59:59';
         }
         $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
