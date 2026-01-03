@@ -15,7 +15,11 @@
               <template v-for="day in displayedRows" :key="day.key">
                 <!-- Day Header -->
                 <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3"
-                     :class="{'bg-light': !day.isOpen, 'bg-primary-subtle text-primary': day.isOpen}"
+                     :class="{
+                        'bg-light': !day.isOpen,
+                        'bg-white': day.isOpen && activeDay !== day,
+                        'bg-primary-subtle text-primary border-start border-4 border-primary': activeDay === day
+                     }"
                      @click="toggleDay(day)"
                      role="button"
                      style="cursor: pointer;">
@@ -23,7 +27,7 @@
                     <div class="fw-bold">{{ cleanDate(day.date) }}</div>
                   </div>
                   <div class="d-flex align-items-center gap-2">
-                    <div class="small fw-bold" :class="day.isOpen ? 'text-primary' : 'text-dark'">{{ day.distance }}</div>
+                    <div class="small fw-bold" :class="activeDay === day ? 'text-primary' : 'text-dark'">{{ day.distance }}</div>
                     <i class="bi" :class="day.isOpen ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
                   </div>
                 </div>
@@ -176,77 +180,8 @@ const props = defineProps({
   }
 });
 
-const staticRows = ref([
-    {
-        key: 'static-1',
-        date: '26/08/2025 - Saturday',
-        distance: '126.53 KM',
-        isOpen: true,
-        summary: {
-            date: '26/08/2025 - Saturday',
-            dist: '126.53 km',
-            dur: '2h 8m 35s',
-            idle: '5m',
-            behav: '12 SV, 1 HA'
-        },
-        timeline: [
-            {
-                type: 'start',
-                time: '07:30 AM',
-                time_sort: 1,
-                location: 'Persiaran Gerbang Selatan, Bukit Jelutong',
-                dist: '45.20 KM',
-                dur: '45m 10s',
-                lat: 3.1129, lon: 101.5394
-            },
-            {
-                type: 'alert',
-                time: '08:25 AM',
-                time_sort: 2,
-                location: 'Jalan Damansara',
-                alert: 'Overspeed',
-                lat: 3.1380, lon: 101.6950,
-                hidden: true
-            },
-            {
-                type: 'stop',
-                time: '08:45 AM',
-                time_sort: 3,
-                location: 'Petronas Jalan Duta',
-                dur: '10m',
-                lat: 3.1700, lon: 101.6700
-            },
-            {
-                type: 'start',
-                time: '08:55 AM',
-                time_sort: 4,
-                location: 'Petronas Jalan Duta',
-                dist: '20.10 KM',
-                dur: '30m',
-                lat: 3.1700, lon: 101.6700
-            },
-            {
-                type: 'end',
-                time: '09:25 AM',
-                time_sort: 5,
-                location: 'KLCC Parking',
-                lat: 3.1579, lon: 101.7116
-            }
-        ],
-        route: [
-             [3.1129, 101.5394, 1693006200000],
-             [3.1200, 101.5500, 1693006500000],
-             [3.1300, 101.6000, 1693007000000],
-             [3.1380, 101.6950, 1693009500000], // Alert location
-             [3.1500, 101.6800, 1693010000000],
-             [3.1700, 101.6700, 1693010700000], // Stop
-             [3.1579, 101.7116, 1693013100000]  // End
-        ]
-    }
-]);
-
 const displayedRows = computed(() => {
-    return props.rowsDailyBreakdown.length > 0 ? props.rowsDailyBreakdown : staticRows.value;
+    return props.rowsDailyBreakdown;
 });
 
 const mapEl = ref(null);
@@ -284,6 +219,9 @@ watch(() => props.rowsDailyBreakdown, (newVal) => {
         // If data changes, load the first one on map
         activeDay.value = newVal[0];
         loadDayOnMap(activeDay.value);
+    } else {
+        activeDay.value = null;
+        clearMapLayers();
     }
 }, { deep: true });
 
@@ -313,19 +251,23 @@ function getTypeColor(type) {
 }
 
 function toggleDay(day) {
-    // Toggle only the clicked day without closing others
-    day.isOpen = !day.isOpen;
-
     if (day.isOpen) {
-        activeDay.value = day;
-        loadDayOnMap(day);
-    } else {
-        // If the closed day was the active one, maybe clear map or switch to another?
-        // For now, if active day is closed, we clear the map if it was the active one.
+        // If already open, check if it's the active one
         if (activeDay.value === day) {
+            // It is active, so close it and clear map
+            day.isOpen = false;
             activeDay.value = null;
             clearMapLayers();
+        } else {
+            // It's open but not active, so make it active (switch map view)
+            activeDay.value = day;
+            loadDayOnMap(day);
         }
+    } else {
+        // Closed, so open it and make it active
+        day.isOpen = true;
+        activeDay.value = day;
+        loadDayOnMap(day);
     }
 }
 
