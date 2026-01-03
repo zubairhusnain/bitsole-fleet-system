@@ -28,7 +28,7 @@
             <select v-model="vehicle" class="form-select text-muted">
               <option value="">-- All Vehicles --</option>
               <option v-for="v in vehicles" :key="v.id" :value="v.device_id">
-                {{ v.name }}
+                {{ v.label }}
               </option>
             </select>
           </div>
@@ -64,7 +64,7 @@
       <TripSummary v-else-if="viewType === 'Trip Summary'" :rowsTripSummary="rowsTripSummary" @view-details="handleViewDetails" />
 
       <DailySummaryList v-else-if="viewType === 'Daily Summary List'" :rowsDailyVehicleList="rowsDailyVehicleList" />
-
+ 
       <DailyBreakdownMap v-else-if="viewType === 'Daily Breakdown (with map)'" :rowsDailyBreakdown="rowsDailyBreakdown" />
 
       <DailySummary v-else-if="viewType === 'Daily Summary'" :rowsDailySummary="rowsDailySummary" />

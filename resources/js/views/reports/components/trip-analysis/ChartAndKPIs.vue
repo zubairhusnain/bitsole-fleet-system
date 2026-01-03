@@ -7,10 +7,13 @@
              <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#e83e8c;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Trip Duration</span></div>
              <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#0b0f28;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Idle Duration</span></div>
              <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#339af0;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Distance</span></div>
-          </div>
-          <!-- Placeholder SVG - In real app, bind to data or use Chart.js -->
-          <div class="d-flex align-items-center justify-content-center h-100 bg-light rounded" style="min-height: 220px;">
-             <span class="text-muted small">Chart visualization requires granular event data</span>
+          </div> 
+          <!-- Chart Visualization -->
+          <div class="h-100 bg-white rounded" style="min-height: 220px; position: relative;">
+             <canvas v-if="trips.length > 0" ref="chartCanvas"></canvas>
+             <div v-else class="d-flex align-items-center justify-content-center h-100 bg-light rounded">
+                 <span class="text-muted small">No trip data available for chart</span>
+             </div>
           </div>
         </div>
       </div>

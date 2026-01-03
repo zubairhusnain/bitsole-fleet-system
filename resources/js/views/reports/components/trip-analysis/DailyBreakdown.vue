@@ -1,13 +1,13 @@
 <template>
   <div>
     <ReportSummary :summary="summaryData" :vehicle="vehicleInfo" :dateRange="{start: startDate, end: endDate}" />
-    <ChartAndKPIs :summary="summaryData" />
+    <ChartAndKPIs :summary="summaryData" :trips="rowsDailyTrips" />
     <div class="card border rounded-3 shadow-0">
       <div class="card-body p-0">
         <div class="table-responsive">
           <table class="table table-sm align-middle mb-0 table-striped w-100 text-nowrap">
             <thead class="table-dark">
-              <tr>
+              <tr> 
                 <th class="py-2 ps-3">Date</th>
                 <th class="py-2">Start Time</th>
                 <th class="py-2">Start Location</th>
