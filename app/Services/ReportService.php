@@ -99,7 +99,8 @@ class ReportService
             }
 
             // Average speed (knots → km/h)
-            if (isset($trip['averageSpeed'])) {
+            // Filter out unrealistic speeds (> 162 knots approx 300 km/h)
+            if (isset($trip['averageSpeed']) && $trip['averageSpeed'] <= 162) {
                 $monthlySpeedData[$monthKey]['total'] += $trip['averageSpeed'] * 1.852;
                 $monthlySpeedData[$monthKey]['count'] += 1;
             }
@@ -365,7 +366,12 @@ class ReportService
             }
             $refillCount = $refills->count();
 
-            $avgSpeed = round(($item['averageSpeed'] ?? 0) * 1.852, 1);
+            $rawAvgSpeed = $item['averageSpeed'] ?? 0;
+            // Sanity check: ignore unrealistic speeds (e.g. > 300 km/h approx 162 knots)
+            if ($rawAvgSpeed > 162) {
+                $rawAvgSpeed = 0;
+            }
+            $avgSpeed = round($rawAvgSpeed * 1.852, 1);
 
             return [
                 'key' => $deviceId,
@@ -472,6 +478,11 @@ class ReportService
         $totalDuration = collect($allTrips)->sum('duration');
         $totalIdle = collect($allStops)->sum('duration');
         $maxSpeed = collect($allTrips)->max('maxSpeed') ?? 0;
+        $rawMaxSpeed = $maxSpeed;
+        // Sanity check for max speed (> 162 knots is unrealistic)
+        if ($rawMaxSpeed > 162) {
+            $rawMaxSpeed = 0;
+        }
 
         // Fuel (if available in trip attributes)
         $totalFuel = 0;
@@ -492,7 +503,7 @@ class ReportService
                 'totalDistance' => $totalDistance, // meters
                 'totalDuration' => $totalDuration, // ms
                 'totalIdle' => $totalIdle, // ms
-                'maxSpeed' => $maxSpeed * 1.852, // knots to km/h
+                'maxSpeed' => $rawMaxSpeed * 1.852, // knots to km/h
                 'totalFuel' => $totalFuel
             ]
         ];
@@ -809,7 +820,7 @@ class ReportService
                 $lat = $closest['latitude'] ?? 0;
                 $lon = $closest['longitude'] ?? 0;
                 $addr = $closest['address'] ?? '';
-                
+
                 // Friendly event name
                 $friendlyName = ucfirst(preg_replace('/(?<!^)[A-Z]/', ' $0', $event['type']));
 
@@ -847,7 +858,7 @@ class ReportService
             // Format route for map: [[lat, lon, timestamp], ...]
             $routePoints = $dayRoutes->map(function($r) {
                 return [
-                    $r['latitude'], 
+                    $r['latitude'],
                     $r['longitude'],
                     strtotime($r['fixTime']) * 1000 // ms for JS
                 ];

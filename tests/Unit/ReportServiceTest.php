@@ -10,11 +10,91 @@ use Illuminate\Http\Request;
 use App\Models\User;
 
 class ReportServiceTest extends TestCase
-{ 
+{
     protected function setUp(): void
     {
         parent::setUp();
         Config::set('constants.Constants.host', 'http://traccar.test');
+    }
+
+    public function test_fetch_fleet_summary_validates_unrealistic_speed()
+    {
+        Http::fake([
+            'http://traccar.test/api/reports/summary*' => Http::response([
+                [
+                    'deviceId' => 1,
+                    'deviceName' => 'Vehicle Normal',
+                    'distance' => 10000,
+                    'averageSpeed' => 54, // ~100 km/h
+                    'spentFuel' => ['value' => 10],
+                    'engineHours' => 3600000,
+                ],
+                [
+                    'deviceId' => 2,
+                    'deviceName' => 'Vehicle Error',
+                    'distance' => 20000,
+                    'averageSpeed' => 115938, // Unrealistic speed (~214,717 km/h)
+                    'spentFuel' => ['value' => 20],
+                    'engineHours' => 7200000,
+                ]
+            ], 200),
+            'http://traccar.test/api/reports/stops*' => Http::response([], 200),
+            'http://traccar.test/api/reports/events*' => Http::response([], 200),
+        ]);
+
+        $service = new ReportService();
+        $request = new Request([
+            'from_date' => '2023-10-25',
+            'to_date' => '2023-10-25'
+        ]);
+
+        $user = new User();
+        $user->traccarSession = 'JSESSIONID=123';
+        $request->setUserResolver(fn () => $user);
+
+        $result = $service->fetchFleetSummary($request, [1, 2]);
+
+        $this->assertCount(2, $result);
+
+        // Check Normal Vehicle
+        $normal = $result->firstWhere('vehicleId', 1);
+        $this->assertEquals('100 km/h', $normal['speed']);
+
+        // Check Error Vehicle (Should be 0 km/h due to validation)
+        $error = $result->firstWhere('vehicleId', 2);
+        $this->assertEquals('0 km/h', $error['speed']);
+    }
+
+    public function test_fetch_daily_trips_validates_max_speed()
+    {
+        Http::fake([
+            'http://traccar.test/api/reports/trips*' => Http::response([
+                [
+                    'deviceId' => 1,
+                    'distance' => 1000,
+                    'duration' => 60000,
+                    'startTime' => '2023-10-25T08:00:00Z',
+                    'endTime' => '2023-10-25T08:01:00Z',
+                    'maxSpeed' => 115938, // Unrealistic
+                ]
+            ], 200),
+            'http://traccar.test/api/reports/stops*' => Http::response([], 200),
+            'http://traccar.test/api/reports/events*' => Http::response([], 200),
+        ]);
+
+        $service = new ReportService();
+        $request = new Request([
+            'from_date' => '2023-10-25',
+            'to_date' => '2023-10-25'
+        ]);
+        $user = new User();
+        $user->traccarSession = 'JSESSIONID=123';
+        $request->setUserResolver(fn () => $user);
+
+        $result = $service->fetchDailyTrips($request, [1]);
+
+        $summary = $result['summary'];
+        $this->assertEquals(0, $summary['maxSpeed']); // Should be clamped to 0
     }
 
     public function test_fetch_daily_summary_returns_correct_data()
@@ -84,6 +164,8 @@ class ReportServiceTest extends TestCase
             'http://traccar.test/api/reports/stops*' => Http::response([
                 [
                     'deviceId' => 1,
+                    'startTime' => '2023-10-25T08:30:00Z',
+                    'endTime' => '2023-10-25T09:00:00Z',
                     'duration' => 1800000, // 30 mins
                 ]
             ], 200),
