@@ -1159,9 +1159,7 @@ class ReportService
     {
         $sessionId = $request->user()->traccarSession ?? session('cookie');
 
-        // We expect a single vehicle for this detailed report
-        $deviceId = $deviceIds[0] ?? null;
-        if (!$deviceId) return [];
+        if (empty($deviceIds)) return [];
 
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
         $toStr = $request->to_date;
@@ -1178,7 +1176,13 @@ class ReportService
             'Accept' => 'application/json'
         ];
 
-        $queryString = "deviceId={$deviceId}&from={$from}&to={$to}";
+        // Build query string for multiple devices
+        $deviceParams = [];
+        foreach ($deviceIds as $id) {
+            $deviceParams[] = "deviceId={$id}";
+        }
+        $deviceQuery = implode('&', $deviceParams);
+        $queryString = "{$deviceQuery}&from={$from}&to={$to}";
 
         try {
             $responses = Http::pool(fn (Pool $pool) => [
@@ -1194,7 +1198,14 @@ class ReportService
         $route = ($responses['route']->ok()) ? $responses['route']->json() : [];
         $events = ($responses['events']->ok()) ? $responses['events']->json() : [];
         $summaryData = ($responses['summary']->ok()) ? $responses['summary']->json() : [];
-        $summaryItem = $summaryData[0] ?? [];
+
+        // Map deviceId to deviceName
+        $deviceMap = [];
+        foreach ($summaryData as $s) {
+            if (isset($s['deviceId'])) {
+                $deviceMap[$s['deviceId']] = $s['deviceName'] ?? 'Device ' . $s['deviceId'];
+            }
+        }
 
         // Normalize Data for Merging
         $merged = collect();
@@ -1225,9 +1236,12 @@ class ReportService
         $sorted = $merged->sortBy('epoch')->values();
 
         // 4. Map to Display Format
-        $rows = $sorted->map(function ($item, $index) {
+        $rows = $sorted->map(function ($item, $index) use ($deviceMap) {
             $raw = $item['raw'];
             $isPos = $item['type'] === 'position';
+
+            $dId = $raw['deviceId'] ?? 0;
+            $vehicleName = $deviceMap[$dId] ?? 'Unknown';
 
             $dt = strtotime($item['timestamp']);
             $date = date('d-m-Y', $dt);
@@ -1272,6 +1286,7 @@ class ReportService
 
             return [
                 'key' => $index,
+                'vehicle' => $vehicleName,
                 'groupDate' => "$date $day",
                 'date' => $date,
                 'time' => $time,
@@ -1301,9 +1316,12 @@ class ReportService
             $lastAddress = round($lastPos['raw']['latitude'], 5) . ', ' . round($lastPos['raw']['longitude'], 5);
         }
 
+        $vehicleLabel = count($deviceIds) > 1 ? 'Multiple Vehicles (' . count($deviceIds) . ')' : ($summaryData[0]['deviceName'] ?? 'Unknown');
+        $deviceIdLabel = count($deviceIds) > 1 ? 'Multiple' : ($deviceIds[0] ?? 'N/A');
+
         $header = [
-            'vehicleId' => $summaryItem['deviceName'] ?? ($deviceId ?? 'N/A'),
-            'deviceId' => $deviceId,
+            'vehicleId' => $vehicleLabel,
+            'deviceId' => $deviceIdLabel,
             'duration' => date('Y/m/d H:i', strtotime($from)) . ' - ' . date('Y/m/d H:i', strtotime($to)),
             'lastReport' => $lastTime,
             'lastLocation' => $lastAddress,

@@ -24,7 +24,7 @@
           <div class="col-12 col-md-3">
             <label class="form-label small">Vehicle</label>
             <select v-model="vehicle" class="form-select">
-              <option value="" disabled>-- Select an Vehicle --</option>
+              <option value="">-- All Vehicles --</option>
               <option v-for="v in vehicles" :key="v.id" :value="v.device_id">{{ v.name }}</option>
             </select>
           </div>
@@ -105,6 +105,7 @@
           <table class="table table-sm align-middle mb-0 table-hover">
             <thead class="table-dark">
               <tr>
+                <th>Vehicle</th>
                 <th>Date</th>
                 <th>Time</th>
                 <th>Status</th>
@@ -127,6 +128,7 @@
                     <td colspan="13" class="fw-bold text-primary">{{ group.date }}</td>
                   </tr>
                   <tr v-for="row in group.rows" :key="row.key">
+                    <td>{{ row.vehicle }}</td>
                     <td>{{ row.date }}</td>
                     <td>{{ row.time }}</td>
                     <td>{{ row.status }}</td>
@@ -236,10 +238,12 @@ const groupedRows = computed(() => {
 });
 
 onMounted(async () => {
-  // Set default dates (Today)
+  // Set default dates (Last 7 Days)
   const now = new Date();
   const start = new Date(now);
+  start.setDate(start.getDate() - 7); // Go back 7 days
   start.setHours(0, 0, 0, 0);
+  
   const end = new Date(now);
   end.setHours(23, 59, 59, 999);
 
@@ -253,6 +257,9 @@ onMounted(async () => {
   } catch (e) {
     console.error('Failed to load vehicles', e);
   }
+
+  // Auto search on load
+  handleSearch();
 });
 
 function toIsoLocal(d) {
@@ -261,22 +268,19 @@ function toIsoLocal(d) {
 }
 
 async function handleSearch() {
-  if (!vehicle.value) {
-    alert('Please select a vehicle.');
-    return;
-  }
-
   loading.value = true;
   hasSearched.value = true;
   rows.value = [];
   headerInfo.value = null;
+
+  const deviceIds = vehicle.value ? [vehicle.value] : [];
 
   try {
     const { data } = await axios.get('/web/reports/asset-activity', {
       params: {
         from_date: startDate.value,
         to_date: endDate.value,
-        device_ids: [vehicle.value]
+        device_ids: deviceIds
       }
     });
 
