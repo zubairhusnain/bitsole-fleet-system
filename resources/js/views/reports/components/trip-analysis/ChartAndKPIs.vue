@@ -7,7 +7,7 @@
              <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#e83e8c;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Trip Duration</span></div>
              <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#0b0f28;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Idle Duration</span></div>
              <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#339af0;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Distance</span></div>
-          </div>
+          </div> 
           <!-- Timeline Chart -->
           <div class="h-100 d-flex flex-column justify-content-center bg-white rounded" style="min-height: 220px;">
              <div v-if="!trips.length" class="d-flex align-items-center justify-content-center h-100 bg-light rounded">
@@ -34,7 +34,7 @@
                         :title="`${seg.data.startTime} - ${seg.data.endTime} (${seg.data.distance})`"
                    ></div>
                 </div>
- 
+
                 <!-- Time Labels -->
                 <div class="d-flex justify-content-between mt-2 text-muted" style="font-size: 10px;">
                    <span>{{ formatTimeLabel(chartRange.min) }}</span>
@@ -101,22 +101,51 @@ const props = defineProps({
   trips: {
     type: Array,
     default: () => []
-  }
+  },
+  startDate: String,
+  endDate: String
 });
 
 const chartRange = computed(() => {
+  // 1. If explicit date range is provided (and valid), use it.
+  if (props.startDate && props.endDate) {
+      const min = new Date(props.startDate).getTime();
+      const max = new Date(props.endDate).getTime();
+      if (!isNaN(min) && !isNaN(max) && max > min) {
+          return { min, max };
+      }
+  }
+
+  // 2. Fallback to computing from trips
   if (!props.trips || !props.trips.length) return { min: 0, max: 0 };
 
-  const times = props.trips.flatMap(t => [new Date(t.startTime).getTime(), new Date(t.endTime).getTime()]);
+  // Use ISO fields if available, otherwise formatted strings might fail in new Date()
+  const times = props.trips.flatMap(t => {
+      const s = t.startTimeIso || t.startTime;
+      const e = t.endTimeIso || t.endTime;
+      return [new Date(s).getTime(), new Date(e).getTime()];
+  });
+
   let min = Math.min(...times);
   let max = Math.max(...times);
 
+  // If we only have invalid dates (NaN), default to now
+  if (isNaN(min) || isNaN(max)) {
+      const now = Date.now();
+      return { min: now, max: now + 86400000 };
+  }
+
+  // If fallback logic is used, and it looks like a single day, clamp to 00:00-23:59
   const firstDate = new Date(min);
-  // Default to 00:00 - 24:00 of the start date
   const startOfDay = new Date(firstDate).setHours(0,0,0,0);
   const endOfDay = new Date(firstDate).setHours(23,59,59,999);
 
-  return { min: startOfDay, max: endOfDay };
+  // If the span is small (less than a day), expand to full day context
+  if ((max - min) < 86400000) {
+      return { min: startOfDay, max: endOfDay };
+  }
+
+  return { min, max };
 });
 
 const timelineSegments = computed(() => {
@@ -128,11 +157,20 @@ const timelineSegments = computed(() => {
   if (totalDuration <= 0) return [];
 
   return props.trips.map(t => {
-      const start = new Date(t.startTime).getTime();
-      const end = new Date(t.endTime).getTime();
+      const s = t.startTimeIso || t.startTime;
+      const e = t.endTimeIso || t.endTime;
+
+      const start = new Date(s).getTime();
+      const end = new Date(e).getTime();
+
+      if (isNaN(start) || isNaN(end)) return null;
+
       // Clamp values
       const safeStart = Math.max(start, min);
       const safeEnd = Math.min(end, max);
+
+      // If segment is outside range, skip
+      if (safeEnd < min || safeStart > max) return null;
 
       const left = ((safeStart - min) / totalDuration) * 100;
       const width = ((safeEnd - safeStart) / totalDuration) * 100;
@@ -142,12 +180,19 @@ const timelineSegments = computed(() => {
           width: `${width}%`,
           data: t
       };
-  });
+  }).filter(Boolean);
 });
 
 const formatTimeLabel = (ts) => {
    if (!ts) return '';
    const d = new Date(ts);
+   if (isNaN(d.getTime())) return '';
+
+   // If range > 24h, show date + time
+   const range = chartRange.value.max - chartRange.value.min;
+   if (range > 86400000) {
+       return d.toLocaleDateString([], {month: 'short', day: 'numeric'}) + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+   }
    return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 };
 

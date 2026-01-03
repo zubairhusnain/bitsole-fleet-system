@@ -1,7 +1,7 @@
 <template>
   <div>
     <ReportSummary :summary="summaryData" :vehicle="vehicleInfo" :dateRange="{start: startDate, end: endDate}" />
-    <ChartAndKPIs :summary="summaryData" :trips="rowsDailyTrips" />
+    <ChartAndKPIs :summary="summaryData" :trips="rowsDailyTrips" :startDate="startDate" :endDate="endDate" />
     <div class="card border rounded-3 shadow-0">
       <div class="card-body p-0">
         <div class="table-responsive">

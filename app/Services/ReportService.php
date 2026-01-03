@@ -184,7 +184,6 @@ class ReportService
         // Allow filtering events to reduce payload; default to harsh + overspeed
         $eventTypes = trim((string)($request->event_types ?? 'harshBraking,harshAcceleration,overspeed'));
         if ($eventTypes === '') { $eventTypes = 'harshBraking,harshAcceleration,overspeed'; }
- 
         $queryString = "deviceId={$deviceId}&from={$from}&to={$to}";
         $headers = ['Content-Type: application/json', 'Accept: application/json'];
 
@@ -444,8 +443,10 @@ class ReportService
                 'key' => $index + 1,
                 'date' => date('d/m/Y', strtotime($trip['startTime'])),
                 'startTime' => date('h:i A', strtotime($trip['startTime'])),
+                'startTimeIso' => $trip['startTime'],
                 'startLocation' => $trip['startAddress'] ?? 'N/A',
                 'endTime' => date('h:i A', strtotime($trip['endTime'])),
+                'endTimeIso' => $trip['endTime'],
                 'endLocation' => $trip['endAddress'] ?? 'N/A',
                 'distance' => round(($trip['distance'] ?? 0) / 1000, 2) . ' KM',
                 // Raw values for calculation if needed
