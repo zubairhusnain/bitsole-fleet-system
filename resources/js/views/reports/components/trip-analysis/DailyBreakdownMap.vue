@@ -4,6 +4,12 @@
       <div class="row g-0 h-100">
         <!-- Left Sidebar: Day List & Timeline -->
         <div class="col-12 col-lg-4 border-end d-flex flex-column" style="height: 75vh; max-height: 800px;">
+          <!-- List Header -->
+          <div class="d-flex justify-content-between align-items-center p-3 bg-dark text-white rounded-top-start">
+              <div class="fw-bold">Date</div>
+              <div class="fw-bold">Distance</div>
+          </div>
+
           <div class="overflow-auto custom-scrollbar flex-grow-1">
             <div class="list-group list-group-flush">
               <template v-for="day in rowsDailyBreakdown" :key="day.key">
@@ -14,10 +20,12 @@
                      role="button"
                      style="cursor: pointer;">
                   <div>  
-                    <div class="fw-bold">{{ day.date }}</div>
-                    <div class="small" :class="day.isOpen ? 'text-primary' : 'text-muted'">{{ day.distance }}</div>
+                    <div class="fw-bold">{{ cleanDate(day.date) }}</div>
                   </div> 
-                  <i class="bi" :class="day.isOpen ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="small fw-bold" :class="day.isOpen ? 'text-primary' : 'text-dark'">{{ day.distance }}</div>
+                    <i class="bi" :class="day.isOpen ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                  </div>
                 </div>
 
                 
@@ -25,7 +33,7 @@
                 <div v-if="day.isOpen" class="bg-white">
                   <!-- Summary Box -->
                   <div class="p-3 m-3 rounded-3 bg-info-subtle text-dark">
-                    <div class="fw-bold mb-2 small text-uppercase text-primary-emphasis">Summary for {{ day.summary.date }}</div>
+                    <div class="fw-bold mb-2 small text-uppercase text-primary-emphasis">Summary for {{ day.summary.date.split(' - ')[0] }}</div>
                     <div class="row g-2">
                       <div class="col-6">
                         <div class="text-muted small" style="font-size: 0.75rem;">Total Distance</div>
@@ -95,46 +103,39 @@
 
           <!-- Playback Controls Overlay -->
           <div v-if="activeDay && activeDay.route && activeDay.route.length > 0" 
-               class="position-absolute top-0 start-50 translate-middle-x mt-3 z-3 bg-white p-2 rounded-pill shadow-sm d-flex align-items-center gap-2 px-3">
+               class="position-absolute top-0 start-50 translate-middle-x mt-3 z-3 bg-white p-1 rounded-pill shadow-sm d-flex align-items-center gap-2 border">
             
-            <button class="btn btn-sm btn-light rounded-circle" @click="restartPlayback" title="Restart">
-              <i class="bi bi-arrow-counterclockwise"></i>
-            </button>
-            
-            <div class="vr mx-1"></div>
-
-            <button class="btn btn-sm btn-light rounded-circle" @click="stepBackward" title="Step Back">
-               <i class="bi bi-skip-backward-fill"></i>
+            <button class="btn btn-sm btn-light rounded-pill px-3 fw-bold d-flex align-items-center" @click="restartPlayback" title="Restart">
+              <i class="bi bi-arrow-counterclockwise me-2"></i> Restart
             </button>
             
-            <button class="btn btn-primary btn-sm rounded-circle shadow-sm" @click="togglePlay" style="width: 32px; height: 32px;">
-              <i class="bi" :class="isPlaying ? 'bi-pause-fill' : 'bi-play-fill'"></i>
-            </button>
+            <div class="vr my-1"></div>
 
-            <button class="btn btn-sm btn-light rounded-circle" @click="stepForward" title="Step Forward">
-               <i class="bi bi-skip-forward-fill"></i>
-            </button>
+            <div class="d-flex align-items-center gap-1 px-1">
+                <button class="btn btn-sm btn-light rounded-circle" @click="stepBackward" title="Step Back">
+                   <i class="bi bi-skip-backward-fill"></i>
+                </button>
+                
+                <button class="btn btn-primary btn-sm rounded-circle shadow-sm d-flex align-items-center justify-content-center" @click="togglePlay" style="width: 32px; height: 32px;">
+                  <i class="bi" :class="isPlaying ? 'bi-pause-fill' : 'bi-play-fill'"></i>
+                </button>
 
-            <div class="vr mx-1"></div>
+                <button class="btn btn-sm btn-light rounded-circle" @click="stepForward" title="Step Forward">
+                   <i class="bi bi-skip-forward-fill"></i>
+                </button>
+            </div>
 
-            <div class="btn-group btn-group-sm" role="group">
-              <input type="radio" class="btn-check" name="speed" id="speed1" autocomplete="off" :checked="playbackSpeed === 10" @click="setSpeed(10)">
-              <label class="btn btn-outline-secondary border-0 small py-0" for="speed1">Slow</label>
+            <div class="vr my-1"></div>
 
-              <input type="radio" class="btn-check" name="speed" id="speed2" autocomplete="off" :checked="playbackSpeed === 50" @click="setSpeed(50)">
-              <label class="btn btn-outline-secondary border-0 small py-0" for="speed2">Normal</label>
-
-              <input type="radio" class="btn-check" name="speed" id="speed3" autocomplete="off" :checked="playbackSpeed === 200" @click="setSpeed(200)">
-              <label class="btn btn-outline-secondary border-0 small py-0" for="speed3">Fast</label>
+            <div class="bg-light rounded-pill p-1 d-flex">
+              <button class="btn btn-sm rounded-pill px-3 border-0" 
+                      :class="playbackSpeed === 10 ? 'bg-white shadow-sm fw-bold text-dark' : 'text-muted'" 
+                      @click="setSpeed(10)">Slow</button>
+              <button class="btn btn-sm rounded-pill px-3 border-0" 
+                      :class="playbackSpeed === 200 ? 'bg-white shadow-sm fw-bold text-dark' : 'text-muted'" 
+                      @click="setSpeed(200)">Fast</button>
             </div>
           </div>
-
-          <!-- Date Overlay on Map -->
-           <div v-if="activeDay" class="position-absolute bottom-0 start-0 m-3 z-3">
-              <div class="bg-white px-3 py-2 rounded shadow-sm opacity-75 small fw-bold">
-                 {{ playbackTimeDisplay }}
-              </div>
-           </div>
         </div>
       </div>
     </div>
@@ -232,25 +233,71 @@ function updateMap(day) {
     if (day.timeline) {
         day.timeline.forEach(item => {
             if (item.lat && item.lon && item.lat !== 0 && item.lon !== 0) {
-                // Determine color/icon
-                let color = 'blue';
-                if (item.type === 'end') color = 'red';
-                if (item.type === 'alert') color = 'orange';
-                if (item.type === 'stop') color = 'grey';
+                
+                if (item.type === 'start') {
+                    // Start Marker with Permanent Tooltip
+                    const dateStr = cleanDate(day.date);
+                    const label = `<div class="text-center lh-1"><div class="fw-bold mb-1">Start Time: ${item.time}</div><div class="small opacity-75">${dateStr}</div></div>`;
+                    
+                    const marker = L.circleMarker([item.lat, item.lon], {
+                        radius: 6,
+                        fillColor: '#0d6efd', // Blue
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 1
+                    });
+                    
+                    marker.bindTooltip(label, { 
+                        permanent: true, 
+                        direction: 'top', 
+                        className: 'custom-tooltip-start',
+                        offset: [0, -5]
+                    });
+                    markersLayer.addLayer(marker);
 
-                const circleMarker = L.circleMarker([item.lat, item.lon], {
-                    radius: 6,
-                    fillColor: color,
-                    color: '#fff',
-                    weight: 2,
-                    opacity: 1,
-                    fillOpacity: 0.8
-                });
+                } else if (item.type === 'end') {
+                    // End Marker with Permanent Tooltip
+                    const dateStr = cleanDate(day.date);
+                    const label = `<div class="text-center lh-1"><div class="fw-bold mb-1">End Time: ${item.time}</div><div class="small opacity-75">${dateStr}</div></div>`;
+                    
+                    const marker = L.circleMarker([item.lat, item.lon], {
+                        radius: 6,
+                        fillColor: '#dc3545', // Red
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 1
+                    });
 
-                let popupContent = `<strong>${getTypeLabel(item.type, item.alert)}</strong><br>${item.time}`;
-                if (item.location) popupContent += `<br>${item.location}`;
-                circleMarker.bindPopup(popupContent);
-                markersLayer.addLayer(circleMarker);
+                    marker.bindTooltip(label, { 
+                        permanent: true, 
+                        direction: 'top', 
+                        className: 'custom-tooltip-end',
+                        offset: [0, -5]
+                    });
+                    markersLayer.addLayer(marker);
+
+                } else {
+                    // Other markers (Alert, Stop)
+                    let color = 'blue';
+                    if (item.type === 'alert') color = 'orange';
+                    if (item.type === 'stop') color = 'grey';
+
+                    const circleMarker = L.circleMarker([item.lat, item.lon], {
+                        radius: 6,
+                        fillColor: color,
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+
+                    let popupContent = `<strong>${getTypeLabel(item.type, item.alert)}</strong><br>${item.time}`;
+                    if (item.location) popupContent += `<br>${item.location}`;
+                    circleMarker.bindPopup(popupContent);
+                    markersLayer.addLayer(circleMarker);
+                }
             }
         });
     }
@@ -358,20 +405,6 @@ function animate(timestamp) {
 
     const elapsed = timestamp - lastTimestamp;
     
-    // Logic: Speed = points per second? Or just simple skip?
-    // Let's try simple frame skip based on speed value.
-    // If speed is 10 (Slow), we advance 1 index every 50ms?
-    // If speed is 200 (Fast), we advance 5 indexes every frame?
-    
-    // Better: Target FPS.
-    // Let's assume we want to cover the route in X seconds.
-    // But route length varies.
-    
-    // Simple approach: Advance N points per frame.
-    // Speed 10 = 1 point per 5 frames?
-    // Speed 50 = 1 point per frame.
-    // Speed 200 = 5 points per frame.
-    
     let pointsToAdvance = 1;
     if (playbackSpeed.value === 10) {
         // Slow: Throttle
@@ -405,8 +438,6 @@ function updateMarkerPosition() {
     const point = activeDay.value.route[currentIndex.value];
     if (point) {
         movingMarker.setLatLng([point[0], point[1]]);
-        // Optional: Pan map to follow marker if out of bounds?
-        // map.panTo([point[0], point[1]]); // Can be annoying if user zoomed out.
     }
 }
 
@@ -424,6 +455,11 @@ function getTypeColor(type) {
     if (type === 'alert') return 'text-warning-emphasis';
     if (type === 'stop') return 'text-secondary';
     return 'text-dark';
+}
+
+function cleanDate(dateStr) {
+    if (!dateStr) return '';
+    return dateStr.split('(')[0].trim();
 }
 
 watch(() => props.rowsDailyBreakdown, (newVal) => {
@@ -471,13 +507,42 @@ onUnmounted(() => {
     position: absolute;
     top: 10px;
     bottom: 30px;
-    left: 27px; /* Center of icon column (16px + 24px/2 approx) - Wait, icon col is 24px wide, + me-3 (16px). Center is ~12px? No. */
-    /* Icon col width is 24px. Center is 12px. Plus padding-left of container (16px px-3). Total left ~ 28px. */
+    left: 27px; 
     width: 2px;
     background-color: #dee2e6;
     z-index: 0;
 }
 .cursor-pointer {
     cursor: pointer;
+}
+.rounded-top-start {
+    border-top-left-radius: 0.375rem;
+}
+
+/* Tooltip Styles */
+:deep(.custom-tooltip-start) {
+    background-color: rgba(13, 110, 253, 0.95);
+    border: none;
+    color: white;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: var(--bs-body-font-family);
+}
+:deep(.custom-tooltip-start::before) {
+    border-top-color: rgba(13, 110, 253, 0.95);
+}
+
+:deep(.custom-tooltip-end) {
+    background-color: rgba(220, 53, 69, 0.95);
+    border: none;
+    color: white;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: var(--bs-body-font-family);
+}
+:deep(.custom-tooltip-end::before) {
+    border-top-color: rgba(220, 53, 69, 0.95);
 }
 </style>

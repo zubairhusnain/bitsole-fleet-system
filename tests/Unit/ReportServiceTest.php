@@ -206,6 +206,177 @@ class ReportServiceTest extends TestCase
                     'deviceId' => 1,
                     'deviceName' => 'Vehicle 1',
                     'startTime' => '2023-10-01T08:00:00Z',
+                    'endTime' => '2023-10-01T09:00:00Z',
+                    'distance' => 10000, // 10km
+                    'duration' => 3600000, // 1 hour
+                ]
+            ], 200),
+            'http://traccar.test/api/reports/stops*' => Http::response([], 200),
+        ]);
+
+        $service = new ReportService();
+        $request = new Request([
+            'from_date' => '2023-10-01',
+            'to_date' => '2023-10-31',
+            'group_by' => 'month'
+        ]);
+
+        $user = new User();
+        $user->traccarSession = 'JSESSIONID=123';
+        $request->setUserResolver(fn () => $user);
+
+        $result = $service->fetchMonthlySummary($request, [1]);
+
+        $this->assertCount(1, $result);
+        $first = $result->first();
+        $this->assertEquals('10/2023', $first['date']);
+        $this->assertEquals('10 KM', $first['distance']);
+    }
+
+    public function test_fetch_daily_breakdown_map_returns_correct_data()
+    {
+        Http::fake([
+            'http://traccar.test/api/reports/trips*' => Http::response([
+                [
+                    'deviceId' => 1,
+                    'deviceName' => 'Vehicle 1',
+                    'startTime' => '2023-10-25T08:00:00Z',
+                    'endTime' => '2023-10-25T09:00:00Z',
+                    'startAddress' => 'Start',
+                    'endAddress' => 'End',
+                    'startLat' => 10,
+                    'startLon' => 10,
+                    'endLat' => 11,
+                    'endLon' => 11,
+                    'distance' => 10000,
+                    'duration' => 3600000,
+                ]
+            ], 200),
+            'http://traccar.test/api/reports/events*' => Http::response([], 200),
+            'http://traccar.test/api/reports/stops*' => Http::response([], 200),
+            'http://traccar.test/api/reports/route*' => Http::response([
+                [
+                    'deviceId' => 1,
+                    'latitude' => 10.0,
+                    'longitude' => 10.0,
+                    'fixTime' => '2023-10-25T08:00:00Z'
+                ],
+                [
+                    'deviceId' => 1,
+                    'latitude' => 10.5,
+                    'longitude' => 10.5,
+                    'fixTime' => '2023-10-25T08:30:00Z'
+                ],
+                [
+                    'deviceId' => 1,
+                    'latitude' => 11.0,
+                    'longitude' => 11.0,
+                    'fixTime' => '2023-10-25T09:00:00Z'
+                ]
+            ], 200),
+        ]);
+
+        $service = new ReportService();
+        $request = new Request([
+            'from_date' => '2023-10-25',
+            'to_date' => '2023-10-25'
+        ]);
+
+        $user = new User();
+        $user->traccarSession = 'JSESSIONID=123';
+        $request->setUserResolver(fn () => $user);
+
+        $result = $service->fetchDailyBreakdownMap($request, [1]);
+
+        $this->assertCount(1, $result);
+        $day = $result[0];
+
+        $this->assertArrayHasKey('route', $day);
+        $this->assertCount(3, $day['route']);
+        // Check first point: [lat, lon, time_ms]
+        $this->assertEquals(10.0, $day['route'][0][0]);
+        $this->assertEquals(10.0, $day['route'][0][1]);
+
+        $this->assertArrayHasKey('timeline', $day);
+        // Start + End = 2 items
+        $this->assertCount(2, $day['timeline']);
+    }
+
+    public function test_fetch_daily_breakdown_map_filters_routes_outside_trips()
+    {
+        Http::fake([
+            'http://traccar.test/api/reports/trips*' => Http::response([
+                [
+                    'deviceId' => 1,
+                    'deviceName' => 'Vehicle 1',
+                    'startTime' => '2023-10-25T08:00:00Z',
+                    'endTime' => '2023-10-25T09:00:00Z',
+                    'distance' => 10000,
+                    'duration' => 3600000,
+                ]
+            ], 200),
+            'http://traccar.test/api/reports/events*' => Http::response([], 200),
+            'http://traccar.test/api/reports/stops*' => Http::response([], 200),
+            'http://traccar.test/api/reports/route*' => Http::response([
+                [
+                    'deviceId' => 1,
+                    'latitude' => 10.0,
+                    'longitude' => 10.0,
+                    'fixTime' => '2023-10-25T08:00:00Z' // Inside
+                ],
+                [
+                    'deviceId' => 1,
+                    'latitude' => 10.5,
+                    'longitude' => 10.5,
+                    'fixTime' => '2023-10-25T08:30:00Z' // Inside
+                ],
+                [
+                    'deviceId' => 1,
+                    'latitude' => 11.0,
+                    'longitude' => 11.0,
+                    'fixTime' => '2023-10-25T09:00:00Z' // Inside
+                ],
+                [
+                    'deviceId' => 1,
+                    'latitude' => 12.0,
+                    'longitude' => 12.0,
+                    'fixTime' => '2023-10-25T09:30:00Z' // Outside
+                ]
+            ], 200),
+        ]);
+
+        $service = new ReportService();
+        $request = new Request([
+            'from_date' => '2023-10-25',
+            'to_date' => '2023-10-25'
+        ]);
+
+        $user = new User();
+        $user->traccarSession = 'JSESSIONID=123';
+        $request->setUserResolver(fn () => $user);
+
+        $result = $service->fetchDailyBreakdownMap($request, [1]);
+
+        $this->assertCount(1, $result);
+        $day = $result[0];
+
+        $this->assertArrayHasKey('route', $day);
+        // Should only have 3 points (08:00, 08:30, 09:00)
+        $this->assertCount(3, $day['route']);
+
+        // Verify the last point is 09:00
+        $lastPoint = end($day['route']);
+        $this->assertEquals(strtotime('2023-10-25T09:00:00Z') * 1000, $lastPoint[2]);
+    }
+
+    public function test_fetch_monthly_summary_grouped_by_vehicle_returns_correct_data()
+    {
+        Http::fake([
+            'http://traccar.test/api/reports/trips*' => Http::response([
+                [
+                    'deviceId' => 1,
+                    'deviceName' => 'Vehicle 1',
+                    'startTime' => '2023-10-01T08:00:00Z',
                     'endTime' => '2023-10-01T10:00:00Z',
                     'distance' => 50000, // 50km
                     'duration' => 7200000, // 2 hours

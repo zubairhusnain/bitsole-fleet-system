@@ -781,8 +781,18 @@ class ReportService
             $dayStops = $stops->filter(function($s) use ($date, $deviceId) {
                 return $s['deviceId'] == $deviceId && date('Y-m-d', strtotime($s['startTime'])) == $date;
             });
-            $dayRoutes = $routes->filter(function($r) use ($date, $deviceId) {
-                return $r['deviceId'] == $deviceId && date('Y-m-d', strtotime($r['fixTime'])) == $date;
+            $dayRoutes = $routes->filter(function($r) use ($dayTrips, $deviceId) {
+                if ($r['deviceId'] != $deviceId) return false;
+                $rTime = strtotime($r['fixTime']);
+                // Check if point belongs to any trip in this day
+                foreach ($dayTrips as $trip) {
+                    $start = strtotime($trip['startTime']);
+                    $end = strtotime($trip['endTime']);
+                    if ($rTime >= $start && $rTime <= $end) {
+                        return true;
+                    }
+                }
+                return false;
             });
 
             // Build timeline
