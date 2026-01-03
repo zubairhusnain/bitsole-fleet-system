@@ -8,9 +8,40 @@
              <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#0b0f28;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Idle Duration</span></div>
              <div class="d-flex align-items-center gap-1"><span style="width:10px;height:10px;background:#339af0;display:inline-block;border-radius:2px;"></span> <span class="small text-muted">Distance</span></div>
           </div>
-          <!-- Placeholder SVG - In real app, bind to data or use Chart.js -->
-          <div class="d-flex align-items-center justify-content-center h-100 bg-light rounded" style="min-height: 220px;">
-             <span class="text-muted small">Chart visualization requires granular event data</span>
+          <!-- Timeline Chart -->
+          <div class="h-100 d-flex flex-column justify-content-center bg-white rounded" style="min-height: 220px;">
+             <div v-if="!trips.length" class="d-flex align-items-center justify-content-center h-100 bg-light rounded">
+                <span class="text-muted small">No trip data available for chart</span>
+             </div>
+             <div v-else class="px-4 py-3 h-100 d-flex flex-column">
+                <h6 class="small fw-bold text-muted mb-4">Activity Timeline</h6>
+                <div class="flex-grow-1 position-relative">
+                   <!-- Base Line -->
+                   <div class="position-absolute w-100 bg-light rounded" style="height: 20px; top: 50%; transform: translateY(-50%);"></div>
+
+                   <!-- Trip Segments -->
+                   <div v-for="(seg, idx) in timelineSegments" :key="idx"
+                        class="position-absolute rounded shadow-sm"
+                        :style="{
+                           left: seg.left,
+                           width: seg.width,
+                           height: '20px',
+                           top: '50%',
+                           transform: 'translateY(-50%)',
+                           backgroundColor: '#e83e8c',
+                           cursor: 'pointer'
+                        }"
+                        :title="`${seg.data.startTime} - ${seg.data.endTime} (${seg.data.distance})`"
+                   ></div>
+                </div>
+ 
+                <!-- Time Labels -->
+                <div class="d-flex justify-content-between mt-2 text-muted" style="font-size: 10px;">
+                   <span>{{ formatTimeLabel(chartRange.min) }}</span>
+                   <span>{{ formatTimeLabel((chartRange.min + chartRange.max) / 2) }}</span>
+                   <span>{{ formatTimeLabel(chartRange.max) }}</span>
+                </div>
+             </div>
           </div>
         </div>
       </div>
@@ -66,8 +97,59 @@ const props = defineProps({
   summary: {
     type: Object,
     default: () => ({})
+  },
+  trips: {
+    type: Array,
+    default: () => []
   }
 });
+
+const chartRange = computed(() => {
+  if (!props.trips || !props.trips.length) return { min: 0, max: 0 };
+
+  const times = props.trips.flatMap(t => [new Date(t.startTime).getTime(), new Date(t.endTime).getTime()]);
+  let min = Math.min(...times);
+  let max = Math.max(...times);
+
+  const firstDate = new Date(min);
+  // Default to 00:00 - 24:00 of the start date
+  const startOfDay = new Date(firstDate).setHours(0,0,0,0);
+  const endOfDay = new Date(firstDate).setHours(23,59,59,999);
+
+  return { min: startOfDay, max: endOfDay };
+});
+
+const timelineSegments = computed(() => {
+  if (!props.trips || !props.trips.length) return [];
+
+  const { min, max } = chartRange.value;
+  const totalDuration = max - min;
+
+  if (totalDuration <= 0) return [];
+
+  return props.trips.map(t => {
+      const start = new Date(t.startTime).getTime();
+      const end = new Date(t.endTime).getTime();
+      // Clamp values
+      const safeStart = Math.max(start, min);
+      const safeEnd = Math.min(end, max);
+
+      const left = ((safeStart - min) / totalDuration) * 100;
+      const width = ((safeEnd - safeStart) / totalDuration) * 100;
+
+      return {
+          left: `${left}%`,
+          width: `${width}%`,
+          data: t
+      };
+  });
+});
+
+const formatTimeLabel = (ts) => {
+   if (!ts) return '';
+   const d = new Date(ts);
+   return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+};
 
 const totalTimeMs = computed(() => (props.summary?.totalDuration || 0) + (props.summary?.totalIdle || 0));
 

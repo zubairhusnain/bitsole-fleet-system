@@ -184,7 +184,7 @@ class ReportService
         // Allow filtering events to reduce payload; default to harsh + overspeed
         $eventTypes = trim((string)($request->event_types ?? 'harshBraking,harshAcceleration,overspeed'));
         if ($eventTypes === '') { $eventTypes = 'harshBraking,harshAcceleration,overspeed'; }
-
+ 
         $queryString = "deviceId={$deviceId}&from={$from}&to={$to}";
         $headers = ['Content-Type: application/json', 'Accept: application/json'];
 

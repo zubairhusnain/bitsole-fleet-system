@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use App\Models\User;
 
 class ReportServiceTest extends TestCase
-{
+{ 
     protected function setUp(): void
     {
         parent::setUp();

@@ -62,7 +62,7 @@
       <DailyBreakdown v-if="viewType === 'Daily Breakdown'" :rowsDailyTrips="rowsDailyTrips" :summaryData="dailySummaryData" :vehicleInfo="selectedVehicleInfo" :startDate="startDate" :endDate="endDate" />
 
       <TripSummary v-else-if="viewType === 'Trip Summary'" :rowsTripSummary="rowsTripSummary" @view-details="handleViewDetails" />
-
+ 
       <DailySummaryList v-else-if="viewType === 'Daily Summary List'" :rowsDailyVehicleList="rowsDailyVehicleList" />
 
       <DailyBreakdownMap v-else-if="viewType === 'Daily Breakdown (with map)'" :rowsDailyBreakdown="rowsDailyBreakdown" />
@@ -114,8 +114,9 @@ const fetchVehicles = async () => {
     // Ensure format matches {id, name, device_id}
     vehicles.value = response.data.options.map(v => ({
         id: v.id,
-        name: v.label,
-        device_id: v.deviceId
+        name: v.name,
+        device_id: v.deviceId,
+        uniqueId: v.uniqueId
     }));
   } catch (error) {
     console.error('Error fetching vehicles:', error);

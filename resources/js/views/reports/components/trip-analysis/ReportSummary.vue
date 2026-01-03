@@ -9,9 +9,9 @@
         </div>
         <div class="col-12 col-md-3">
           <div class="small text-muted">Device ID</div>
-          <div class="fw-semibold">{{ vehicle?.device_id || '-' }}</div>
+          <div class="fw-semibold">{{ vehicle?.uniqueId || vehicle?.device_id || '-' }}</div>
         </div>
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-md-3"> 
           <div class="small text-muted">Duration</div>
           <div class="fw-semibold">{{ formatTime(dateRange?.start) }} - {{ formatTime(dateRange?.end) }}</div>
         </div>
