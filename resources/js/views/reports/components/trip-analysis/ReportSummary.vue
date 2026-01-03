@@ -11,13 +11,13 @@
           <div class="small text-muted">Device ID</div>
           <div class="fw-semibold">{{ vehicle?.uniqueId || vehicle?.device_id || '-' }}</div>
         </div>
-        <div class="col-12 col-md-3"> 
+        <div class="col-12 col-md-3">
           <div class="small text-muted">Duration</div>
           <div class="fw-semibold">{{ formatTime(dateRange?.start) }} - {{ formatTime(dateRange?.end) }}</div>
         </div>
         <div class="col-12 col-md-3">
           <div class="small text-muted">View Type</div>
-          <div class="fw-semibold">Daily Breakdown</div>
+          <div class="fw-semibold">{{ viewType }}</div>
         </div>
         <div class="col-12">
           <div class="small text-muted">Remarks</div>
@@ -32,7 +32,11 @@
 defineProps({
   summary: Object,
   vehicle: Object,
-  dateRange: Object
+  dateRange: Object,
+  viewType: {
+    type: String,
+    default: 'Daily Breakdown'
+  }
 });
 
 const formatTime = (t) => {

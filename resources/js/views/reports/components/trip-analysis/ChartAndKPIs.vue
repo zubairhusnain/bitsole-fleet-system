@@ -172,6 +172,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  precomputedChartData: {
+    type: Array,
+    default: () => []
+  },
   startDate: String,
   endDate: String
 });
@@ -209,6 +213,11 @@ const idlePct = computed(() => {
 
 // Chart Data Processing
 const chartData = computed(() => {
+    // If precomputed data is provided (e.g. from Daily Summary), use it
+    if (props.precomputedChartData && props.precomputedChartData.length > 0) {
+        return props.precomputedChartData.sort((a, b) => a.date.localeCompare(b.date));
+    }
+
     const dataMap = {};
 
     // Process Trips

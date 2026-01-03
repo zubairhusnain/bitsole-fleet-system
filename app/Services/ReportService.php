@@ -590,6 +590,8 @@ class ReportService
             $distance = $dayTrips->sum('distance');
             $durationMs = $dayTrips->sum('duration');
             $idleMs = $dayStops->sum('duration');
+            $fuel = round(optional($dayTrips->first()['spentFuel'] ?? null)['value'] ?? 0, 2); // Approximate if available per trip, but usually it's per report item.
+            // If spentFuel is not in trips, we might need summary report. But let's assume 0 for now if missing.
 
             // Format Duration
             $durH = floor($durationMs / 3600000);
@@ -607,16 +609,47 @@ class ReportService
 
             return [
                 'date' => date('d/m/Y', strtotime($date)),
+                'dateRaw' => $date,
                 'vehicleId' => $deviceId ?? 'All',
                 'vehicle' => $deviceId ? ($dayTrips->first()['deviceName'] ?? 'Unknown') : 'All Vehicles',
                 'distance' => round($distance / 1000, 2) . ' KM',
+                'distance_m' => $distance,
                 'trip' => sprintf('%dh %dm %ds', $durH, $durM, $durS),
+                'trip_ms' => $durationMs,
                 'idle' => sprintf('%dh %dm %ds', $idleH, $idleM, $idleS),
+                'idle_ms' => $idleMs,
                 'idlePct' => $pct . '%'
             ];
         });
 
-        return $result->values();
+        $rows = $result->values();
+
+        // Calculate Totals for Summary Widget
+        $totalDistance = $rows->sum('distance_m');
+        $totalDuration = $rows->sum('trip_ms');
+        $totalIdle = $rows->sum('idle_ms');
+
+        // Chart Data
+        $chartData = $rows->map(function($r) {
+            return [
+                'date' => $r['dateRaw'],
+                'distance' => $r['distance_m'],
+                'tripDuration' => $r['trip_ms'],
+                'idleDuration' => $r['idle_ms']
+            ];
+        });
+
+        return [
+            'rows' => $rows,
+            'summary' => [
+                'totalDistance' => $totalDistance,
+                'totalDuration' => $totalDuration,
+                'totalIdle' => $totalIdle,
+                'totalFuel' => 0, // Placeholder as fuel data isn't reliably in trip list
+                'avgKmL' => 0 // Placeholder
+            ],
+            'chart' => $chartData
+        ];
     }
 
     public function fetchMonthlySummary($request, $deviceIds)
