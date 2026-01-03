@@ -801,7 +801,6 @@ class ReportService
             foreach ($dayEvents as $event) {
                 if ($event['type'] == 'deviceOnline' || $event['type'] == 'deviceOffline') continue;
 
-                // Try to find closest route point for location
                 $eventTs = strtotime($event['eventTime']);
                 $closest = $dayRoutes->sortBy(function($r) use ($eventTs) {
                     return abs(strtotime($r['fixTime']) - $eventTs);
@@ -810,15 +809,32 @@ class ReportService
                 $lat = $closest['latitude'] ?? 0;
                 $lon = $closest['longitude'] ?? 0;
                 $addr = $closest['address'] ?? '';
+                
+                // Friendly event name
+                $friendlyName = ucfirst(preg_replace('/(?<!^)[A-Z]/', ' $0', $event['type']));
 
                 $timeline[] = [
                     'time_sort' => $eventTs,
                     'time' => date('h:i A', $eventTs),
                     'location' => $addr,
-                    'alert' => $event['type'],
+                    'alert' => $friendlyName, // e.g. "Harsh Braking"
                     'type' => 'alert',
                     'lat' => $lat,
                     'lon' => $lon
+                ];
+            }
+
+            // Add Stops to Timeline
+            foreach ($dayStops as $stop) {
+                $stopTs = strtotime($stop['startTime']);
+                $timeline[] = [
+                    'time_sort' => $stopTs,
+                    'time' => date('h:i A', $stopTs),
+                    'location' => $stop['address'] ?? '',
+                    'dur' => gmdate('H\h i\m', ($stop['duration'] ?? 0)/1000),
+                    'type' => 'stop', // New type
+                    'lat' => $stop['latitude'] ?? 0,
+                    'lon' => $stop['longitude'] ?? 0
                 ];
             }
 
@@ -828,9 +844,13 @@ class ReportService
             $totalDur = $dayTrips->sum('duration');
             $totalIdle = $dayStops->sum('duration');
 
-            // Format route for map: [[lat, lon], ...]
+            // Format route for map: [[lat, lon, timestamp], ...]
             $routePoints = $dayRoutes->map(function($r) {
-                return [$r['latitude'], $r['longitude']];
+                return [
+                    $r['latitude'], 
+                    $r['longitude'],
+                    strtotime($r['fixTime']) * 1000 // ms for JS
+                ];
             })->values()->all();
 
             return [
