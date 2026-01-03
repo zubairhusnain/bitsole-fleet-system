@@ -608,6 +608,7 @@ class ReportService
             $pct = $totalTime > 0 ? round(($idleMs / $totalTime) * 100, 1) : 0;
 
             return [
+                'key' => $key, // Unique key for frontend
                 'date' => date('d/m/Y', strtotime($date)),
                 'dateRaw' => $date,
                 'vehicleId' => $deviceId ?? 'All',
@@ -742,6 +743,7 @@ class ReportService
             $dateStr = date('m/Y', strtotime($month));
 
             return [
+                'key' => $key, // Unique key for frontend (YYYY-MM or YYYY-MM_deviceId)
                 'date' => $dateStr,
                 'dateRaw' => $month, // YYYY-MM for sorting
                 'vehicleId' => $deviceId ?? 'All',

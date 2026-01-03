@@ -23,10 +23,10 @@
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label small fw-semibold text-muted">
-              Vehicle <span v-if="viewType === 'Daily Breakdown' || viewType === 'Daily Breakdown (with map)'" class="text-danger">*</span>
+              Vehicle <span class="text-danger">*</span>
             </label>
             <select v-model="vehicle" class="form-select text-muted">
-              <option value="">-- All Vehicles --</option>
+              <option value="" disabled>-- Select Vehicle --</option>
               <option v-for="v in vehicles" :key="v.id" :value="v.device_id">
                 {{ v.name }}
               </option>
@@ -39,6 +39,7 @@
               <option>Daily Breakdown</option>
               <option>Daily Breakdown (with map)</option>
               <option>Daily Summary</option>
+              <option>Daily Summary List</option>
               <option>Monthly Summary</option>
               <option>Monthly Summary List</option>
             </select>
@@ -65,6 +66,8 @@
       <DailyBreakdownMap v-else-if="viewType === 'Daily Breakdown (with map)'" :rowsDailyBreakdown="rowsDailyBreakdown" />
 
       <DailySummary v-else-if="viewType === 'Daily Summary'" :rowsDailySummary="rowsDailySummary" :summary="dailySummaryTotals" :chartData="dailySummaryChart" :vehicle="selectedVehicleInfo" :startDate="startDate" :endDate="endDate" />
+
+      <DailySummaryList v-else-if="viewType === 'Daily Summary List'" :rowsDailyVehicleList="rowsDailyVehicleList" />
 
       <MonthlySummary v-else-if="viewType === 'Monthly Summary'" :rowsMonthlySummary="rowsMonthlySummary" :summary="monthlySummaryTotals" :chartData="monthlySummaryChart" :vehicle="selectedVehicleInfo" :startDate="startDate" :endDate="endDate" />
 
@@ -149,9 +152,9 @@ const handleSearch = async () => {
       to = localISOTime;
   }
 
-  // Validate Device Selection for Breakdown views
-  if (!vehicle.value && (viewType.value === 'Daily Breakdown' || viewType.value === 'Daily Breakdown (with map)')) {
-      alert('Please select a vehicle for this report type.');
+  // Validate Device Selection
+  if (!vehicle.value) {
+      alert('Please select a vehicle.');
       return;
   }
 
@@ -180,20 +183,21 @@ const handleSearch = async () => {
     } else if (viewType.value === 'Daily Summary') {
       const p = { ...params, group_by: 'date' };
       const response = await window.axios.get('/web/reports/daily-summary', { params: p });
-      rowsDailySummary.value = response.data.rows;
-      dailySummaryTotals.value = response.data.summary;
-      dailySummaryChart.value = response.data.chart;
+      rowsDailySummary.value = response.data.rows || [];
+      dailySummaryTotals.value = response.data.summary || {};
+      dailySummaryChart.value = response.data.chart || [];
     } else if (viewType.value === 'Daily Summary List') {
-      // Removed
+      const response = await window.axios.get('/web/reports/daily-summary', { params });
+      rowsDailyVehicleList.value = response.data.rows || [];
     } else if (viewType.value === 'Monthly Summary') {
       const p = { ...params, group_by: 'month' };
       const response = await window.axios.get('/web/reports/monthly-summary', { params: p });
-      rowsMonthlySummary.value = response.data.rows;
-      monthlySummaryTotals.value = response.data.summary;
-      monthlySummaryChart.value = response.data.chart;
+      rowsMonthlySummary.value = response.data.rows || [];
+      monthlySummaryTotals.value = response.data.summary || {};
+      monthlySummaryChart.value = response.data.chart || [];
     } else if (viewType.value === 'Monthly Summary List') {
       const response = await window.axios.get('/web/reports/monthly-summary', { params });
-      rowsMonthlyVehicleList.value = response.data;
+      rowsMonthlyVehicleList.value = response.data.rows || [];
     }
   } catch (error) {
     console.error('Error fetching report data:', error);
@@ -202,6 +206,7 @@ const handleSearch = async () => {
     else if (viewType.value === 'Daily Breakdown') rowsDailyTrips.value = [];
     else if (viewType.value === 'Daily Breakdown (with map)') rowsDailyBreakdown.value = [];
     else if (viewType.value === 'Daily Summary') rowsDailySummary.value = [];
+    else if (viewType.value === 'Daily Summary List') rowsDailyVehicleList.value = [];
     else if (viewType.value === 'Monthly Summary') rowsMonthlySummary.value = [];
     else if (viewType.value === 'Monthly Summary List') rowsMonthlyVehicleList.value = [];
   } finally {
@@ -234,7 +239,7 @@ onMounted(() => {
   startDate.value = toIsoLocal(start);
   endDate.value = toIsoLocal(end);
 
-  handleSearch();
+  // handleSearch(); // Require user interaction
 });
 </script>
 
