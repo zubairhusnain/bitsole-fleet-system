@@ -113,6 +113,9 @@ class AssetActivityTest extends TestCase
 
         // Should return 200 with empty response (handled by frontend as no data), not 500
         $response->assertStatus(200);
-        $this->assertEquals([], $response->json());
+        $json = $response->json();
+        $this->assertArrayHasKey('header', $json);
+        $this->assertArrayHasKey('rows', $json);
+        $this->assertEmpty($json['rows']);
     }
 }

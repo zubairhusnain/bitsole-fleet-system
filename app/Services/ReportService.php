@@ -1157,6 +1157,9 @@ class ReportService
     }
     public function fetchAssetActivity($request, $deviceIds)
     {
+        // Increase memory limit for this heavy report
+        ini_set('memory_limit', '512M');
+
         $sessionId = $request->user()->traccarSession ?? session('cookie');
 
         if (empty($deviceIds)) return [];
@@ -1176,173 +1179,152 @@ class ReportService
             'Accept' => 'application/json'
         ];
 
-        // Chunk device IDs to avoid URL length issues or API limits
-        // 40 devices * ~15 chars = ~600 chars query string, safe for most servers
-        $chunks = array_chunk($deviceIds, 40);
-        
-        try {
-            $responses = Http::pool(function (Pool $pool) use ($chunks, $baseUrl, $headers, $from, $to) {
-                $requests = [];
-                foreach ($chunks as $i => $chunkIds) {
-                    $deviceParams = [];
-                    foreach ($chunkIds as $id) {
-                        $deviceParams[] = "deviceId={$id}";
-                    }
-                    $deviceQuery = implode('&', $deviceParams);
-                    $queryString = "{$deviceQuery}&from={$from}&to={$to}";
+        // Sequential processing with smaller chunks to save memory
+        $chunks = array_chunk($deviceIds, 20);
 
-                    $requests[] = $pool->as("route_{$i}")->withHeaders($headers)->get("{$baseUrl}/api/reports/route?{$queryString}");
-                    $requests[] = $pool->as("events_{$i}")->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$queryString}");
-                    $requests[] = $pool->as("summary_{$i}")->withHeaders($headers)->get("{$baseUrl}/api/reports/summary?{$queryString}");
+        $allRows = [];
+        $singleDeviceName = 'Unknown';
+
+        foreach ($chunks as $chunkIds) {
+            try {
+                $deviceParams = [];
+                foreach ($chunkIds as $id) {
+                    $deviceParams[] = "deviceId={$id}";
                 }
-                return $requests;
-            });
-        } catch (\Throwable $e) {
-            Log::error('fetchAssetActivity exception', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            return [];
-        }
+                $deviceQuery = implode('&', $deviceParams);
+                $queryString = "{$deviceQuery}&from={$from}&to={$to}";
 
-        $route = [];
-        $events = [];
-        $summaryData = [];
+                // Fetch data for this chunk
+                $responses = Http::pool(function (Pool $pool) use ($baseUrl, $headers, $queryString) {
+                    return [
+                        $pool->as('route')->withHeaders($headers)->get("{$baseUrl}/api/reports/route?{$queryString}"),
+                        $pool->as('events')->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$queryString}"),
+                        $pool->as('summary')->withHeaders($headers)->get("{$baseUrl}/api/reports/summary?{$queryString}"),
+                    ];
+                });
 
-        foreach ($chunks as $i => $chunk) {
-            $r = $responses["route_{$i}"] ?? null;
-            $e = $responses["events_{$i}"] ?? null;
-            $s = $responses["summary_{$i}"] ?? null;
+                $routeData = ($responses['route']->ok()) ? $responses['route']->json() : [];
+                $eventsData = ($responses['events']->ok()) ? $responses['events']->json() : [];
+                $summaryData = ($responses['summary']->ok()) ? $responses['summary']->json() : [];
 
-            if ($r instanceof \Illuminate\Http\Client\Response && $r->ok()) {
-                $data = $r->json();
-                if (is_array($data)) $route = array_merge($route, $data);
+                // Map device names
+                $chunkDeviceMap = [];
+                if (is_array($summaryData)) {
+                    foreach ($summaryData as $s) {
+                        if (isset($s['deviceId'])) {
+                            $name = $s['deviceName'] ?? 'Device ' . $s['deviceId'];
+                            $chunkDeviceMap[$s['deviceId']] = $name;
+                            if ($singleDeviceName === 'Unknown') $singleDeviceName = $name;
+                        }
+                    }
+                }
+
+                // Process Route
+                if (is_array($routeData)) {
+                    foreach ($routeData as $pos) {
+                        $dId = $pos['deviceId'] ?? 0;
+                        $time = $pos['fixTime'] ?? $pos['deviceTime'];
+                        $dt = strtotime($time);
+                        $attrs = $pos['attributes'] ?? [];
+
+                        $lat = isset($pos['latitude']) ? round($pos['latitude'], 5) : 0;
+                        $lon = isset($pos['longitude']) ? round($pos['longitude'], 5) : 0;
+                        $power = $attrs['power'] ?? $attrs['battery'] ?? null;
+                        if ($power) $power = round($power, 1) . 'V';
+                        $fuel = $attrs['fuel'] ?? null;
+                        if ($fuel) $fuel = round($fuel, 1) . ' L';
+
+                        $allRows[] = [
+                            'key' => 0, // Will reindex later
+                            'vehicle' => $chunkDeviceMap[$dId] ?? 'Unknown',
+                            'groupDate' => date('d-m-Y l', $dt),
+                            'date' => date('d-m-Y', $dt),
+                            'time' => date('H:i:s', $dt),
+                            'status' => 'Position Log',
+                            'lat' => $lat,
+                            'lon' => $lon,
+                            'location' => $pos['address'] ?? '',
+                            'direction' => $pos['course'] ?? 0,
+                            'speed' => round(($pos['speed'] ?? 0) * 1.852, 0) . ' km/h',
+                            'gsm' => $attrs['rssi'] ?? null,
+                            'gps' => $attrs['sat'] ?? null,
+                            'power' => $power,
+                            'ignition' => $attrs['ignition'] ?? null,
+                            'fuel' => $fuel,
+                            'isEvent' => false,
+                            'rawType' => 'position',
+                            'epoch' => $dt
+                        ];
+                    }
+                }
+
+                // Process Events
+                if (is_array($eventsData)) {
+                    foreach ($eventsData as $evt) {
+                        $dId = $evt['deviceId'] ?? 0;
+                        $time = $evt['eventTime'] ?? $evt['serverTime'];
+                        $dt = strtotime($time);
+                        $attrs = $evt['attributes'] ?? [];
+
+                        $allRows[] = [
+                            'key' => 0,
+                            'vehicle' => $chunkDeviceMap[$dId] ?? 'Unknown',
+                            'groupDate' => date('d-m-Y l', $dt),
+                            'date' => date('d-m-Y', $dt),
+                            'time' => date('H:i:s', $dt),
+                            'status' => $this->formatEventDescription($evt),
+                            'lat' => 0,
+                            'lon' => 0,
+                            'location' => '',
+                            'direction' => 0,
+                            'speed' => '0 km/h',
+                            'gsm' => null,
+                            'gps' => null,
+                            'power' => null,
+                            'ignition' => null,
+                            'fuel' => null,
+                            'isEvent' => true,
+                            'rawType' => $evt['type'] ?? '',
+                            'epoch' => $dt
+                        ];
+                    }
+                }
+
+                unset($routeData, $eventsData, $summaryData, $responses);
+
+            } catch (\Throwable $e) {
+                Log::error('fetchAssetActivity chunk exception', ['error' => $e->getMessage()]);
             }
-            if ($e instanceof \Illuminate\Http\Client\Response && $e->ok()) {
-                $data = $e->json();
-                if (is_array($data)) $events = array_merge($events, $data);
-            }
-            if ($s instanceof \Illuminate\Http\Client\Response && $s->ok()) {
-                $data = $s->json();
-                if (is_array($data)) $summaryData = array_merge($summaryData, $data);
-            }
         }
 
-        // Map deviceId to deviceName
-        $deviceMap = [];
-        foreach ($summaryData as $s) {
-            if (isset($s['deviceId'])) {
-                $deviceMap[$s['deviceId']] = $s['deviceName'] ?? 'Device ' . $s['deviceId'];
-            }
-        }
-
-        // Normalize Data for Merging
-        $merged = collect();
-
-        // 1. Process Route (Positions)
-        foreach ($route as $pos) {
-            $time = $pos['fixTime'] ?? $pos['deviceTime'];
-            $merged->push([
-                'type' => 'position',
-                'raw' => $pos,
-                'timestamp' => $time,
-                'epoch' => strtotime($time),
-            ]);
-        }
-
-        // 2. Process Events
-        foreach ($events as $evt) {
-            $time = $evt['eventTime'] ?? $evt['serverTime'];
-            $merged->push([
-                'type' => 'event',
-                'raw' => $evt,
-                'timestamp' => $time,
-                'epoch' => strtotime($time),
-            ]);
-        }
-
-        // 3. Sort by Time
-        $sorted = $merged->sortBy('epoch')->values();
-
-        // 4. Map to Display Format
-        $rows = $sorted->map(function ($item, $index) use ($deviceMap) {
-            $raw = $item['raw'];
-            $isPos = $item['type'] === 'position';
-
-            $dId = $raw['deviceId'] ?? 0;
-            $vehicleName = $deviceMap[$dId] ?? 'Unknown';
-
-            $dt = strtotime($item['timestamp']);
-            $date = date('d-m-Y', $dt);
-            $day = date('l', $dt); // Monday
-            $time = date('H:i:s', $dt);
-
-            $attrs = $raw['attributes'] ?? [];
-
-            // Status
-            $status = $isPos ? 'Position Log' : $this->formatEventDescription($raw);
-
-            // Location
-            $lat = $isPos ? ($raw['latitude'] ?? 0) : 0;
-            $lon = $isPos ? ($raw['longitude'] ?? 0) : 0;
-            // Round coords
-            $lat = $lat ? round($lat, 5) : '';
-            $lon = $lon ? round($lon, 5) : '';
-
-            $location = $raw['address'] ?? '';
-
-            // Speed
-            $speedKnots = $raw['speed'] ?? 0;
-            $speedKph = round($speedKnots * 1.852, 0);
-
-            // Direction
-            $course = $raw['course'] ?? 0;
-
-            // GSM/GPS
-            $gsm = $attrs['rssi'] ?? null;
-            $gps = $attrs['sat'] ?? null;
-
-            // Power
-            $power = $attrs['power'] ?? $attrs['battery'] ?? null;
-            if ($power) $power = round($power, 1) . 'V';
-
-            // Ignition
-            $ignition = $attrs['ignition'] ?? null; // boolean
-
-            // Fuel
-            $fuel = $attrs['fuel'] ?? null;
-            if ($fuel) $fuel = round($fuel, 1) . ' L';
-
-            return [
-                'key' => $index,
-                'vehicle' => $vehicleName,
-                'groupDate' => "$date $day",
-                'date' => $date,
-                'time' => $time,
-                'status' => $status,
-                'lat' => $lat,
-                'lon' => $lon,
-                'location' => $location,
-                'direction' => $course,
-                'speed' => $speedKph . ' km/h',
-                'gsm' => $gsm,
-                'gps' => $gps,
-                'power' => $power,
-                'ignition' => $ignition,
-                'fuel' => $fuel,
-                'isEvent' => !$isPos,
-                'rawType' => $isPos ? 'position' : ($raw['type'] ?? '')
-            ];
+        // Sort by Time
+        usort($allRows, function($a, $b) {
+            return $a['epoch'] <=> $b['epoch'];
         });
 
+        // Re-index keys
+        foreach ($allRows as $index => &$row) {
+            $row['key'] = $index;
+        }
+        unset($row);
+
         // Header Info
-        $lastRow = $sorted->last();
+        $lastRow = end($allRows);
         $lastTime = $lastRow ? date('Y-m-d H:i:s', $lastRow['epoch']) : 'N/A';
 
-        $lastPos = $sorted->where('type', 'position')->last();
-        $lastAddress = $lastPos['raw']['address'] ?? '';
-        if (!$lastAddress && $lastPos) {
-            $lastAddress = round($lastPos['raw']['latitude'], 5) . ', ' . round($lastPos['raw']['longitude'], 5);
+        // Find last position
+        $lastAddress = '';
+        for ($i = count($allRows) - 1; $i >= 0; $i--) {
+            if ($allRows[$i]['rawType'] === 'position') {
+                $lastAddress = $allRows[$i]['location'];
+                if (!$lastAddress) {
+                    $lastAddress = $allRows[$i]['lat'] . ', ' . $allRows[$i]['lon'];
+                }
+                break;
+            }
         }
 
-        $vehicleLabel = count($deviceIds) > 1 ? 'Multiple Vehicles (' . count($deviceIds) . ')' : ($summaryData[0]['deviceName'] ?? 'Unknown');
+        $vehicleLabel = count($deviceIds) > 1 ? 'Multiple Vehicles (' . count($deviceIds) . ')' : $singleDeviceName;
         $deviceIdLabel = count($deviceIds) > 1 ? 'Multiple' : ($deviceIds[0] ?? 'N/A');
 
         $header = [
@@ -1355,7 +1337,7 @@ class ReportService
 
         return [
             'header' => $header,
-            'rows' => $rows
+            'rows' => $allRows
         ];
     }
 
