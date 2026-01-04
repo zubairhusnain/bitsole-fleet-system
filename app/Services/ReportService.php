@@ -1173,7 +1173,10 @@ class ReportService
         }
         $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
 
-        $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
+            // Get limit from request, default to 100
+            $limitParam = (int) $request->input('limit', 100);
+
+            $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
         if (empty($baseUrl)) return [];
 
         $headers = [
@@ -1183,28 +1186,35 @@ class ReportService
 
         // Sequential processing with smaller chunks to save memory
         // Process 1 device at a time to minimize peak memory usage
-        $chunks = array_chunk($deviceIds, 1);
+        $chunks = collect(array_chunk($deviceIds, 1));
 
-        $allRows = [];
         $singleDeviceName = 'Unknown';
+        $limitReached = false;
+        $currentRowCount = 0;
 
         // Safety limits
         $maxRows = 20000;
         $memoryThreshold = 0.9; // Stop if 90% of memory limit is reached
+        $allRows = $chunks->map(function ($chunkIds) use ($request, $from, $to, $baseUrl, $headers, &$singleDeviceName, &$limitReached, &$currentRowCount, $maxRows, $memoryThreshold, $limitParam) {
 
-        foreach ($chunks as $chunkIds) {
+            if ($limitReached) return [];
+
             // Check memory usage
             $limit = $this->getMemoryLimitBytes();
             if ($limit > 0 && memory_get_usage(true) > ($limit * $memoryThreshold)) {
                 Log::warning('AssetActivity: Memory limit approaching, stopping processing early.');
-                break;
+                $limitReached = true;
+                return [];
             }
 
             // Check row count
-            if (count($allRows) >= $maxRows) {
+            if ($currentRowCount >= $maxRows) {
                  Log::warning('AssetActivity: Row limit reached, stopping processing early.');
-                 break;
+                 $limitReached = true;
+                 return [];
             }
+
+            $chunkRows = [];
 
             try {
                 $deviceParams = [];
@@ -1212,7 +1222,7 @@ class ReportService
                     $deviceParams[] = "deviceId={$id}";
                 }
                 $deviceQuery = implode('&', $deviceParams);
-                $queryString = "{$deviceQuery}&from={$from}&to={$to}";
+                $queryString = "{$deviceQuery}&from={$from}&to={$to}&limit={$limitParam}";
 
                 // Fetch data for this chunk
                 $responses = Http::pool(function (Pool $pool) use ($baseUrl, $headers, $queryString) {
@@ -1254,7 +1264,7 @@ class ReportService
                         $fuel = $attrs['fuel'] ?? null;
                         if ($fuel) $fuel = round($fuel, 1) . ' L';
 
-                        $allRows[] = [
+                        $chunkRows[] = [
                             'key' => 0, // Will reindex later
                             'vehicle' => $chunkDeviceMap[$dId] ?? 'Unknown',
                             'groupDate' => date('d-m-Y l', $dt),
@@ -1286,7 +1296,7 @@ class ReportService
                         $dt = strtotime($time);
                         $attrs = $evt['attributes'] ?? [];
 
-                        $allRows[] = [
+                        $chunkRows[] = [
                             'key' => 0,
                             'vehicle' => $chunkDeviceMap[$dId] ?? 'Unknown',
                             'groupDate' => date('d-m-Y l', $dt),
@@ -1320,12 +1330,21 @@ class ReportService
             } catch (\Throwable $e) {
                 Log::error('fetchAssetActivity chunk exception', ['error' => $e->getMessage()]);
             }
-        }
+
+            $currentRowCount += count($chunkRows);
+            return $chunkRows;
+
+        })->collapse()->values()->all();
 
         // Sort by Time
         usort($allRows, function($a, $b) {
             return $a['epoch'] <=> $b['epoch'];
         });
+
+        // Limit to last N records
+        if ($limitParam > 0 && count($allRows) > $limitParam) {
+            $allRows = array_slice($allRows, -$limitParam);
+        }
 
         // Re-index keys
         foreach ($allRows as $index => &$row) {

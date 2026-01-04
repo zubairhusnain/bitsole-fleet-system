@@ -13,11 +13,11 @@
       <div class="card-header"><h6 class="mb-0">Search Option</h6></div>
       <div class="card-body">
         <div class="row g-3 align-items-end">
-          <div class="col-12 col-md-3">
+          <div class="col-12 col-md-2">
             <label class="form-label small">Start Date</label>
             <input v-model="startDate" type="datetime-local" class="form-control" />
           </div>
-          <div class="col-12 col-md-3">
+          <div class="col-12 col-md-2">
             <label class="form-label small">End Date</label>
             <input v-model="endDate" type="datetime-local" class="form-control" />
           </div>
@@ -28,42 +28,18 @@
               <option v-for="v in vehicles" :key="v.id" :value="v.device_id">{{ v.name }}</option>
             </select>
           </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label small">Search Filter</label>
-            <select class="form-select" v-model="searchFilter">
-              <option value="">-- Search Filter --</option>
-              <option>Door Sensor</option>
-              <option>Exceptions</option>
-              <option>Power Disconnection</option>
-              <option>Ignition</option>
-              <option>Idling</option>
-              <option>Seatbelt</option>
-              <option>Trailer</option>
+          <div class="col-12 col-md-2">
+            <label class="form-label small">Row Limit</label>
+            <select class="form-select" v-model="apiLimit">
+              <option :value="100">100 Records</option>
+              <option :value="200">200 Records</option>
+              <option :value="500">500 Records</option>
+              <option :value="1000">1000 Records</option>
+              <option :value="2000">2000 Records</option>
             </select>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label small">Report Format</label>
-            <select class="form-select" v-model="reportFormat">
-              <option value="">-- Report Format --</option>
-              <option>Website</option>
-              <option>Map</option>
-              <option>Excel</option>
-              <option>PDF</option>
-              <option>Google Earth KML</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label small">Map Option</label>
-            <select class="form-select" v-model="mapOption">
-              <option value="">-- Map Option --</option>
-              <option>Icon</option>
-              <option>Line</option>
-              <option>Playback</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-3 text-md-end offset-md-3">
             <button class="btn btn-app-dark w-100" @click="handleSearch" :disabled="loading">
-              <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
               Submit
             </button>
           </div>
@@ -122,7 +98,14 @@
               </tr>
             </thead>
             <tbody>
-              <template v-if="groupedRows.length">
+              <tr v-if="loading">
+                <td colspan="13" class="text-center py-4">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </td>
+              </tr>
+              <template v-else-if="groupedRows.length">
                 <template v-for="(group, gIndex) in groupedRows" :key="gIndex">
                   <tr class="table-light">
                     <td colspan="13" class="fw-bold text-primary">{{ group.date }}</td>
@@ -167,15 +150,7 @@
       </div>
       <div class="card-footer d-flex align-items-center py-2" v-if="rows.length">
         <div class="text-muted small me-auto">
-          Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, filteredRows.length) }} of {{ filteredRows.length }} results
-        </div>
-        <div class="me-3">
-          <select v-model="itemsPerPage" class="form-select form-select-sm" style="width: auto; display: inline-block;">
-            <option :value="50">50</option>
-            <option :value="100">100</option>
-            <option :value="200">200</option>
-            <option :value="500">500</option>
-          </select>
+          Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, rows.length) }} of {{ rows.length }} results
         </div>
         <nav aria-label="Pagination" class="ms-auto" v-if="totalPages > 1">
           <ul class="pagination pagination-sm mb-0 pagination-app">
@@ -196,16 +171,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 
 const startDate = ref('');
 const endDate = ref('');
 const vehicle = ref('');
 const vehicles = ref([]);
-const searchFilter = ref('');
-const reportFormat = ref('');
-const mapOption = ref('');
+const apiLimit = ref(100);
 const loading = ref(false);
 const rows = ref([]);
 const headerInfo = ref(null);
@@ -215,36 +188,16 @@ const hasSearched = ref(false);
 const currentPage = ref(1);
 const itemsPerPage = ref(100);
 
-const filteredRows = computed(() => {
-  if (!rows.value.length) return [];
-  if (!searchFilter.value) return rows.value;
-
-  const filter = searchFilter.value;
-  return rows.value.filter(row => {
-    if (filter === 'Ignition') {
-      return row.rawType === 'ignitionOn' || row.rawType === 'ignitionOff';
-    }
-    if (filter === 'Power Disconnection') {
-      return row.rawType === 'powerCut';
-    }
-    if (filter === 'Idling') {
-      return row.rawType === 'idling' || (row.status && row.status.toLowerCase().includes('idling'));
-    }
-    if (filter === 'Exceptions') {
-      // Exclude positions and common status events
-      if (row.rawType === 'position') return false;
-      if (['ignitionOn', 'ignitionOff', 'powerCut', 'idling'].includes(row.rawType)) return false;
-      return true;
-    }
-    // TODO: Implement logic for Door Sensor, Seatbelt, Trailer when data is available
-    return false;
-  });
+const paginatedRows = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value;
+  const end = start + itemsPerPage.value;
+  return rows.value.slice(start, end);
 });
 
 const groupedRows = computed(() => {
-  if (!filteredRows.value.length) return [];
+  if (!paginatedRows.value.length) return [];
   const groups = {};
-  filteredRows.value.forEach(row => {
+  paginatedRows.value.forEach(row => {
     if (!groups[row.groupDate]) {
       groups[row.groupDate] = [];
     }
@@ -256,13 +209,17 @@ const groupedRows = computed(() => {
   }));
 });
 
+const totalPages = computed(() => {
+  return Math.ceil(rows.value.length / itemsPerPage.value);
+});
+
 onMounted(async () => {
   // Set default dates (Last 7 Days)
   const now = new Date();
   const start = new Date(now);
   start.setDate(start.getDate() - 7); // Go back 7 days
   start.setHours(0, 0, 0, 0);
-  
+
   const end = new Date(now);
   end.setHours(23, 59, 59, 999);
 
@@ -299,7 +256,8 @@ async function handleSearch() {
       params: {
         from_date: startDate.value,
         to_date: endDate.value,
-        device_ids: deviceIds
+        device_ids: deviceIds,
+        limit: apiLimit.value
       }
     });
 
