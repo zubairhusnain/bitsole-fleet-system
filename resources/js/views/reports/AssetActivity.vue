@@ -152,19 +152,21 @@
         <div class="text-muted small me-auto">
           Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, rows.length) }} of {{ rows.length }} results
         </div>
-        <nav aria-label="Pagination" class="ms-auto" v-if="totalPages > 1">
-          <ul class="pagination pagination-sm mb-0 pagination-app">
-            <li class="page-item" :class="{ disabled: currentPage === 1 }">
-              <button class="page-link" @click="currentPage--">‹</button>
-            </li>
-            <li class="page-item disabled">
-              <span class="page-link">{{ currentPage }} / {{ totalPages }}</span>
-            </li>
-            <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-              <button class="page-link" @click="currentPage++">›</button>
-            </li>
-          </ul>
-        </nav>
+        <nav aria-label="Page navigation" class="ms-auto" v-if="totalPages > 1">
+        <ul class="pagination pagination-sm mb-0 pagination-app">
+          <li class="page-item" :class="{ disabled: currentPage === 1 }">
+            <button class="page-link" @click="changePage(currentPage - 1)">‹</button>
+          </li>
+          <li class="page-item" v-for="page in visiblePages" :key="page" :class="{ active: currentPage === page }">
+            <button class="page-link" @click="changePage(page)">
+              {{ page }}
+            </button>
+          </li>
+          <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+            <button class="page-link" @click="changePage(currentPage + 1)">›</button>
+          </li>
+        </ul>
+      </nav>
       </div>
     </div>
   </div>
