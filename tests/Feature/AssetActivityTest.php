@@ -90,4 +90,29 @@ class AssetActivityTest extends TestCase
         $response->assertStatus(422);
         $response->assertJson(['message' => 'Date range cannot exceed 31 days.']);
     }
+
+    public function test_asset_activity_handles_connection_error()
+    {
+        // Simulate connection error which Http::pool returns as Exception object in the array
+        Http::fake(function ($request) {
+             throw new \Illuminate\Http\Client\ConnectionException('Connection timed out');
+        });
+
+        $user = \App\Models\User::factory()->create();
+        $this->actingAs($user);
+
+        // Need at least one device to trigger the pool
+        $device = new \App\Models\Devices();
+        $device->device_id = 888;
+        $device->distributor_id = $user->id;
+        $device->save();
+        $user->role = 3;
+        $user->save();
+
+        $response = $this->get('/web/reports/asset-activity?from_date=2024-05-16&to_date=2024-05-16');
+
+        // Should return 200 with empty response (handled by frontend as no data), not 500
+        $response->assertStatus(200);
+        $this->assertEquals([], $response->json());
+    }
 }

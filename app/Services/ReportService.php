@@ -1179,7 +1179,7 @@ class ReportService
         // Chunk device IDs to avoid URL length issues or API limits
         // 40 devices * ~15 chars = ~600 chars query string, safe for most servers
         $chunks = array_chunk($deviceIds, 40);
-        
+
         try {
             $responses = Http::pool(function (Pool $pool) use ($chunks, $baseUrl, $headers, $from, $to) {
                 $requests = [];
@@ -1197,8 +1197,8 @@ class ReportService
                 }
                 return $requests;
             });
-        } catch (\Exception $e) {
-            Log::error('fetchAssetActivity exception', ['error' => $e->getMessage()]);
+        } catch (\Throwable $e) {
+            Log::error('fetchAssetActivity exception', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return [];
         }
 
