@@ -149,24 +149,14 @@
         </div>
       </div>
       <div class="card-footer d-flex align-items-center py-2" v-if="rows.length">
-        <div class="text-muted small me-auto">
-          Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, rows.length) }} of {{ rows.length }} results
-        </div>
-        <nav aria-label="Page navigation" class="ms-auto" v-if="totalPages > 1">
-        <ul class="pagination pagination-sm mb-0 pagination-app">
-          <li class="page-item" :class="{ disabled: currentPage === 1 }">
-            <button class="page-link" @click="changePage(currentPage - 1)">‹</button>
-          </li>
-          <li class="page-item" v-for="page in visiblePages" :key="page" :class="{ active: currentPage === page }">
-            <button class="page-link" @click="changePage(page)">
-              {{ page }}
-            </button>
-          </li>
-          <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-            <button class="page-link" @click="changePage(currentPage + 1)">›</button>
-          </li>
-        </ul>
-      </nav>
+        <div class="text-muted small me-auto">Showing {{ startIndex + 1 }} to {{ Math.min(startIndex + pageSize, totalCount) }} of {{ totalCount }} results</div>
+        <nav aria-label="Pagination" class="ms-auto">
+          <ul class="pagination pagination-sm mb-0 pagination-app">
+            <li class="page-item" :class="{ disabled: page === 1 }"><button class="page-link" @click="prevPage">‹</button></li>
+            <li class="page-item" v-for="n in totalPages" :key="n" :class="{ active: page === n }"><button class="page-link" @click="goPage(n)">{{ n }}</button></li>
+            <li class="page-item" :class="{ disabled: page === totalPages }"><button class="page-link" @click="nextPage">›</button></li>
+          </ul>
+        </nav>
       </div>
     </div>
   </div>
@@ -187,19 +177,21 @@ const headerInfo = ref(null);
 const hasSearched = ref(false);
 
 // Pagination
-const currentPage = ref(1);
-const itemsPerPage = ref(100);
+const page = ref(1);
+const pageSize = ref(100);
 
-const paginatedRows = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage.value;
-  const end = start + itemsPerPage.value;
-  return rows.value.slice(start, end);
+const totalCount = computed(() => rows.value.length);
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
+const startIndex = computed(() => (page.value - 1) * pageSize.value);
+
+const pagedRows = computed(() => {
+  return rows.value.slice(startIndex.value, startIndex.value + pageSize.value);
 });
 
 const groupedRows = computed(() => {
-  if (!paginatedRows.value.length) return [];
+  if (!pagedRows.value.length) return [];
   const groups = {};
-  paginatedRows.value.forEach(row => {
+  pagedRows.value.forEach(row => {
     if (!groups[row.groupDate]) {
       groups[row.groupDate] = [];
     }
@@ -211,9 +203,14 @@ const groupedRows = computed(() => {
   }));
 });
 
-const totalPages = computed(() => {
-  return Math.ceil(rows.value.length / itemsPerPage.value);
-});
+function goPage(n) {
+  if (n >= 1 && n <= totalPages.value) {
+    page.value = n;
+  }
+}
+
+function prevPage() { goPage(page.value - 1); }
+function nextPage() { goPage(page.value + 1); }
 
 onMounted(async () => {
   // Set default dates (Last 7 Days)
