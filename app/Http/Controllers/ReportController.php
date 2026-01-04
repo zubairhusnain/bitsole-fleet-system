@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\ReportService;
 use App\Models\Devices;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ReportController extends Controller
 {
@@ -82,21 +83,25 @@ class ReportController extends Controller
 
     public function assetActivity(Request $request)
     {
-        $request->validate([
-            'from_date' => 'required|date',
-            'to_date' => 'required|date|after_or_equal:from_date',
-        ]);
+        try {
+            $request->validate([
+                'from_date' => 'required|date',
+                'to_date' => 'required|date|after_or_equal:from_date',
+            ]);
 
-        // Limit date range to 31 days to prevent server overload
-        $from = \Carbon\Carbon::parse($request->from_date);
-        $to = \Carbon\Carbon::parse($request->to_date);
-        if ($from->diffInDays($to) > 31) {
-            return response()->json(['message' => 'Date range cannot exceed 31 days.'], 422);
+            $from = \Carbon\Carbon::parse($request->from_date);
+            $to = \Carbon\Carbon::parse($request->to_date);
+            if ($from->diffInDays($to) > 31) {
+                return response()->json(['message' => 'Date range cannot exceed 31 days.'], 422);
+            }
+
+            $deviceIds = $this->getDeviceIds($request);
+            if (empty($deviceIds)) return response()->json([]);
+            return $this->reportService->fetchAssetActivity($request, $deviceIds);
+        } catch (\Throwable $e) {
+            Log::error('assetActivity failed', ['error' => $e->getMessage()]);
+            return response()->json([]);
         }
-
-        $deviceIds = $this->getDeviceIds($request);
-        if (empty($deviceIds)) return response()->json([]);
-        return $this->reportService->fetchAssetActivity($request, $deviceIds);
     }
 
     public function deviceOptions(Request $request)

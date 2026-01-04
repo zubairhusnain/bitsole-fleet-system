@@ -1179,7 +1179,7 @@ class ReportService
         // Chunk device IDs to avoid URL length issues or API limits
         // 40 devices * ~15 chars = ~600 chars query string, safe for most servers
         $chunks = array_chunk($deviceIds, 40);
-
+        
         try {
             $responses = Http::pool(function (Pool $pool) use ($chunks, $baseUrl, $headers, $from, $to) {
                 $requests = [];
