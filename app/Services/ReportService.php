@@ -1182,13 +1182,30 @@ class ReportService
         ];
 
         // Sequential processing with smaller chunks to save memory
-        // Reduced to 5 to prevent Guzzle/PHP memory exhaustion on large datasets
-        $chunks = array_chunk($deviceIds, 5);
+        // Process 1 device at a time to minimize peak memory usage
+        $chunks = array_chunk($deviceIds, 1);
 
         $allRows = [];
         $singleDeviceName = 'Unknown';
 
+        // Safety limits
+        $maxRows = 20000;
+        $memoryThreshold = 0.9; // Stop if 90% of memory limit is reached
+
         foreach ($chunks as $chunkIds) {
+            // Check memory usage
+            $limit = $this->getMemoryLimitBytes();
+            if ($limit > 0 && memory_get_usage(true) > ($limit * $memoryThreshold)) {
+                Log::warning('AssetActivity: Memory limit approaching, stopping processing early.');
+                break;
+            }
+
+            // Check row count
+            if (count($allRows) >= $maxRows) {
+                 Log::warning('AssetActivity: Row limit reached, stopping processing early.');
+                 break;
+            }
+
             try {
                 $deviceParams = [];
                 foreach ($chunkIds as $id) {
@@ -1295,6 +1312,11 @@ class ReportService
 
                 unset($routeData, $eventsData, $summaryData, $responses);
 
+                // Force garbage collection
+                if (function_exists('gc_collect_cycles')) {
+                    gc_collect_cycles();
+                }
+
             } catch (\Throwable $e) {
                 Log::error('fetchAssetActivity chunk exception', ['error' => $e->getMessage()]);
             }
@@ -1342,6 +1364,26 @@ class ReportService
             'header' => $header,
             'rows' => $allRows
         ];
+    }
+
+    private function getMemoryLimitBytes()
+    {
+        $limit = ini_get('memory_limit');
+        if ($limit === '-1') {
+            return -1;
+        }
+        $val = trim($limit);
+        $last = strtolower($val[strlen($val)-1]);
+        $val = (int)$val;
+        switch($last) {
+            case 'g':
+                $val *= 1024;
+            case 'm':
+                $val *= 1024;
+            case 'k':
+                $val *= 1024;
+        }
+        return $val;
     }
 
     private function formatEventDescription($event)
