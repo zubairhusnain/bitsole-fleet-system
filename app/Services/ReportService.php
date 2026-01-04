@@ -1158,7 +1158,9 @@ class ReportService
     public function fetchAssetActivity($request, $deviceIds)
     {
         // Increase memory limit for this heavy report
-        ini_set('memory_limit', '512M');
+        // Set to 1024M to handle large JSON responses from Traccar
+        ini_set('memory_limit', '1024M');
+        set_time_limit(300); // 5 minutes timeout
 
         $sessionId = $request->user()->traccarSession ?? session('cookie');
 
@@ -1180,7 +1182,8 @@ class ReportService
         ];
 
         // Sequential processing with smaller chunks to save memory
-        $chunks = array_chunk($deviceIds, 20);
+        // Reduced to 5 to prevent Guzzle/PHP memory exhaustion on large datasets
+        $chunks = array_chunk($deviceIds, 5);
 
         $allRows = [];
         $singleDeviceName = 'Unknown';
