@@ -148,7 +148,7 @@
           </table>
         </div>
       </div>
-      <div class="card-footer d-flex align-items-center py-2" v-if="rows.length">
+      <div class="card-footer d-flex align-items-center py-2">
         <div class="text-muted small me-auto">Showing {{ startIndex + 1 }} to {{ Math.min(startIndex + pageSize, totalCount) }} of {{ totalCount }} results</div>
         <nav aria-label="Pagination" class="ms-auto">
           <ul class="pagination pagination-sm mb-0 pagination-app">
@@ -203,14 +203,9 @@ const groupedRows = computed(() => {
   }));
 });
 
-function goPage(n) {
-  if (n >= 1 && n <= totalPages.value) {
-    page.value = n;
-  }
-}
-
-function prevPage() { goPage(page.value - 1); }
-function nextPage() { goPage(page.value + 1); }
+function goPage(n) { page.value = n; }
+function prevPage() { if (page.value > 1) page.value--; }
+function nextPage() { if (page.value < totalPages.value) page.value++; }
 
 onMounted(async () => {
   // Set default dates (Last 7 Days)
