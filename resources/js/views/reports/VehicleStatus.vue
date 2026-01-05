@@ -318,6 +318,91 @@ const downloadCSV = async () => {
     }
 };
 
+const downloadPDF = async () => {
+    try {
+        const params = {
+            vehicle_id: selectedVehicleId.value,
+            group_id: selectedGroupId.value,
+            per_page: 999999
+        };
+        const { data } = await axios.get('/web/reports/vehicle-status', { params });
+        const list = Array.isArray(data) ? data : (data.data ?? []);
+        const rows = processVehicleData(list);
+
+        const headers = [
+            'Vehicle ID', 'Owner', 'Type/Model', 'Device Model', 'IMEI', 'ICCID',
+            'Odometer', 'Power', 'Last Report', 'Longitude', 'Latitude', 'Location',
+            'Speed', 'GPS Signal', 'Ignition', 'Last Ignition On', 'Last Ignition Off', 'Activation Date'
+        ];
+
+        let tableHtml = `
+            <html>
+            <head>
+                <title>Vehicle Status Report</title>
+                <style>
+                    body { font-family: sans-serif; font-size: 10px; margin: 20px; }
+                    h2 { text-align: center; margin-bottom: 20px; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                    th, td { border: 1px solid #ddd; padding: 6px; text-align: left; vertical-align: middle; }
+                    th { background-color: #f2f2f2; font-weight: bold; }
+                    tr:nth-child(even) { background-color: #f9f9f9; }
+                    .header-info { margin-bottom: 20px; font-size: 12px; }
+                </style>
+            </head>
+            <body>
+                <h2>Vehicle Status Report</h2>
+                <div class="header-info">
+                    <strong>Date:</strong> ${new Date().toLocaleString()}<br>
+                    <strong>Total Vehicles:</strong> ${rows.length}
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            ${headers.map(h => `<th>${h}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(r => `
+                            <tr>
+                                <td>${r.vehicle_id}</td>
+                                <td>${r.owner}</td>
+                                <td>${r.type_model}</td>
+                                <td>${r.device_model}</td>
+                                <td>${r.imei}</td>
+                                <td>${r.iccid}</td>
+                                <td>${r.odometer}</td>
+                                <td>${r.power}</td>
+                                <td>${r.last_report}</td>
+                                <td>${r.longitude}</td>
+                                <td>${r.latitude}</td>
+                                <td>${r.location}</td>
+                                <td>${r.speed}</td>
+                                <td>${r.gps_signal}</td>
+                                <td>${r.ignition ? 'ON' : 'OFF'}</td>
+                                <td>${r.last_ignition_on}</td>
+                                <td>${r.last_ignition_off}</td>
+                                <td>${r.activation_date}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                <script>
+                    window.onload = function() { window.print(); window.close(); }
+                <\/script>
+            </body>
+            </html>
+        `;
+
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(tableHtml);
+        printWindow.document.close();
+
+    } catch (e) {
+        console.error('PDF Export failed:', e);
+        alert('PDF Export failed. Please try again.');
+    }
+};
+
 // Fetch Data
 const fetchVehicles = async () => {
     if (selectedFormat.value === 'Excel') {
