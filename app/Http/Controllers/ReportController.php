@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\ReportService;
 use App\Models\Devices;
+use App\Models\TcGroup;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -33,10 +34,18 @@ class ReportController extends Controller
         } else {
             $query = Devices::accessibleByUser($user);
         }
-        
+
         // Filter by specific vehicle if provided
         if ($request->filled('vehicle_id')) {
             $query->where('device_id', $request->vehicle_id);
+        }
+
+        // Filter by group if provided
+        if ($request->filled('group_id')) {
+            $groupId = $request->group_id;
+            $query->whereHas('tcDevice', function($q) use ($groupId) {
+                $q->where('groupid', $groupId);
+            });
         }
 
         // Eager load tcDevice and its current position
@@ -44,7 +53,7 @@ class ReportController extends Controller
 
         // Pagination or fetch all
         $perPage = $request->input('per_page', 25);
-        
+
         $devices = $query->orderByDesc('id')->paginate($perPage);
 
         // Fetch last ignition events for these devices
@@ -81,7 +90,7 @@ class ReportController extends Controller
                 return $device;
             });
         }
-        
+
         return $devices;
     }
 
@@ -217,6 +226,37 @@ class ReportController extends Controller
                 'label' => $label,
             ];
         })->values();
+
+        return response()->json(['options' => $options]);
+    }
+
+    public function groupOptions(Request $request)
+    {
+        $user = $request->user();
+
+        $query = Devices::accessibleByUser($user);
+        $query->with('tcDevice');
+        $devices = $query->get();
+
+        $groupIds = $devices->pluck('tcDevice.groupid')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($groupIds->isEmpty()) {
+            return response()->json(['options' => []]);
+        }
+
+        $groups = TcGroup::whereIn('id', $groupIds)
+            ->orderBy('name')
+            ->get();
+
+        $options = $groups->map(function($g) {
+            return [
+                'id' => $g->id,
+                'name' => $g->name,
+            ];
+        });
 
         return response()->json(['options' => $options]);
     }

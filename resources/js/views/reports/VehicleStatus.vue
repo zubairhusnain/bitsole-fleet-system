@@ -20,22 +20,22 @@
                     {{ opt.label }}
                 </option>
             </select>
-          </div> 
+          </div>
           <div class="col-12 col-md-4">
             <label class="form-label small">Group</label>
-            <select class="form-select">
-              <option>-- Select Group --</option>
-              <option>Group A</option>
-              <option>Group B</option>
+            <select class="form-select" v-model="selectedGroupId">
+              <option value="">-- All Groups --</option>
+              <option v-for="grp in groupOptions" :key="grp.id" :value="grp.id">
+                {{ grp.name }}
+              </option>
             </select>
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label small">Report Format</label>
-            <select class="form-select">
-              <option>-- Report Format --</option>
-              <option>Website</option>
-              <option>Excel</option>
-              <option>PDF</option>
+            <select class="form-select" v-model="selectedFormat">
+              <option value="Website">Website</option>
+              <option value="Excel">Excel</option>
+              <option value="PDF">PDF</option>
             </select>
           </div>
           <div class="col-12 col-md-1 text-md-end">
@@ -134,13 +134,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { formatTelemetry } from '../../utils/telemetry';
 
 const vehicles = ref([]);
 const vehicleOptions = ref([]);
+const groupOptions = ref([]);
 const selectedVehicleId = ref('');
+const selectedGroupId = ref('');
+const selectedFormat = ref('Website');
 const loading = ref(true);
 const currentPage = ref(1);
 const itemsPerPage = 16;
@@ -167,9 +170,13 @@ const formatDate = (dateStr) => {
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
-    const hours = String(d.getHours()).padStart(2, '0');
+    let hours = d.getHours();
     const minutes = String(d.getMinutes()).padStart(2, '0');
-    return `${day}/${month}/${year} - ${hours}:${minutes}`;
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    const strHours = String(hours).padStart(2, '0');
+    return `${day}/${month}/${year} - ${strHours}:${minutes} ${ampm}`;
 };
 
 const getSignalStatus = (sat) => {
@@ -181,18 +188,148 @@ const getSignalStatus = (sat) => {
     return 'Weak';
 };
 
+// Fetch Groups
+const fetchGroups = async () => {
+    try {
+        const { data } = await axios.get('/web/reports/group-options');
+        groupOptions.value = data.options || [];
+    } catch (e) {
+        console.error(e);
+    }
+};
+
 // Fetch Options
 const fetchOptions = async () => {
     try {
-        const { data } = await axios.get('/web/reports/device-options');
+        const params = {};
+        if (selectedGroupId.value) params.group_id = selectedGroupId.value;
+        const { data } = await axios.get('/web/reports/device-options', { params });
         vehicleOptions.value = data.options || [];
     } catch (e) {
         console.error(e);
     }
 };
 
+watch(selectedGroupId, () => {
+    selectedVehicleId.value = '';
+    fetchOptions();
+});
+
+const processVehicleData = (list) => {
+    return list.map(v => {
+        const tc = v.tc_device || v.tcDevice || {};
+        const pos = tc.position || {};
+        const attrs = parseAttrs(pos.attributes);
+        const deviceAttrs = parseAttrs(tc.attributes);
+        const vehicleAttrs = parseAttrs(v.attributes);
+
+        // Merge: Device < Vehicle < Position (Standard Traccar/Laravel precedence)
+        const mergedAttrs = { ...deviceAttrs, ...vehicleAttrs, ...attrs };
+        const tel = formatTelemetry(mergedAttrs, { protocol: null, model: tc.model, preferNamedOdometer: true });
+
+        const vehicleId = deviceAttrs.vehicleNo || deviceAttrs.vehicle_id || deviceAttrs.vehicleId || deviceAttrs.vehicleID || null;
+
+        // Speed logic aligned with Vehicle List
+        const speedAttr = pickAttr(mergedAttrs, ['speedKmh', 'speed_kmh', 'speedKmH', 'speed', 'speedKMH']);
+        let speedVal = (typeof pos.speed === 'number' ? Math.round(pos.speed * 1.852) : pos.speed) ?? v.speed ?? speedAttr;
+        let speed = '0 km/h';
+        if (speedVal != null) {
+            if (typeof speedVal === 'string' && /km\/h/i.test(speedVal)) {
+                speed = speedVal;
+            } else {
+                const n = Number(speedVal);
+                speed = Number.isFinite(n) ? `${Math.round(n)} km/h` : String(speedVal);
+            }
+        }
+
+        // Location logic aligned with Vehicle List
+        let coords = null;
+        if (pos.latitude && pos.longitude) {
+            coords = `${parseFloat(pos.latitude).toFixed(5)}, ${parseFloat(pos.longitude).toFixed(5)}`;
+        }
+        const location = pos.address || v.location || pickAttr(mergedAttrs, ['address', 'location']) || coords || 'N/A';
+
+        // Ignition logic
+        const ignRaw = mergedAttrs.ignition ?? v.ignition;
+        const ignition = ignRaw === true || ignRaw === 1 || String(ignRaw).toLowerCase() === 'on';
+
+        return {
+            id: v.device_id || v.id,
+            vehicle_id: vehicleId || tc.name || v.name || 'Unknown',
+            owner: v.manager ? v.manager.name : (v.group || 'N/A'),
+            type_model: `${deviceAttrs.type || ''} ${tc.model || ''}`.trim() || 'N/A',
+            device_model: tc.model || 'N/A',
+            imei: tc.uniqueid || 'N/A',
+            iccid: deviceAttrs.iccid || 'N/A',
+            odometer: tel?.odometer?.display || '0 km',
+            power: ignition ? 'On' : 'Off', // Mapping Power to Ignition status as common fallback
+            last_report: formatDate(pos.servertime || pos.fixtime),
+            longitude: pos.longitude ? parseFloat(pos.longitude).toFixed(5) : 'N/A',
+            latitude: pos.latitude ? parseFloat(pos.latitude).toFixed(5) : 'N/A',
+            location: location,
+            speed: speed,
+            gps_signal: getSignalStatus(mergedAttrs.sat || pos.attributes?.sat),
+            ignition: ignition,
+            last_ignition_on: formatDate(v.last_ignition_on),
+            last_ignition_off: formatDate(v.last_ignition_off),
+            activation_date: formatDate(v.created_at)
+        };
+    });
+};
+
+const downloadCSV = async () => {
+    try {
+        const params = {
+            vehicle_id: selectedVehicleId.value,
+            group_id: selectedGroupId.value,
+            per_page: 999999
+        };
+        const { data } = await axios.get('/web/reports/vehicle-status', { params });
+        const list = Array.isArray(data) ? data : (data.data ?? []);
+        const rows = processVehicleData(list);
+
+        const headers = [
+            'Vehicle ID', 'Owner', 'Type/Model', 'Device Model', 'IMEI', 'ICCID',
+            'Odometer', 'Power', 'Last Report', 'Longitude', 'Latitude', 'Location',
+            'Speed', 'GPS Signal', 'Ignition', 'Last Ignition On', 'Last Ignition Off', 'Activation Date'
+        ];
+
+        const csvRows = [headers.join(',')];
+
+        rows.forEach(r => {
+            const vals = [
+                r.vehicle_id, r.owner, r.type_model, r.device_model, r.imei, r.iccid,
+                r.odometer, r.power, r.last_report, r.longitude, r.latitude,
+                `"${(r.location || '').replace(/"/g, '""')}"`, // Escape quotes
+                r.speed, r.gps_signal, r.ignition ? 'ON' : 'OFF', r.last_ignition_on, r.last_ignition_off, r.activation_date
+            ];
+            csvRows.push(vals.join(','));
+        });
+
+        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Vehicle_Status_Report_${new Date().toISOString().slice(0,10)}.csv`;
+        link.click();
+
+    } catch (e) {
+        console.error('Export failed:', e);
+        alert('Export failed. Please try again.');
+    }
+};
+
 // Fetch Data
 const fetchVehicles = async () => {
+    if (selectedFormat.value === 'Excel') {
+        downloadCSV();
+        return;
+    }
+    if (selectedFormat.value === 'PDF') {
+        // Simple print for PDF export
+        setTimeout(() => window.print(), 500);
+        return;
+    }
+
     loading.value = true;
     currentPage.value = 1;
     try {
@@ -200,69 +337,14 @@ const fetchVehicles = async () => {
         if (selectedVehicleId.value) {
             params.vehicle_id = selectedVehicleId.value;
         }
+        if (selectedGroupId.value) {
+            params.group_id = selectedGroupId.value;
+        }
 
         const { data } = await axios.get('/web/reports/vehicle-status', { params });
         const list = Array.isArray(data) ? data : (data.data ?? []);
 
-        vehicles.value = list.map(v => {
-            const tc = v.tc_device || v.tcDevice || {};
-            const pos = tc.position || {};
-            const attrs = parseAttrs(pos.attributes);
-            const deviceAttrs = parseAttrs(tc.attributes);
-            const vehicleAttrs = parseAttrs(v.attributes);
-
-            // Merge: Device < Vehicle < Position (Standard Traccar/Laravel precedence)
-            const mergedAttrs = { ...deviceAttrs, ...vehicleAttrs, ...attrs };
-            const tel = formatTelemetry(mergedAttrs, { protocol: null, model: tc.model, preferNamedOdometer: true });
-
-            const vehicleId = deviceAttrs.vehicleNo || deviceAttrs.vehicle_id || deviceAttrs.vehicleId || deviceAttrs.vehicleID || null;
-
-            // Speed logic aligned with Vehicle List
-            const speedAttr = pickAttr(mergedAttrs, ['speedKmh', 'speed_kmh', 'speedKmH', 'speed', 'speedKMH']);
-            let speedVal = (typeof pos.speed === 'number' ? Math.round(pos.speed * 1.852) : pos.speed) ?? v.speed ?? speedAttr;
-            let speed = '0 km/h';
-            if (speedVal != null) {
-                if (typeof speedVal === 'string' && /km\/h/i.test(speedVal)) {
-                    speed = speedVal;
-                } else {
-                    const n = Number(speedVal);
-                    speed = Number.isFinite(n) ? `${Math.round(n)} km/h` : String(speedVal);
-                }
-            }
-
-            // Location logic aligned with Vehicle List
-            let coords = null;
-            if (pos.latitude && pos.longitude) {
-                coords = `${parseFloat(pos.latitude).toFixed(5)}, ${parseFloat(pos.longitude).toFixed(5)}`;
-            }
-            const location = pos.address || v.location || pickAttr(mergedAttrs, ['address', 'location']) || coords || 'N/A';
-
-            // Ignition logic
-            const ignRaw = mergedAttrs.ignition ?? v.ignition;
-            const ignition = ignRaw === true || ignRaw === 1 || String(ignRaw).toLowerCase() === 'on';
-
-            return {
-                id: v.device_id || v.id,
-                vehicle_id: vehicleId || tc.name || v.name || 'Unknown',
-                owner: v.manager ? v.manager.name : (v.group || 'N/A'),
-                type_model: `${deviceAttrs.type || ''} ${tc.model || ''}`.trim() || 'N/A',
-                device_model: tc.model || 'N/A',
-                imei: tc.uniqueid || 'N/A',
-                iccid: deviceAttrs.iccid || 'N/A',
-                odometer: tel?.odometer?.display || '0 km',
-                power: ignition ? 'On' : 'Off', // Mapping Power to Ignition status as common fallback
-                last_report: formatDate(pos.servertime || pos.fixtime),
-                longitude: pos.longitude ? parseFloat(pos.longitude).toFixed(5) : 'N/A',
-                latitude: pos.latitude ? parseFloat(pos.latitude).toFixed(5) : 'N/A',
-                location: location,
-                speed: speed,
-                gps_signal: getSignalStatus(mergedAttrs.sat || pos.attributes?.sat),
-                ignition: ignition,
-                last_ignition_on: formatDate(v.last_ignition_on),
-                last_ignition_off: formatDate(v.last_ignition_off),
-                activation_date: formatDate(v.created_at)
-            };
-        });
+        vehicles.value = processVehicleData(list);
     } catch (err) {
         console.error("Failed to fetch vehicles", err);
     } finally {
@@ -308,6 +390,7 @@ const changePage = (page) => {
 };
 
 onMounted(() => {
+    fetchGroups();
     fetchOptions();
     fetchVehicles();
 });
