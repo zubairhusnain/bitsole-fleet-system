@@ -81,38 +81,47 @@ class ReportService
         $monthlySpeedData = array_fill_keys($months, ['total' => 0, 'count' => 0]);
 
         // ------------------------------------------------------------------ 4) Aggregate TRIPS (distance, fuel, avg speed)
-        foreach ($trips as $trip) {
-            if (empty($trip['startTime']))
-                continue;
+        $aggregated = collect($trips)->reduce(function ($acc, $trip) use ($months) {
+            if (empty($trip['startTime'])) return $acc;
 
             $monthKey = $months[date('n', strtotime($trip['startTime'])) - 1];
 
             // Distance (m → km)
-            if (isset($trip['distance']))
-                $monthlyDistance[$monthKey] += round($trip['distance'] / 1000, 1);
+            if (isset($trip['distance'])) {
+                $acc['distance'][$monthKey] += round($trip['distance'] / 1000, 1);
+            }
 
             // Fuel spent
             $startFuel = data_get($trip, 'start.attributes.fuel', 0);
             $endFuel = data_get($trip, 'end.attributes.fuel', 0);
             if ($startFuel && $endFuel && $startFuel >= $endFuel) {
-                $monthlyFuel[$monthKey] += round($startFuel - $endFuel, 1);
+                $acc['fuel'][$monthKey] += round($startFuel - $endFuel, 1);
             }
 
             // Average speed (knots → km/h)
             // Filter out unrealistic speeds (> 162 knots approx 300 km/h)
             if (isset($trip['averageSpeed']) && $trip['averageSpeed'] <= 162) {
-                $monthlySpeedData[$monthKey]['total'] += $trip['averageSpeed'] * 1.852;
-                $monthlySpeedData[$monthKey]['count'] += 1;
+                $acc['speed'][$monthKey]['total'] += $trip['averageSpeed'] * 1.852;
+                $acc['speed'][$monthKey]['count'] += 1;
             }
-        }
+
+            return $acc;
+        }, [
+            'distance' => $monthlyDistance,
+            'fuel' => $monthlyFuel,
+            'speed' => $monthlySpeedData
+        ]);
+
+        $monthlyDistance = $aggregated['distance'];
+        $monthlyFuel = $aggregated['fuel'];
+        $monthlySpeedData = $aggregated['speed'];
 
         // Compute monthly avg speed
-        $monthlyAvgSpeed = [];
-        foreach ($months as $m) {
+        $monthlyAvgSpeed = collect($months)->mapWithKeys(function ($m) use ($monthlySpeedData) {
             $total = $monthlySpeedData[$m]['total'];
             $cnt = $monthlySpeedData[$m]['count'] ?: 1;
-            $monthlyAvgSpeed[$m] = round($total / $cnt, 1);
-        }
+            return [$m => round($total / $cnt, 1)];
+        })->all();
 
         // ------------------------------------------------------------------ 5) Build Chart.js‑like payload
         $chart = [
@@ -250,13 +259,8 @@ class ReportService
         $days = max(1, round($diff / (60 * 60 * 24)));
 
         // Build query string with multiple deviceId params
-        $queryParams = [];
-        foreach ($deviceIds as $id) {
-            $queryParams[] = "deviceId={$id}";
-        }
-        $deviceQuery = implode('&', $queryParams);
+        // We will chunk requests to avoid URL length limits and improve parallelism
         $commonQuery = "from={$from}&to={$to}";
-        $fullQuery = "{$deviceQuery}&{$commonQuery}";
 
         $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
         if (empty($baseUrl)) {
@@ -272,13 +276,25 @@ class ReportService
             'Content-Type' => 'application/json'
         ];
 
+        // Chunk size of 20 devices per request group
+        $chunks = array_chunk($deviceIds, 20);
+
         try {
-            // Execute requests in parallel using HTTP Pool
-            $responses = Http::pool(fn (Pool $pool) => [
-                $pool->as('summary')->withHeaders($headers)->get("{$baseUrl}/api/reports/summary?{$fullQuery}"),
-                $pool->as('stops')->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
-                $pool->as('events')->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$fullQuery}&type=" . urlencode($eventTypes)),
-            ]);
+            // Execute requests in parallel using HTTP Pool for all chunks
+            $responses = Http::pool(function (Pool $pool) use ($chunks, $baseUrl, $headers, $commonQuery, $eventTypes) {
+                $poolRequests = [];
+                foreach ($chunks as $index => $chunkIds) {
+                    $deviceQuery = collect($chunkIds)->map(function($id) {
+                        return "deviceId={$id}";
+                    })->implode('&');
+                    $fullQuery = "{$deviceQuery}&{$commonQuery}";
+
+                    $poolRequests[] = $pool->as("summary_{$index}")->withHeaders($headers)->get("{$baseUrl}/api/reports/summary?{$fullQuery}");
+                    $poolRequests[] = $pool->as("stops_{$index}")->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}");
+                    $poolRequests[] = $pool->as("events_{$index}")->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$fullQuery}&type=" . urlencode($eventTypes));
+                }
+                return $poolRequests;
+            });
         } catch (\Exception $e) {
             Log::error('ReportService: Failed to fetch fleet summary', [
                 'error' => $e->getMessage(),
@@ -287,25 +303,32 @@ class ReportService
             return [];
         }
 
-        // Debug logging
-        foreach ($responses as $key => $response) {
-            if ($response instanceof \Illuminate\Http\Client\Response && !$response->ok()) {
-                Log::error("ReportService API Error [{$key}]", [
-                    'url' => "{$baseUrl}/api/reports/{$key}",
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                    'query' => $fullQuery
-                ]);
+        // Aggregate results
+        $allSummary = [];
+        $allStops = [];
+        $allEvents = [];
+
+        foreach ($chunks as $index => $chunkIds) {
+            $summaryRes = $responses["summary_{$index}"] ?? null;
+            $stopsRes = $responses["stops_{$index}"] ?? null;
+            $eventsRes = $responses["events_{$index}"] ?? null;
+
+            if ($summaryRes instanceof \Illuminate\Http\Client\Response) {
+                if ($summaryRes->ok()) {
+                    $allSummary = array_merge($allSummary, $summaryRes->json());
+                } else {
+                    Log::error("ReportService API Error [summary_{$index}]", ['status' => $summaryRes->status(), 'body' => $summaryRes->body()]);
+                }
+            }
+
+            if ($stopsRes instanceof \Illuminate\Http\Client\Response && $stopsRes->ok()) {
+                $allStops = array_merge($allStops, $stopsRes->json());
+            }
+
+            if ($eventsRes instanceof \Illuminate\Http\Client\Response && $eventsRes->ok()) {
+                $allEvents = array_merge($allEvents, $eventsRes->json());
             }
         }
-
-        $summaryRes = $responses['summary'] ?? null;
-        $stopsRes = $responses['stops'] ?? null;
-        $eventsRes = $responses['events'] ?? null;
-
-        $allSummary = ($summaryRes instanceof \Illuminate\Http\Client\Response && $summaryRes->ok()) ? $summaryRes->json() : [];
-        $allStops = ($stopsRes instanceof \Illuminate\Http\Client\Response && $stopsRes->ok()) ? $stopsRes->json() : [];
-        $allEvents = ($eventsRes instanceof \Illuminate\Http\Client\Response && $eventsRes->ok()) ? $eventsRes->json() : [];
 
         // Group data by deviceId
         $stopsByDevice = collect($allStops)->groupBy('deviceId');
@@ -357,13 +380,9 @@ class ReportService
 
             // Refills
             $refills = $deviceEvents->where('type', 'fuelIncrease');
-            $refillTotal = 0;
-            foreach ($refills as $refill) {
-                $attrs = $refill['attributes'] ?? [];
-                if (isset($attrs['amount'])) {
-                    $refillTotal += $attrs['amount'];
-                }
-            }
+            $refillTotal = $refills->sum(function ($refill) {
+                return $refill['attributes']['amount'] ?? 0;
+            });
             $refillCount = $refills->count();
 
             $rawAvgSpeed = $item['averageSpeed'] ?? 0;
@@ -406,11 +425,9 @@ class ReportService
         }
         $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
 
-        $queryParams = [];
-        foreach ($deviceIds as $id) {
-            $queryParams[] = "deviceId={$id}";
-        }
-        $deviceQuery = implode('&', $queryParams);
+        $deviceQuery = collect($deviceIds)->map(function($id) {
+            return "deviceId={$id}";
+        })->implode('&');
         $fullQuery = "{$deviceQuery}&from={$from}&to={$to}";
 
         $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
@@ -485,16 +502,14 @@ class ReportService
         }
 
         // Fuel (if available in trip attributes)
-        $totalFuel = 0;
-        foreach ($allTrips as $trip) {
+        $totalFuel = collect($allTrips)->sum(function ($trip) {
             $startFuel = data_get($trip, 'start.attributes.fuel', 0);
             $endFuel = data_get($trip, 'end.attributes.fuel', 0);
              if ($startFuel && $endFuel && $startFuel >= $endFuel) {
-                $totalFuel += ($startFuel - $endFuel);
-            } else {
-                 $totalFuel += data_get($trip, 'spentFuel', 0);
+                return $startFuel - $endFuel;
             }
-        }
+            return data_get($trip, 'spentFuel', 0);
+        });
 
         return [
             'rows' => $rows,
@@ -520,11 +535,9 @@ class ReportService
         }
         $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
 
-        $queryParams = [];
-        foreach ($deviceIds as $id) {
-            $queryParams[] = "deviceId={$id}";
-        }
-        $deviceQuery = implode('&', $queryParams);
+        $deviceQuery = collect($deviceIds)->map(function($id) {
+            return "deviceId={$id}";
+        })->implode('&');
         $fullQuery = "{$deviceQuery}&from={$from}&to={$to}";
 
         $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
@@ -664,11 +677,9 @@ class ReportService
         }
         $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
 
-        $queryParams = [];
-        foreach ($deviceIds as $id) {
-            $queryParams[] = "deviceId={$id}";
-        }
-        $deviceQuery = implode('&', $queryParams);
+        $deviceQuery = collect($deviceIds)->map(function($id) {
+            return "deviceId={$id}";
+        })->implode('&');
         $fullQuery = "{$deviceQuery}&from={$from}&to={$to}";
 
         $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
@@ -804,9 +815,9 @@ class ReportService
         }
         $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
 
-        $queryParams = [];
-        foreach ($deviceIds as $id) { $queryParams[] = "deviceId={$id}"; }
-        $deviceQuery = implode('&', $queryParams);
+        $deviceQuery = collect($deviceIds)->map(function($id) {
+            return "deviceId={$id}";
+        })->implode('&');
         $fullQuery = "{$deviceQuery}&from={$from}&to={$to}";
 
         $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
@@ -876,20 +887,15 @@ class ReportService
                 if ($r['deviceId'] != $deviceId) return false;
                 $rTime = strtotime($r['fixTime']);
                 // Check if point belongs to any trip in this day
-                foreach ($dayTrips as $trip) {
+                return $dayTrips->contains(function($trip) use ($rTime) {
                     $start = strtotime($trip['startTime']);
                     $end = strtotime($trip['endTime']);
-                    if ($rTime >= $start && $rTime <= $end) {
-                        return true;
-                    }
-                }
-                return false;
+                    return $rTime >= $start && $rTime <= $end;
+                });
             });
 
             // Build timeline
-            $timeline = [];
-
-            foreach ($dayTrips as $trip) {
+            $tripTimeline = $dayTrips->flatMap(function($trip) use ($dayEvents) {
                 $durMs = $trip['duration'] ?? 0;
                 $durSec = floor($durMs / 1000);
                 $h = floor($durSec / 3600);
@@ -916,31 +922,34 @@ class ReportService
                 if ($hbCount > 0) $badges[] = "$hbCount HB";
                 $alertBadge = implode(', ', $badges);
 
-                $timeline[] = [
-                    'time_sort' => $tripStart,
-                    'time' => date('h:i A', $tripStart),
-                    'location' => $trip['startAddress'] ?? '',
-                    'dist' => round(($trip['distance'] ?? 0)/1000, 2) . 'KM',
-                    'dur' => $durStr,
-                    'alert' => $alertBadge,
-                    'type' => 'start',
-                    'lat' => $trip['startLat'] ?? 0,
-                    'lon' => $trip['startLon'] ?? 0
+                return [
+                    [
+                        'time_sort' => $tripStart,
+                        'time' => date('h:i A', $tripStart),
+                        'location' => $trip['startAddress'] ?? '',
+                        'dist' => round(($trip['distance'] ?? 0)/1000, 2) . 'KM',
+                        'dur' => $durStr,
+                        'alert' => $alertBadge,
+                        'type' => 'start',
+                        'lat' => $trip['startLat'] ?? 0,
+                        'lon' => $trip['startLon'] ?? 0
+                    ],
+                    [
+                        'time_sort' => $tripEnd,
+                        'time' => date('h:i A', $tripEnd),
+                        'location' => $trip['endAddress'] ?? '',
+                        'type' => 'end',
+                        'lat' => $trip['endLat'] ?? 0,
+                        'lon' => $trip['endLon'] ?? 0
+                    ]
                 ];
-                $timeline[] = [
-                    'time_sort' => $tripEnd,
-                    'time' => date('h:i A', $tripEnd),
-                    'location' => $trip['endAddress'] ?? '',
-                    'type' => 'end',
-                    'lat' => $trip['endLat'] ?? 0,
-                    'lon' => $trip['endLon'] ?? 0
-                ];
-            }
+            });
+
 
             // Events (Hidden in list, visible on map)
-            foreach ($dayEvents as $event) {
-                if ($event['type'] == 'deviceOnline' || $event['type'] == 'deviceOffline') continue;
-
+            $eventTimeline = $dayEvents->filter(function($event) {
+                return !in_array($event['type'], ['deviceOnline', 'deviceOffline']);
+            })->map(function($event) use ($dayRoutes) {
                 $eventTs = strtotime($event['eventTime']);
                 $closest = $dayRoutes->sortBy(function($r) use ($eventTs) {
                     return abs(strtotime($r['fixTime']) - $eventTs);
@@ -955,7 +964,7 @@ class ReportService
                 if ($event['type'] == 'harshAcceleration') $friendlyName = 'Harsh Acceleration';
                 if ($event['type'] == 'harshBraking') $friendlyName = 'Harsh Braking';
 
-                $timeline[] = [
+                return [
                     'time_sort' => $eventTs,
                     'time' => date('h:i A', $eventTs),
                     'location' => $addr,
@@ -965,12 +974,12 @@ class ReportService
                     'lon' => $lon,
                     'hidden' => true
                 ];
-            }
+            });
 
             // Stops
-            foreach ($dayStops as $stop) {
+            $stopTimeline = $dayStops->map(function($stop) {
                 $stopTs = strtotime($stop['startTime']);
-                $timeline[] = [
+                return [
                     'time_sort' => $stopTs,
                     'time' => date('h:i A', $stopTs),
                     'location' => $stop['address'] ?? '',
@@ -978,12 +987,14 @@ class ReportService
                     'lat' => $stop['latitude'] ?? 0,
                     'lon' => $stop['longitude'] ?? 0
                 ];
-            }
-
-            // Sort timeline
-            usort($timeline, function($a, $b) {
-                return $a['time_sort'] <=> $b['time_sort'];
             });
+
+            // Merge and Sort
+            $timeline = $tripTimeline->merge($eventTimeline)
+                ->merge($stopTimeline)
+                ->sortBy('time_sort')
+                ->values()
+                ->all();
 
             // Route points
             $routePoints = $dayRoutes->map(function($r) {
@@ -1085,18 +1096,15 @@ class ReportService
         }
         // dd($events);
         // Format events data
-        $formattedEvents = [];
-        if (is_array($events)) {
-            foreach ($events as $event) {
-                $formattedEvents[] = [
-                    'eventTime' => $event->eventTime ?? $event->serverTime ?? date('Y-m-d H:i:s'),
-                    'deviceName' => $deviceName->device_modal ?? 'Unknown Device',
-                    'type' => $event->type ?? 'unknown',
-                    'description' => $this->formatEventDescription($event),
-                    'attributes' => $event->attributes ?? null
-                ];
-            }
-        }
+        $formattedEvents = collect($events)->map(function ($event) use ($deviceName) {
+            return [
+                'eventTime' => $event->eventTime ?? $event->serverTime ?? date('Y-m-d H:i:s'),
+                'deviceName' => $deviceName->device_modal ?? 'Unknown Device',
+                'type' => $event->type ?? 'unknown',
+                'description' => $this->formatEventDescription($event),
+                'attributes' => $event->attributes ?? null
+            ];
+        })->all();
 
         return $formattedEvents;
     }
@@ -1140,18 +1148,15 @@ class ReportService
         }
         // dd($events);
         // Format events data
-        $formattedEvents = [];
-        if (is_array($events)) {
-            foreach ($events as $event) {
-                $formattedEvents[] = [
-                    'eventTime' => $event->eventTime ?? $event->serverTime ?? date('Y-m-d H:i:s'),
-                    'deviceName' => $deviceName->device_modal ?? 'Unknown Device',
-                    'type' => $event->type ?? 'unknown',
-                    'description' => $this->formatEventDescription($event),
-                    'attributes' => $event->attributes ?? null
-                ];
-            }
-        }
+        $formattedEvents = collect($events)->map(function ($event) use ($deviceName) {
+            return [
+                'eventTime' => $event->eventTime ?? $event->serverTime ?? date('Y-m-d H:i:s'),
+                'deviceName' => $deviceName->device_modal ?? 'Unknown Device',
+                'type' => $event->type ?? 'unknown',
+                'description' => $this->formatEventDescription($event),
+                'attributes' => $event->attributes ?? null
+            ];
+        })->all();
 
         return $formattedEvents;
     }

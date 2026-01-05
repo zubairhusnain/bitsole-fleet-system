@@ -342,6 +342,7 @@ const isTestingMode = ref(false);
 const isLocalMode = ref(false);
 provide('isTestingMode', isTestingMode);
 
+
 const checkTestingMode = () => {
     // Check for environment variable configuration
     const envTestingMode = import.meta.env.VITE_TESTING_MODE;
