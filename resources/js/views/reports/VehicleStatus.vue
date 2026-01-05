@@ -59,18 +59,49 @@
                 <th>ICCID</th>
                 <th>Odometer</th>
                 <th>Power</th>
+                <th>Last Report</th>
+                <th>Longitude</th>
+                <th>Latitude</th>
+                <th>Location</th>
+                <th>Speed</th>
+                <th>GPS Signal</th>
+                <th>Ignition</th>
+                <th>Last Ignition On</th>
+                <th>Last Ignition Off</th>
+                <th>Activation Date</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="row in rows" :key="row.id">
-                <td>{{ row.id }}</td>
+                <td>{{ row.vehicle_id }}</td>
                 <td>{{ row.owner }}</td>
-                <td>{{ row.type }}</td>
-                <td>{{ row.device }}</td>
+                <td>{{ row.type_model }}</td>
+                <td>{{ row.device_model }}</td>
                 <td>{{ row.imei }}</td>
                 <td>{{ row.iccid }}</td>
-                <td>{{ row.odo }}</td>
-                <td class="text-primary">{{ row.power }}</td>
+                <td>{{ row.odometer }}</td>
+                <td>
+                  <span class="badge" :class="row.power === 'On' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'">
+                    {{ row.power }}
+                  </span>
+                </td>
+                <td>{{ row.last_report }}</td>
+                <td>{{ row.longitude }}</td>
+                <td>{{ row.latitude }}</td>
+                <td>{{ row.location }}</td>
+                <td>{{ row.speed }}</td>
+                <td>
+                  <i class="bi bi-broadcast me-1" :class="{'text-success': row.gps_signal === 'Good', 'text-warning': row.gps_signal === 'Fair', 'text-danger': row.gps_signal === 'Weak'}"></i>
+                  {{ row.gps_signal }}
+                </td>
+                <td>
+                  <span class="badge" :class="row.ignition ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'">
+                    {{ row.ignition ? 'ON' : 'OFF' }}
+                  </span>
+                </td>
+                <td>{{ row.last_ignition_on }}</td>
+                <td>{{ row.last_ignition_off }}</td>
+                <td>{{ row.activation_date }}</td>
               </tr>
             </tbody>
           </table>
@@ -98,14 +129,174 @@
 import { ref } from 'vue';
 
 const rows = ref([
-  { id: 'VHCL-1001', owner: 'AMT - Sime Darby Rent A Car S...', type: 'MPV • STARIA 2.2V', device: 'FMC130', imei: '864292044667001', iccid: '8960012002723151361', odo: '181,141', power: '13.4V' },
-  { id: 'VHCL-1002', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry 2.5V', device: 'FMC130', imei: '864292044667002', iccid: '8960012002723151362', odo: '154,230', power: '13.6V' },
-  { id: 'VHCL-1003', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry', device: 'FMC130', imei: '864292044667003', iccid: '8960012002723151363', odo: '120,450', power: '13.8V' },
-  { id: 'VHCL-1004', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry 2.5V', device: 'FMC130', imei: '864292044667004', iccid: '8960012002723151364', odo: '198,700', power: '14.0V' },
-  { id: 'VHCL-1005', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry', device: 'FMC130', imei: '864292044667005', iccid: '8960012002723151365', odo: '165,890', power: '14.4V' },
-  { id: 'VHCL-1006', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry', device: 'FMC130', imei: '864292044667006', iccid: '8960012002723151366', odo: '142,300', power: '14.6V' },
-  { id: 'VHCL-1007', owner: 'AMT - Sime Darby Rent A Car S...', type: 'MPV • STARIA 2.2V', device: 'FMC130', imei: '864292044667007', iccid: '8960012002723151367', odo: '175,600', power: '13.9V' },
-  { id: 'VHCL-1008', owner: 'AMT - Sime Darby Rent A Car S...', type: 'CAR • Camry', device: 'FMC130', imei: '864292044667008', iccid: '8960012002723151368', odo: '133,450', power: '14.1V' },
+  {
+    id: 1,
+    vehicle_id: 'VHCL-1001',
+    owner: 'John Doe',
+    type_model: 'Toyota Camry',
+    device_model: 'FMB120',
+    imei: '865432045678901',
+    iccid: '8986012345678901234',
+    odometer: '12,345 km',
+    power: 'On',
+    last_report: '25/08/2025 - 18:00',
+    longitude: '101.71032',
+    latitude: '3.13032',
+    location: 'PLAZA OSK',
+    speed: '0 km/h',
+    gps_signal: 'Fair',
+    ignition: true,
+    last_ignition_on: '25/08/2025 - 18:00',
+    last_ignition_off: '25/08/2025 - 18:00',
+    activation_date: '01/01/2024'
+  },
+  {
+    id: 2,
+    vehicle_id: 'VHCL-1002',
+    owner: 'Jane Smith',
+    type_model: 'Honda Civic',
+    device_model: 'FMB120',
+    imei: '865432045678902',
+    iccid: '8986012345678901235',
+    odometer: '5,678 km',
+    power: 'On',
+    last_report: '25/08/2025 - 18:00',
+    longitude: '101.71032',
+    latitude: '3.13032',
+    location: 'LORONG LOKE YEW JALAN LOK...',
+    speed: '0 km/h',
+    gps_signal: 'Good',
+    ignition: false,
+    last_ignition_on: '25/08/2025 - 18:00',
+    last_ignition_off: '25/08/2025 - 18:00',
+    activation_date: '15/02/2024'
+  },
+  {
+    id: 3,
+    vehicle_id: 'VHCL-1003',
+    owner: 'Logistics Corp',
+    type_model: 'Isuzu Elf',
+    device_model: 'FMB120',
+    imei: '865432045678903',
+    iccid: '8986012345678901236',
+    odometer: '45,000 km',
+    power: 'Off',
+    last_report: '25/08/2025 - 18:00',
+    longitude: '101.71032',
+    latitude: '3.13032',
+    location: 'LORONG LOKE YEW JALAN LOK...',
+    speed: '0 km/h',
+    gps_signal: 'Good',
+    ignition: false,
+    last_ignition_on: '25/08/2025 - 18:00',
+    last_ignition_off: '25/08/2025 - 18:00',
+    activation_date: '10/03/2024'
+  },
+  {
+    id: 4,
+    vehicle_id: 'VHCL-1004',
+    owner: 'Transport Ltd',
+    type_model: 'Scania R500',
+    device_model: 'FMB120',
+    imei: '865432045678904',
+    iccid: '8986012345678901237',
+    odometer: '120,500 km',
+    power: 'On',
+    last_report: '25/08/2025 - 18:00',
+    longitude: '101.71032',
+    latitude: '3.13032',
+    location: 'MEGAN PHILEO PROMENADE B...',
+    speed: '0 km/h',
+    gps_signal: 'Weak',
+    ignition: true,
+    last_ignition_on: '25/08/2025 - 18:00',
+    last_ignition_off: '25/08/2025 - 18:00',
+    activation_date: '20/04/2024'
+  },
+  {
+    id: 5,
+    vehicle_id: 'VHCL-1005',
+    owner: 'John Doe',
+    type_model: 'Toyota Camry',
+    device_model: 'FMB120',
+    imei: '865432045678905',
+    iccid: '8986012345678901238',
+    odometer: '15,000 km',
+    power: 'On',
+    last_report: '25/08/2025 - 18:00',
+    longitude: '101.71032',
+    latitude: '3.13032',
+    location: 'PLAZA OSK',
+    speed: '0 km/h',
+    gps_signal: 'Fair',
+    ignition: false,
+    last_ignition_on: '25/08/2025 - 18:00',
+    last_ignition_off: '25/08/2025 - 18:00',
+    activation_date: '05/05/2024'
+  },
+  {
+    id: 6,
+    vehicle_id: 'VHCL-1006',
+    owner: 'City Taxi',
+    type_model: 'Proton Saga',
+    device_model: 'FMB120',
+    imei: '865432045678906',
+    iccid: '8986012345678901239',
+    odometer: '30,000 km',
+    power: 'On',
+    last_report: '25/08/2025 - 18:00',
+    longitude: '101.71032',
+    latitude: '3.13032',
+    location: 'JALAN CTA 2, KUALA LUMPUR I...',
+    speed: '0 km/h',
+    gps_signal: 'Good',
+    ignition: true,
+    last_ignition_on: '25/08/2025 - 18:00',
+    last_ignition_off: '25/08/2025 - 18:00',
+    activation_date: '12/06/2024'
+  },
+  {
+    id: 7,
+    vehicle_id: 'VHCL-1007',
+    owner: 'Jane Smith',
+    type_model: 'Honda Civic',
+    device_model: 'FMB120',
+    imei: '865432045678907',
+    iccid: '8986012345678901240',
+    odometer: '8,000 km',
+    power: 'Off',
+    last_report: '25/08/2025 - 18:00',
+    longitude: '101.71032',
+    latitude: '3.13032',
+    location: 'GAMBANG R&R W TO E',
+    speed: '0 km/h',
+    gps_signal: 'Weak',
+    ignition: false,
+    last_ignition_on: '25/08/2025 - 18:00',
+    last_ignition_off: '25/08/2025 - 18:00',
+    activation_date: '25/07/2024'
+  },
+  {
+    id: 8,
+    vehicle_id: 'VHCL-1008',
+    owner: 'John Doe',
+    type_model: 'Toyota Camry',
+    device_model: 'FMB120',
+    imei: '865432045678908',
+    iccid: '8986012345678901241',
+    odometer: '20,000 km',
+    power: 'On',
+    last_report: '25/08/2025 - 18:00',
+    longitude: '101.71032',
+    latitude: '3.13032',
+    location: 'PLAZA OSK',
+    speed: '0 km/h',
+    gps_signal: 'Fair',
+    ignition: true,
+    last_ignition_on: '25/08/2025 - 18:00',
+    last_ignition_off: '25/08/2025 - 18:00',
+    activation_date: '30/08/2024'
+  },
 ]);
 </script>
 
@@ -115,4 +306,5 @@ tbody tr td { font-size: 13px; }
 .panel .card-body { padding-top: 1rem; padding-bottom: 1rem; }
 .card-header h6 { font-weight: 600; }
 .table-striped tbody tr:nth-of-type(odd) { --bs-table-accent-bg: #f8f9fb; }
+.badge { font-weight: 500; font-size: 0.75rem; }
 </style>
