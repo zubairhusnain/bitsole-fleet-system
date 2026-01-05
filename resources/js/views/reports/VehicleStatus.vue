@@ -152,6 +152,14 @@ const parseAttrs = (a) => {
     try { return JSON.parse(a); } catch { return {}; }
 };
 
+const pickAttr = (attrs, keys) => {
+    for (const k of keys) {
+        const val = attrs?.[k];
+        if (val !== undefined && val !== null && val !== '') return val;
+    }
+    return null;
+};
+
 const formatDate = (dateStr) => {
     if (!dateStr || dateStr === 'N/A') return 'N/A';
     const d = new Date(dateStr);
