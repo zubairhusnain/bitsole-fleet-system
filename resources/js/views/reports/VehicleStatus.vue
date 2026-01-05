@@ -14,11 +14,11 @@
         <div class="row g-3 align-items-end">
           <div class="col-12 col-md-4">
             <label class="form-label small">Vehicle</label>
-            <select class="form-select">
-              <option>--Select an Vehicle--</option>
-              <option>VHCL-1001</option>
-              <option>VHCL-1002</option>
-              <option>VHCL-1003</option>
+            <select class="form-select" v-model="selectedVehicleId">
+                <option value="">-- All Vehicles --</option>
+                <option v-for="opt in vehicleOptions" :key="opt.id" :value="opt.deviceId">
+                    {{ opt.label }}
+                </option>
             </select>
           </div>
           <div class="col-12 col-md-4">
@@ -39,7 +39,7 @@
             </select>
           </div>
           <div class="col-12 col-md-1 text-md-end">
-            <button class="btn btn-app-dark w-100">Submit</button>
+            <button class="btn btn-app-dark w-100" @click="fetchVehicles">Submit</button>
           </div>
         </div>
       </div>
@@ -72,7 +72,13 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in rows" :key="row.id">
+              <tr v-if="loading">
+                 <td colspan="18" class="text-center py-4">Loading...</td>
+              </tr>
+              <tr v-else-if="paginatedVehicles.length === 0">
+                 <td colspan="18" class="text-center py-4">No vehicles found</td>
+              </tr>
+              <tr v-else v-for="row in paginatedVehicles" :key="row.id">
                 <td>{{ row.vehicle_id }}</td>
                 <td>{{ row.owner }}</td>
                 <td>{{ row.type_model }}</td>
@@ -108,16 +114,18 @@
         </div>
       </div>
       <div class="card-footer d-flex align-items-center py-2">
-        <div class="text-muted small me-auto">Showing 1 to 16 of 1079 results</div>
+        <div class="text-muted small me-auto">Showing {{ paginationStart }} to {{ paginationEnd }} of {{ filteredVehicles.length }} results</div>
         <nav aria-label="Pagination" class="ms-auto">
           <ul class="pagination pagination-sm mb-0 pagination-app">
-            <li class="page-item disabled"><button class="page-link">‹</button></li>
-            <li class="page-item active"><button class="page-link">1</button></li>
-            <li class="page-item"><button class="page-link">2</button></li>
-            <li class="page-item"><button class="page-link">3</button></li>
-            <li class="page-item"><button class="page-link">4</button></li>
-            <li class="page-item"><button class="page-link">5</button></li>
-            <li class="page-item"><button class="page-link">›</button></li>
+            <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                <button class="page-link" @click="changePage(currentPage - 1)">‹</button>
+            </li>
+            <li class="page-item" v-for="page in visiblePages" :key="page" :class="{ active: currentPage === page }">
+                <button class="page-link" @click="changePage(page)">{{ page }}</button>
+            </li>
+            <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                <button class="page-link" @click="changePage(currentPage + 1)">›</button>
+            </li>
           </ul>
         </nav>
       </div>
@@ -126,183 +134,150 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import axios from 'axios';
 
-const rows = ref([
-  {
-    id: 1,
-    vehicle_id: 'VHCL-1001',
-    owner: 'John Doe',
-    type_model: 'Toyota Camry',
-    device_model: 'FMB120',
-    imei: '865432045678901',
-    iccid: '8986012345678901234',
-    odometer: '12,345 km',
-    power: 'On',
-    last_report: '25/08/2025 - 18:00',
-    longitude: '101.71032',
-    latitude: '3.13032',
-    location: 'PLAZA OSK',
-    speed: '0 km/h',
-    gps_signal: 'Fair',
-    ignition: true,
-    last_ignition_on: '25/08/2025 - 18:00',
-    last_ignition_off: '25/08/2025 - 18:00',
-    activation_date: '01/01/2024'
-  },
-  {
-    id: 2,
-    vehicle_id: 'VHCL-1002',
-    owner: 'Jane Smith',
-    type_model: 'Honda Civic',
-    device_model: 'FMB120',
-    imei: '865432045678902',
-    iccid: '8986012345678901235',
-    odometer: '5,678 km',
-    power: 'On',
-    last_report: '25/08/2025 - 18:00',
-    longitude: '101.71032',
-    latitude: '3.13032',
-    location: 'LORONG LOKE YEW JALAN LOK...',
-    speed: '0 km/h',
-    gps_signal: 'Good',
-    ignition: false,
-    last_ignition_on: '25/08/2025 - 18:00',
-    last_ignition_off: '25/08/2025 - 18:00',
-    activation_date: '15/02/2024'
-  },
-  {
-    id: 3,
-    vehicle_id: 'VHCL-1003',
-    owner: 'Logistics Corp',
-    type_model: 'Isuzu Elf',
-    device_model: 'FMB120',
-    imei: '865432045678903',
-    iccid: '8986012345678901236',
-    odometer: '45,000 km',
-    power: 'Off',
-    last_report: '25/08/2025 - 18:00',
-    longitude: '101.71032',
-    latitude: '3.13032',
-    location: 'LORONG LOKE YEW JALAN LOK...',
-    speed: '0 km/h',
-    gps_signal: 'Good',
-    ignition: false,
-    last_ignition_on: '25/08/2025 - 18:00',
-    last_ignition_off: '25/08/2025 - 18:00',
-    activation_date: '10/03/2024'
-  },
-  {
-    id: 4,
-    vehicle_id: 'VHCL-1004',
-    owner: 'Transport Ltd',
-    type_model: 'Scania R500',
-    device_model: 'FMB120',
-    imei: '865432045678904',
-    iccid: '8986012345678901237',
-    odometer: '120,500 km',
-    power: 'On',
-    last_report: '25/08/2025 - 18:00',
-    longitude: '101.71032',
-    latitude: '3.13032',
-    location: 'MEGAN PHILEO PROMENADE B...',
-    speed: '0 km/h',
-    gps_signal: 'Weak',
-    ignition: true,
-    last_ignition_on: '25/08/2025 - 18:00',
-    last_ignition_off: '25/08/2025 - 18:00',
-    activation_date: '20/04/2024'
-  },
-  {
-    id: 5,
-    vehicle_id: 'VHCL-1005',
-    owner: 'John Doe',
-    type_model: 'Toyota Camry',
-    device_model: 'FMB120',
-    imei: '865432045678905',
-    iccid: '8986012345678901238',
-    odometer: '15,000 km',
-    power: 'On',
-    last_report: '25/08/2025 - 18:00',
-    longitude: '101.71032',
-    latitude: '3.13032',
-    location: 'PLAZA OSK',
-    speed: '0 km/h',
-    gps_signal: 'Fair',
-    ignition: false,
-    last_ignition_on: '25/08/2025 - 18:00',
-    last_ignition_off: '25/08/2025 - 18:00',
-    activation_date: '05/05/2024'
-  },
-  {
-    id: 6,
-    vehicle_id: 'VHCL-1006',
-    owner: 'City Taxi',
-    type_model: 'Proton Saga',
-    device_model: 'FMB120',
-    imei: '865432045678906',
-    iccid: '8986012345678901239',
-    odometer: '30,000 km',
-    power: 'On',
-    last_report: '25/08/2025 - 18:00',
-    longitude: '101.71032',
-    latitude: '3.13032',
-    location: 'JALAN CTA 2, KUALA LUMPUR I...',
-    speed: '0 km/h',
-    gps_signal: 'Good',
-    ignition: true,
-    last_ignition_on: '25/08/2025 - 18:00',
-    last_ignition_off: '25/08/2025 - 18:00',
-    activation_date: '12/06/2024'
-  },
-  {
-    id: 7,
-    vehicle_id: 'VHCL-1007',
-    owner: 'Jane Smith',
-    type_model: 'Honda Civic',
-    device_model: 'FMB120',
-    imei: '865432045678907',
-    iccid: '8986012345678901240',
-    odometer: '8,000 km',
-    power: 'Off',
-    last_report: '25/08/2025 - 18:00',
-    longitude: '101.71032',
-    latitude: '3.13032',
-    location: 'GAMBANG R&R W TO E',
-    speed: '0 km/h',
-    gps_signal: 'Weak',
-    ignition: false,
-    last_ignition_on: '25/08/2025 - 18:00',
-    last_ignition_off: '25/08/2025 - 18:00',
-    activation_date: '25/07/2024'
-  },
-  {
-    id: 8,
-    vehicle_id: 'VHCL-1008',
-    owner: 'John Doe',
-    type_model: 'Toyota Camry',
-    device_model: 'FMB120',
-    imei: '865432045678908',
-    iccid: '8986012345678901241',
-    odometer: '20,000 km',
-    power: 'On',
-    last_report: '25/08/2025 - 18:00',
-    longitude: '101.71032',
-    latitude: '3.13032',
-    location: 'PLAZA OSK',
-    speed: '0 km/h',
-    gps_signal: 'Fair',
-    ignition: true,
-    last_ignition_on: '25/08/2025 - 18:00',
-    last_ignition_off: '25/08/2025 - 18:00',
-    activation_date: '30/08/2024'
-  },
-]);
+const vehicles = ref([]);
+const vehicleOptions = ref([]);
+const selectedVehicleId = ref('');
+const loading = ref(true);
+const currentPage = ref(1);
+const itemsPerPage = 16;
+
+// Helper functions
+const parseAttrs = (a) => {
+    if (!a) return {};
+    if (typeof a === 'object') return a;
+    try { return JSON.parse(a); } catch { return {}; }
+};
+
+const formatDate = (dateStr) => {
+    if (!dateStr || dateStr === 'N/A') return 'N/A';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'N/A';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year} - ${hours}:${minutes}`;
+};
+
+const getSignalStatus = (sat) => {
+    if (!sat) return 'Weak';
+    const n = parseInt(sat);
+    if (isNaN(n)) return 'Weak';
+    if (n >= 7) return 'Good';
+    if (n >= 4) return 'Fair';
+    return 'Weak';
+};
+
+// Fetch Options
+const fetchOptions = async () => {
+    try {
+        const { data } = await axios.get('/web/reports/device-options');
+        vehicleOptions.value = data.options || [];
+    } catch (e) {
+        console.error(e);
+    }
+};
+
+// Fetch Data
+const fetchVehicles = async () => {
+    loading.value = true;
+    currentPage.value = 1;
+    try {
+        const params = { per_page: 500 };
+        if (selectedVehicleId.value) {
+            params.vehicle_id = selectedVehicleId.value;
+        }
+        
+        const { data } = await axios.get('/web/reports/vehicle-status', { params });
+        const list = Array.isArray(data) ? data : (data.data ?? []);
+
+        vehicles.value = list.map(v => {
+            const tc = v.tc_device || v.tcDevice || {};
+            const pos = tc.position || {};
+            const attrs = parseAttrs(pos.attributes);
+            const deviceAttrs = parseAttrs(tc.attributes);
+
+            const vehicleId = deviceAttrs.vehicleNo || deviceAttrs.vehicle_id || deviceAttrs.vehicleId || deviceAttrs.vehicleID || null;
+
+            return {
+                id: v.device_id || v.id,
+                vehicle_id: vehicleId || tc.name || v.name || 'Unknown',
+                owner: v.manager ? v.manager.name : (v.group || 'N/A'),
+                type_model: `${deviceAttrs.type || ''} ${tc.model || ''}`.trim() || 'N/A',
+                device_model: tc.model || 'N/A',
+                imei: tc.uniqueid || 'N/A',
+                iccid: deviceAttrs.iccid || 'N/A',
+                odometer: attrs.odometer ? (Number(attrs.odometer) / 1000).toFixed(0) + ' km' : '0 km',
+                power: attrs.ignition ? 'On' : 'Off',
+                last_report: formatDate(pos.servertime || pos.fixtime),
+                longitude: pos.longitude ? parseFloat(pos.longitude).toFixed(5) : 'N/A',
+                latitude: pos.latitude ? parseFloat(pos.latitude).toFixed(5) : 'N/A',
+                location: pos.address || 'N/A',
+                speed: pos.speed != null ? Number((parseFloat(pos.speed) * 1.852).toFixed(1)) + ' km/h' : '0 km/h',
+                gps_signal: getSignalStatus(attrs.sat),
+                ignition: attrs.ignition || false,
+                last_ignition_on: formatDate(v.last_ignition_on),
+                last_ignition_off: formatDate(v.last_ignition_off),
+                activation_date: formatDate(v.created_at)
+            };
+        });
+    } catch (err) {
+        console.error("Failed to fetch vehicles", err);
+    } finally {
+        loading.value = false;
+    }
+};
+
+// Computed
+const filteredVehicles = computed(() => {
+    return vehicles.value;
+});
+
+const totalPages = computed(() => Math.ceil(filteredVehicles.value.length / itemsPerPage));
+
+const paginatedVehicles = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredVehicles.value.slice(start, end);
+});
+
+const visiblePages = computed(() => {
+    const pages = [];
+    const total = totalPages.value;
+    const current = currentPage.value;
+    let startPage = Math.max(1, current - 2);
+    let endPage = Math.min(total, startPage + 4);
+    if (endPage - startPage < 4) {
+        startPage = Math.max(1, endPage - 4);
+    }
+    for (let i = startPage; i <= endPage; i++) {
+        if (i > 0) pages.push(i);
+    }
+    return pages;
+});
+
+const paginationStart = computed(() => filteredVehicles.value.length === 0 ? 0 : (currentPage.value - 1) * itemsPerPage + 1);
+const paginationEnd = computed(() => Math.min(currentPage.value * itemsPerPage, filteredVehicles.value.length));
+
+const changePage = (page) => {
+    if (page >= 1 && page <= totalPages.value) {
+        currentPage.value = page;
+    }
+};
+
+onMounted(() => {
+    fetchOptions();
+    fetchVehicles();
+});
 </script>
 
 <style scoped>
-thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; }
-tbody tr td { font-size: 13px; }
+thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; white-space: nowrap; padding: 10px 20px; }
+tbody tr td { font-size: 13px; white-space: nowrap; padding: 10px 20px; }
 .panel .card-body { padding-top: 1rem; padding-bottom: 1rem; }
 .card-header h6 { font-weight: 600; }
 .table-striped tbody tr:nth-of-type(odd) { --bs-table-accent-bg: #f8f9fb; }

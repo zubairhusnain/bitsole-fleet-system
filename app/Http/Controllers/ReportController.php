@@ -6,6 +6,7 @@ use App\Services\ReportService;
 use App\Models\Devices;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
@@ -17,6 +18,71 @@ class ReportController extends Controller
     public function __construct(\App\Services\ReportService $reportService)
     {
         $this->reportService = $reportService;
+    }
+
+    public function vehicleStatus(Request $request)
+    {
+        $user = $request->user();
+
+        // Apply role-based access control
+        if ($request->boolean('mine')) {
+            $query = Devices::accessibleByUser($user);
+            $query->whereHas('users', function($q) use ($user) {
+                $q->where('users.id', $user->id);
+            });
+        } else {
+            $query = Devices::accessibleByUser($user);
+        }
+        
+        // Filter by specific vehicle if provided
+        if ($request->filled('vehicle_id')) {
+            $query->where('device_id', $request->vehicle_id);
+        }
+
+        // Eager load tcDevice and its current position
+        $query->with(['tcDevice.position', 'manager']);
+
+        // Pagination or fetch all
+        $perPage = $request->input('per_page', 25);
+        
+        $devices = $query->orderByDesc('id')->paginate($perPage);
+
+        // Fetch last ignition events for these devices
+        $deviceIds = $devices->pluck('device_id')->unique()->values()->all();
+
+        if (!empty($deviceIds)) {
+            $ignitionEvents = DB::connection('pgsql')
+                ->table('tc_events')
+                ->select('deviceid', 'type', DB::raw('MAX(eventtime) as last_time'))
+                ->whereIn('deviceid', $deviceIds)
+                ->whereIn('type', ['ignitionOn', 'ignitionOff'])
+                ->groupBy('deviceid', 'type')
+                ->get();
+
+            $ignitionTimes = [];
+            foreach ($ignitionEvents as $evt) {
+                $ignitionTimes[$evt->deviceid][$evt->type] = $evt->last_time;
+            }
+
+            // Helper for date formatting
+            $formatDate = function ($dateStr) {
+                if (!$dateStr) return null;
+                return date('d/m/Y-H:i', strtotime($dateStr));
+            };
+
+            // Enrich the devices collection
+            $devices->getCollection()->transform(function ($device) use ($ignitionTimes, $formatDate) {
+                $ignOnTime = $ignitionTimes[$device->device_id]['ignitionOn'] ?? null;
+                $ignOffTime = $ignitionTimes[$device->device_id]['ignitionOff'] ?? null;
+
+                $device->last_ignition_on = $ignOnTime ? $formatDate($ignOnTime) : null;
+                $device->last_ignition_off = $ignOffTime ? $formatDate($ignOffTime) : null;
+
+                return $device;
+            });
+        }
+        
+        return $devices;
     }
 
     public function tripSummary(Request $request)
