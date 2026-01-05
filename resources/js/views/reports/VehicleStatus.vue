@@ -20,7 +20,7 @@
                     {{ opt.label }}
                 </option>
             </select>
-          </div>
+          </div> 
           <div class="col-12 col-md-4">
             <label class="form-label small">Group</label>
             <select class="form-select">
@@ -136,6 +136,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
+import { formatTelemetry } from '../../utils/telemetry';
 
 const vehicles = ref([]);
 const vehicleOptions = ref([]);
@@ -191,7 +192,7 @@ const fetchVehicles = async () => {
         if (selectedVehicleId.value) {
             params.vehicle_id = selectedVehicleId.value;
         }
-        
+
         const { data } = await axios.get('/web/reports/vehicle-status', { params });
         const list = Array.isArray(data) ? data : (data.data ?? []);
 
@@ -200,8 +201,37 @@ const fetchVehicles = async () => {
             const pos = tc.position || {};
             const attrs = parseAttrs(pos.attributes);
             const deviceAttrs = parseAttrs(tc.attributes);
+            const vehicleAttrs = parseAttrs(v.attributes);
+
+            // Merge: Device < Vehicle < Position (Standard Traccar/Laravel precedence)
+            const mergedAttrs = { ...deviceAttrs, ...vehicleAttrs, ...attrs };
+            const tel = formatTelemetry(mergedAttrs, { protocol: null, model: tc.model, preferNamedOdometer: true });
 
             const vehicleId = deviceAttrs.vehicleNo || deviceAttrs.vehicle_id || deviceAttrs.vehicleId || deviceAttrs.vehicleID || null;
+
+            // Speed logic aligned with Vehicle List
+            const speedAttr = pickAttr(mergedAttrs, ['speedKmh', 'speed_kmh', 'speedKmH', 'speed', 'speedKMH']);
+            let speedVal = (typeof pos.speed === 'number' ? Math.round(pos.speed * 1.852) : pos.speed) ?? v.speed ?? speedAttr;
+            let speed = '0 km/h';
+            if (speedVal != null) {
+                if (typeof speedVal === 'string' && /km\/h/i.test(speedVal)) {
+                    speed = speedVal;
+                } else {
+                    const n = Number(speedVal);
+                    speed = Number.isFinite(n) ? `${Math.round(n)} km/h` : String(speedVal);
+                }
+            }
+
+            // Location logic aligned with Vehicle List
+            let coords = null;
+            if (pos.latitude && pos.longitude) {
+                coords = `${parseFloat(pos.latitude).toFixed(5)}, ${parseFloat(pos.longitude).toFixed(5)}`;
+            }
+            const location = pos.address || v.location || pickAttr(mergedAttrs, ['address', 'location']) || coords || 'N/A';
+
+            // Ignition logic
+            const ignRaw = mergedAttrs.ignition ?? v.ignition;
+            const ignition = ignRaw === true || ignRaw === 1 || String(ignRaw).toLowerCase() === 'on';
 
             return {
                 id: v.device_id || v.id,
@@ -211,15 +241,15 @@ const fetchVehicles = async () => {
                 device_model: tc.model || 'N/A',
                 imei: tc.uniqueid || 'N/A',
                 iccid: deviceAttrs.iccid || 'N/A',
-                odometer: attrs.odometer ? (Number(attrs.odometer) / 1000).toFixed(0) + ' km' : '0 km',
-                power: attrs.ignition ? 'On' : 'Off',
+                odometer: tel?.odometer?.display || '0 km',
+                power: ignition ? 'On' : 'Off', // Mapping Power to Ignition status as common fallback
                 last_report: formatDate(pos.servertime || pos.fixtime),
                 longitude: pos.longitude ? parseFloat(pos.longitude).toFixed(5) : 'N/A',
                 latitude: pos.latitude ? parseFloat(pos.latitude).toFixed(5) : 'N/A',
-                location: pos.address || 'N/A',
-                speed: pos.speed != null ? Number((parseFloat(pos.speed) * 1.852).toFixed(1)) + ' km/h' : '0 km/h',
-                gps_signal: getSignalStatus(attrs.sat),
-                ignition: attrs.ignition || false,
+                location: location,
+                speed: speed,
+                gps_signal: getSignalStatus(mergedAttrs.sat || pos.attributes?.sat),
+                ignition: ignition,
                 last_ignition_on: formatDate(v.last_ignition_on),
                 last_ignition_off: formatDate(v.last_ignition_off),
                 activation_date: formatDate(v.created_at)
