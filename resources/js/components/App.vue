@@ -106,7 +106,7 @@
                                 <i class="nav-icon bi bi-car-front"></i>
                                 <p>
                                     Vehicle Management
-                                    <i class="nav-arrow bi bi-chevron-right"></i>
+                                    <i class="bi bi-chevron-right right"></i>
                                 </p>
                             </a>
                             <ul class="nav nav-treeview">
@@ -263,7 +263,7 @@
                                 <i class="nav-icon bi bi-people-fill"></i>
                                 <p>
                                     User Management
-                                    <i class="nav-arrow bi bi-chevron-right"></i>
+                                    <i class="bi bi-chevron-right right"></i>
                                 </p>
                             </a>
                             <ul class="nav nav-treeview">
@@ -351,7 +351,7 @@ const checkTestingMode = () => {
     const rawQ = route.query.testingmode ?? route.query.testingMode;
     const q = rawQ !== null && rawQ !== undefined ? String(rawQ) : null;
 
-    if (envTestingMode === 'true') {
+    if (envTestingMode === 'true') { 
         isTestingMode.value = true;
         isLocalMode.value = true;
     } else if (q === '1') {
@@ -731,4 +731,6 @@ nav a.router-link-exact-active {
 .name-text { color: #0b0f28; }
 .chevron { color: #0b0f28; font-size: 18px; }
 .role-badge { font-size: 10px; line-height: 1; color: #6b7280; border: 1px solid #e5e7eb; border-radius: 999px; padding: 1px 6px; text-transform: capitalize; }
+.app-sidebar .nav-link .nav-icon { margin-right: 0.5rem; }
+.app-sidebar .nav-link p { display: flex; align-items: center; justify-content: space-between; }
 </style>

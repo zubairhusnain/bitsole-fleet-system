@@ -50,7 +50,7 @@
                                 </svg>
                             </div>
                             <div>
-                                <div class="small text-muted">Time</div>
+                                <div class="small text-muted">Last Update</div>
                                 <div class="fw-semibold">{{ lastUpdateDisplay }}</div>
                             </div>
                         </div>
@@ -158,7 +158,7 @@
                                 </svg>
                             </div>
                             <div>
-                                <div class="small text-muted">Device Battery</div>
+                                <div class="small text-muted">Vehicle Battery</div>
                                 <div class="fw-semibold">{{ batteryDisplay }}</div>
                             </div>
                         </div>
@@ -932,10 +932,10 @@ function routingErrorMessage(e) {
     if (typeof msgRaw === 'string' && msgRaw.toLowerCase().includes('failed')) return 'Unable to draw route lines between vehicle and zones.';
     return 'Unable to draw route lines between vehicle and zones.';
 }
- 
+
  function initRouting() {
      if (!mapInstance || typeof L === 'undefined' || !L.Routing || routingControl) return;
- 
+
      try {
         routingControl = L.Routing.control({
             waypoints: [],
@@ -951,12 +951,12 @@ function routingErrorMessage(e) {
 
          const container = routingControl.getContainer();
          if (container) container.style.display = 'none';
- 
+
          // Listen for routing errors
          routingControl.on('routingerror', (e) => {
             error.value = routingErrorMessage(e);
          });
- 
+
          updateRouting();
      } catch (e) {
         error.value = 'Unable to draw route lines between vehicle and zones.';
