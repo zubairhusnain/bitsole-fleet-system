@@ -122,8 +122,8 @@
                   <td>{{ row.location }}</td>
                   <td class="text-center">
                      <a v-if="!row.isEvent" :href="`https://www.google.com/maps?q=${row.lat},${row.lon}`" target="_blank" rel="noopener">
-                       <i class="bi bi-arrow-right text-primary" :style="{ transform: `rotate(${row.direction}deg)`, display: 'inline-block' }"></i>
-                     </a>
+                      <i class="bi bi-arrow-up text-primary" :style="{ transform: `rotate(${row.direction}deg)`, display: 'inline-block' }"></i>
+                    </a>
                   </td>
                   <td>{{ row.speed }}</td>
                   <td>
@@ -208,7 +208,7 @@ const filteredRows = computed(() => {
     r.location.toLowerCase().includes(q)
   );
 });
-
+ 
 const totalPages = computed(() => Math.ceil(filteredRows.value.length / itemsPerPage.value));
 
 const paginatedRows = computed(() => {
