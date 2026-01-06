@@ -2044,64 +2044,29 @@ class ReportService
             $cur = strtotime('+1 day', $cur);
         }
 
-        try {
-            $responses = Http::pool(fn (Pool $pool) => array_merge(
-                // Trips
-                array_map(function($date) use ($pool, $baseUrl, $deviceId, $headers) {
-                    $from = "{$date}T00:00:00Z";
-                    $to = "{$date}T23:59:59Z";
-                    return $pool->as("trips_{$date}")->timeout(300)->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?deviceId={$deviceId}&from={$from}&to={$to}");
-                }, $chunkDates),
-
-                // Stops or Events
-                array_map(function($date) use ($pool, $baseUrl, $deviceId, $headers, $type) {
-                    $from = "{$date}T00:00:00Z";
-                    $to = "{$date}T23:59:59Z";
-                    if ($type === 'Engine Hours') {
-                        return $pool->as("events_{$date}")->timeout(300)->withHeaders($headers)->get("{$baseUrl}/api/reports/events?deviceId={$deviceId}&from={$from}&to={$to}&type=ignitionOn&type=ignitionOff");
-                    } else {
-                        return $pool->as("stops_{$date}")->timeout(300)->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?deviceId={$deviceId}&from={$from}&to={$to}");
-                    }
-                }, $chunkDates)
-            ));
-        } catch (\Exception $e) {
-            Log::error('fetchUtilisationReport exception', ['error' => $e->getMessage()]);
-            $vehicleRec = Devices::accessibleByUser($request->user())->with('tcDevice')->where('device_id', $deviceId)->first();
-
-            $tcDevice = $vehicleRec ? $vehicleRec->tcDevice : null;
-            $uniqueId = $tcDevice ? $tcDevice->uniqueid : $deviceId;
-            $attributes = $tcDevice && $tcDevice->attributes ? $tcDevice->attributes : [];
-            if (is_string($attributes)) $attributes = json_decode($attributes, true);
-
-            $vehicleName = $tcDevice->name ?? 'Unknown';
-            $vehicleNo = $attributes['vehicleNo'] ?? null;
-
-            if ($vehicleNo) {
-                $vehicleIdDisplay = "{$vehicleNo} - {$vehicleName}";
-            } else {
-                $vehicleIdDisplay = $vehicleName;
-            }
-
-            $totalDays = max(1, round((strtotime($toStr) - strtotime($request->from_date)) / (60 * 60 * 24)) + 1);
-            return [
-                'summary' => [
-                    'vehicleIdDisplay' => $vehicleIdDisplay,
-                    'deviceId' => $uniqueId,
-                    'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
-                    'totalDays' => $totalDays
-                ],
-                'rows' => []
-            ];
-        }
-
-        // Process Data (Optimized per-day)
+        // Process Data in Batches
         $engineIntervals = collect([]);
         if ($type === 'Engine Hours') {
+             // For Engine Hours, we fetch ALL events first (chunked to avoid timeout)
+             // We need global events to pair start/end times correctly across batch boundaries
              $allEvents = [];
-             foreach ($chunkDates as $date) {
-                 $eResp = $responses["events_{$date}"] ?? null;
-                 if ($eResp instanceof Response && $eResp->ok()) {
-                     $allEvents = array_merge($allEvents, $eResp->json());
+             $eventChunks = array_chunk($chunkDates, 30);
+             foreach ($eventChunks as $eBatch) {
+                 try {
+                     $eResponses = Http::pool(fn (Pool $pool) => array_map(function($date) use ($pool, $baseUrl, $deviceId, $headers) {
+                        $from = "{$date}T00:00:00Z";
+                        $to = "{$date}T23:59:59Z";
+                        return $pool->as("events_{$date}")->timeout(300)->withHeaders($headers)->get("{$baseUrl}/api/reports/events?deviceId={$deviceId}&from={$from}&to={$to}&type=ignitionOn&type=ignitionOff");
+                     }, $eBatch));
+
+                     foreach ($eBatch as $date) {
+                         $eResp = $eResponses["events_{$date}"] ?? null;
+                         if ($eResp instanceof Response && $eResp->ok()) {
+                             $allEvents = array_merge($allEvents, $eResp->json());
+                         }
+                     }
+                 } catch (\Exception $e) {
+                     Log::error("Failed to fetch event batch starting {$eBatch[0]}", ['error' => $e->getMessage()]);
                  }
              }
 
@@ -2121,111 +2086,163 @@ class ReportService
              }
         }
 
+        $finalRows = collect([]);
+        $foundVehicleName = null;
 
-        $rows = collect($chunkDates)->map(function ($date) use ($responses, $engineIntervals, $type) {
-            $dayStart = strtotime("{$date} 00:00:00");
-            $dayEnd = strtotime("{$date} 23:59:59");
+        // Chunk dates for processing Trips/Stops to save memory and avoid timeouts
+        $dateChunks = array_chunk($chunkDates, 5);
 
-            $tripMs = 0;
-            $idleMs = 0;
-            $distance = 0;
-            $hours = array_fill(0, 24, false);
+        foreach ($dateChunks as $batchDates) {
+            $responses = [];
+            try {
+                $responses = Http::pool(fn (Pool $pool) => array_merge(
+                    // Trips
+                    array_map(function($date) use ($pool, $baseUrl, $deviceId, $headers) {
+                        $from = "{$date}T00:00:00Z";
+                        $to = "{$date}T23:59:59Z";
+                        return $pool->as("trips_{$date}")->timeout(300)->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?deviceId={$deviceId}&from={$from}&to={$to}");
+                    }, $batchDates),
 
-            // Get Trips for this day
-            $tResp = $responses["trips_{$date}"] ?? null;
-            $dayTrips = ($tResp instanceof Response && $tResp->ok()) ? $tResp->json() : [];
+                    // Stops (only if not Engine Hours)
+                    ($type !== 'Engine Hours') ? array_map(function($date) use ($pool, $baseUrl, $deviceId, $headers) {
+                        $from = "{$date}T00:00:00Z";
+                        $to = "{$date}T23:59:59Z";
+                        return $pool->as("stops_{$date}")->timeout(300)->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?deviceId={$deviceId}&from={$from}&to={$to}");
+                    }, $batchDates) : []
+                ));
+            } catch (\Exception $e) {
+                Log::error("Failed to fetch report batch starting {$batchDates[0]}", ['error' => $e->getMessage()]);
+                // If batch fails, we skip processing it (or could add empty rows)
+                // For now, let's continue to next batch
+                // But to preserve report structure, we should probably add empty rows
+                // However, the map below relies on $batchDates, so if responses are missing, it handles it gracefully (empty array)
+            }
 
-            // Process Trips (Movement)
-            foreach ($dayTrips as $t) {
-                $s = strtotime($t['startTime']);
-                $e = strtotime($t['endTime']);
-
-                // Distance: Sum if trip starts on this day (matches legacy behavior)
-                if (strpos($t['startTime'], $date) === 0) {
-                    $distance += $t['distance'] ?? 0;
-                }
-
-                // Overlap
-                $overlapStart = max($s, $dayStart);
-                $overlapEnd = min($e, $dayEnd);
-
-                if ($overlapEnd > $overlapStart) {
-                    $dur = ($overlapEnd - $overlapStart) * 1000;
-                    $tripMs += $dur;
-
-                    if ($type !== 'Engine Hours') {
-                        $sh = (int)date('G', $overlapStart);
-                        $eh = (int)date('G', $overlapEnd);
-                        for ($h = $sh; $h <= $eh; $h++) $hours[$h] = true;
+            // Capture vehicle name from first valid response if not yet found
+            if (!$foundVehicleName) {
+                foreach ($batchDates as $date) {
+                    $tResp = $responses["trips_{$date}"] ?? null;
+                    if ($tResp instanceof Response && $tResp->ok()) {
+                        $first = $tResp->json()[0] ?? null;
+                        if ($first && isset($first['deviceName'])) {
+                            $foundVehicleName = $first['deviceName'];
+                            break;
+                        }
                     }
                 }
             }
 
-            if ($type === 'Engine Hours') {
-                $engineMs = 0;
-                $relevantIntervals = $engineIntervals->filter(function($item) use ($dayStart, $dayEnd) {
-                     $s = strtotime($item['startTime']);
-                     $e = strtotime($item['endTime']);
-                     return $e > $dayStart && $s < $dayEnd;
-                });
+            // Process Rows for this Batch
+            $batchRows = collect($batchDates)->map(function ($date) use ($responses, $engineIntervals, $type) {
+                $dayStart = strtotime("{$date} 00:00:00");
+                $dayEnd = strtotime("{$date} 23:59:59");
 
-                foreach ($relevantIntervals as $item) {
-                     $s = strtotime($item['startTime']);
-                     $e = strtotime($item['endTime']);
+                $tripMs = 0;
+                $idleMs = 0;
+                $distance = 0;
+                $hours = array_fill(0, 24, false);
 
-                     $overlapStart = max($s, $dayStart);
-                     $overlapEnd = min($e, $dayEnd);
-                     if ($overlapEnd > $overlapStart) {
-                         $engineMs += ($overlapEnd - $overlapStart) * 1000;
+                // Get Trips for this day
+                $tResp = $responses["trips_{$date}"] ?? null;
+                $dayTrips = ($tResp instanceof Response && $tResp->ok()) ? $tResp->json() : [];
 
-                         $sh = (int)date('G', $overlapStart);
-                         $eh = (int)date('G', $overlapEnd);
-                         for ($h = $sh; $h <= $eh; $h++) $hours[$h] = true;
-                     }
-                }
+                // Process Trips (Movement)
+                foreach ($dayTrips as $t) {
+                    $s = strtotime($t['startTime']);
+                    $e = strtotime($t['endTime']);
 
-                $idleMs = max(0, $engineMs - $tripMs);
-                $totalMs = $engineMs;
-            } else {
-                $sResp = $responses["stops_{$date}"] ?? null;
-                $dayStops = ($sResp instanceof Response && $sResp->ok()) ? $sResp->json() : [];
+                    // Distance: Sum if trip starts on this day (matches legacy behavior)
+                    if (strpos($t['startTime'], $date) === 0) {
+                        $distance += $t['distance'] ?? 0;
+                    }
 
-                foreach ($dayStops as $stop) {
-                    $s = strtotime($stop['startTime']);
-                    $e = strtotime($stop['endTime']);
-
+                    // Overlap
                     $overlapStart = max($s, $dayStart);
                     $overlapEnd = min($e, $dayEnd);
 
                     if ($overlapEnd > $overlapStart) {
-                        $idleMs += ($overlapEnd - $overlapStart) * 1000;
+                        $dur = ($overlapEnd - $overlapStart) * 1000;
+                        $tripMs += $dur;
+
+                        if ($type !== 'Engine Hours') {
+                            $sh = (int)date('G', $overlapStart);
+                            $eh = (int)date('G', $overlapEnd);
+                            for ($h = $sh; $h <= $eh; $h++) $hours[$h] = true;
+                        }
                     }
                 }
-                $totalMs = $tripMs + $idleMs;
-            }
 
-            $usagePct = $totalMs > 0 ? round(($tripMs / $totalMs) * 100) : 0;
+                if ($type === 'Engine Hours') {
+                    $engineMs = 0;
+                    $relevantIntervals = $engineIntervals->filter(function($item) use ($dayStart, $dayEnd) {
+                         $s = strtotime($item['startTime']);
+                         $e = strtotime($item['endTime']);
+                         return $e > $dayStart && $s < $dayEnd;
+                    });
 
-            $h = floor($tripMs / 3600000);
-            $m = floor(($tripMs % 3600000) / 60000);
-            $moveStr = "{$h} hours {$m} minutes";
+                    foreach ($relevantIntervals as $item) {
+                         $s = strtotime($item['startTime']);
+                         $e = strtotime($item['endTime']);
 
-            $ih = floor($idleMs / 3600000);
-            $im = floor(($idleMs % 3600000) / 60000);
-            $idleStr = "{$ih} hours {$im} minutes";
+                         $overlapStart = max($s, $dayStart);
+                         $overlapEnd = min($e, $dayEnd);
+                         if ($overlapEnd > $overlapStart) {
+                             $engineMs += ($overlapEnd - $overlapStart) * 1000;
 
-            $ts = strtotime($date);
-            $dayLabel = date('d/m/Y l', $ts);
+                             $sh = (int)date('G', $overlapStart);
+                             $eh = (int)date('G', $overlapEnd);
+                             for ($h = $sh; $h <= $eh; $h++) $hours[$h] = true;
+                         }
+                    }
 
-            return [
-                'day' => $dayLabel,
-                'usage' => "{$usagePct}%",
-                'move' => $moveStr,
-                'idle' => $idleStr,
-                'dist' => round($distance / 1000, 2) . ' KM',
-                'hours' => $hours
-            ];
-        })->values();
+                    $idleMs = max(0, $engineMs - $tripMs);
+                    $totalMs = $engineMs;
+                } else {
+                    $sResp = $responses["stops_{$date}"] ?? null;
+                    $dayStops = ($sResp instanceof Response && $sResp->ok()) ? $sResp->json() : [];
+
+                    foreach ($dayStops as $stop) {
+                        $s = strtotime($stop['startTime']);
+                        $e = strtotime($stop['endTime']);
+
+                        $overlapStart = max($s, $dayStart);
+                        $overlapEnd = min($e, $dayEnd);
+
+                        if ($overlapEnd > $overlapStart) {
+                            $idleMs += ($overlapEnd - $overlapStart) * 1000;
+                        }
+                    }
+                    $totalMs = $tripMs + $idleMs;
+                }
+
+                $usagePct = $totalMs > 0 ? round(($tripMs / $totalMs) * 100) : 0;
+
+                $h = floor($tripMs / 3600000);
+                $m = floor(($tripMs % 3600000) / 60000);
+                $moveStr = "{$h} hours {$m} minutes";
+
+                $ih = floor($idleMs / 3600000);
+                $im = floor(($idleMs % 3600000) / 60000);
+                $idleStr = "{$ih} hours {$im} minutes";
+
+                $ts = strtotime($date);
+                $dayLabel = date('d/m/Y l', $ts);
+
+                return [
+                    'day' => $dayLabel,
+                    'usage' => "{$usagePct}%",
+                    'move' => $moveStr,
+                    'idle' => $idleStr,
+                    'dist' => round($distance / 1000, 2) . ' KM',
+                    'hours' => $hours
+                ];
+            });
+
+            $finalRows = $finalRows->merge($batchRows);
+
+            // Explicitly unset large response array to free memory
+            unset($responses);
+        }
 
         $vehicleRec = Devices::with('tcDevice')->where('device_id', $deviceId)->first();
         $tcDevice = $vehicleRec ? $vehicleRec->tcDevice : null;
@@ -2238,16 +2255,8 @@ class ReportService
         }
 
         $vehicleName = $tcDevice->name ?? 'Unknown';
-        if ($vehicleName === 'Unknown') {
-            foreach ($responses as $key => $resp) {
-                if (strpos($key, 'trips_') === 0 && $resp instanceof Response && $resp->ok()) {
-                     $first = $resp->json()[0] ?? null;
-                     if ($first && isset($first['deviceName'])) {
-                         $vehicleName = $first['deviceName'];
-                         break;
-                     }
-                }
-            }
+        if ($vehicleName === 'Unknown' && $foundVehicleName) {
+            $vehicleName = $foundVehicleName;
         }
 
          // Try to find vehicle no in attributes
@@ -2268,7 +2277,7 @@ class ReportService
                 'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
                 'totalDays' => $totalDays
             ],
-            'rows' => $rows
+            'rows' => $finalRows->values()
         ];
     }
 
