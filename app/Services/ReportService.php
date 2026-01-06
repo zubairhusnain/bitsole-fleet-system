@@ -1508,8 +1508,8 @@ class ReportService
                     $lon = isset($pos['longitude']) ? round($pos['longitude'], 5) : 0;
                     $power = $attrs['power'] ?? $attrs['battery'] ?? null;
                     if ($power) $power = round($power, 1) . 'V';
-                    $fuel = $attrs['fuel'] ?? null;
-                    if ($fuel) $fuel = round($fuel, 1) . ' L';
+
+                    $fuel = $this->formatFuel($attrs);
 
                     // GSM Signal Formatting
                     $rssi = $attrs['rssi'] ?? null;
@@ -1536,18 +1536,29 @@ class ReportService
                     $ign = $attrs['ignition'] ?? false;
                     $ignition = $ign ? 'ON' : 'OFF';
 
+                    // Determine Status (Moving, Idling, Stopped)
+                    $speedKnots = $pos['speed'] ?? 0;
+                    $speedKph = round($speedKnots * 1.852, 0);
+
+                    $status = 'Stopped';
+                    if ($speedKph > 0) {
+                        $status = 'Moving';
+                    } elseif ($ign) {
+                        $status = 'Idling';
+                    }
+
                     $chunkRows[] = [
                         'key' => 0, // Will reindex later
                         'vehicle' => $chunkDeviceMap[$dId] ?? 'Unknown',
                         'groupDate' => date('d-m-Y l', $dt),
                         'date' => date('d-m-Y', $dt),
                         'time' => date('H:i:s', $dt),
-                        'status' => 'Position Log',
+                        'status' => $status,
                         'lat' => $lat,
                         'lon' => $lon,
-                        'location' => $pos['address'] ?? '',
+                        'location' => ($pos['address'] ?? null) ?: (($lat && $lon) ? ($lat . ', ' . $lon) : ''),
                         'direction' => $pos['course'] ?? 0,
-                        'speed' => round(($pos['speed'] ?? 0) * 1.852, 0) . ' km/h',
+                        'speed' => $speedKph . ' km/h',
                         'gsm' => $gsm,
                         'gps' => $gps,
                         'power' => $power,
@@ -1673,6 +1684,87 @@ class ReportService
         return $val;
     }
 
+    private function formatFuel($attrs)
+    {
+        if (empty($attrs)) return null;
+
+        $lower = array_change_key_case($attrs, CASE_LOWER);
+
+        $getVal = function($keys) use ($attrs, $lower) {
+            foreach ((array)$keys as $k) {
+                if (isset($attrs[$k])) return $attrs[$k];
+                $lk = strtolower($k);
+                if (isset($lower[$lk])) return $lower[$lk];
+            }
+            return null;
+        };
+
+        $num = function($v) {
+            return (is_numeric($v)) ? (float)$v : null;
+        };
+
+        // 1. Resolve Percent
+        $percent = null;
+        $percentCandidates = ['CAN_FuelPercentage_89', 'fuelPercent', 'fuelLevel', 'fuel_percent', 'io89', 'io48'];
+        foreach ($percentCandidates as $key) {
+            $val = $num($getVal($key));
+            if ($val !== null && $val > -1) {
+                $percent = max(0, min(100, round($val)));
+                break;
+            }
+        }
+
+        // 2. Resolve Liters
+        $liters = null;
+        $litersCandidates = ['CAN_FuelLeter_84', 'OBD_FuelLeter_48', 'fuelLiter', 'fuelLiters', 'fuel', 'io84'];
+        foreach ($litersCandidates as $key) {
+            $val = $num($getVal($key));
+            if ($val !== null && $val > -1) {
+                $liters = round($val * 10) / 10;
+                break;
+            }
+        }
+
+        // 3. Raw Analog Fallback
+        $raw = null;
+        if ($percent === null && $liters === null) {
+            $rawCandidates = [
+                'io67', 'io68', 'io69', 'io240', 'io241', 'io242', 'io243',
+                'fuelRaw', 'analog1', 'analog2', 'analog3', 'adc1', 'adc2', 'adc3'
+            ];
+            foreach ($rawCandidates as $key) {
+                $val = $num($getVal($key));
+                if ($val !== null && $val > -1) {
+                    $raw = $val;
+                    break;
+                }
+            }
+
+            // Generic 'fuel' scan
+            if ($raw === null) {
+                foreach ($lower as $k => $v) {
+                    if (strpos($k, 'fuel') !== false) {
+                        $n = $num($v);
+                        if ($n !== null && $n > -1) {
+                            $raw = $n;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Return formatted string
+        if ($liters !== null) return $liters . ' L';
+        if ($percent !== null) return $percent . '%';
+        if ($raw !== null) {
+            if ($raw >= 0 && $raw <= 100) return round($raw) . '%';
+            return (string)$raw;
+        }
+
+        return null;
+    }
+
     private function formatEventDescription($event)
     {
         $isObj = is_object($event);
@@ -1735,4 +1827,3 @@ class ReportService
     }
 
 }
-

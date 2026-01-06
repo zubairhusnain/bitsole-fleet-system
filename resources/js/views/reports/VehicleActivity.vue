@@ -12,7 +12,7 @@
       <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
       <div class="card-body pt-2">
         <div class="row g-3 align-items-end">
-          <div class="col-12 col-md-4">
+          <div class="col-12 col-md-3">
             <label class="form-label small fw-semibold text-muted">Duration</label>
             <div class="input-group">
               <input type="date" v-model="fromDate" class="form-control" />
@@ -20,35 +20,20 @@
               <input type="date" v-model="toDate" class="form-control" />
             </div>
           </div>
-          <div class="col-12 col-md-4">
+          <div class="col-12 col-md-3">
             <label class="form-label small fw-semibold text-muted">Vehicle</label>
             <select class="form-select text-muted" v-model="selectedDevice">
               <option :value="null">--Select a Vehicle--</option>
               <option v-for="d in devices" :key="d.id" :value="d.id">{{ d.name }}</option>
             </select>
           </div>
-          <div class="col-12 col-md-4">
+          <div class="col-12 col-md-3">
             <label class="form-label small fw-semibold text-muted">Search Filter</label>
             <input type="text" v-model="searchFilter" class="form-control" placeholder="-- Search Filter --" />
           </div>
-
-          <div class="col-12 col-md-4">
-            <label class="form-label small fw-semibold text-muted">Report Format</label>
-             <select class="form-select text-muted" disabled>
-              <option>-- Report Format --</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label small fw-semibold text-muted">Map Option</label>
-             <select class="form-select text-muted" disabled>
-              <option>-- Map Option --</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-4 text-md-end">
-             <button class="btn btn-primary px-4 w-100" @click="fetchReport" :disabled="loading">
-               <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
-               Submit
-             </button>
+          <div class="col-12 col-md-3">
+            <label class="form-label small fw-semibold text-muted d-block">&nbsp;</label>
+            <button class="btn btn-primary w-100" @click="fetchReport">Submit</button>
           </div>
         </div>
       </div>
@@ -57,26 +42,36 @@
     <div v-if="reportData" class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Vehicle Activity Report Result</h6></div>
       <div class="card-body pt-2">
-        <div class="row g-3 bg-light rounded-3 p-3 mx-1">
+        <div class="row g-3">
           <div class="col-12 col-md-3">
-            <div class="small text-muted fw-semibold">Vehicle</div>
-            <div class="fw-bold text-dark">{{ reportData.header.vehicleId }}</div>
+            <div class="bg-light p-3 rounded-2 h-100">
+              <div class="small fw-bold text-dark">Vehicle ID</div>
+              <div class="small text-muted">{{ reportData.header.vehicleId }}</div>
+            </div>
           </div>
           <div class="col-12 col-md-3">
-            <div class="small text-muted fw-semibold">Device ID</div>
-            <div class="fw-bold text-dark">{{ reportData.header.deviceId }}</div>
+            <div class="bg-light p-3 rounded-2 h-100">
+              <div class="small fw-bold text-dark">Device ID</div>
+              <div class="small text-muted">{{ reportData.header.deviceId }}</div>
+            </div>
           </div>
           <div class="col-12 col-md-3">
-            <div class="small text-muted fw-semibold">Duration</div>
-            <div class="fw-bold text-dark">{{ reportData.header.duration }}</div>
+            <div class="bg-light p-3 rounded-2 h-100">
+              <div class="small fw-bold text-dark">Duration</div>
+              <div class="small text-muted">{{ reportData.header.duration }}</div>
+            </div>
           </div>
           <div class="col-12 col-md-3">
-            <div class="small text-muted fw-semibold">Last Report</div>
-            <div class="fw-bold text-dark">{{ reportData.header.lastReport }}</div>
+            <div class="bg-light p-3 rounded-2 h-100">
+              <div class="small fw-bold text-dark">Last Report</div>
+              <div class="small text-muted">{{ reportData.header.lastReport }}</div>
+            </div>
           </div>
-          <div class="col-12 mt-3 pt-3 border-top border-secondary-subtle">
-            <div class="small text-muted fw-bold">Last Location</div>
-            <div class="small text-muted">{{ reportData.header.lastLocation || 'N/A' }}</div>
+          <div class="col-12">
+            <div class="bg-light p-3 rounded-2">
+              <div class="small fw-bold text-dark">Last Location</div>
+              <div class="small text-primary">{{ reportData.header.lastLocation || 'N/A' }}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -84,7 +79,7 @@
 
     <div class="card border rounded-3 shadow-0">
       <div class="card-body p-0">
-        <div class="table-responsive">
+        <div class="table-responsive" style="max-height: none; overflow: hidden;">
           <table class="table table-sm align-middle mb-0 table-striped">
             <thead class="table-dark">
               <tr>
@@ -105,14 +100,18 @@
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="13" class="text-center py-4">Loading data...</td>
+                <td colspan="13" class="text-center py-4">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </td>
               </tr>
               <tr v-else-if="!reportData || !reportData.rows || reportData.rows.length === 0">
                 <td colspan="13" class="text-center py-4">No data available.</td>
               </tr>
               <template v-else v-for="(group, dateKey) in groupedRows" :key="dateKey">
                 <tr class="table-section">
-                  <td colspan="13" class="fw-semibold ps-3 py-2 text-primary">{{ dateKey }}</td>
+                  <td colspan="13" class="fw-semibold ps-3 py-2 text-primary bg-light">{{ dateKey }}</td>
                 </tr>
                 <tr v-for="row in group" :key="row.key">
                   <td class="ps-3">{{ row.date }}</td>
@@ -121,8 +120,10 @@
                   <td>{{ row.lon }}</td>
                   <td>{{ row.lat }}</td>
                   <td>{{ row.location }}</td>
-                  <td class="text-center" :style="{ transform: `rotate(${row.direction}deg)` }">
-                    <i v-if="!row.isEvent" class="bi bi-arrow-up"></i>
+                  <td class="text-center">
+                     <a v-if="!row.isEvent" :href="`https://www.google.com/maps?q=${row.lat},${row.lon}`" target="_blank" rel="noopener">
+                       <i class="bi bi-arrow-right text-primary" :style="{ transform: `rotate(${row.direction}deg)`, display: 'inline-block' }"></i>
+                     </a>
                   </td>
                   <td>{{ row.speed }}</td>
                   <td>
@@ -143,21 +144,34 @@
           </table>
         </div>
       </div>
-      <div class="card-footer d-flex align-items-center py-2 bg-white border-top" v-if="reportData && reportData.rows.length > 0">
+      <div class="card-footer d-flex align-items-center py-3 bg-white border-top" v-if="reportData && reportData.rows.length > 0">
         <div class="text-muted small me-auto">
            Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, filteredRows.length) }} of {{ filteredRows.length }} results
         </div>
-        <ul class="pagination pagination-sm mb-0">
-          <li class="page-item" :class="{ disabled: currentPage === 1 }">
-            <button class="page-link" @click="changePage(currentPage - 1)">&lt;</button>
-          </li>
-          <li class="page-item" v-for="p in totalPages" :key="p" :class="{ active: p === currentPage }" v-show="Math.abs(p - currentPage) < 3 || p === 1 || p === totalPages">
-             <button class="page-link" @click="changePage(p)">{{ p }}</button>
-          </li>
-          <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-            <button class="page-link" @click="changePage(currentPage + 1)">&gt;</button>
-          </li>
-        </ul>
+        <div class="d-flex gap-1">
+            <button class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0"
+                    style="width: 32px; height: 32px;"
+                    :disabled="currentPage === 1"
+                    @click="changePage(currentPage - 1)">
+              <i class="bi bi-chevron-left small"></i>
+            </button>
+
+            <button v-for="p in totalPages" :key="p"
+                    class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0 fw-semibold"
+                    :class="p === currentPage ? 'bg-dark text-white border-dark' : 'bg-white text-dark'"
+                    style="width: 32px; height: 32px;"
+                    v-show="Math.abs(p - currentPage) < 3 || p === 1 || p === totalPages"
+                    @click="changePage(p)">
+              {{ p }}
+            </button>
+
+            <button class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0"
+                    style="width: 32px; height: 32px;"
+                    :disabled="currentPage === totalPages"
+                    @click="changePage(currentPage + 1)">
+              <i class="bi bi-chevron-right small"></i>
+            </button>
+        </div>
       </div>
     </div>
   </div>
