@@ -251,6 +251,7 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/monthly-summary', [\App\Http\Controllers\ReportController::class, 'monthlySummary']);
     Route::get('/asset-activity', [\App\Http\Controllers\ReportController::class, 'assetActivity']);
     Route::get('/vehicle-activity', [\App\Http\Controllers\ReportController::class, 'vehicleActivity']);
+    Route::get('/idling', [\App\Http\Controllers\ReportController::class, 'idling']);
     Route::get('/daily-breakdown-map', [\App\Http\Controllers\ReportController::class, 'dailyBreakdownMap']);
     Route::get('/vehicle-status', [\App\Http\Controllers\ReportController::class, 'vehicleStatus']);
     Route::get('/vehicle-status/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportVehicleStatusPdf']);

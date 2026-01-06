@@ -13,61 +13,67 @@
       <div class="card-header"><h6 class="mb-0">Search Option</h6></div>
       <div class="card-body">
         <div class="row g-3 align-items-end">
-          <div class="col-12 col-md-4">
+          <div class="col-12 col-md-3">
             <label class="form-label small">Duration</label>
-            <input type="text" class="form-control" placeholder="dd/mm/yyyy - dd/mm/yyyy" />
+            <div class="input-group">
+                <input type="date" v-model="fromDate" class="form-control" />
+                <span class="input-group-text bg-white">-</span>
+                <input type="date" v-model="toDate" class="form-control" />
+            </div>
           </div>
-          <div class="col-12 col-md-4">
+          <div class="col-12 col-md-3">
             <label class="form-label small">Vehicle</label>
-            <select class="form-select">
-              <option>--Select an Vehicle--</option>
-              <option>VGPS2563</option>
-              <option>VHCL-1006</option>
+            <select v-model="selectedDevice" class="form-select">
+              <option value="" disabled>--Select a Vehicle--</option>
+              <option v-for="d in devices" :key="d.id" :value="d.id">{{ d.label }}</option>
             </select>
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label small">Idling Time Filter</label>
-            <select class="form-select">
-              <option>-- Report Format --</option>
-              <option>Less then 2 Minutes</option>
-              <option>Less then 3 Minutes</option>
-              <option>Less then 5 Minutes</option>
-              <option>Greater then 2 Minutes</option>
-              <option>Greater then 5 Minutes</option>
-              <option>Greater then 10 Minutes</option>
-              <option>Greater then 20 Minutes</option>
-              <option>Greater then 30 Minutes</option>
-              <option>Greater then 1 Hour</option>
-              <option>Greater then 2 Hours</option>
-              <option>Greater then 5 Hours</option>
+            <select v-model="timeFilter" class="form-select">
+              <option value="">-- Report Format --</option>
+              <option value="<120">Less than 2 Minutes</option>
+              <option value="<180">Less than 3 Minutes</option>
+              <option value="<300">Less than 5 Minutes</option>
+              <option value=">120">Greater than 2 Minutes</option>
+              <option value=">300">Greater than 5 Minutes</option>
+              <option value=">600">Greater than 10 Minutes</option>
+              <option value=">1200">Greater than 20 Minutes</option>
+              <option value=">1800">Greater than 30 Minutes</option>
+              <option value=">3600">Greater than 1 Hour</option>
+              <option value=">7200">Greater than 2 Hours</option>
+              <option value=">18000">Greater than 5 Hours</option>
             </select>
           </div>
-          <div class="col-12 col-md-1 text-md-end">
-            <button class="btn btn-app-dark w-100">Submit</button>
+          <div class="col-12 col-md-3">
+            <button class="btn btn-app-dark w-100" @click="fetchReport" :disabled="loading">
+                <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
+                Submit
+            </button>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="card border rounded-3 shadow-0 mb-3">
+    <div v-if="reportData && reportData.length > 0" class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header"><h6 class="mb-0">Idling Report Result</h6></div>
       <div class="card-body">
         <div class="row g-3">
           <div class="col-12 col-md-3">
-            <div class="small text-muted">Vehicle ID</div>
-            <div class="fw-semibold">#VGPS2563</div>
-          </div>
-          <div class="col-12 col-md-3">
-            <div class="small text-muted">Device ID</div>
-            <div class="fw-semibold">#84349829</div>
+            <div class="small text-muted">Vehicle</div>
+            <div class="fw-semibold">{{ getDeviceName(selectedDevice) }}</div>
           </div>
           <div class="col-12 col-md-3">
             <div class="small text-muted">Duration</div>
-            <div class="fw-semibold">2024/03/11 00:00 - 2024/03/20 23:59</div>
+            <div class="fw-semibold">{{ fromDate }} - {{ toDate }}</div>
           </div>
           <div class="col-12 col-md-3">
             <div class="small text-muted">Idle Duration Criteria</div>
-            <div class="fw-semibold">&gt; 2 minute(s)</div>
+            <div class="fw-semibold">{{ getTimeFilterLabel(timeFilter) }}</div>
+          </div>
+          <div class="col-12 col-md-3">
+            <div class="small text-muted">Total Events</div>
+            <div class="fw-semibold">{{ filteredRows.length }}</div>
           </div>
         </div>
       </div>
@@ -89,66 +95,194 @@
               </tr>
             </thead>
             <tbody>
-              <tr class="table-section">
-                <td colspan="7" class="fw-semibold">11-03-2024 <span class="text-muted">Monday</span></td>
+              <tr v-if="loading">
+                <td colspan="7" class="text-center py-4">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </td>
               </tr>
-              <tr v-for="row in monday" :key="row.t1">
-                <td>{{ row.date }}</td>
-                <td>{{ row.t1 }}</td>
-                <td>{{ row.t2 }}</td>
-                <td>{{ row.dur }}</td>
-                <td>{{ row.loc }}</td>
-                <td>{{ row.lon }}</td>
-                <td>{{ row.lat }}</td>
+              <tr v-else-if="filteredRows.length === 0">
+                <td colspan="7" class="text-center py-4">No idling events found.</td>
               </tr>
-              <tr class="table-section">
-                <td colspan="7" class="fw-semibold">12-03-2024 <span class="text-muted">Tuesday</span></td>
-              </tr>
-              <tr v-for="row in tuesday" :key="row.t1">
-                <td>{{ row.date }}</td>
-                <td>{{ row.t1 }}</td>
-                <td>{{ row.t2 }}</td>
-                <td>{{ row.dur }}</td>
-                <td>{{ row.loc }}</td>
-                <td>{{ row.lon }}</td>
-                <td>{{ row.lat }}</td>
-              </tr>
+              <template v-else v-for="(group, dateKey) in groupedRows" :key="dateKey">
+                <tr class="table-section">
+                  <td colspan="7" class="fw-semibold ps-3 py-2 text-primary bg-light">{{ dateKey }}</td>
+                </tr>
+                <tr v-for="(row, idx) in group" :key="idx">
+                  <td class="ps-3">{{ row.date }}</td>
+                  <td>{{ row.startTime }}</td>
+                  <td>{{ row.endTime }}</td>
+                  <td>{{ row.durationFormatted }}</td>
+                  <td>
+                    <a :href="`https://www.google.com/maps?q=${row.lat},${row.lon}`" target="_blank" class="text-decoration-none">
+                        {{ row.location }}
+                    </a>
+                  </td>
+                  <td>{{ row.lon }}</td>
+                  <td>{{ row.lat }}</td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>
       </div>
-      <div class="card-footer d-flex align-items-center py-2">
-        <div class="text-muted small me-auto">Showing 1 to 8 of 8 results</div>
-        <nav aria-label="Pagination" class="ms-auto">
-          <ul class="pagination pagination-sm mb-0 pagination-app">
-            <li class="page-item disabled"><button class="page-link">‹</button></li>
-            <li class="page-item active"><button class="page-link">1</button></li>
-            <li class="page-item"><button class="page-link">2</button></li>
-            <li class="page-item"><button class="page-link">3</button></li>
-            <li class="page-item"><button class="page-link">4</button></li>
-            <li class="page-item"><button class="page-link">5</button></li>
-            <li class="page-item"><button class="page-link">›</button></li>
-          </ul>
-        </nav>
+      <div class="card-footer d-flex align-items-center py-3 bg-white border-top" v-if="filteredRows.length > 0">
+        <div class="text-muted small me-auto">
+            Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, filteredRows.length) }} of {{ filteredRows.length }} results
+        </div>
+        <div class="d-flex gap-1">
+            <button class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0" 
+                    style="width: 32px; height: 32px;"
+                    :disabled="currentPage === 1"
+                    @click="changePage(currentPage - 1)">
+              <i class="bi bi-chevron-left small"></i>
+            </button>
+            
+            <button v-for="p in totalPages" :key="p" 
+                    class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0 fw-semibold"
+                    :class="p === currentPage ? 'bg-dark text-white border-dark' : 'bg-white text-dark'"
+                    style="width: 32px; height: 32px;"
+                    v-show="Math.abs(p - currentPage) < 3 || p === 1 || p === totalPages"
+                    @click="changePage(p)">
+              {{ p }}
+            </button>
+
+            <button class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0" 
+                    style="width: 32px; height: 32px;"
+                    :disabled="currentPage === totalPages"
+                    @click="changePage(currentPage + 1)">
+              <i class="bi bi-chevron-right small"></i>
+            </button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
-const monday = ref([
-  { date: '11-03-2024', t1: '05:05:44', t2: '05:07:49', dur: '2m 5s', loc: 'LORONG LOKE YEW JALAN LOKE YEW, PUDU, 55200 KUALA LUMPUR', lon: '101.71032', lat: '3.13032' },
-  { date: '11-03-2024', t1: '05:25:11', t2: '05:27:50', dur: '2m 39s', loc: 'MEGAN PHLEO PROMENADE BLOCK B, KAMPUNG BARU, 55100 KUALA LUMPUR', lon: '101.71032', lat: '3.13032' },
-  { date: '11-03-2024', t1: '06:02:45', t2: '06:05:02', dur: '2m 17s', loc: 'PLAZA OSK', lon: '101.71032', lat: '3.13032' },
-  { date: '11-03-2024', t1: '14:23:47', t2: '14:29:49', dur: '6m 2s', loc: 'JALAN CTA 2, KUALA LUMPUR INTERNATIONAL AIRPORT (KUL), KLIA, SELANGOR', lon: '101.71032', lat: '3.13032' },
-  { date: '11-03-2024', t1: '17:07:47', t2: '17:09:56', dur: '2m 9s', loc: 'GAMBANG R&R W TO E', lon: '101.71032', lat: '3.13032' },
-]);
-const tuesday = ref([
-  { date: '12-03-2024', t1: '05:05:44', t2: '05:07:49', dur: '2m 5s', loc: 'LORONG LOKE YEW JALAN LOKE YEW, PUDU, 55200 KUALA LUMPUR', lon: '101.71032', lat: '3.13032' },
-  { date: '12-03-2024', t1: '05:25:11', t2: '05:27:50', dur: '2m 39s', loc: 'MEGAN PHLEO PROMENADE BLOCK B, KAMPUNG BARU, 55100 KUALA LUMPUR', lon: '101.71032', lat: '3.13032' },
-  { date: '12-03-2024', t1: '06:02:45', t2: '06:05:02', dur: '2m 17s', loc: 'PLAZA OSK', lon: '101.71032', lat: '3.13032' },
-]);
+import { ref, computed, onMounted } from 'vue';
+import axios from 'axios';
+
+// State
+const devices = ref([]);
+const selectedDevice = ref('');
+const fromDate = ref(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+const toDate = ref(new Date().toISOString().slice(0, 10));
+const timeFilter = ref('>120'); // Default > 2 mins
+const loading = ref(false);
+const reportData = ref([]);
+
+// Pagination
+const currentPage = ref(1);
+const itemsPerPage = ref(20);
+
+// Computed
+const filteredRows = computed(() => {
+    if (!reportData.value) return [];
+    
+    let rows = reportData.value;
+
+    if (timeFilter.value) {
+        const op = timeFilter.value.substring(0, 1);
+        const val = parseInt(timeFilter.value.substring(1));
+        
+        rows = rows.filter(r => {
+            if (op === '<') return r.durationSeconds < val;
+            if (op === '>') return r.durationSeconds > val;
+            return true;
+        });
+    }
+
+    return rows;
+});
+
+const paginatedRows = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage.value;
+    const end = start + itemsPerPage.value;
+    return filteredRows.value.slice(start, end);
+});
+
+const groupedRows = computed(() => {
+    const groups = {};
+    paginatedRows.value.forEach(row => {
+        // Create a friendly date key (e.g., "11-03-2024 Monday")
+        const dateObj = new Date(row.startEpoch * 1000);
+        const options = { weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' };
+        // We can just use row.date + day name
+        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+        const key = `${row.date} ${dayName}`;
+        
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(row);
+    });
+    return groups;
+});
+
+const totalPages = computed(() => Math.ceil(filteredRows.value.length / itemsPerPage.value));
+
+// Methods
+function getDeviceName(id) {
+    const d = devices.value.find(x => x.id === id);
+    return d ? d.label : id;
+}
+
+function getTimeFilterLabel(val) {
+    if (!val) return 'All';
+    const op = val.substring(0, 1);
+    const num = parseInt(val.substring(1));
+    const mins = Math.floor(num / 60);
+    const hours = Math.floor(mins / 60);
+    
+    const timeStr = hours > 0 ? `${hours} Hour(s)` : `${mins} Minute(s)`;
+    return (op === '<' ? 'Less than ' : 'Greater than ') + timeStr;
+}
+
+function changePage(page) {
+    if (page >= 1 && page <= totalPages.value) {
+        currentPage.value = page;
+    }
+}
+
+async function loadDevices() {
+    try {
+        const res = await axios.get('/web/reports/device-options');
+        devices.value = res.data.options || [];
+        if (devices.value.length > 0) {
+            selectedDevice.value = devices.value[0].id;
+        }
+    } catch (e) {
+        console.error('Failed to load devices', e);
+    }
+}
+
+async function fetchReport() {
+    if (!selectedDevice.value) return;
+
+    loading.value = true;
+    reportData.value = [];
+    currentPage.value = 1;
+
+    try {
+        const res = await axios.get('/web/reports/idling', {
+            params: {
+                from_date: fromDate.value,
+                to_date: toDate.value,
+                device_ids: [selectedDevice.value]
+            }
+        });
+        reportData.value = res.data;
+    } catch (e) {
+        console.error('Failed to fetch idling report', e);
+        alert('Failed to fetch report data');
+    } finally {
+        loading.value = false;
+    }
+}
+
+onMounted(() => {
+    loadDevices();
+});
 </script>
 
 <style scoped>

@@ -1684,6 +1684,165 @@ class ReportService
         return $val;
     }
 
+    public function fetchIdlingReport($request, $deviceIds)
+    {
+        ini_set('memory_limit', '512M');
+        set_time_limit(300);
+
+        $sessionId = $request->user()->traccarSession ?? session('cookie');
+        if (empty($deviceIds)) return [];
+
+        $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
+        $toStr = $request->to_date;
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
+            $toStr .= ' 23:59:59';
+        }
+        $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
+
+        $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
+        if (empty($baseUrl)) return [];
+
+        $headers = [
+            'Cookie' => $sessionId,
+            'Accept' => 'application/json'
+        ];
+
+        // Process sequentially to save memory
+        $chunks = collect(array_chunk($deviceIds, 5)); // Process 5 devices at a time
+        $allIdlingEvents = [];
+
+        foreach ($chunks as $chunkIds) {
+            $deviceQuery = collect($chunkIds)->map(function($id) {
+                return "deviceId={$id}";
+            })->implode('&');
+            $queryString = "{$deviceQuery}&from={$from}&to={$to}";
+
+            try {
+                $responses = Http::pool(fn (Pool $pool) => [
+                    $pool->as('route')->withHeaders($headers)->get("{$baseUrl}/api/reports/route?{$queryString}"),
+                    $pool->as('devices')->withHeaders($headers)->get("{$baseUrl}/api/devices?{$deviceQuery}"), // To get names
+                ]);
+            } catch (\Exception $e) {
+                Log::error('fetchIdlingReport chunk exception', ['error' => $e->getMessage()]);
+                continue;
+            }
+
+            $routeData = ($responses['route']->ok()) ? $responses['route']->json() : [];
+            $devicesData = ($responses['devices']->ok()) ? $responses['devices']->json() : [];
+
+            $deviceMap = [];
+            foreach ($devicesData as $d) {
+                $deviceMap[$d['id']] = $d['name'];
+            }
+
+            // Group route data by device
+            $groupedRoute = [];
+            foreach ($routeData as $pos) {
+                $dId = $pos['deviceId'];
+                if (!isset($groupedRoute[$dId])) $groupedRoute[$dId] = [];
+                $groupedRoute[$dId][] = $pos;
+            }
+
+            // Analyze for idling
+            foreach ($groupedRoute as $dId => $positions) {
+                // Sort by time just in case
+                usort($positions, function($a, $b) {
+                    return strtotime($a['fixTime']) - strtotime($b['fixTime']);
+                });
+
+                $currentStart = null;
+                $deviceName = $deviceMap[$dId] ?? 'Unknown';
+
+                foreach ($positions as $index => $pos) {
+                    $speedKnots = $pos['speed'] ?? 0;
+                    $speedKph = $speedKnots * 1.852;
+                    $attrs = $pos['attributes'] ?? [];
+                    $ignition = $attrs['ignition'] ?? false;
+
+                    // Idling condition: Ignition ON AND Speed approx 0 (e.g., < 2 km/h)
+                    $isIdling = $ignition && ($speedKph < 2);
+
+                    if ($isIdling) {
+                        if ($currentStart === null) {
+                            $currentStart = $pos;
+                        }
+                    } else {
+                        if ($currentStart !== null) {
+                            // End of idling session
+                            $startDt = strtotime($currentStart['fixTime']);
+                            $endDt = strtotime($positions[$index-1]['fixTime']); // Use previous point as end
+                            $duration = $endDt - $startDt;
+
+                            if ($duration > 0) {
+                                $allIdlingEvents[] = [
+                                    'vehicle' => $deviceName,
+                                    'deviceId' => $dId,
+                                    'date' => date('d-m-Y', $startDt),
+                                    'startTime' => date('H:i:s', $startDt),
+                                    'endTime' => date('H:i:s', $endDt),
+                                    'durationSeconds' => $duration,
+                                    'durationFormatted' => $this->formatDuration($duration),
+                                    'location' => $currentStart['address'] ?? ($currentStart['latitude'] . ', ' . $currentStart['longitude']),
+                                    'lat' => $currentStart['latitude'],
+                                    'lon' => $currentStart['longitude'],
+                                    'startEpoch' => $startDt
+                                ];
+                            }
+                            $currentStart = null;
+                        }
+                    }
+                }
+
+                // Check if still idling at the end of the list
+                if ($currentStart !== null) {
+                    $lastPos = end($positions);
+                    $startDt = strtotime($currentStart['fixTime']);
+                    $endDt = strtotime($lastPos['fixTime']);
+                    $duration = $endDt - $startDt;
+
+                    if ($duration > 0) {
+                        $allIdlingEvents[] = [
+                            'vehicle' => $deviceName,
+                            'deviceId' => $dId,
+                            'date' => date('d-m-Y', $startDt),
+                            'startTime' => date('H:i:s', $startDt),
+                            'endTime' => date('H:i:s', $endDt),
+                            'durationSeconds' => $duration,
+                            'durationFormatted' => $this->formatDuration($duration),
+                            'location' => $currentStart['address'] ?? ($currentStart['latitude'] . ', ' . $currentStart['longitude']),
+                            'lat' => $currentStart['latitude'],
+                            'lon' => $currentStart['longitude'],
+                            'startEpoch' => $startDt
+                        ];
+                    }
+                }
+            }
+
+            // Cleanup
+            unset($routeData, $groupedRoute, $responses);
+            if (function_exists('gc_collect_cycles')) gc_collect_cycles();
+        }
+
+        // Sort by start time
+        usort($allIdlingEvents, function($a, $b) {
+            return $b['startEpoch'] <=> $a['startEpoch'];
+        });
+
+        return $allIdlingEvents;
+    }
+
+    private function formatDuration($seconds)
+    {
+        $h = floor($seconds / 3600);
+        $m = floor(($seconds % 3600) / 60);
+        $s = $seconds % 60;
+        $str = '';
+        if ($h > 0) $str .= $h . 'h ';
+        if ($m > 0) $str .= $m . 'm ';
+        $str .= $s . 's';
+        return trim($str);
+    }
+
     private function formatFuel($attrs)
     {
         if (empty($attrs)) return null;
