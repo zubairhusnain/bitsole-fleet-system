@@ -329,73 +329,51 @@ const downloadPDF = async () => {
         const list = Array.isArray(data) ? data : (data.data ?? []);
         const rows = processVehicleData(list);
 
+        const doc = new jsPDF('l', 'mm', 'a4'); // Landscape, millimeters, A4
+
         const headers = [
             'Vehicle ID', 'Owner', 'Type/Model', 'Device Model', 'IMEI', 'ICCID',
             'Odometer', 'Power', 'Last Report', 'Longitude', 'Latitude', 'Location',
             'Speed', 'GPS Signal', 'Ignition', 'Last Ignition On', 'Last Ignition Off', 'Activation Date'
         ];
 
-        let tableHtml = `
-            <html>
-            <head>
-                <title>Vehicle Status Report</title>
-                <style>
-                    body { font-family: sans-serif; font-size: 10px; margin: 20px; }
-                    h2 { text-align: center; margin-bottom: 20px; }
-                    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-                    th, td { border: 1px solid #ddd; padding: 6px; text-align: left; vertical-align: middle; }
-                    th { background-color: #f2f2f2; font-weight: bold; }
-                    tr:nth-child(even) { background-color: #f9f9f9; }
-                    .header-info { margin-bottom: 20px; font-size: 12px; }
-                </style>
-            </head>
-            <body>
-                <h2>Vehicle Status Report</h2>
-                <div class="header-info">
-                    <strong>Date:</strong> ${new Date().toLocaleString()}<br>
-                    <strong>Total Vehicles:</strong> ${rows.length}
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            ${headers.map(h => `<th>${h}</th>`).join('')}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${rows.map(r => `
-                            <tr>
-                                <td>${r.vehicle_id}</td>
-                                <td>${r.owner}</td>
-                                <td>${r.type_model}</td>
-                                <td>${r.device_model}</td>
-                                <td>${r.imei}</td>
-                                <td>${r.iccid}</td>
-                                <td>${r.odometer}</td>
-                                <td>${r.power}</td>
-                                <td>${r.last_report}</td>
-                                <td>${r.longitude}</td>
-                                <td>${r.latitude}</td>
-                                <td>${r.location}</td>
-                                <td>${r.speed}</td>
-                                <td>${r.gps_signal}</td>
-                                <td>${r.ignition ? 'ON' : 'OFF'}</td>
-                                <td>${r.last_ignition_on}</td>
-                                <td>${r.last_ignition_off}</td>
-                                <td>${r.activation_date}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-                <script>
-                    window.onload = function() { window.print(); window.close(); }
-                <\/script>
-            </body>
-            </html>
-        `;
+        const tableBody = rows.map(r => [
+            r.vehicle_id,
+            r.owner,
+            r.type_model,
+            r.device_model,
+            r.imei,
+            r.iccid,
+            r.odometer,
+            r.power,
+            r.last_report,
+            r.longitude,
+            r.latitude,
+            r.location,
+            r.speed,
+            r.gps_signal,
+            r.ignition ? 'ON' : 'OFF',
+            r.last_ignition_on,
+            r.last_ignition_off,
+            r.activation_date
+        ]);
 
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(tableHtml);
-        printWindow.document.close();
+        doc.text('Vehicle Status Report', 14, 15);
+        doc.setFontSize(10);
+        doc.text(`Date: ${new Date().toLocaleString()}`, 14, 22);
+        doc.text(`Total Vehicles: ${rows.length}`, 14, 27);
+
+        autoTable(doc, {
+            head: [headers],
+            body: tableBody,
+            startY: 32,
+            styles: { fontSize: 7, cellPadding: 1 },
+            headStyles: { fillColor: [11, 15, 40], textColor: [255, 255, 255] },
+            alternateRowStyles: { fillColor: [248, 249, 251] },
+            margin: { top: 32 },
+        });
+
+        doc.save(`Vehicle_Status_Report_${new Date().toISOString().slice(0,10)}.pdf`);
 
     } catch (e) {
         console.error('PDF Export failed:', e);
