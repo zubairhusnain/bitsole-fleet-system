@@ -2000,7 +2000,18 @@ class ReportService
         $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
         if (empty($baseUrl)) {
              Log::error('ReportService: Traccar Host URL is not configured.');
-             return response()->json(['message' => 'Configuration error'], 500);
+             $vehicleRec = Devices::accessibleByUser($request->user())->with('tcDevice')->where('device_id', $deviceId)->first();
+             $vehicleName = data_get($vehicleRec, 'tcDevice.name', data_get($vehicleRec, 'name', 'Unknown'));
+             $totalDays = max(1, round((strtotime($toStr) - strtotime($request->from_date)) / (60 * 60 * 24)) + 1);
+             return [
+                 'summary' => [
+                     'vehicleIdDisplay' => $vehicleName,
+                     'deviceId' => $deviceId,
+                     'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
+                     'totalDays' => $totalDays
+                 ],
+                 'rows' => []
+             ];
         }
 
         $headers = [
@@ -2016,7 +2027,18 @@ class ReportService
             ]);
         } catch (\Exception $e) {
             Log::error('fetchUtilisationReport exception', ['error' => $e->getMessage()]);
-            return response()->json(['message' => 'Failed to fetch report data'], 500);
+            $vehicleRec = Devices::accessibleByUser($request->user())->with('tcDevice')->where('device_id', $deviceId)->first();
+            $vehicleName = data_get($vehicleRec, 'tcDevice.name', data_get($vehicleRec, 'name', 'Unknown'));
+            $totalDays = max(1, round((strtotime($toStr) - strtotime($request->from_date)) / (60 * 60 * 24)) + 1);
+            return [
+                'summary' => [
+                    'vehicleIdDisplay' => $vehicleName,
+                    'deviceId' => $deviceId,
+                    'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
+                    'totalDays' => $totalDays
+                ],
+                'rows' => []
+            ];
         }
 
         $allTrips = ($responses['trips']->ok()) ? $responses['trips']->json() : [];

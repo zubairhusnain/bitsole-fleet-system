@@ -6,11 +6,9 @@
         <li class="breadcrumb-item">Reports & Analytics</li>
         <li class="breadcrumb-item active" aria-current="page">Utilisation Report</li>
       </ol>
-    </div>
+    </div> 
     <h4 class="mb-3">Utilisation Report</h4>
-    <div v-if="errorMessage" class="alert alert-danger py-2 px-3 small mb-3">
-      {{ errorMessage }}
-    </div>
+    <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = ''" />
     <div class="card panel border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white py-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
       <div class="card-body">
@@ -38,7 +36,6 @@
           </div>
           <div class="col-12 col-md-1">
             <button class="btn btn-info text-white w-100 fw-semibold" style="background-color: #0ea5e9; border: none;" @click="fetchReport" :disabled="loading">
-              <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
               Submit
             </button>
           </div>
@@ -104,6 +101,13 @@
               </tr>
             </thead>
             <tbody>
+              <tr v-if="loading">
+                <td colspan="5" class="text-center py-4">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </td>
+              </tr>
               <tr v-for="row in rows" :key="row.day">
                 <td class="ps-3 py-3 fw-medium text-dark">{{ row.day }}</td>
                 <td class="py-3"><span class="badge bg-success-subtle text-success px-3 py-2 rounded-1" style="min-width: 50px;">{{ row.usage }}</span></td>
@@ -143,6 +147,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import UiAlert from '../../components/UiAlert.vue';
 
 const deviceOptions = ref([]);
 const selectedDeviceId = ref('');
