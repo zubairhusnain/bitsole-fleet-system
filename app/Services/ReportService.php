@@ -2001,12 +2001,18 @@ class ReportService
         if (empty($baseUrl)) {
              Log::error('ReportService: Traccar Host URL is not configured.');
              $vehicleRec = Devices::accessibleByUser($request->user())->with('tcDevice')->where('device_id', $deviceId)->first();
-             $vehicleName = data_get($vehicleRec, 'tcDevice.name', data_get($vehicleRec, 'name', 'Unknown'));
+
+             $tcDevice = $vehicleRec ? $vehicleRec->tcDevice : null;
+             $uniqueId = $tcDevice ? $tcDevice->uniqueid : $deviceId;
+             $attributes = $tcDevice && $tcDevice->attributes ? $tcDevice->attributes : [];
+             if (is_string($attributes)) $attributes = json_decode($attributes, true);
+             $vehicleNo = $attributes['vehicleNo'] ?? $attributes['vehicle_no'] ?? $attributes['vehicle number'] ?? $attributes['vehicleNumber'] ?? ($tcDevice->name ?? 'Unknown');
+
              $totalDays = max(1, round((strtotime($toStr) - strtotime($request->from_date)) / (60 * 60 * 24)) + 1);
              return [
                  'summary' => [
-                     'vehicleIdDisplay' => $vehicleName,
-                     'deviceId' => $deviceId,
+                     'vehicleIdDisplay' => $vehicleNo,
+                     'deviceId' => $uniqueId,
                      'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
                      'totalDays' => $totalDays
                  ],
@@ -2028,12 +2034,18 @@ class ReportService
         } catch (\Exception $e) {
             Log::error('fetchUtilisationReport exception', ['error' => $e->getMessage()]);
             $vehicleRec = Devices::accessibleByUser($request->user())->with('tcDevice')->where('device_id', $deviceId)->first();
-            $vehicleName = data_get($vehicleRec, 'tcDevice.name', data_get($vehicleRec, 'name', 'Unknown'));
+
+            $tcDevice = $vehicleRec ? $vehicleRec->tcDevice : null;
+            $uniqueId = $tcDevice ? $tcDevice->uniqueid : $deviceId;
+            $attributes = $tcDevice && $tcDevice->attributes ? $tcDevice->attributes : [];
+            if (is_string($attributes)) $attributes = json_decode($attributes, true);
+            $vehicleNo = $attributes['vehicleNo'] ?? $attributes['vehicle_no'] ?? $attributes['vehicle number'] ?? $attributes['vehicleNumber'] ?? ($tcDevice->name ?? 'Unknown');
+
             $totalDays = max(1, round((strtotime($toStr) - strtotime($request->from_date)) / (60 * 60 * 24)) + 1);
             return [
                 'summary' => [
-                    'vehicleIdDisplay' => $vehicleName,
-                    'deviceId' => $deviceId,
+                    'vehicleIdDisplay' => $vehicleNo,
+                    'deviceId' => $uniqueId,
                     'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
                     'totalDays' => $totalDays
                 ],
@@ -2097,13 +2109,28 @@ class ReportService
             ];
         })->values();
 
-        $vehicleName = data_get($trips->first(), 'deviceName', 'Unknown');
+        $vehicleRec = Devices::with('tcDevice')->where('device_id', $deviceId)->first();
+        $tcDevice = $vehicleRec ? $vehicleRec->tcDevice : null;
+
+        $uniqueId = $tcDevice ? $tcDevice->uniqueid : $deviceId;
+
+        $attributes = $tcDevice && $tcDevice->attributes ? $tcDevice->attributes : [];
+        if (is_string($attributes)) {
+            $attributes = json_decode($attributes, true);
+        }
+
+        // Fallback to name from trips if local DB lookup fails
+        $vehicleNameFromTrips = data_get($trips->first(), 'deviceName', 'Unknown');
+
+        // Try to find vehicle no in attributes
+        $vehicleNo = $attributes['vehicleNo'] ?? $attributes['vehicle_no'] ?? $attributes['vehicle number'] ?? $attributes['vehicleNumber'] ?? ($tcDevice->name ?? $vehicleNameFromTrips);
+
         $totalDays = max(1, round((strtotime($toStr) - strtotime($request->from_date)) / (60 * 60 * 24)) + 1);
 
         return [
             'summary' => [
-                'vehicleIdDisplay' => $vehicleName,
-                'deviceId' => $deviceId,
+                'vehicleIdDisplay' => $vehicleNo,
+                'deviceId' => $uniqueId,
                 'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
                 'totalDays' => $totalDays
             ],

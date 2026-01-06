@@ -341,10 +341,25 @@ class ReportController extends Controller
                 $to = \Carbon\Carbon::parse($request->to_date);
                 $totalDays = max(1, $from->diffInDays($to) + 1);
                 $deviceId = is_array($request->device_ids ?? null) ? ($request->device_ids[0] ?? null) : null;
+
+                $vehicleNo = '';
+                $uniqueId = $deviceId;
+
+                if ($deviceId) {
+                    try {
+                        $vehicleRec = Devices::with('tcDevice')->where('device_id', $deviceId)->first();
+                        $tcDevice = $vehicleRec ? $vehicleRec->tcDevice : null;
+                        $uniqueId = $tcDevice ? $tcDevice->uniqueid : $deviceId;
+                        $attributes = $tcDevice && $tcDevice->attributes ? $tcDevice->attributes : [];
+                        if (is_string($attributes)) $attributes = json_decode($attributes, true);
+                        $vehicleNo = $attributes['vehicleNo'] ?? $attributes['vehicle_no'] ?? $attributes['vehicle number'] ?? $attributes['vehicleNumber'] ?? ($tcDevice->name ?? '');
+                    } catch (\Throwable $ignore) {}
+                }
+
                 return response()->json([
                     'summary' => [
-                        'vehicleIdDisplay' => '',
-                        'deviceId' => $deviceId,
+                        'vehicleIdDisplay' => $vehicleNo,
+                        'deviceId' => $uniqueId,
                         'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
                         'totalDays' => $totalDays
                     ],
