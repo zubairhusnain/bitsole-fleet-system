@@ -317,11 +317,14 @@ class ReportController extends Controller
 
     public function utilisation(Request $request)
     {
+        set_time_limit(300); // 5 minutes to prevent 504 Gateway Timeout
+
         try {
             $request->validate([
                 'from_date' => 'required|date',
                 'to_date' => 'required|date|after_or_equal:from_date',
                 'device_ids' => 'required|array|min:1',
+                'type' => 'sometimes|string|in:Movement,Engine Hours',
             ]);
 
             $from = \Carbon\Carbon::parse($request->from_date);

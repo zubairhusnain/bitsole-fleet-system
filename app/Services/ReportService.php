@@ -2040,7 +2040,9 @@ class ReportService
         try {
             $responses = Http::pool(fn (Pool $pool) => [
                 $pool->as('trips')->timeout(120)->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
-                $pool->as('stops')->timeout(120)->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
+                ($type === 'Engine Hours')
+                    ? $pool->as('events')->timeout(120)->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$fullQuery}&type=ignitionOn&type=ignitionOff")
+                    : $pool->as('stops')->timeout(120)->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}")
             ]);
         } catch (\Exception $e) {
             Log::error('fetchUtilisationReport exception', ['error' => $e->getMessage()]);
@@ -2072,35 +2074,95 @@ class ReportService
             ];
         }
 
-        // If we are here, $responses MIGHT be set. But if catch block returns, we are good.
-        // Wait, if catch block executes, it returns.
-        // So we only reach here if Http::pool didn't throw.
-
         // Safe check
         $tripsResp = $responses['trips'] ?? null;
         $stopsResp = $responses['stops'] ?? null;
+        $eventsResp = $responses['events'] ?? null;
 
         $allTrips = ($tripsResp instanceof Response && $tripsResp->ok()) ? $tripsResp->json() : [];
         $allStops = ($stopsResp instanceof Response && $stopsResp->ok()) ? $stopsResp->json() : [];
+        $allEvents = ($eventsResp instanceof Response && $eventsResp->ok()) ? $eventsResp->json() : [];
 
         $trips = collect($allTrips);
         $stops = collect($allStops);
+        $events = collect($allEvents);
 
-        // Group by Date
-        $groupedTrips = $trips->groupBy(function($item) {
-             return date('Y-m-d', strtotime($item['startTime']));
-        });
+        $engineIntervals = collect([]);
+        if ($type === 'Engine Hours') {
+             $sortedEvents = $events->sortBy('eventTime')->values();
+             $currentStart = null;
+             foreach ($sortedEvents as $ev) {
+                 if ($ev['type'] === 'ignitionOn') {
+                     $currentStart = $ev['eventTime'];
+                 } elseif ($ev['type'] === 'ignitionOff' && $currentStart) {
+                     $engineIntervals->push([
+                         'startTime' => $currentStart,
+                         'endTime' => $ev['eventTime'],
+                         'duration' => (strtotime($ev['eventTime']) - strtotime($currentStart)) * 1000
+                     ]);
+                     $currentStart = null;
+                 }
+             }
+        }
 
-        $rows = $groupedTrips->map(function ($dayTrips, $date) use ($stops) {
-            $dayStops = $stops->filter(function($stop) use ($date) {
-                return date('Y-m-d', strtotime($stop['startTime'])) == $date;
-            });
+        // Generate all dates in range
+        $dates = collect();
+        $currentDate = strtotime($request->from_date);
+        $endDate = strtotime($request->to_date);
 
-            $distance = $dayTrips->sum('distance');
-            $tripMs = $dayTrips->sum('duration');
-            $idleMs = $dayStops->sum('duration');
+        while ($currentDate <= $endDate) {
+            $dates->push(date('Y-m-d', $currentDate));
+            $currentDate = strtotime('+1 day', $currentDate);
+        }
 
-            $totalMs = $tripMs + $idleMs;
+        $rows = $dates->map(function ($date) use ($trips, $stops, $engineIntervals, $type) {
+            $dayStart = strtotime("{$date} 00:00:00");
+            $dayEnd = strtotime("{$date} 23:59:59");
+
+            // Helper to calculate overlap
+            $calcOverlap = function($items) use ($dayStart, $dayEnd) {
+                $total = 0;
+                foreach ($items as $item) {
+                    $start = strtotime($item['startTime']);
+                    $end = strtotime($item['endTime']);
+
+                    $overlapStart = max($start, $dayStart);
+                    $overlapEnd = min($end, $dayEnd);
+
+                    if ($overlapEnd > $overlapStart) {
+                        $total += ($overlapEnd - $overlapStart) * 1000; // ms
+                    }
+                }
+                return $total;
+            };
+
+            // Calculate Metrics
+            $tripMs = $calcOverlap($trips);
+
+            // Distance is tricky to split, so we just sum trips that START on this day (legacy behavior)
+            // or we could split by proportion of time. For simplicity, we keep "Trips Starting Today" for distance
+            // to avoid complex speed integration.
+            $distance = $trips->filter(function($t) use ($date) {
+                return date('Y-m-d', strtotime($t['startTime'])) == $date;
+            })->sum('distance');
+
+            if ($type === 'Engine Hours') {
+                 $engineMs = $calcOverlap($engineIntervals);
+
+                 // Idle = Engine On - Moving
+                 // Note: Ideally we subtract overlapping Moving from Engine On.
+                 // Simple approximation: max(0, Engine - Moving)
+                 $idleMs = max(0, $engineMs - $tripMs);
+                 $totalMs = $engineMs;
+
+                 $activitySource = $engineIntervals;
+            } else {
+                 $idleMs = $calcOverlap($stops);
+                 $totalMs = $tripMs + $idleMs;
+
+                 $activitySource = $trips;
+            }
+
             $usagePct = $totalMs > 0 ? round(($tripMs / $totalMs) * 100) : 0;
 
             $h = floor($tripMs / 3600000);
@@ -2113,7 +2175,7 @@ class ReportService
 
             // Hourly Activity
             $hours = array_fill(0, 24, false);
-            foreach ($dayTrips as $t) {
+            foreach ($activitySource as $t) {
                 $start = strtotime($t['startTime']);
                 $end = strtotime($t['endTime']);
 
