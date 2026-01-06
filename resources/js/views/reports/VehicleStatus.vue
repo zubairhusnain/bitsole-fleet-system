@@ -319,65 +319,30 @@ const downloadCSV = async () => {
 };
 
 const downloadPDF = async () => {
+    loading.value = true;
     try {
         const params = {
             vehicle_id: selectedVehicleId.value,
             group_id: selectedGroupId.value,
             per_page: 999999
         };
-        const { data } = await axios.get('/web/reports/vehicle-status', { params });
-        const list = Array.isArray(data) ? data : (data.data ?? []);
-        const rows = processVehicleData(list);
-
-        const doc = new jsPDF('l', 'mm', 'a4'); // Landscape, millimeters, A4
-
-        const headers = [
-            'Vehicle ID', 'Owner', 'Type/Model', 'Device Model', 'IMEI', 'ICCID',
-            'Odometer', 'Power', 'Last Report', 'Longitude', 'Latitude', 'Location',
-            'Speed', 'GPS Signal', 'Ignition', 'Last Ignition On', 'Last Ignition Off', 'Activation Date'
-        ];
-
-        const tableBody = rows.map(r => [
-            r.vehicle_id,
-            r.owner,
-            r.type_model,
-            r.device_model,
-            r.imei,
-            r.iccid,
-            r.odometer,
-            r.power,
-            r.last_report,
-            r.longitude,
-            r.latitude,
-            r.location,
-            r.speed,
-            r.gps_signal,
-            r.ignition ? 'ON' : 'OFF',
-            r.last_ignition_on,
-            r.last_ignition_off,
-            r.activation_date
-        ]);
-
-        doc.text('Vehicle Status Report', 14, 15);
-        doc.setFontSize(10);
-        doc.text(`Date: ${new Date().toLocaleString()}`, 14, 22);
-        doc.text(`Total Vehicles: ${rows.length}`, 14, 27);
-
-        autoTable(doc, {
-            head: [headers],
-            body: tableBody,
-            startY: 32,
-            styles: { fontSize: 7, cellPadding: 1 },
-            headStyles: { fillColor: [11, 15, 40], textColor: [255, 255, 255] },
-            alternateRowStyles: { fillColor: [248, 249, 251] },
-            margin: { top: 32 },
+        const response = await axios.get('/web/reports/vehicle-status/export-pdf', {
+            params,
+            responseType: 'blob'
         });
 
-        doc.save(`Vehicle_Status_Report_${new Date().toISOString().slice(0,10)}.pdf`);
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Vehicle_Status_Report_${new Date().toISOString().slice(0,10)}.pdf`;
+        link.click();
+        URL.revokeObjectURL(link.href);
 
     } catch (e) {
         console.error('PDF Export failed:', e);
         alert('PDF Export failed. Please try again.');
+    } finally {
+        loading.value = false;
     }
 };
 

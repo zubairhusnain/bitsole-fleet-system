@@ -8,6 +8,7 @@ use App\Models\TcGroup;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ReportController extends Controller
 {
@@ -22,6 +23,35 @@ class ReportController extends Controller
     }
 
     public function vehicleStatus(Request $request)
+    {
+        $query = $this->buildVehicleStatusQuery($request);
+
+        // Pagination or fetch all
+        $perPage = $request->input('per_page', 25);
+
+        $devices = $query->orderByDesc('id')->paginate($perPage);
+
+        $this->enrichWithIgnitionData($devices->getCollection());
+
+        return $devices;
+    }
+
+    public function exportVehicleStatusPdf(Request $request)
+    {
+        $query = $this->buildVehicleStatusQuery($request);
+        $devices = $query->orderByDesc('id')->get();
+
+        $this->enrichWithIgnitionData($devices);
+
+        $rows = $this->processVehicleDataForPdf($devices);
+
+        $pdf = Pdf::loadView('reports.vehicle_status_pdf', ['rows' => $rows]);
+        $pdf->setPaper('a4', 'landscape');
+
+        return $pdf->download('Vehicle_Status_Report_' . date('Y-m-d') . '.pdf');
+    }
+
+    private function buildVehicleStatusQuery(Request $request)
     {
         $user = $request->user();
 
@@ -51,47 +81,106 @@ class ReportController extends Controller
         // Eager load tcDevice and its current position
         $query->with(['tcDevice.position', 'manager']);
 
-        // Pagination or fetch all
-        $perPage = $request->input('per_page', 25);
+        return $query;
+    }
 
-        $devices = $query->orderByDesc('id')->paginate($perPage);
-
+    private function enrichWithIgnitionData($devicesCollection)
+    {
         // Fetch last ignition events for these devices
-        $deviceIds = $devices->pluck('device_id')->unique()->values()->all();
+        $deviceIds = $devicesCollection->pluck('device_id')->unique()->values()->all();
 
-        if (!empty($deviceIds)) {
-            $ignitionEvents = DB::connection('pgsql')
-                ->table('tc_events')
-                ->select('deviceid', 'type', DB::raw('MAX(eventtime) as last_time'))
-                ->whereIn('deviceid', $deviceIds)
-                ->whereIn('type', ['ignitionOn', 'ignitionOff'])
-                ->groupBy('deviceid', 'type')
-                ->get();
-
-            $ignitionTimes = [];
-            foreach ($ignitionEvents as $evt) {
-                $ignitionTimes[$evt->deviceid][$evt->type] = $evt->last_time;
-            }
-
-            // Helper for date formatting
-            $formatDate = function ($dateStr) {
-                if (!$dateStr) return null;
-                return date('d/m/Y-H:i', strtotime($dateStr));
-            };
-
-            // Enrich the devices collection
-            $devices->getCollection()->transform(function ($device) use ($ignitionTimes, $formatDate) {
-                $ignOnTime = $ignitionTimes[$device->device_id]['ignitionOn'] ?? null;
-                $ignOffTime = $ignitionTimes[$device->device_id]['ignitionOff'] ?? null;
-
-                $device->last_ignition_on = $ignOnTime ? $formatDate($ignOnTime) : null;
-                $device->last_ignition_off = $ignOffTime ? $formatDate($ignOffTime) : null;
-
-                return $device;
-            });
+        if (empty($deviceIds)) {
+            return;
         }
 
-        return $devices;
+        $ignitionEvents = DB::connection('pgsql')
+            ->table('tc_events')
+            ->select('deviceid', 'type', DB::raw('MAX(eventtime) as last_time'))
+            ->whereIn('deviceid', $deviceIds)
+            ->whereIn('type', ['ignitionOn', 'ignitionOff'])
+            ->groupBy('deviceid', 'type')
+            ->get();
+
+        $ignitionTimes = [];
+        foreach ($ignitionEvents as $evt) {
+            $ignitionTimes[$evt->deviceid][$evt->type] = $evt->last_time;
+        }
+
+        // Helper for date formatting
+        $formatDate = function ($dateStr) {
+            if (!$dateStr) return null;
+            return date('d/m/Y - h:i A', strtotime($dateStr));
+        };
+
+        // Enrich the devices collection
+        $devicesCollection->transform(function ($device) use ($ignitionTimes, $formatDate) {
+            $ignOnTime = $ignitionTimes[$device->device_id]['ignitionOn'] ?? null;
+            $ignOffTime = $ignitionTimes[$device->device_id]['ignitionOff'] ?? null;
+
+            $device->last_ignition_on = $ignOnTime ? $formatDate($ignOnTime) : null;
+            $device->last_ignition_off = $ignOffTime ? $formatDate($ignOffTime) : null;
+
+            return $device;
+        });
+    }
+
+    private function processVehicleDataForPdf($devices)
+    {
+        return $devices->map(function ($v) {
+            $tc = $v->tcDevice;
+            $pos = $tc?->position;
+
+            $decode = fn($a) => is_string($a) ? json_decode($a, true) : (is_array($a) ? $a : []);
+            $attrs = $decode($pos?->attributes ?? []);
+            $deviceAttrs = $decode($tc?->attributes ?? []);
+            $mergedAttrs = array_merge($deviceAttrs, $attrs);
+
+            // Ignition
+            $ignRaw = $mergedAttrs['ignition'] ?? $v->ignition ?? false;
+            $ignition = ($ignRaw === true || $ignRaw === 1 || strtolower((string)$ignRaw) === 'on');
+
+            // Speed
+            $speedVal = $pos?->speed ?? 0; // knots
+            $speedKmh = round($speedVal * 1.852);
+
+            // Odometer
+            $odometer = isset($mergedAttrs['odometer']) ? round($mergedAttrs['odometer'] / 1000) . ' km' : '0 km';
+            if (isset($mergedAttrs['totalDistance'])) {
+                 $odometer = round($mergedAttrs['totalDistance'] / 1000) . ' km';
+            }
+
+            // Location
+            $lat = $pos?->latitude ? number_format($pos->latitude, 5) : 'N/A';
+            $lon = $pos?->longitude ? number_format($pos->longitude, 5) : 'N/A';
+            $address = $pos?->address ?? 'N/A';
+
+            // Signal
+            $sat = $mergedAttrs['sat'] ?? 0;
+            $signal = 'Weak';
+            if ($sat >= 7) $signal = 'Good';
+            elseif ($sat >= 4) $signal = 'Fair';
+
+            return [
+                'vehicle_id' => $tc?->name ?? 'Unknown',
+                'owner' => $v->manager?->name ?? 'N/A',
+                'type_model' => trim(($deviceAttrs['type'] ?? '') . ' ' . ($tc?->model ?? '')),
+                'device_model' => $tc?->model ?? 'N/A',
+                'imei' => $tc?->uniqueid ?? 'N/A',
+                'iccid' => $deviceAttrs['iccid'] ?? 'N/A',
+                'odometer' => $odometer,
+                'power' => $ignition ? 'On' : 'Off',
+                'last_report' => $pos?->servertime ? date('d/m/Y - h:i A', strtotime($pos->servertime)) : 'N/A',
+                'latitude' => $lat,
+                'longitude' => $lon,
+                'location' => $address,
+                'speed' => $speedKmh . ' km/h',
+                'gps_signal' => $signal,
+                'ignition' => $ignition ? 'ON' : 'OFF',
+                'last_ignition_on' => $v->last_ignition_on ?? 'N/A',
+                'last_ignition_off' => $v->last_ignition_off ?? 'N/A',
+                'activation_date' => $v->created_at ? $v->created_at->format('d/m/Y') : 'N/A',
+            ];
+        });
     }
 
     public function tripSummary(Request $request)
