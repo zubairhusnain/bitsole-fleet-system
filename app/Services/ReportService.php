@@ -1269,6 +1269,31 @@ class ReportService
                         $fuel = $attrs['fuel'] ?? null;
                         if ($fuel) $fuel = round($fuel, 1) . ' L';
 
+                        // GSM Signal Formatting
+                        $rssi = $attrs['rssi'] ?? null;
+                        $gsm = 'No Signal';
+                        if ($rssi !== null) {
+                            if ($rssi >= -70) $gsm = 'Excellent';
+                            elseif ($rssi >= -85) $gsm = 'Good';
+                            elseif ($rssi >= -100) $gsm = 'Fair';
+                            elseif ($rssi >= -110) $gsm = 'Poor';
+                            else $gsm = 'Very Poor';
+                        }
+
+                        // GPS Signal Formatting
+                        $sat = $attrs['sat'] ?? 0;
+                        $gps = 'No Signal';
+                        if ($sat > 0) {
+                            if ($sat >= 10) $gps = 'Excellent';
+                            elseif ($sat >= 7) $gps = 'Good';
+                            elseif ($sat >= 4) $gps = 'Fair';
+                            else $gps = 'Poor';
+                        }
+
+                        // Ignition Formatting
+                        $ign = $attrs['ignition'] ?? false;
+                        $ignition = $ign ? 'ON' : 'OFF';
+
                         $chunkRows[] = [
                             'key' => 0, // Will reindex later
                             'vehicle' => $chunkDeviceMap[$dId] ?? 'Unknown',
@@ -1281,10 +1306,10 @@ class ReportService
                             'location' => $pos['address'] ?? '',
                             'direction' => $pos['course'] ?? 0,
                             'speed' => round(($pos['speed'] ?? 0) * 1.852, 0) . ' km/h',
-                            'gsm' => $attrs['rssi'] ?? null,
-                            'gps' => $attrs['sat'] ?? null,
+                            'gsm' => $gsm,
+                            'gps' => $gps,
                             'power' => $power,
-                            'ignition' => $attrs['ignition'] ?? null,
+                            'ignition' => $ignition,
                             'fuel' => $fuel,
                             'isEvent' => false,
                             'rawType' => 'position',
@@ -1334,6 +1359,244 @@ class ReportService
 
             } catch (\Throwable $e) {
                 Log::error('fetchAssetActivity chunk exception', ['error' => $e->getMessage()]);
+            }
+
+            $currentRowCount += count($chunkRows);
+            return $chunkRows;
+
+        })->collapse()->values()->all();
+
+        // Sort by Time
+        usort($allRows, function($a, $b) {
+            return $a['epoch'] <=> $b['epoch'];
+        });
+
+        // Limit to last N records
+        if ($limitParam > 0 && count($allRows) > $limitParam) {
+            $allRows = array_slice($allRows, -$limitParam);
+        }
+
+        // Re-index keys
+        foreach ($allRows as $index => &$row) {
+            $row['key'] = $index;
+        }
+        unset($row);
+
+        // Header Info
+        $lastRow = end($allRows);
+        $lastTime = $lastRow ? date('Y-m-d H:i:s', $lastRow['epoch']) : 'N/A';
+
+        // Find last position
+        $lastAddress = '';
+        for ($i = count($allRows) - 1; $i >= 0; $i--) {
+            if ($allRows[$i]['rawType'] === 'position') {
+                $lastAddress = $allRows[$i]['location'];
+                if (!$lastAddress) {
+                    $lastAddress = $allRows[$i]['lat'] . ', ' . $allRows[$i]['lon'];
+                }
+                break;
+            }
+        }
+
+        $vehicleLabel = count($deviceIds) > 1 ? 'Multiple Vehicles (' . count($deviceIds) . ')' : $singleDeviceName;
+        $deviceIdLabel = count($deviceIds) > 1 ? 'Multiple' : ($deviceIds[0] ?? 'N/A');
+
+        $header = [
+            'vehicleId' => $vehicleLabel,
+            'deviceId' => $deviceIdLabel,
+            'duration' => date('Y/m/d H:i', strtotime($from)) . ' - ' . date('Y/m/d H:i', strtotime($to)),
+            'lastReport' => $lastTime,
+            'lastLocation' => $lastAddress,
+        ];
+
+        return [
+            'header' => $header,
+            'rows' => $allRows
+        ];
+    }
+
+    public function fetchVehicleActivity($request, $deviceIds)
+    {
+        // Increase memory limit for this heavy report
+        // Set to 1024M to handle large JSON responses from Traccar
+        ini_set('memory_limit', '1024M');
+        set_time_limit(300); // 5 minutes timeout
+
+        $sessionId = $request->user()->traccarSession ?? session('cookie');
+
+        if (empty($deviceIds)) return [];
+
+        $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
+        $toStr = $request->to_date;
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
+            $toStr .= ' 23:59:59';
+        }
+        $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
+
+            // Get limit from request, default to 100
+            $limitParam = (int) $request->input('limit', 100);
+
+            $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
+        if (empty($baseUrl)) return [];
+
+        $headers = [
+            'Cookie' => $sessionId,
+            'Accept' => 'application/json'
+        ];
+
+        // Sequential processing with smaller chunks to save memory
+        // Process 1 device at a time to minimize peak memory usage
+        $chunks = collect(array_chunk($deviceIds, 1));
+
+        $singleDeviceName = 'Unknown';
+        $limitReached = false;
+        $currentRowCount = 0;
+
+        $allRows = $chunks->map(function ($chunkIds) use ($headers, $baseUrl, $from, $to, &$singleDeviceName, &$limitReached, &$currentRowCount, $limitParam) {
+
+            if ($limitReached) return [];
+
+            // If we have collected enough rows across chunks (approx check)
+            if ($limitParam > 0 && $currentRowCount >= $limitParam * 2) {
+                 $limitReached = true;
+                 return [];
+            }
+
+            $deviceQuery = collect($chunkIds)->map(function($id) {
+                return "deviceId={$id}";
+            })->implode('&');
+            $fullQuery = "{$deviceQuery}&from={$from}&to={$to}";
+
+            try {
+                $responses = Http::pool(fn (Pool $pool) => [
+                    $pool->as('route')->withHeaders($headers)->get("{$baseUrl}/api/reports/route?{$fullQuery}"),
+                    $pool->as('events')->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$fullQuery}"),
+                    $pool->as('summary')->withHeaders($headers)->get("{$baseUrl}/api/reports/summary?{$fullQuery}"),
+                ]);
+            } catch (\Exception $e) {
+                Log::error('fetchVehicleActivity chunk exception', ['error' => $e->getMessage()]);
+                return [];
+            }
+
+            $routeData = ($responses['route']->ok()) ? $responses['route']->json() : [];
+            $eventsData = ($responses['events']->ok()) ? $responses['events']->json() : [];
+            $summaryData = ($responses['summary']->ok()) ? $responses['summary']->json() : [];
+
+            $chunkRows = [];
+            $chunkDeviceMap = [];
+
+            // Process Summary to get device names
+            if (is_array($summaryData)) {
+                foreach ($summaryData as $s) {
+                    if (isset($s['deviceId'])) {
+                        $name = $s['deviceName'] ?? 'Device ' . $s['deviceId'];
+                        $chunkDeviceMap[$s['deviceId']] = $name;
+                        if ($singleDeviceName === 'Unknown') $singleDeviceName = $name;
+                    }
+                }
+            }
+
+            // Process Route
+            if (is_array($routeData)) {
+                foreach ($routeData as $pos) {
+                    $dId = $pos['deviceId'] ?? 0;
+                    $time = $pos['fixTime'] ?? $pos['deviceTime'];
+                    $dt = strtotime($time);
+                    $attrs = $pos['attributes'] ?? [];
+
+                    $lat = isset($pos['latitude']) ? round($pos['latitude'], 5) : 0;
+                    $lon = isset($pos['longitude']) ? round($pos['longitude'], 5) : 0;
+                    $power = $attrs['power'] ?? $attrs['battery'] ?? null;
+                    if ($power) $power = round($power, 1) . 'V';
+                    $fuel = $attrs['fuel'] ?? null;
+                    if ($fuel) $fuel = round($fuel, 1) . ' L';
+
+                    // GSM Signal Formatting
+                    $rssi = $attrs['rssi'] ?? null;
+                    $gsm = 'No Signal';
+                    if ($rssi !== null) {
+                        if ($rssi >= -70) $gsm = 'Excellent';
+                        elseif ($rssi >= -85) $gsm = 'Good';
+                        elseif ($rssi >= -100) $gsm = 'Fair';
+                        elseif ($rssi >= -110) $gsm = 'Poor';
+                        else $gsm = 'Very Poor';
+                    }
+
+                    // GPS Signal Formatting
+                    $sat = $attrs['sat'] ?? 0;
+                    $gps = 'No Signal';
+                    if ($sat > 0) {
+                        if ($sat >= 10) $gps = 'Excellent';
+                        elseif ($sat >= 7) $gps = 'Good';
+                        elseif ($sat >= 4) $gps = 'Fair';
+                        else $gps = 'Poor';
+                    }
+
+                    // Ignition Formatting
+                    $ign = $attrs['ignition'] ?? false;
+                    $ignition = $ign ? 'ON' : 'OFF';
+
+                    $chunkRows[] = [
+                        'key' => 0, // Will reindex later
+                        'vehicle' => $chunkDeviceMap[$dId] ?? 'Unknown',
+                        'groupDate' => date('d-m-Y l', $dt),
+                        'date' => date('d-m-Y', $dt),
+                        'time' => date('H:i:s', $dt),
+                        'status' => 'Position Log',
+                        'lat' => $lat,
+                        'lon' => $lon,
+                        'location' => $pos['address'] ?? '',
+                        'direction' => $pos['course'] ?? 0,
+                        'speed' => round(($pos['speed'] ?? 0) * 1.852, 0) . ' km/h',
+                        'gsm' => $gsm,
+                        'gps' => $gps,
+                        'power' => $power,
+                        'ignition' => $ignition,
+                        'fuel' => $fuel,
+                        'isEvent' => false,
+                        'rawType' => 'position',
+                        'epoch' => $dt
+                    ];
+                }
+            }
+
+            // Process Events
+            if (is_array($eventsData)) {
+                foreach ($eventsData as $evt) {
+                    $dId = $evt['deviceId'] ?? 0;
+                    $time = $evt['eventTime'] ?? $evt['serverTime'];
+                    $dt = strtotime($time);
+                    $attrs = $evt['attributes'] ?? [];
+
+                    $chunkRows[] = [
+                        'key' => 0,
+                        'vehicle' => $chunkDeviceMap[$dId] ?? 'Unknown',
+                        'groupDate' => date('d-m-Y l', $dt),
+                        'date' => date('d-m-Y', $dt),
+                        'time' => date('H:i:s', $dt),
+                        'status' => $this->formatEventDescription($evt),
+                        'lat' => 0,
+                        'lon' => 0,
+                        'location' => '',
+                        'direction' => 0,
+                        'speed' => '0 km/h',
+                        'gsm' => null,
+                        'gps' => null,
+                        'power' => null,
+                        'ignition' => null,
+                        'fuel' => null,
+                        'isEvent' => true,
+                        'rawType' => $evt['type'] ?? '',
+                        'epoch' => $dt
+                    ];
+                }
+            }
+
+            unset($routeData, $eventsData, $summaryData, $responses);
+
+            // Force garbage collection
+            if (function_exists('gc_collect_cycles')) {
+                gc_collect_cycles();
             }
 
             $currentRowCount += count($chunkRows);

@@ -268,6 +268,29 @@ class ReportController extends Controller
         }
     }
 
+    public function vehicleActivity(Request $request)
+    {
+        try {
+            $request->validate([
+                'from_date' => 'required|date',
+                'to_date' => 'required|date|after_or_equal:from_date',
+            ]);
+
+            $from = \Carbon\Carbon::parse($request->from_date);
+            $to = \Carbon\Carbon::parse($request->to_date);
+            if ($from->diffInDays($to) > 31) {
+                return response()->json(['message' => 'Date range cannot exceed 31 days.'], 422);
+            }
+
+            $deviceIds = $this->getDeviceIds($request);
+            if (empty($deviceIds)) return response()->json([]);
+            return $this->reportService->fetchVehicleActivity($request, $deviceIds);
+        } catch (\Throwable $e) {
+            Log::error('vehicleActivity failed', ['error' => $e->getMessage()]);
+            return response()->json([]);
+        }
+    }
+
     public function deviceOptions(Request $request)
     {
         $user = $request->user();
