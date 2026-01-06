@@ -1798,6 +1798,37 @@ const batteryMobileRaw = computed(() => positionPickAttr(['battery', 'Battery', 
 const batteryTrackerRaw = computed(() => positionPickAttr(['batterylevel', 'batteryLevel', 'battery_level', 'voltage', 'batteryVoltage', 'power', 'battery', 'Battery']));
 const batteryDisplay = computed(() => {
     const a = positionAttrs.value || {};
+
+    // Priority 1: Battery_io_67
+    const bio67 = a.Battery_io_67;
+    if (bio67 !== undefined && bio67 !== null && bio67 !== '') {
+        const s = String(bio67).trim();
+        const n = extractNumber(s);
+        if (Number.isFinite(n)) {
+            if (n !== -1) {
+                const fixed = Math.abs(n) >= 10 ? n.toFixed(1) : n.toFixed(2);
+                return `${fixed} V`;
+            }
+        } else {
+            return hasVoltageUnit(s) ? s : `${s} V`;
+        }
+    }
+
+    // Priority 2: CAN_Battery_io_168
+    const canBio168 = a.CAN_Battery_io_168;
+    if (canBio168 !== undefined && canBio168 !== null && canBio168 !== '') {
+        const s = String(canBio168).trim();
+        const n = extractNumber(s);
+        if (Number.isFinite(n)) {
+            if (n !== -1) {
+                const fixed = Math.abs(n) >= 10 ? n.toFixed(1) : n.toFixed(2);
+                return `${fixed} V`;
+            }
+        } else {
+            return hasVoltageUnit(s) ? s : `${s} V`;
+        }
+    }
+
     const bl = a.batteryLevel;
     if (bl !== undefined && bl !== null && bl !== '') {
         const s = String(bl).trim();
@@ -1806,7 +1837,7 @@ const batteryDisplay = computed(() => {
             return `${Math.round(n)} %`;
         }
         return hasPercentUnit(s) ? s : `${s} %`;
-    }
+    } 
     const bv = a.battery;
     if (bv !== undefined && bv !== null && bv !== '') {
         const s = String(bv).trim();
@@ -1849,6 +1880,33 @@ function voltageToPercent(v) {
 // Battery percent for icon fill (percent for mobile, voltage→percent for trackers)
 const batteryLevelPercent = computed(() => {
     const a = positionAttrs.value || {};
+
+    // Priority 1: Battery_io_67
+    const bio67 = a.Battery_io_67;
+    if (bio67 !== undefined && bio67 !== null && bio67 !== '') {
+        const s = String(bio67).trim();
+        const n = extractNumber(s);
+        if (Number.isFinite(n)) {
+            if (n !== -1) {
+                if (hasPercentUnit(s)) return Math.max(0, Math.min(100, Math.round(n)));
+                return voltageToPercent(n);
+            }
+        }
+    }
+
+    // Priority 2: CAN_Battery_io_168
+    const canBio168 = a.CAN_Battery_io_168;
+    if (canBio168 !== undefined && canBio168 !== null && canBio168 !== '') {
+        const s = String(canBio168).trim();
+        const n = extractNumber(s);
+        if (Number.isFinite(n)) {
+            if (n !== -1) {
+                if (hasPercentUnit(s)) return Math.max(0, Math.min(100, Math.round(n)));
+                return voltageToPercent(n);
+            }
+        }
+    }
+
     const bl = a.batteryLevel;
     if (bl !== undefined && bl !== null && bl !== '') {
         const n = extractNumber(bl);
