@@ -1985,4 +1985,108 @@ class ReportService
         }
     }
 
+    public function fetchUtilisationReport($request, $deviceId)
+    {
+        $sessionId = $request->user()->traccarSession ?? session('cookie');
+        $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
+        $toStr = $request->to_date;
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
+            $toStr .= ' 23:59:59';
+        }
+        $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
+
+        $fullQuery = "deviceId={$deviceId}&from={$from}&to={$to}";
+
+        $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
+        if (empty($baseUrl)) {
+             Log::error('ReportService: Traccar Host URL is not configured.');
+             return response()->json(['message' => 'Configuration error'], 500);
+        }
+
+        $headers = [
+            'Cookie' => $sessionId,
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json'
+        ];
+
+        try {
+            $responses = Http::pool(fn (Pool $pool) => [
+                $pool->as('trips')->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
+                $pool->as('stops')->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('fetchUtilisationReport exception', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to fetch report data'], 500);
+        }
+
+        $allTrips = ($responses['trips']->ok()) ? $responses['trips']->json() : [];
+        $allStops = ($responses['stops']->ok()) ? $responses['stops']->json() : [];
+
+        $trips = collect($allTrips);
+        $stops = collect($allStops);
+
+        // Group by Date
+        $groupedTrips = $trips->groupBy(function($item) {
+             return date('Y-m-d', strtotime($item['startTime']));
+        });
+
+        $rows = $groupedTrips->map(function ($dayTrips, $date) use ($stops) {
+            $dayStops = $stops->filter(function($stop) use ($date) {
+                return date('Y-m-d', strtotime($stop['startTime'])) == $date;
+            });
+
+            $distance = $dayTrips->sum('distance');
+            $tripMs = $dayTrips->sum('duration');
+            $idleMs = $dayStops->sum('duration');
+
+            $totalMs = $tripMs + $idleMs;
+            $usagePct = $totalMs > 0 ? round(($tripMs / $totalMs) * 100) : 0;
+
+            $h = floor($tripMs / 3600000);
+            $m = floor(($tripMs % 3600000) / 60000);
+            $moveStr = "{$h} hours {$m} minutes";
+
+            // Hourly Activity
+            $hours = array_fill(0, 24, false);
+            foreach ($dayTrips as $t) {
+                $start = strtotime($t['startTime']);
+                $end = strtotime($t['endTime']);
+
+                for ($h = 0; $h < 24; $h++) {
+                    // Use UTC to match Traccar's Z-suffixed timestamps
+                    $blockStart = strtotime("{$date}T" . sprintf('%02d', $h) . ":00:00Z");
+                    $blockEnd = strtotime("{$date}T" . sprintf('%02d', $h) . ":59:59Z");
+
+                    if ($start <= $blockEnd && $end >= $blockStart) {
+                        $hours[$h] = true;
+                    }
+                }
+            }
+
+            $ts = strtotime($date);
+            $dayLabel = date('d/m/Y l', $ts);
+
+            return [
+                'day' => $dayLabel,
+                'usage' => "{$usagePct}%",
+                'move' => $moveStr,
+                'dist' => round($distance / 1000, 2) . ' KM',
+                'hours' => $hours
+            ];
+        })->values();
+
+        $vehicleName = $trips->first()['deviceName'] ?? 'Unknown';
+        $totalDays = max(1, round((strtotime($toStr) - strtotime($request->from_date)) / (60 * 60 * 24)) + 1);
+
+        return [
+            'summary' => [
+                'vehicleIdDisplay' => $vehicleName,
+                'deviceId' => $deviceId,
+                'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
+                'totalDays' => $totalDays
+            ],
+            'rows' => $rows
+        ];
+    }
+
 }

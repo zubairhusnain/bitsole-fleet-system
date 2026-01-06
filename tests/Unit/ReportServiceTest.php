@@ -17,6 +17,64 @@ class ReportServiceTest extends TestCase
         Config::set('constants.Constants.host', 'http://traccar.test');
     }
 
+    public function test_fetch_utilisation_report_returns_correct_structure()
+    {
+        Http::fake([
+            'http://traccar.test/api/reports/trips*' => Http::response([
+                [
+                    'deviceId' => 1,
+                    'deviceName' => 'Vehicle 1',
+                    'startTime' => '2023-10-25T08:10:00Z',
+                    'endTime' => '2023-10-25T08:50:00Z',
+                    'distance' => 10000,
+                    'duration' => 2400000, // 40 mins
+                ]
+            ], 200),
+            'http://traccar.test/api/reports/stops*' => Http::response([
+                [
+                    'deviceId' => 1,
+                    'startTime' => '2023-10-25T09:00:00Z',
+                    'endTime' => '2023-10-25T09:30:00Z',
+                    'duration' => 1800000, // 30 mins
+                ]
+            ], 200),
+        ]);
+
+        $service = new ReportService();
+        $request = new Request([
+            'from_date' => '2023-10-25',
+            'to_date' => '2023-10-25'
+        ]);
+        $user = new User();
+        $user->traccarSession = 'JSESSIONID=123';
+        $request->setUserResolver(fn () => $user);
+
+        $result = $service->fetchUtilisationReport($request, 1);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('summary', $result);
+        $this->assertArrayHasKey('rows', $result);
+
+        $summary = $result['summary'];
+        $this->assertEquals('Vehicle 1', $summary['vehicleIdDisplay']);
+        $this->assertEquals(1, $summary['deviceId']);
+
+        $rows = $result['rows'];
+        $this->assertCount(1, $rows);
+        $row = $rows[0];
+
+        $this->assertEquals('10 KM', $row['dist']);
+        $this->assertEquals('0 hours 40 minutes', $row['move']);
+
+        // 40m move + 30m idle = 70m total. 40/70 = 57.14% => 57%
+        $this->assertEquals('57%', $row['usage']);
+
+        $hours = $row['hours'];
+        $this->assertTrue($hours[8], 'Hour 8 should be active');
+        $this->assertFalse($hours[7], 'Hour 7 should be inactive');
+        $this->assertFalse($hours[9], 'Hour 9 should be inactive');
+    }
+
     public function test_fetch_fleet_summary_validates_unrealistic_speed()
     {
         Http::fake([
@@ -135,10 +193,12 @@ class ReportServiceTest extends TestCase
 
         $result = $service->fetchDailySummary($request, [1]);
 
-        $this->assertIsArray($result->toArray());
-        $this->assertCount(1, $result);
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('rows', $result);
+        $rows = $result['rows'];
+        $this->assertCount(1, $rows);
 
-        $first = $result->first();
+        $first = $rows[0];
         $this->assertEquals('10 KM', $first['distance']);
         $this->assertEquals('1h 0m 0s', $first['trip']);
         $this->assertEquals('0h 30m 0s', $first['idle']);
@@ -227,8 +287,11 @@ class ReportServiceTest extends TestCase
 
         $result = $service->fetchMonthlySummary($request, [1]);
 
-        $this->assertCount(1, $result);
-        $first = $result->first();
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('rows', $result);
+        $rows = $result['rows'];
+        $this->assertCount(1, $rows);
+        $first = $rows[0];
         $this->assertEquals('10/2023', $first['date']);
         $this->assertEquals('10 KM', $first['distance']);
     }
@@ -404,10 +467,12 @@ class ReportServiceTest extends TestCase
 
         $result = $service->fetchMonthlySummary($request, [1]);
 
-        $this->assertIsArray($result->toArray());
-        $this->assertCount(1, $result);
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('rows', $result);
+        $rows = $result['rows'];
+        $this->assertCount(1, $rows);
 
-        $first = $result->first();
+        $first = $rows[0];
         $this->assertEquals('50 KM', $first['distance']);
         $this->assertEquals('0d 02h 00m', $first['trip']);
         $this->assertEquals('1h 0m', $first['idle']);
