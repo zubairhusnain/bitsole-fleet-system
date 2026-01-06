@@ -13,27 +13,39 @@
       <div class="card-body pt-2">
         <div class="row g-3 align-items-end">
           <div class="col-12 col-md-4">
-            <label class="form-label small fw-semibold text-muted">Duration (From - To)</label>
+            <label class="form-label small fw-semibold text-muted">Duration</label>
             <div class="input-group">
               <input type="date" v-model="fromDate" class="form-control" />
               <span class="input-group-text bg-white">-</span>
               <input type="date" v-model="toDate" class="form-control" />
             </div>
           </div>
-          <div class="col-12 col-md-3">
+          <div class="col-12 col-md-4">
             <label class="form-label small fw-semibold text-muted">Vehicle</label>
             <select class="form-select text-muted" v-model="selectedDevice">
               <option :value="null">--Select a Vehicle--</option>
               <option v-for="d in devices" :key="d.id" :value="d.id">{{ d.name }}</option>
             </select>
           </div>
-          <div class="col-12 col-md-3">
+          <div class="col-12 col-md-4">
             <label class="form-label small fw-semibold text-muted">Search Filter</label>
             <input type="text" v-model="searchFilter" class="form-control" placeholder="-- Search Filter --" />
           </div>
 
-          <div class="col-12 col-md-2 text-md-end">
-             <button class="btn btn-primary px-4" @click="fetchReport" :disabled="loading">
+          <div class="col-12 col-md-4">
+            <label class="form-label small fw-semibold text-muted">Report Format</label>
+             <select class="form-select text-muted" disabled>
+              <option>-- Report Format --</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label small fw-semibold text-muted">Map Option</label>
+             <select class="form-select text-muted" disabled>
+              <option>-- Map Option --</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-4 text-md-end">
+             <button class="btn btn-primary px-4 w-100" @click="fetchReport" :disabled="loading">
                <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
                Submit
              </button>
@@ -100,7 +112,7 @@
               </tr>
               <template v-else v-for="(group, dateKey) in groupedRows" :key="dateKey">
                 <tr class="table-section">
-                  <td colspan="13" class="fw-semibold ps-3 py-2">{{ dateKey }}</td>
+                  <td colspan="13" class="fw-semibold ps-3 py-2 text-primary">{{ dateKey }}</td>
                 </tr>
                 <tr v-for="row in group" :key="row.key">
                   <td class="ps-3">{{ row.date }}</td>
@@ -118,7 +130,7 @@
                     {{ row.gsm }}
                   </td>
                   <td>{{ row.gps }}</td>
-                  <td class="text-success">{{ row.power }}</td>
+                  <td class="text-primary fw-bold">{{ row.power }}</td>
                   <td>
                     <span v-if="row.ignition" :class="row.ignition === 'ON' ? 'badge bg-success' : 'badge bg-secondary'">
                       {{ row.ignition }}
@@ -132,7 +144,20 @@
         </div>
       </div>
       <div class="card-footer d-flex align-items-center py-2 bg-white border-top" v-if="reportData && reportData.rows.length > 0">
-        <div class="text-muted small me-auto">Showing {{ reportData.rows.length }} results</div>
+        <div class="text-muted small me-auto">
+           Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, filteredRows.length) }} of {{ filteredRows.length }} results
+        </div>
+        <ul class="pagination pagination-sm mb-0">
+          <li class="page-item" :class="{ disabled: currentPage === 1 }">
+            <button class="page-link" @click="changePage(currentPage - 1)">&lt;</button>
+          </li>
+          <li class="page-item" v-for="p in totalPages" :key="p" :class="{ active: p === currentPage }" v-show="Math.abs(p - currentPage) < 3 || p === 1 || p === totalPages">
+             <button class="page-link" @click="changePage(p)">{{ p }}</button>
+          </li>
+          <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+            <button class="page-link" @click="changePage(currentPage + 1)">&gt;</button>
+          </li>
+        </ul>
       </div>
     </div>
   </div>
@@ -148,11 +173,15 @@ const router = useRouter();
 // State
 const devices = ref([]);
 const selectedDevice = ref(null);
-const fromDate = ref(new Date().toISOString().slice(0, 10));
+const fromDate = ref(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
 const toDate = ref(new Date().toISOString().slice(0, 10));
 const searchFilter = ref('');
 const loading = ref(false);
 const reportData = ref(null);
+
+// Pagination
+const currentPage = ref(1);
+const itemsPerPage = ref(20);
 
 // Computed
 const filteredRows = computed(() => {
@@ -166,9 +195,17 @@ const filteredRows = computed(() => {
   );
 });
 
+const totalPages = computed(() => Math.ceil(filteredRows.value.length / itemsPerPage.value));
+
+const paginatedRows = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value;
+  const end = start + itemsPerPage.value;
+  return filteredRows.value.slice(start, end);
+});
+
 const groupedRows = computed(() => {
   const groups = {};
-  filteredRows.value.forEach(row => {
+  paginatedRows.value.forEach(row => {
     if (!groups[row.groupDate]) {
       groups[row.groupDate] = [];
     }
@@ -178,12 +215,19 @@ const groupedRows = computed(() => {
 });
 
 // Methods
+function changePage(page) {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page;
+  }
+}
 async function loadDevices() {
   try {
     const res = await axios.get('/web/reports/device-options');
-    devices.value = res.data;
+    devices.value = res.data.options || [];
     if (devices.value.length > 0) {
       selectedDevice.value = devices.value[0].id;
+      // Auto-fetch report on load
+      fetchReport();
     }
   } catch (e) {
     console.error('Failed to load devices', e);
