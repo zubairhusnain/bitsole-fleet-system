@@ -7,6 +7,7 @@ use App\Models\Devices;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 
@@ -706,6 +707,7 @@ class ReportService
 
         $allTrips = ($responses['trips']->ok()) ? $responses['trips']->json() : [];
         $allStops = ($responses['stops']->ok()) ? $responses['stops']->json() : [];
+
 
         $trips = collect($allTrips);
         $stops = collect($allStops);
@@ -2037,8 +2039,8 @@ class ReportService
 
         try {
             $responses = Http::pool(fn (Pool $pool) => [
-                $pool->as('trips')->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
-                $pool->as('stops')->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
+                $pool->as('trips')->timeout(120)->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
+                $pool->as('stops')->timeout(120)->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
             ]);
         } catch (\Exception $e) {
             Log::error('fetchUtilisationReport exception', ['error' => $e->getMessage()]);
@@ -2070,8 +2072,16 @@ class ReportService
             ];
         }
 
-        $allTrips = ($responses['trips']->ok()) ? $responses['trips']->json() : [];
-        $allStops = ($responses['stops']->ok()) ? $responses['stops']->json() : [];
+        // If we are here, $responses MIGHT be set. But if catch block returns, we are good.
+        // Wait, if catch block executes, it returns.
+        // So we only reach here if Http::pool didn't throw.
+
+        // Safe check
+        $tripsResp = $responses['trips'] ?? null;
+        $stopsResp = $responses['stops'] ?? null;
+
+        $allTrips = ($tripsResp instanceof Response && $tripsResp->ok()) ? $tripsResp->json() : [];
+        $allStops = ($stopsResp instanceof Response && $stopsResp->ok()) ? $stopsResp->json() : [];
 
         $trips = collect($allTrips);
         $stops = collect($allStops);
