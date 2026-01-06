@@ -2008,7 +2008,7 @@ class ReportService
              if (is_string($attributes)) $attributes = json_decode($attributes, true);
 
              $vehicleName = $tcDevice->name ?? 'Unknown';
-             $vehicleNo = $attributes['vehicleNo'] ?? $attributes['vehicle_no'] ?? $attributes['vehicle number'] ?? $attributes['vehicleNumber'] ?? null;
+             $vehicleNo = $attributes['vehicleNo'] ?? null;
 
              if ($vehicleNo) {
                  $vehicleIdDisplay = "{$vehicleNo} - {$vehicleName}";
@@ -2049,7 +2049,7 @@ class ReportService
             if (is_string($attributes)) $attributes = json_decode($attributes, true);
 
             $vehicleName = $tcDevice->name ?? 'Unknown';
-            $vehicleNo = $attributes['vehicleNo'] ?? $attributes['vehicle_no'] ?? $attributes['vehicle number'] ?? $attributes['vehicleNumber'] ?? null;
+            $vehicleNo = $attributes['vehicleNo'] ?? null;
 
             if ($vehicleNo) {
                 $vehicleIdDisplay = "{$vehicleNo} - {$vehicleName}";
@@ -2140,7 +2140,7 @@ class ReportService
          $vehicleName = $tcDevice->name ?? $vehicleNameFromTrips;
 
          // Try to find vehicle no in attributes
-         $vehicleNo = $attributes['vehicleNo'] ?? $attributes['vehicle_no'] ?? $attributes['vehicle number'] ?? $attributes['vehicleNumber'] ?? null;
+         $vehicleNo = $attributes['vehicleNo'] ?? null;
 
          if ($vehicleNo) {
              $vehicleIdDisplay = "{$vehicleNo} - {$vehicleName}";

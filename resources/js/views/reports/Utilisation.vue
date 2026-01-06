@@ -62,7 +62,7 @@
             <div class="col-12 col-md-3">
                 <div class="bg-light rounded-2 p-3 h-100">
                     <div class="small fw-bold text-dark mb-1">Vehicle ID</div>
-                    <div class="small text-muted">#{{ summary.vehicleIdDisplay }}</div>
+                    <div class="small text-muted">{{ summary.vehicleIdDisplay }}</div>
                 </div>
             </div>
             <div class="col-12 col-md-3">
@@ -226,12 +226,8 @@ async function fetchReport() {
         durationDisplay: '',
         totalDays: 0
     };
+    console.log('summary data ',summary);
 
-    // Override vehicleIdDisplay with uniqueId if available locally
-    const opt = deviceOptions.value.find(x => x.id === selectedDeviceId.value);
-    if (opt && opt.uniqueId) {
-        summary.value.vehicleIdDisplay = opt.uniqueId;
-    }
     page.value = 1;
 
   } catch (e) {
