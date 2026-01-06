@@ -1989,6 +1989,7 @@ class ReportService
 
     public function fetchUtilisationReport($request, $deviceId)
     {
+        Log::info("fetchUtilisationReport started for device {$deviceId}");
         $type = $request->type ?? 'Movement';
         $sessionId = $request->user()->traccarSession ?? session('cookie');
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
@@ -2090,9 +2091,10 @@ class ReportService
         $foundVehicleName = null;
 
         // Chunk dates for processing Trips/Stops to save memory and avoid timeouts
-        $dateChunks = array_chunk($chunkDates, 5);
+        $dateChunks = array_chunk($chunkDates, 30);
 
-        foreach ($dateChunks as $batchDates) {
+        foreach ($dateChunks as $index => $batchDates) {
+            Log::info("Processing batch " . ($index + 1) . " with " . count($batchDates) . " dates");
             $responses = [];
             try {
                 $responses = Http::pool(fn (Pool $pool) => array_merge(
@@ -2144,6 +2146,9 @@ class ReportService
 
                 // Get Trips for this day
                 $tResp = $responses["trips_{$date}"] ?? null;
+                if (!($tResp instanceof Response && $tResp->ok())) {
+                     Log::warning("Trips request failed for {$date}", ['status' => $tResp ? $tResp->status() : 'null']);
+                }
                 $dayTrips = ($tResp instanceof Response && $tResp->ok()) ? $tResp->json() : [];
 
                 // Process Trips (Movement)
@@ -2199,6 +2204,9 @@ class ReportService
                     $totalMs = $engineMs;
                 } else {
                     $sResp = $responses["stops_{$date}"] ?? null;
+                    if (!($sResp instanceof Response && $sResp->ok())) {
+                         Log::warning("Stops request failed for {$date}", ['status' => $sResp ? $sResp->status() : 'null']);
+                    }
                     $dayStops = ($sResp instanceof Response && $sResp->ok()) ? $sResp->json() : [];
 
                     foreach ($dayStops as $stop) {
