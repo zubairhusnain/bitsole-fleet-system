@@ -353,8 +353,7 @@ const fetchVehicles = async () => {
         return;
     }
     if (selectedFormat.value === 'PDF') {
-        // Simple print for PDF export
-        setTimeout(() => window.print(), 500);
+        await downloadPDF();
         return;
     }
 
