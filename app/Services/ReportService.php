@@ -2006,12 +2006,20 @@ class ReportService
              $uniqueId = $tcDevice ? $tcDevice->uniqueid : $deviceId;
              $attributes = $tcDevice && $tcDevice->attributes ? $tcDevice->attributes : [];
              if (is_string($attributes)) $attributes = json_decode($attributes, true);
-             $vehicleNo = $attributes['vehicleNo'] ?? $attributes['vehicle_no'] ?? $attributes['vehicle number'] ?? $attributes['vehicleNumber'] ?? ($tcDevice->name ?? 'Unknown');
+
+             $vehicleName = $tcDevice->name ?? 'Unknown';
+             $vehicleNo = $attributes['vehicleNo'] ?? $attributes['vehicle_no'] ?? $attributes['vehicle number'] ?? $attributes['vehicleNumber'] ?? null;
+
+             if ($vehicleNo) {
+                 $vehicleIdDisplay = "{$vehicleNo} - {$vehicleName}";
+             } else {
+                 $vehicleIdDisplay = $vehicleName;
+             }
 
              $totalDays = max(1, round((strtotime($toStr) - strtotime($request->from_date)) / (60 * 60 * 24)) + 1);
              return [
                  'summary' => [
-                     'vehicleIdDisplay' => $vehicleNo,
+                     'vehicleIdDisplay' => $vehicleIdDisplay,
                      'deviceId' => $uniqueId,
                      'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
                      'totalDays' => $totalDays
@@ -2039,12 +2047,20 @@ class ReportService
             $uniqueId = $tcDevice ? $tcDevice->uniqueid : $deviceId;
             $attributes = $tcDevice && $tcDevice->attributes ? $tcDevice->attributes : [];
             if (is_string($attributes)) $attributes = json_decode($attributes, true);
-            $vehicleNo = $attributes['vehicleNo'] ?? $attributes['vehicle_no'] ?? $attributes['vehicle number'] ?? $attributes['vehicleNumber'] ?? ($tcDevice->name ?? 'Unknown');
+
+            $vehicleName = $tcDevice->name ?? 'Unknown';
+            $vehicleNo = $attributes['vehicleNo'] ?? $attributes['vehicle_no'] ?? $attributes['vehicle number'] ?? $attributes['vehicleNumber'] ?? null;
+
+            if ($vehicleNo) {
+                $vehicleIdDisplay = "{$vehicleNo} - {$vehicleName}";
+            } else {
+                $vehicleIdDisplay = $vehicleName;
+            }
 
             $totalDays = max(1, round((strtotime($toStr) - strtotime($request->from_date)) / (60 * 60 * 24)) + 1);
             return [
                 'summary' => [
-                    'vehicleIdDisplay' => $vehicleNo,
+                    'vehicleIdDisplay' => $vehicleIdDisplay,
                     'deviceId' => $uniqueId,
                     'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
                     'totalDays' => $totalDays
@@ -2120,17 +2136,24 @@ class ReportService
         }
 
         // Fallback to name from trips if local DB lookup fails
-        $vehicleNameFromTrips = data_get($trips->first(), 'deviceName', 'Unknown');
+         $vehicleNameFromTrips = data_get($trips->first(), 'deviceName', 'Unknown');
+         $vehicleName = $tcDevice->name ?? $vehicleNameFromTrips;
 
-        // Try to find vehicle no in attributes
-        $vehicleNo = $attributes['vehicleNo'] ?? $attributes['vehicle_no'] ?? $attributes['vehicle number'] ?? $attributes['vehicleNumber'] ?? ($tcDevice->name ?? $vehicleNameFromTrips);
+         // Try to find vehicle no in attributes
+         $vehicleNo = $attributes['vehicleNo'] ?? $attributes['vehicle_no'] ?? $attributes['vehicle number'] ?? $attributes['vehicleNumber'] ?? null;
 
-        $totalDays = max(1, round((strtotime($toStr) - strtotime($request->from_date)) / (60 * 60 * 24)) + 1);
+         if ($vehicleNo) {
+             $vehicleIdDisplay = "{$vehicleNo} - {$vehicleName}";
+         } else {
+             $vehicleIdDisplay = $vehicleName;
+         }
 
-        return [
-            'summary' => [
-                'vehicleIdDisplay' => $vehicleNo,
-                'deviceId' => $uniqueId,
+         $totalDays = max(1, round((strtotime($toStr) - strtotime($request->from_date)) / (60 * 60 * 24)) + 1);
+
+         return [
+             'summary' => [
+                 'vehicleIdDisplay' => $vehicleIdDisplay,
+                 'deviceId' => $uniqueId,
                 'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
                 'totalDays' => $totalDays
             ],

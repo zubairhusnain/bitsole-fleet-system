@@ -352,7 +352,15 @@ class ReportController extends Controller
                         $uniqueId = $tcDevice ? $tcDevice->uniqueid : $deviceId;
                         $attributes = $tcDevice && $tcDevice->attributes ? $tcDevice->attributes : [];
                         if (is_string($attributes)) $attributes = json_decode($attributes, true);
-                        $vehicleNo = $attributes['vehicleNo'] ?? $attributes['vehicle_no'] ?? $attributes['vehicle number'] ?? $attributes['vehicleNumber'] ?? ($tcDevice->name ?? '');
+                        
+                        $vehicleName = $tcDevice->name ?? '';
+                        $vehicleNoRaw = $attributes['vehicleNo'] ?? $attributes['vehicle_no'] ?? $attributes['vehicle number'] ?? $attributes['vehicleNumber'] ?? null;
+                        
+                        if ($vehicleNoRaw) {
+                            $vehicleNo = "{$vehicleNoRaw} - {$vehicleName}";
+                        } else {
+                            $vehicleNo = $vehicleName;
+                        }
                     } catch (\Throwable $ignore) {}
                 }
 
