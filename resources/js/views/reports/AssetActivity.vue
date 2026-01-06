@@ -9,6 +9,10 @@
     </div>
     <h4 class="mb-3">Asset Activity Report</h4>
 
+    <div v-if="errorMessage" class="alert alert-danger py-2 px-3 small mb-3">
+        {{ errorMessage }}
+    </div>
+
     <div class="card panel border rounded-3 shadow-0 mb-3">
       <div class="card-header"><h6 class="mb-0">Search Option</h6></div>
       <div class="card-body">
@@ -172,6 +176,7 @@ const vehicle = ref('');
 const vehicles = ref([]);
 const apiLimit = ref(100);
 const loading = ref(false);
+const errorMessage = ref(null);
 const rows = ref([]);
 const headerInfo = ref(null);
 const hasSearched = ref(false);
@@ -240,6 +245,7 @@ function toIsoLocal(d) {
 async function handleSearch() {
   loading.value = true;
   hasSearched.value = true;
+  errorMessage.value = null;
   rows.value = [];
   headerInfo.value = null;
 
@@ -261,7 +267,7 @@ async function handleSearch() {
     }
   } catch (e) {
     console.error('Error fetching asset activity', e);
-    alert('Failed to load report data.');
+    errorMessage.value = e.response?.data?.message || 'Failed to load report data.';
   } finally {
     loading.value = false;
   }

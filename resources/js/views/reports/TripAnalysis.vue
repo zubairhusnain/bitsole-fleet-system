@@ -9,6 +9,10 @@
     </div>
     <h4 class="mb-3">Trip Analysis Report</h4>
 
+    <div v-if="errorMessage" class="alert alert-danger py-2 px-3 small mb-3">
+        {{ errorMessage }}
+    </div>
+
     <div class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
       <div class="card-body pt-2">
@@ -93,6 +97,7 @@ const vehicle = ref('');
 const vehicles = ref([]);
 const viewType = ref('Trip Summary');
 const loading = ref(false);
+const errorMessage = ref(null);
 
 const rowsTripSummary = ref([]);
 const rowsDailyTrips = ref([]);
@@ -158,7 +163,7 @@ const handleSearch = async () => {
 
   // Validate Device Selection
   if (!vehicle.value && isVehicleRequired.value) {
-      alert('Please select a vehicle for this report type.');
+      errorMessage.value = 'Please select a vehicle for this report type.';
       return;
   }
 
@@ -172,6 +177,7 @@ const handleSearch = async () => {
   }
 
   loading.value = true;
+  errorMessage.value = null;
   try {
     if (viewType.value === 'Trip Summary') {
       const response = await window.axios.get('/web/reports/trip-summary', { params });
@@ -205,6 +211,7 @@ const handleSearch = async () => {
     }
   } catch (error) {
     console.error('Error fetching report data:', error);
+    errorMessage.value = error.response?.data?.message || 'Error fetching report data.';
     // Clear the current view's data on error
     if (viewType.value === 'Trip Summary') rowsTripSummary.value = [];
     else if (viewType.value === 'Daily Breakdown') rowsDailyTrips.value = [];

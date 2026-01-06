@@ -9,6 +9,10 @@
     </div>
     <h4 class="mb-3">Idling Report</h4>
 
+    <div v-if="errorMessage" class="alert alert-danger py-2 px-3 small mb-3">
+        {{ errorMessage }}
+    </div>
+
     <div class="card panel border rounded-3 shadow-0 mb-3">
       <div class="card-header"><h6 class="mb-0">Search Option</h6></div>
       <div class="card-body">
@@ -20,7 +24,7 @@
                 <span class="input-group-text bg-white">-</span>
                 <input type="date" v-model="toDate" class="form-control" />
             </div>
-          </div>
+          </div> 
           <div class="col-12 col-md-3">
             <label class="form-label small">Vehicle</label>
             <select v-model="selectedDevice" class="form-select">
@@ -132,14 +136,14 @@
             Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, filteredRows.length) }} of {{ filteredRows.length }} results
         </div>
         <div class="d-flex gap-1">
-            <button class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0" 
+            <button class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0"
                     style="width: 32px; height: 32px;"
                     :disabled="currentPage === 1"
                     @click="changePage(currentPage - 1)">
               <i class="bi bi-chevron-left small"></i>
             </button>
-            
-            <button v-for="p in totalPages" :key="p" 
+
+            <button v-for="p in totalPages" :key="p"
                     class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0 fw-semibold"
                     :class="p === currentPage ? 'bg-dark text-white border-dark' : 'bg-white text-dark'"
                     style="width: 32px; height: 32px;"
@@ -148,7 +152,7 @@
               {{ p }}
             </button>
 
-            <button class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0" 
+            <button class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0"
                     style="width: 32px; height: 32px;"
                     :disabled="currentPage === totalPages"
                     @click="changePage(currentPage + 1)">
@@ -171,6 +175,7 @@ const fromDate = ref(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(
 const toDate = ref(new Date().toISOString().slice(0, 10));
 const timeFilter = ref('>120'); // Default > 2 mins
 const loading = ref(false);
+const errorMessage = ref(null);
 const reportData = ref([]);
 
 // Pagination
@@ -180,13 +185,13 @@ const itemsPerPage = ref(20);
 // Computed
 const filteredRows = computed(() => {
     if (!reportData.value) return [];
-    
+
     let rows = reportData.value;
 
     if (timeFilter.value) {
         const op = timeFilter.value.substring(0, 1);
         const val = parseInt(timeFilter.value.substring(1));
-        
+
         rows = rows.filter(r => {
             if (op === '<') return r.durationSeconds < val;
             if (op === '>') return r.durationSeconds > val;
@@ -212,7 +217,7 @@ const groupedRows = computed(() => {
         // We can just use row.date + day name
         const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
         const key = `${row.date} ${dayName}`;
-        
+
         if (!groups[key]) groups[key] = [];
         groups[key].push(row);
     });
@@ -233,7 +238,7 @@ function getTimeFilterLabel(val) {
     const num = parseInt(val.substring(1));
     const mins = Math.floor(num / 60);
     const hours = Math.floor(mins / 60);
-    
+
     const timeStr = hours > 0 ? `${hours} Hour(s)` : `${mins} Minute(s)`;
     return (op === '<' ? 'Less than ' : 'Greater than ') + timeStr;
 }
@@ -250,6 +255,8 @@ async function loadDevices() {
         devices.value = res.data.options || [];
         if (devices.value.length > 0) {
             selectedDevice.value = devices.value[0].id;
+            // Auto-fetch report on load
+            fetchReport();
         }
     } catch (e) {
         console.error('Failed to load devices', e);
@@ -260,6 +267,7 @@ async function fetchReport() {
     if (!selectedDevice.value) return;
 
     loading.value = true;
+    errorMessage.value = null;
     reportData.value = [];
     currentPage.value = 1;
 
@@ -274,7 +282,7 @@ async function fetchReport() {
         reportData.value = res.data;
     } catch (e) {
         console.error('Failed to fetch idling report', e);
-        alert('Failed to fetch report data');
+        errorMessage.value = e.response?.data?.message || 'Failed to fetch report data';
     } finally {
         loading.value = false;
     }

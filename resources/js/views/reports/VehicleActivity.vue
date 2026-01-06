@@ -8,6 +8,11 @@
       </ol>
     </div>
     <h4 class="mb-3">Vehicle Activity Report</h4>
+
+    <div v-if="errorMessage" class="alert alert-danger py-2 px-3 small mb-3">
+        {{ errorMessage }}
+    </div>
+
     <div class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
       <div class="card-body pt-2">
@@ -191,6 +196,7 @@ const fromDate = ref(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(
 const toDate = ref(new Date().toISOString().slice(0, 10));
 const searchFilter = ref('');
 const loading = ref(false);
+const errorMessage = ref(null);
 const reportData = ref(null);
 
 // Pagination
@@ -208,7 +214,7 @@ const filteredRows = computed(() => {
     r.location.toLowerCase().includes(q)
   );
 });
- 
+
 const totalPages = computed(() => Math.ceil(filteredRows.value.length / itemsPerPage.value));
 
 const paginatedRows = computed(() => {
@@ -252,6 +258,7 @@ async function fetchReport() {
   if (!selectedDevice.value) return;
 
   loading.value = true;
+  errorMessage.value = null;
   reportData.value = null;
 
   try {
@@ -265,7 +272,7 @@ async function fetchReport() {
     reportData.value = res.data;
   } catch (e) {
     console.error('Failed to fetch report', e);
-    // You might want to show a toast or alert here
+    errorMessage.value = e.response?.data?.message || 'Failed to fetch report data';
   } finally {
     loading.value = false;
   }

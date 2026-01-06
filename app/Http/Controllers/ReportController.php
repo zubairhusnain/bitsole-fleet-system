@@ -255,8 +255,8 @@ class ReportController extends Controller
 
             $from = \Carbon\Carbon::parse($request->from_date);
             $to = \Carbon\Carbon::parse($request->to_date);
-            if ($from->diffInDays($to) > 31) {
-                return response()->json(['message' => 'Date range cannot exceed 31 days.'], 422);
+            if ($from->diffInDays($to) > 90) {
+                return response()->json(['message' => 'Date range cannot exceed 90 days.'], 422);
             }
 
             $deviceIds = $this->getDeviceIds($request);
@@ -278,8 +278,8 @@ class ReportController extends Controller
 
             $from = \Carbon\Carbon::parse($request->from_date);
             $to = \Carbon\Carbon::parse($request->to_date);
-            if ($from->diffInDays($to) > 31) {
-                return response()->json(['message' => 'Date range cannot exceed 31 days.'], 422);
+            if ($from->diffInDays($to) > 90) {
+                return response()->json(['message' => 'Date range cannot exceed 90 days.'], 422);
             }
 
             $deviceIds = $this->getDeviceIds($request);
@@ -301,8 +301,8 @@ class ReportController extends Controller
 
             $from = \Carbon\Carbon::parse($request->from_date);
             $to = \Carbon\Carbon::parse($request->to_date);
-            if ($from->diffInDays($to) > 31) {
-                return response()->json(['message' => 'Date range cannot exceed 31 days.'], 422);
+            if ($from->diffInDays($to) > 90) {
+                return response()->json(['message' => 'Date range cannot exceed 90 days.'], 422);
             }
 
             $deviceIds = $this->getDeviceIds($request);
