@@ -2037,13 +2037,35 @@ class ReportService
             'Content-Type' => 'application/json'
         ];
 
+        // Generate dates for chunking
+        $chunkDates = [];
+        $cur = strtotime($request->from_date);
+        $endTs = strtotime($request->to_date);
+        while ($cur <= $endTs) {
+            $chunkDates[] = date('Y-m-d', $cur);
+            $cur = strtotime('+1 day', $cur);
+        }
+
         try {
-            $responses = Http::pool(fn (Pool $pool) => [
-                $pool->as('trips')->timeout(120)->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
-                ($type === 'Engine Hours')
-                    ? $pool->as('events')->timeout(120)->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$fullQuery}&type=ignitionOn&type=ignitionOff")
-                    : $pool->as('stops')->timeout(120)->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}")
-            ]);
+            $responses = Http::pool(fn (Pool $pool) => array_merge(
+                // Trips
+                array_map(function($date) use ($pool, $baseUrl, $deviceId, $headers) {
+                    $from = "{$date}T00:00:00Z";
+                    $to = "{$date}T23:59:59Z";
+                    return $pool->as("trips_{$date}")->timeout(300)->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?deviceId={$deviceId}&from={$from}&to={$to}");
+                }, $chunkDates),
+
+                // Stops or Events
+                array_map(function($date) use ($pool, $baseUrl, $deviceId, $headers, $type) {
+                    $from = "{$date}T00:00:00Z";
+                    $to = "{$date}T23:59:59Z";
+                    if ($type === 'Engine Hours') {
+                        return $pool->as("events_{$date}")->timeout(300)->withHeaders($headers)->get("{$baseUrl}/api/reports/events?deviceId={$deviceId}&from={$from}&to={$to}&type=ignitionOn&type=ignitionOff");
+                    } else {
+                        return $pool->as("stops_{$date}")->timeout(300)->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?deviceId={$deviceId}&from={$from}&to={$to}");
+                    }
+                }, $chunkDates)
+            ));
         } catch (\Exception $e) {
             Log::error('fetchUtilisationReport exception', ['error' => $e->getMessage()]);
             $vehicleRec = Devices::accessibleByUser($request->user())->with('tcDevice')->where('device_id', $deviceId)->first();
@@ -2074,14 +2096,29 @@ class ReportService
             ];
         }
 
-        // Safe check
-        $tripsResp = $responses['trips'] ?? null;
-        $stopsResp = $responses['stops'] ?? null;
-        $eventsResp = $responses['events'] ?? null;
+        // Merge Results
+        $allTrips = [];
+        $allStops = [];
+        $allEvents = [];
 
-        $allTrips = ($tripsResp instanceof Response && $tripsResp->ok()) ? $tripsResp->json() : [];
-        $allStops = ($stopsResp instanceof Response && $stopsResp->ok()) ? $stopsResp->json() : [];
-        $allEvents = ($eventsResp instanceof Response && $eventsResp->ok()) ? $eventsResp->json() : [];
+        foreach ($chunkDates as $date) {
+             $tResp = $responses["trips_{$date}"] ?? null;
+             if ($tResp instanceof Response && $tResp->ok()) {
+                 $allTrips = array_merge($allTrips, $tResp->json());
+             }
+
+             if ($type === 'Engine Hours') {
+                 $eResp = $responses["events_{$date}"] ?? null;
+                 if ($eResp instanceof Response && $eResp->ok()) {
+                     $allEvents = array_merge($allEvents, $eResp->json());
+                 }
+             } else {
+                 $sResp = $responses["stops_{$date}"] ?? null;
+                 if ($sResp instanceof Response && $sResp->ok()) {
+                     $allStops = array_merge($allStops, $sResp->json());
+                 }
+             }
+        }
 
         $trips = collect($allTrips);
         $stops = collect($allStops);
