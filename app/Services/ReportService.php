@@ -2097,7 +2097,7 @@ class ReportService
             ];
         })->values();
 
-        $vehicleName = $trips->first()['deviceName'] ?? 'Unknown';
+        $vehicleName = data_get($trips->first(), 'deviceName', 'Unknown');
         $totalDays = max(1, round((strtotime($toStr) - strtotime($request->from_date)) / (60 * 60 * 24)) + 1);
 
         return [

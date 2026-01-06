@@ -6,7 +6,7 @@
         <li class="breadcrumb-item">Reports & Analytics</li>
         <li class="breadcrumb-item active" aria-current="page">Utilisation Report</li>
       </ol>
-    </div> 
+    </div>
     <h4 class="mb-3">Utilisation Report</h4>
     <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = ''" />
     <div class="card panel border rounded-3 shadow-0 mb-3">
@@ -108,7 +108,10 @@
                   </div>
                 </td>
               </tr>
-              <tr v-for="row in rows" :key="row.day">
+              <tr v-else-if="rows.length === 0">
+                <td colspan="5" class="text-center text-muted py-4">No results</td>
+              </tr>
+              <tr v-else v-for="row in pagedRows" :key="row.day">
                 <td class="ps-3 py-3 fw-medium text-dark">{{ row.day }}</td>
                 <td class="py-3"><span class="badge bg-success-subtle text-success px-3 py-2 rounded-1" style="min-width: 50px;">{{ row.usage }}</span></td>
                 <td class="py-3">{{ row.move }}</td>
@@ -127,16 +130,20 @@
         </div>
       </div>
       <div class="card-footer d-flex align-items-center py-2">
-        <div class="text-muted small me-auto">Showing 1 to 10 of 10 results</div>
+        <div class="text-muted small me-auto">
+          Showing {{ totalCount > 0 ? (startIndex + 1) : 0 }} to {{ endIndex }} of {{ totalCount }} results
+        </div>
         <nav aria-label="Pagination" class="ms-auto">
           <ul class="pagination pagination-sm mb-0 pagination-app">
-            <li class="page-item disabled"><button class="page-link">‹</button></li>
-            <li class="page-item active"><button class="page-link">1</button></li>
-            <li class="page-item"><button class="page-link">2</button></li>
-            <li class="page-item"><button class="page-link">3</button></li>
-            <li class="page-item"><button class="page-link">4</button></li>
-            <li class="page-item"><button class="page-link">5</button></li>
-            <li class="page-item"><button class="page-link">›</button></li>
+            <li class="page-item" :class="{ disabled: page === 1 || loading }">
+              <button class="page-link" @click="prevPage" :disabled="page === 1 || loading">‹</button>
+            </li>
+            <li class="page-item" v-for="n in totalPages" :key="n" :class="{ active: page === n }">
+              <button class="page-link" @click="goPage(n)" :disabled="loading">{{ n }}</button>
+            </li>
+            <li class="page-item" :class="{ disabled: page === totalPages || loading }">
+              <button class="page-link" @click="nextPage" :disabled="page === totalPages || loading">›</button>
+            </li>
           </ul>
         </nav>
       </div>
@@ -145,7 +152,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
 
@@ -164,6 +171,23 @@ const summary = ref({
 });
 
 const rows = ref([]);
+const page = ref(1);
+const pageSize = ref(10);
+const totalCount = computed(() => rows.value.length);
+const startIndex = computed(() => (page.value - 1) * pageSize.value);
+const endIndex = computed(() => Math.min(startIndex.value + pageSize.value, totalCount.value));
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
+const pagedRows = computed(() => rows.value.slice(startIndex.value, startIndex.value + pageSize.value));
+
+function goPage(n) {
+  if (n >= 1 && n <= totalPages.value) page.value = n;
+}
+function prevPage() {
+  if (page.value > 1) page.value -= 1;
+}
+function nextPage() {
+  if (page.value < totalPages.value) page.value += 1;
+}
 
 async function loadDeviceOptions() {
   try {
@@ -208,6 +232,7 @@ async function fetchReport() {
     if (opt && opt.uniqueId) {
         summary.value.vehicleIdDisplay = opt.uniqueId;
     }
+    page.value = 1;
 
   } catch (e) {
     console.error('Failed to fetch utilisation report', e);
