@@ -1998,8 +1998,6 @@ class ReportService
         }
         $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
 
-        $fullQuery = "deviceId={$deviceId}&from={$from}&to={$to}";
-
         $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
         if (empty($baseUrl)) {
              Log::error('ReportService: Traccar Host URL is not configured.');
@@ -2096,37 +2094,18 @@ class ReportService
             ];
         }
 
-        // Merge Results
-        $allTrips = [];
-        $allStops = [];
-        $allEvents = [];
-
-        foreach ($chunkDates as $date) {
-             $tResp = $responses["trips_{$date}"] ?? null;
-             if ($tResp instanceof Response && $tResp->ok()) {
-                 $allTrips = array_merge($allTrips, $tResp->json());
-             }
-
-             if ($type === 'Engine Hours') {
+        // Process Data (Optimized per-day)
+        $engineIntervals = collect([]);
+        if ($type === 'Engine Hours') {
+             $allEvents = [];
+             foreach ($chunkDates as $date) {
                  $eResp = $responses["events_{$date}"] ?? null;
                  if ($eResp instanceof Response && $eResp->ok()) {
                      $allEvents = array_merge($allEvents, $eResp->json());
                  }
-             } else {
-                 $sResp = $responses["stops_{$date}"] ?? null;
-                 if ($sResp instanceof Response && $sResp->ok()) {
-                     $allStops = array_merge($allStops, $sResp->json());
-                 }
              }
-        }
 
-        $trips = collect($allTrips);
-        $stops = collect($allStops);
-        $events = collect($allEvents);
-
-        $engineIntervals = collect([]);
-        if ($type === 'Engine Hours') {
-             $sortedEvents = $events->sortBy('eventTime')->values();
+             $sortedEvents = collect($allEvents)->sortBy('eventTime')->values();
              $currentStart = null;
              foreach ($sortedEvents as $ev) {
                  if ($ev['type'] === 'ignitionOn') {
@@ -2142,62 +2121,87 @@ class ReportService
              }
         }
 
-        // Generate all dates in range
-        $dates = collect();
-        $currentDate = strtotime($request->from_date);
-        $endDate = strtotime($request->to_date);
 
-        while ($currentDate <= $endDate) {
-            $dates->push(date('Y-m-d', $currentDate));
-            $currentDate = strtotime('+1 day', $currentDate);
-        }
-
-        $rows = $dates->map(function ($date) use ($trips, $stops, $engineIntervals, $type) {
+        $rows = collect($chunkDates)->map(function ($date) use ($responses, $engineIntervals, $type) {
             $dayStart = strtotime("{$date} 00:00:00");
             $dayEnd = strtotime("{$date} 23:59:59");
 
-            // Helper to calculate overlap
-            $calcOverlap = function($items) use ($dayStart, $dayEnd) {
-                $total = 0;
-                foreach ($items as $item) {
-                    $start = strtotime($item['startTime']);
-                    $end = strtotime($item['endTime']);
+            $tripMs = 0;
+            $idleMs = 0;
+            $distance = 0;
+            $hours = array_fill(0, 24, false);
 
-                    $overlapStart = max($start, $dayStart);
-                    $overlapEnd = min($end, $dayEnd);
+            // Get Trips for this day
+            $tResp = $responses["trips_{$date}"] ?? null;
+            $dayTrips = ($tResp instanceof Response && $tResp->ok()) ? $tResp->json() : [];
 
-                    if ($overlapEnd > $overlapStart) {
-                        $total += ($overlapEnd - $overlapStart) * 1000; // ms
+            // Process Trips (Movement)
+            foreach ($dayTrips as $t) {
+                $s = strtotime($t['startTime']);
+                $e = strtotime($t['endTime']);
+
+                // Distance: Sum if trip starts on this day (matches legacy behavior)
+                if (strpos($t['startTime'], $date) === 0) {
+                    $distance += $t['distance'] ?? 0;
+                }
+
+                // Overlap
+                $overlapStart = max($s, $dayStart);
+                $overlapEnd = min($e, $dayEnd);
+
+                if ($overlapEnd > $overlapStart) {
+                    $dur = ($overlapEnd - $overlapStart) * 1000;
+                    $tripMs += $dur;
+
+                    if ($type !== 'Engine Hours') {
+                        $sh = (int)date('G', $overlapStart);
+                        $eh = (int)date('G', $overlapEnd);
+                        for ($h = $sh; $h <= $eh; $h++) $hours[$h] = true;
                     }
                 }
-                return $total;
-            };
-
-            // Calculate Metrics
-            $tripMs = $calcOverlap($trips);
-
-            // Distance is tricky to split, so we just sum trips that START on this day (legacy behavior)
-            // or we could split by proportion of time. For simplicity, we keep "Trips Starting Today" for distance
-            // to avoid complex speed integration.
-            $distance = $trips->filter(function($t) use ($date) {
-                return date('Y-m-d', strtotime($t['startTime'])) == $date;
-            })->sum('distance');
+            }
 
             if ($type === 'Engine Hours') {
-                 $engineMs = $calcOverlap($engineIntervals);
+                $engineMs = 0;
+                $relevantIntervals = $engineIntervals->filter(function($item) use ($dayStart, $dayEnd) {
+                     $s = strtotime($item['startTime']);
+                     $e = strtotime($item['endTime']);
+                     return $e > $dayStart && $s < $dayEnd;
+                });
 
-                 // Idle = Engine On - Moving
-                 // Note: Ideally we subtract overlapping Moving from Engine On.
-                 // Simple approximation: max(0, Engine - Moving)
-                 $idleMs = max(0, $engineMs - $tripMs);
-                 $totalMs = $engineMs;
+                foreach ($relevantIntervals as $item) {
+                     $s = strtotime($item['startTime']);
+                     $e = strtotime($item['endTime']);
 
-                 $activitySource = $engineIntervals;
+                     $overlapStart = max($s, $dayStart);
+                     $overlapEnd = min($e, $dayEnd);
+                     if ($overlapEnd > $overlapStart) {
+                         $engineMs += ($overlapEnd - $overlapStart) * 1000;
+
+                         $sh = (int)date('G', $overlapStart);
+                         $eh = (int)date('G', $overlapEnd);
+                         for ($h = $sh; $h <= $eh; $h++) $hours[$h] = true;
+                     }
+                }
+
+                $idleMs = max(0, $engineMs - $tripMs);
+                $totalMs = $engineMs;
             } else {
-                 $idleMs = $calcOverlap($stops);
-                 $totalMs = $tripMs + $idleMs;
+                $sResp = $responses["stops_{$date}"] ?? null;
+                $dayStops = ($sResp instanceof Response && $sResp->ok()) ? $sResp->json() : [];
 
-                 $activitySource = $trips;
+                foreach ($dayStops as $stop) {
+                    $s = strtotime($stop['startTime']);
+                    $e = strtotime($stop['endTime']);
+
+                    $overlapStart = max($s, $dayStart);
+                    $overlapEnd = min($e, $dayEnd);
+
+                    if ($overlapEnd > $overlapStart) {
+                        $idleMs += ($overlapEnd - $overlapStart) * 1000;
+                    }
+                }
+                $totalMs = $tripMs + $idleMs;
             }
 
             $usagePct = $totalMs > 0 ? round(($tripMs / $totalMs) * 100) : 0;
@@ -2209,23 +2213,6 @@ class ReportService
             $ih = floor($idleMs / 3600000);
             $im = floor(($idleMs % 3600000) / 60000);
             $idleStr = "{$ih} hours {$im} minutes";
-
-            // Hourly Activity
-            $hours = array_fill(0, 24, false);
-            foreach ($activitySource as $t) {
-                $start = strtotime($t['startTime']);
-                $end = strtotime($t['endTime']);
-
-                for ($h = 0; $h < 24; $h++) {
-                    // Use UTC to match Traccar's Z-suffixed timestamps
-                    $blockStart = strtotime("{$date}T" . sprintf('%02d', $h) . ":00:00Z");
-                    $blockEnd = strtotime("{$date}T" . sprintf('%02d', $h) . ":59:59Z");
-
-                    if ($start <= $blockEnd && $end >= $blockStart) {
-                        $hours[$h] = true;
-                    }
-                }
-            }
 
             $ts = strtotime($date);
             $dayLabel = date('d/m/Y l', $ts);
@@ -2250,9 +2237,18 @@ class ReportService
             $attributes = json_decode($attributes, true);
         }
 
-        // Fallback to name from trips if local DB lookup fails
-         $vehicleNameFromTrips = data_get($trips->first(), 'deviceName', 'Unknown');
-         $vehicleName = $tcDevice->name ?? $vehicleNameFromTrips;
+        $vehicleName = $tcDevice->name ?? 'Unknown';
+        if ($vehicleName === 'Unknown') {
+            foreach ($responses as $key => $resp) {
+                if (strpos($key, 'trips_') === 0 && $resp instanceof Response && $resp->ok()) {
+                     $first = $resp->json()[0] ?? null;
+                     if ($first && isset($first['deviceName'])) {
+                         $vehicleName = $first['deviceName'];
+                         break;
+                     }
+                }
+            }
+        }
 
          // Try to find vehicle no in attributes
          $vehicleNo = $attributes['vehicleNo'] ?? null;
