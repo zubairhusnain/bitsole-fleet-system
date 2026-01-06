@@ -65,6 +65,7 @@ class ReportServiceTest extends TestCase
 
         $this->assertEquals('10 KM', $row['dist']);
         $this->assertEquals('0 hours 40 minutes', $row['move']);
+        $this->assertEquals('0 hours 30 minutes', $row['idle']);
 
         // 40m move + 30m idle = 70m total. 40/70 = 57.14% => 57%
         $this->assertEquals('57%', $row['usage']);

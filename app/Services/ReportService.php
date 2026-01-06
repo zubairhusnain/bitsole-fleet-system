@@ -1987,6 +1987,7 @@ class ReportService
 
     public function fetchUtilisationReport($request, $deviceId)
     {
+        $type = $request->type ?? 'Movement';
         $sessionId = $request->user()->traccarSession ?? session('cookie');
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
         $toStr = $request->to_date;
@@ -2096,6 +2097,10 @@ class ReportService
             $m = floor(($tripMs % 3600000) / 60000);
             $moveStr = "{$h} hours {$m} minutes";
 
+            $ih = floor($idleMs / 3600000);
+            $im = floor(($idleMs % 3600000) / 60000);
+            $idleStr = "{$ih} hours {$im} minutes";
+
             // Hourly Activity
             $hours = array_fill(0, 24, false);
             foreach ($dayTrips as $t) {
@@ -2120,6 +2125,7 @@ class ReportService
                 'day' => $dayLabel,
                 'usage' => "{$usagePct}%",
                 'move' => $moveStr,
+                'idle' => $idleStr,
                 'dist' => round($distance / 1000, 2) . ' KM',
                 'hours' => $hours
             ];

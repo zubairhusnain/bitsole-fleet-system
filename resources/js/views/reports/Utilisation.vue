@@ -32,7 +32,10 @@
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label text-muted small fw-semibold">Type</label>
-            <input type="text" class="form-control" value="Movement" />
+            <select class="form-select" v-model="selectedType">
+              <option value="Movement">Movement</option>
+              <option value="Engine Hours">Engine Hours</option>
+            </select>
           </div>
           <div class="col-12 col-md-1">
             <button class="btn btn-info text-white w-100 fw-semibold" style="background-color: #0ea5e9; border: none;" @click="fetchReport" :disabled="loading">
@@ -49,11 +52,11 @@
         <div class="d-flex align-items-right gap-3">
             <div class="d-flex align-items-center gap-2">
                 <span class="d-inline-block rounded-1" style="width: 12px; height: 12px; background-color: #0ea5e9;"></span>
-                <span class="small text-muted">With Movement</span>
+                <span class="small text-muted">{{ selectedType === 'Engine Hours' ? 'Engine On' : 'With Movement' }}</span>
             </div>
             <div class="d-flex align-items-center gap-2">
                 <span class="d-inline-block rounded-1" style="width: 12px; height: 12px; background-color: #e5e7eb;"></span>
-                <span class="small text-muted">Without Movement</span>
+                <span class="small text-muted">{{ selectedType === 'Engine Hours' ? 'Engine Off' : 'Without Movement' }}</span>
             </div>
         </div>
       </div>
@@ -95,26 +98,28 @@
               <tr>
                 <th class="py-3 ps-3">Date/Day</th>
                 <th class="py-3">Usage</th>
-                <th class="py-3">Total Movement Time</th>
+                <th class="py-3">{{ selectedType === 'Engine Hours' ? 'Engine On' : 'With Movement' }}</th>
+                <th class="py-3">{{ selectedType === 'Engine Hours' ? 'Engine Off' : 'Without Movement' }}</th>
                 <th class="py-3">Distance</th>
                 <th class="py-3">Hourly Activity</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="5" class="text-center py-4">
+                <td colspan="6" class="text-center py-4">
                   <div class="spinner-border text-primary" role="status">
                     <span class="visually-hidden">Loading...</span>
                   </div>
                 </td>
               </tr>
               <tr v-else-if="rows.length === 0">
-                <td colspan="5" class="text-center text-muted py-4">No results</td>
+                <td colspan="6" class="text-center text-muted py-4">No results</td>
               </tr>
               <tr v-else v-for="row in pagedRows" :key="row.day">
                 <td class="ps-3 py-3 fw-medium text-dark">{{ row.day }}</td>
                 <td class="py-3"><span class="badge bg-success-subtle text-success px-3 py-2 rounded-1" style="min-width: 50px;">{{ row.usage }}</span></td>
                 <td class="py-3">{{ row.move }}</td>
+                <td class="py-3">{{ row.idle }}</td>
                 <td class="py-3">{{ row.dist }}</td>
                 <td class="py-3">
                   <div class="d-flex gap-1">
@@ -158,6 +163,7 @@ import UiAlert from '../../components/UiAlert.vue';
 
 const deviceOptions = ref([]);
 const selectedDeviceId = ref('');
+const selectedType = ref('Movement');
 const fromDate = ref(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
 const toDate = ref(new Date().toISOString().slice(0, 10));
 const loading = ref(false);
@@ -214,6 +220,7 @@ async function fetchReport() {
       from_date: fromDate.value,
       to_date: toDate.value,
       device_ids: [selectedDeviceId.value],
+      type: selectedType.value,
     };
 
     const response = await axios.get('/web/reports/utilisation', { params });
