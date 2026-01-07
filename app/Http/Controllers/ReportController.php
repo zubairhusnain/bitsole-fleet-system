@@ -502,10 +502,19 @@ class ReportController extends Controller
         if (!Schema::hasTable('incidents')) {
             return response()->json(['rows' => []]);
         }
+
+        // Fetch real drivers from DB
+        $realDrivers = \App\Models\Drivers::with('tcDriver')->get()
+            ->map(fn($d) => $d->tcDriver->name ?? null)
+            ->filter(fn($name) => !empty($name))
+            ->values()
+            ->toArray();
+
+        $drivers = !empty($realDrivers) ? $realDrivers : ['Sophia Martinez','Liam Johnson','Ava Smith','Mason Brown','Isabella Garcia','Noah Wilson','Olivia Taylor','Lucas Anderson','Mia Thomas','Jacob Jackson','Charlotte White','Amelia Harris','William Thompson'];
+
         $count = Incident::count();
         if ($count === 0) {
             try {
-                $drivers = ['Sophia Martinez','Liam Johnson','Ava Smith','Mason Brown','Isabella Garcia','Noah Wilson','Olivia Taylor','Lucas Anderson','Mia Thomas','Jacob Jackson','Charlotte White','Amelia Harris','William Thompson'];
                 $user = $request->user();
                 $devices = Devices::accessibleByUser($user)->with('tcDevice')->get();
                 $pool = [];
@@ -541,6 +550,15 @@ class ReportController extends Controller
                 DB::table('incidents')->insert($pool);
             } catch (\Throwable $e) {
                 Log::error('seed incidents failed', ['error' => $e->getMessage()]);
+            }
+        } else {
+            // Update existing records if they have drivers not in the list
+            $invalid = Incident::whereNotIn('driver', $drivers)->get();
+            if ($invalid->count() > 0) {
+                foreach ($invalid as $inc) {
+                    $inc->driver = $drivers[array_rand($drivers)];
+                    $inc->save();
+                }
             }
         }
         $q = Incident::query();
