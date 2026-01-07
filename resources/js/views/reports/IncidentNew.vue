@@ -11,10 +11,8 @@
     <h4 class="mb-3">Create New Incident Report</h4>
 
     <!-- Alerts -->
-    <div v-if="alert.message" :class="`alert alert-${alert.type} alert-dismissible fade show`" role="alert">
-      {{ alert.message }}
-      <button type="button" class="btn-close" @click="alert.message = ''"></button>
-    </div>
+    <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="error = ''" />
+    <UiAlert :show="!!message" :message="message" variant="success" dismissible @dismiss="message = ''" />
 
     <div class="card border rounded-3 shadow-0 mb-3">
       <div class="card-body p-4">
@@ -42,7 +40,10 @@
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label small fw-semibold text-muted">Driver</label>
-            <input type="text" class="form-control text-muted" placeholder="Enter Driver Name" v-model="form.driverId" />
+            <select class="form-select text-muted" v-model="form.driverId">
+              <option value="">-- Select Driver --</option>
+              <option v-for="drv in driverOptions" :key="drv.id" :value="drv.name">{{ drv.name }}</option>
+            </select>
           </div>
 
           <!-- Row 2: Incident Start & Incident End -->
@@ -50,6 +51,7 @@
             <label class="form-label small fw-semibold text-muted">Incident Start</label>
             <div class="input-group">
               <input type="datetime-local" class="form-control text-muted" v-model="form.incidentStart" />
+              <span class="input-group-text bg-white"><i class="bi bi-calendar3"></i></span>
             </div>
           </div>
           <div class="col-12 col-md-6">
@@ -63,7 +65,10 @@
           <!-- Row 3: Impact Date/Time -->
           <div class="col-12">
             <label class="form-label small fw-semibold text-muted">Impact Date/Time</label>
-            <input type="datetime-local" class="form-control text-muted" v-model="form.impactTime" />
+            <div class="input-group">
+              <input type="datetime-local" class="form-control text-muted" v-model="form.impactTime" />
+              <span class="input-group-text bg-white"><i class="bi bi-calendar3"></i></span>
+            </div>
           </div>
 
           <!-- Row 4: Description -->
@@ -94,11 +99,14 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
+import UiAlert from '../../components/UiAlert.vue';
 
 const router = useRouter();
 
 const deviceOptions = ref([]);
-const alert = ref({ message: '', type: '' });
+const driverOptions = ref([]);
+const message = ref('');
+const error = ref('');
 
 const form = ref({
   deviceId: '',
@@ -114,6 +122,7 @@ const form = ref({
 
 onMounted(() => {
   loadDeviceOptions();
+  loadDriverOptions();
 });
 
 async function loadDeviceOptions() {
@@ -125,8 +134,24 @@ async function loadDeviceOptions() {
   }
 }
 
+async function loadDriverOptions() {
+  try {
+    const res = await axios.get('/web/drivers');
+    // API returns { drivers: [...] }
+    const drivers = res.data.drivers || [];
+    driverOptions.value = drivers.map(d => ({
+      id: d.id,
+      name: d.name || 'Unknown'
+    }));
+  } catch (e) {
+    console.error('Failed to load driver options', e);
+  }
+}
+
 function onDeviceChange() {
-  const selected = deviceOptions.value.find(d => d.id === form.value.deviceId);
+  // Convert to number for comparison since API returns number IDs but select value is string
+  const id = Number(form.value.deviceId);
+  const selected = deviceOptions.value.find(d => d.id === id);
   if (selected) {
     form.value.vehicleId = selected.label || selected.name || 'Unknown';
   } else {
@@ -135,12 +160,14 @@ function onDeviceChange() {
 }
 
 function validate() {
+  error.value = '';
+  message.value = '';
   if (!form.value.deviceId) {
-    alert.value = { message: 'Please select a vehicle.', type: 'danger' };
+    error.value = 'Please select a vehicle.';
     return false;
   }
   if (!form.value.incidentStart) {
-    alert.value = { message: 'Please select incident start time.', type: 'danger' };
+    error.value = 'Please select incident start time.';
     return false;
   }
   return true;
@@ -154,7 +181,7 @@ const save = () => {
     })
     .catch((e) => {
       console.error('Failed to save incident', e);
-      alert.value = { message: 'Failed to save incident.', type: 'danger' };
+      error.value = e.response?.data?.message || 'Failed to save incident.';
     });
 };
 
@@ -162,7 +189,7 @@ const saveAndAdd = () => {
   if (!validate()) return;
   axios.post('/web/reports/incidents', form.value)
     .then(() => {
-      alert.value = { message: 'Incident saved successfully.', type: 'success' };
+      message.value = 'Incident saved successfully.';
       // Reset form but keep maybe vehicle? No, clear all usually.
       form.value = {
         deviceId: '',
@@ -175,12 +202,10 @@ const saveAndAdd = () => {
         description: '',
         remarks: ''
       };
-      // Scroll to top
-      window.scrollTo(0, 0);
     })
     .catch((e) => {
       console.error('Failed to save incident', e);
-      alert.value = { message: 'Failed to save incident.', type: 'danger' };
+      error.value = e.response?.data?.message || 'Failed to save incident.';
     });
 };
 </script>

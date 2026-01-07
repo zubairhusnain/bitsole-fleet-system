@@ -678,7 +678,7 @@ class ReportController extends Controller
             'type_model' => $data['typeModel'] ?? null,
             'incident_start' => $data['incidentStart'] ?? null,
             'incident_end' => $data['incidentEnd'] ?? null,
-            'impact_time' => $data['impactTime'] ?? null,
+            'impact_time' => $data['impactTime'] ?? $data['incidentStart'] ?? null,
             'driver' => $data['driverId'] ?? null,
             'description' => $data['description'] ?? null,
             'remarks' => $data['remarks'] ?? null,

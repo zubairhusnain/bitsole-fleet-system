@@ -98,7 +98,7 @@
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 
-const date = ref(new Date().toISOString().slice(0, 10));
+const date = ref('');
 const filterVehicleId = ref('');
 const deviceOptions = ref([]);
 const alert = ref({ message: '', type: '' });
