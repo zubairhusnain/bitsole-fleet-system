@@ -266,3 +266,4 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/incidents/export-excel', [\App\Http\Controllers\ReportController::class, 'exportIncidentsExcel']);
     Route::get('/vehicle-ranking', [\App\Http\Controllers\ReportController::class, 'vehicleRanking']);
 });
+ 

@@ -47,6 +47,104 @@ class ReportService
         return $trips;
     }
 
+    public function vehicleRanking($request)
+    {
+        $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date . ' 00:00:00'));
+        $to = date('Y-m-d\TH:i:00\Z', strtotime($request->to_date . ' 23:59:59'));
+        $vehicleIds = $request->vehicle_ids ?? [];
+
+        $sessionId = $request->user()->traccarSession ?? session('cookie');
+
+        // Query string
+        $query = 'from=' . $from . '&to=' . $to;
+
+        // If vehicle_ids provided, append multiple deviceId parameters using Collection
+        if (!empty($vehicleIds)) {
+            $vehicleIds = is_string($vehicleIds) ? explode(',', $vehicleIds) : $vehicleIds;
+            if (is_array($vehicleIds)) {
+                $query .= collect($vehicleIds)->map(fn($vid) => '&deviceId=' . $vid)->implode('');
+            }
+        }
+
+        $eventsQuery = $query . '&type=alarm&type=deviceOverspeed';
+
+        Log::info('VehicleRanking Service Request', ['query' => $query]);
+
+        $headers = ['Content-Type: application/json', 'Accept: application/json'];
+
+        // 1. Summary
+        $summaryRaw = static::curl('/api/reports/summary?' . $query, 'GET', $sessionId, '', $headers);
+        $summaries = [];
+        if ($summaryRaw->responseCode == 200) {
+            $summaries = json_decode($summaryRaw->response, true);
+        } else {
+            Log::error('VehicleRanking Service Summary Failed', ['code' => $summaryRaw->responseCode, 'error' => $summaryRaw->error ?? '']);
+        }
+
+        // 2. Events
+        $eventsRaw = static::curl('/api/reports/events?' . $eventsQuery, 'GET', $sessionId, '', $headers);
+        $events = [];
+        if ($eventsRaw->responseCode == 200) {
+            $events = json_decode($eventsRaw->response, true);
+        } else {
+             Log::error('VehicleRanking Service Events Failed', ['code' => $eventsRaw->responseCode, 'error' => $eventsRaw->error ?? '']);
+        }
+
+        // Fetch local device details for Model/Type
+        $deviceIds = collect($summaries)->pluck('deviceId');
+        $tcDevices = \App\Models\TcDevice::whereIn('id', $deviceIds)->get()->keyBy('id');
+
+        $eventsByDevice = collect($events)->groupBy('deviceId');
+
+        // Process Data using Map
+        $rows = collect($summaries)->map(function ($sum) use ($eventsByDevice, $tcDevices) {
+            $deviceId = $sum['deviceId'];
+            $evs = $eventsByDevice->get($deviceId, collect([]));
+            $tcDev = $tcDevices->get($deviceId);
+
+            $distanceM = $sum['distance'] ?? 0;
+            $engineHoursMs = $sum['engineHours'] ?? 0;
+
+            // Counts
+            $ha = $evs->filter(fn($e) => ($e['attributes']['alarm'] ?? null) === 'hardAcceleration')->count();
+            $hb = $evs->filter(fn($e) => ($e['attributes']['alarm'] ?? null) === 'hardBraking')->count();
+            $hc = $evs->filter(fn($e) => ($e['attributes']['alarm'] ?? null) === 'hardCornering')->count();
+            $sv = $evs->where('type', 'deviceOverspeed')->count();
+
+            // Calculate Points (100 - penalties)
+            $points = 100 - ($ha * 5) - ($hb * 5) - ($hc * 5) - ($sv * 10);
+            $model = $tcDev ? ($tcDev->model ?? $tcDev->category ?? 'N/A') : 'N/A';
+
+            return [
+                'vehicleId' => $sum['deviceName'] ?? 'Unknown',
+                'typeModel' => $model,
+                'distance' => round($distanceM / 1000, 2) . ' KM',
+                'duration' => $this->formatDurationHms($engineHoursMs),
+                'totalHA' => $ha ?: 0,
+                'totalHB' => $hb ?: 0,
+                'totalHC' => $hc ?: 0,
+                'totalSV' => $sv ?: 0,
+                'points' => $points,
+                'percentage' => max(0, min(100, $points)),
+            ];
+        });
+
+        // Sort by Points Descending and Add Rank
+        return $rows->sortByDesc('points')->values()->map(function ($row, $index) {
+            $row['rank'] = $index + 1;
+            return $row;
+        });
+    }
+
+    private function formatDurationHms($ms) {
+        $seconds = floor($ms / 1000);
+        $h = floor($seconds / 3600);
+        $m = floor(($seconds % 3600) / 60);
+        $s = $seconds % 60;
+        return sprintf('%dh %dm %ds', $h, $m, $s);
+    }
+
+    
     public function yearlyReportDashboard($request)
     {
         // ------------------------------------------------------------------ 1) Session, device, dates

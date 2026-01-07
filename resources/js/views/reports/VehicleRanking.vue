@@ -7,14 +7,13 @@
         <li class="breadcrumb-item active" aria-current="page">Vehicle Ranking Report</li>
       </ol>
     </div>
-    <h4 class="mb-3">Vehicle Ranking Report</h4>
-
+    <h4 class="mb-3">Vehicle Ranking Report</h4> 
     <div class="card panel border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
       <div class="card-body pt-2">
         <form @submit.prevent="fetchRanking">
           <div class="row g-3 align-items-end">
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-md-3">
               <label class="form-label small fw-semibold text-muted">Duration</label>
               <div class="input-group">
                 <input type="date" class="form-control" v-model="fromDate" required />
@@ -22,7 +21,14 @@
                 <input type="date" class="form-control" v-model="toDate" required />
               </div>
             </div>
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-md-3">
+              <label class="form-label small fw-semibold text-muted">Vehicle</label>
+              <select class="form-select" v-model="filterVehicleId">
+                <option value="">-- All Vehicles --</option>
+                <option v-for="opt in deviceOptions" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-3">
               <label class="form-label small fw-semibold text-muted">Type</label>
               <select class="form-select" v-model="rankingType">
                 <option value="percentage">Ranking by Percentage</option>
@@ -30,7 +36,7 @@
                 <option value="behaviour">Driving Behaviour</option>
               </select>
             </div>
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-md-3">
               <button type="submit" class="btn btn-info text-white w-100" :disabled="loading">
                 <span v-if="loading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                 Submit
@@ -107,35 +113,50 @@ const loading = ref(false);
 const fromDate = ref('');
 const toDate = ref('');
 const rankingType = ref('percentage');
+const filterVehicleId = ref('');
+const deviceOptions = ref([]);
 
 // Set default dates (current month)
-onMounted(() => {
+onMounted(async () => {
   const now = new Date();
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  
+
   fromDate.value = firstDay.toISOString().split('T')[0];
   toDate.value = lastDay.toISOString().split('T')[0];
-  
-  // Optional: Auto fetch on load
-  // fetchRanking(); 
+
+  await loadDeviceOptions();
+
+  // Auto fetch on load
+  fetchRanking();
 });
+
+const loadDeviceOptions = async () => {
+  try {
+    const res = await axios.get('/web/reports/device-options?includeAll=true');
+    deviceOptions.value = res.data.options || res.data || [];
+  } catch (e) {
+    console.error('Failed to load device options', e);
+  }
+};
 
 const fetchRanking = async () => {
   loading.value = true;
   try {
-    const response = await axios.get('/web/reports/vehicle-ranking', {
-      params: {
+    const params = {
         from_date: fromDate.value,
         to_date: toDate.value,
         type: rankingType.value
-      }
-    });
+    };
+    if (filterVehicleId.value) {
+        params.vehicle_ids = [filterVehicleId.value];
+    }
+    const response = await axios.get('/web/reports/vehicle-ranking', { params });
     rows.value = response.data;
   } catch (error) {
     console.error('Error fetching ranking:', error);
     // Keep mock data or clear it? Let's clear it to show error state if needed, but for now just log
-    rows.value = []; 
+    rows.value = [];
   } finally {
     loading.value = false;
   }
