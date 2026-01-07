@@ -23,14 +23,21 @@
       <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
       <div class="card-body pt-2">
         <div class="row g-3 align-items-end">
-          <div class="col-12 col-md-5">
-            <label class="form-label small fw-semibold text-muted">Date</label>
+          <div class="col-12 col-md-3">
+            <label class="form-label small fw-semibold text-muted">From Date</label>
             <div class="input-group">
-              <input type="date" class="form-control" v-model="date" />
+              <input type="date" class="form-control" v-model="fromDate" />
               <span class="input-group-text bg-white"><i class="bi bi-calendar3"></i></span>
             </div>
           </div>
-          <div class="col-12 col-md-5">
+          <div class="col-12 col-md-3">
+            <label class="form-label small fw-semibold text-muted">To Date</label>
+            <div class="input-group">
+              <input type="date" class="form-control" v-model="toDate" />
+              <span class="input-group-text bg-white"><i class="bi bi-calendar3"></i></span>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
             <label class="form-label small fw-semibold text-muted">Vehicle</label>
             <select class="form-select" v-model="filterVehicleId">
               <option value="">-- All Vehicles --</option>
@@ -98,7 +105,8 @@
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 
-const date = ref('');
+const fromDate = ref('');
+const toDate = ref('');
 const filterVehicleId = ref('');
 const deviceOptions = ref([]);
 const alert = ref({ message: '', type: '' });
@@ -129,7 +137,7 @@ async function fetchIncidents() {
   loading.value = true;
   rows.value = [];
   try {
-    const params = { date: date.value, device_id: filterVehicleId.value };
+    const params = { from_date: fromDate.value, to_date: toDate.value, vehicle_id: filterVehicleId.value };
     const res = await axios.get('/web/reports/incidents', { params });
     rows.value = res.data.rows || [];
     page.value = 1;
@@ -143,15 +151,21 @@ async function fetchIncidents() {
 }
 
 function exportPdf(row) {
-  const params = new URLSearchParams();
-  if (date.value) params.append('date', date.value);
-  if (row.incidentId) params.append('incident_id', String(row.incidentId));
+  const params = new URLSearchParams({
+    from_date: fromDate.value,
+    to_date: toDate.value,
+    vehicle_id: filterVehicleId.value,
+    incident_id: String(row.incidentId || '')
+  });
   window.open('/web/reports/incidents/export-pdf?' + params.toString(), '_blank');
 }
 function exportExcel(row) {
-  const params = new URLSearchParams();
-  if (date.value) params.append('date', date.value);
-  if (row.incidentId) params.append('incident_id', String(row.incidentId));
+  const params = new URLSearchParams({
+    from_date: fromDate.value,
+    to_date: toDate.value,
+    vehicle_id: filterVehicleId.value,
+    incident_id: String(row.incidentId || '')
+  });
   window.open('/web/reports/incidents/export-excel?' + params.toString(), '_blank');
 }
 

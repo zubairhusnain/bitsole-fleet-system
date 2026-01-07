@@ -544,6 +544,12 @@ class ReportController extends Controller
             }
         }
         $q = Incident::query();
+        if ($request->filled('from_date')) {
+            $q->whereDate('impact_time', '>=', $request->from_date);
+        }
+        if ($request->filled('to_date')) {
+            $q->whereDate('impact_time', '<=', $request->to_date);
+        }
         if ($request->filled('date')) {
             $day = date('Y-m-d', strtotime($request->date));
             $q->whereDate('impact_time', $day);
@@ -592,9 +598,18 @@ class ReportController extends Controller
         } else {
             $rows = $this->incidents($request)->getData(true)['rows'] ?? [];
         }
-        $pdf = Pdf::loadView('reports.incidents_pdf', ['rows' => $rows, 'date' => $request->date ?? date('Y-m-d')]);
+        $dateLabel = $request->date;
+        if ($request->filled('from_date') && $request->filled('to_date')) {
+            $dateLabel = $request->from_date . ' to ' . $request->to_date;
+        } elseif ($request->filled('from_date')) {
+            $dateLabel = 'From ' . $request->from_date;
+        } elseif ($request->filled('to_date')) {
+            $dateLabel = 'Until ' . $request->to_date;
+        }
+        $dateLabel = $dateLabel ?? date('Y-m-d');
+        $pdf = Pdf::loadView('reports.incidents_pdf', ['rows' => $rows, 'date' => $dateLabel]);
         $pdf->setPaper('a4', 'landscape');
-        return $pdf->download('Incident_Analysis_Report_' . date('Y-m-d') . '.pdf');
+        return $pdf->download('Incident_Analysis_Report_' . $dateLabel . '.pdf');
     }
 
     public function exportIncidentsExcel(Request $request)
