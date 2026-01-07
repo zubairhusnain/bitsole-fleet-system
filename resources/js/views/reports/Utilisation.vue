@@ -206,7 +206,7 @@ async function loadDeviceOptions() {
     console.error('Failed to load devices', e);
   }
 }
- 
+
 async function fetchReport() {
   if (!selectedDeviceId.value) {
     errorMessage.value = 'Please select a vehicle for this report.';

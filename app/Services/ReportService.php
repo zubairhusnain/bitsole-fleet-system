@@ -10,7 +10,7 @@ use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
-
+ 
 /**
  * Class ReportService
  * @package App\Services
@@ -2202,14 +2202,8 @@ class ReportService
 
                         if ($type !== 'Engine Hours') {
                             $sh = (int)date('G', $overlapStart);
-                            $endExclusive = $overlapEnd - 1;
-                            if ($endExclusive < $overlapStart) {
-                                $endExclusive = $overlapStart;
-                            }
-                            $eh = (int)date('G', $endExclusive);
-                            for ($h = $sh; $h <= $eh; $h++) {
-                                $hours[$h] = true;
-                            }
+                            $eh = (int)date('G', $overlapEnd);
+                            for ($h = $sh; $h <= $eh; $h++) $hours[$h] = true;
                         }
                     }
                 });
@@ -2232,14 +2226,8 @@ class ReportService
                              $engineMs += ($overlapEnd - $overlapStart) * 1000;
 
                              $sh = (int)date('G', $overlapStart);
-                             $endExclusive = $overlapEnd - 1;
-                             if ($endExclusive < $overlapStart) {
-                                 $endExclusive = $overlapStart;
-                             }
-                             $eh = (int)date('G', $endExclusive);
-                             for ($h = $sh; $h <= $eh; $h++) {
-                                 $hours[$h] = true;
-                             }
+                             $eh = (int)date('G', $overlapEnd);
+                             for ($h = $sh; $h <= $eh; $h++) $hours[$h] = true;
                          }
                     });
 
