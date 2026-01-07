@@ -34,7 +34,7 @@
             <label class="form-label small fw-semibold text-muted">Vehicle</label>
             <select class="form-select" v-model="filterVehicleId">
               <option value="">-- All Vehicles --</option>
-              <option v-for="opt in deviceOptions" :key="opt.id" :value="opt.id">{{ opt.name }}</option>
+              <option v-for="opt in deviceOptions" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
             </select>
           </div>
           <div class="col-12 col-md-2">
@@ -118,8 +118,8 @@ function nextPage() { if (page.value < totalPages.value) page.value += 1; }
 
 async function loadDeviceOptions() {
   try {
-    const res = await axios.get('/web/reports/device-options');
-    deviceOptions.value = res.data || [];
+    const res = await axios.get('/web/reports/device-options?includeAll=true');
+    deviceOptions.value = res.data.options || res.data || [];
   } catch (e) {
     console.error('Failed to load device options', e);
   }

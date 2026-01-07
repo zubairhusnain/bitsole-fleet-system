@@ -24,7 +24,7 @@
             <label class="form-label small fw-semibold text-muted">Vehicle</label>
             <select class="form-select text-muted" v-model="form.deviceId" @change="onDeviceChange">
               <option value="">-- Select Vehicle --</option>
-              <option v-for="opt in deviceOptions" :key="opt.id" :value="opt.id">{{ opt.name }}</option>
+              <option v-for="opt in deviceOptions" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
             </select>
           </div>
           <div class="col-12 col-md-4">
@@ -118,8 +118,8 @@ onMounted(() => {
 
 async function loadDeviceOptions() {
   try {
-    const res = await axios.get('/web/reports/device-options');
-    deviceOptions.value = res.data || [];
+    const res = await axios.get('/web/reports/device-options?includeAll=true');
+    deviceOptions.value = res.data.options || res.data || [];
   } catch (e) {
     console.error('Failed to load device options', e);
   }
@@ -128,7 +128,7 @@ async function loadDeviceOptions() {
 function onDeviceChange() {
   const selected = deviceOptions.value.find(d => d.id === form.value.deviceId);
   if (selected) {
-    form.value.vehicleId = selected.name || 'Unknown';
+    form.value.vehicleId = selected.label || selected.name || 'Unknown';
   } else {
     form.value.vehicleId = '';
   }
