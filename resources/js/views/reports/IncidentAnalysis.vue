@@ -7,7 +7,7 @@
         <li class="breadcrumb-item active" aria-current="page">Incident Analysis Report</li>
       </ol>
     </div>
-    
+
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h4 class="mb-0">Incident Analysis Report</h4>
       <RouterLink to="/reports/incident/new" class="btn btn-dark btn-sm px-3 py-2">Add New Incident</RouterLink>
@@ -20,16 +20,16 @@
           <div class="col-12 col-md-5">
             <label class="form-label small fw-semibold text-muted">Date</label>
             <div class="input-group">
-              <input type="text" class="form-control" placeholder="dd/mm/yyyy" />
+              <input type="date" class="form-control" v-model="date" />
               <span class="input-group-text bg-white"><i class="bi bi-calendar3"></i></span>
             </div>
           </div>
           <div class="col-12 col-md-5">
             <label class="form-label small fw-semibold text-muted">Vehicle</label>
-            <input type="text" class="form-control" placeholder="--Select an Vehicle --" />
+            <input type="text" class="form-control" placeholder="--Select an Vehicle --" v-model="vehicleQuery" />
           </div>
           <div class="col-12 col-md-2">
-            <button class="btn btn-info text-white w-100">Submit</button>
+            <button class="btn btn-info text-white w-100" @click="fetchIncidents" :disabled="loading">Submit</button>
           </div>
         </div>
       </div>
@@ -53,7 +53,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in rows" :key="row.key">
+              <tr v-for="row in pagedRows" :key="row.deviceId + '_' + row.vehicleId">
                 <td class="ps-3">{{ row.vehicleId }}</td>
                 <td>{{ row.typeModel }}</td>
                 <td>{{ row.incidentStart }}</td>
@@ -63,8 +63,8 @@
                 <td class="text-truncate" style="max-width: 200px;">{{ row.description }}</td>
                 <td class="text-truncate" style="max-width: 200px;">{{ row.remarks }}</td>
                 <td class="text-center pe-3">
-                  <button class="btn btn-sm p-0 text-dark me-2"><i class="bi bi-file-earmark-excel fs-6"></i></button>
-                  <button class="btn btn-sm p-0 text-primary"><i class="bi bi-file-earmark-pdf fs-6"></i></button>
+                  <button class="btn btn-sm p-0 text-dark me-2" @click="exportExcel(row)"><i class="bi bi-file-earmark-excel fs-6"></i></button>
+                  <button class="btn btn-sm p-0 text-primary" @click="exportPdf(row)"><i class="bi bi-file-earmark-pdf fs-6"></i></button>
                 </td>
               </tr>
             </tbody>
@@ -72,16 +72,12 @@
         </div>
       </div>
       <div class="card-footer d-flex align-items-center py-2 bg-white border-top">
-        <div class="text-muted small me-auto">Showing 1 to {{ rows.length }} of 1079 results</div>
+        <div class="text-muted small me-auto">Showing {{ totalCount > 0 ? (startIndex + 1) : 0 }} to {{ endIndex }} of {{ totalCount }} results</div>
         <nav aria-label="Pagination" class="ms-auto">
           <ul class="pagination pagination-sm mb-0 pagination-app">
-            <li class="page-item disabled"><button class="page-link"><i class="bi bi-chevron-left"></i></button></li>
-            <li class="page-item active"><button class="page-link">1</button></li>
-            <li class="page-item"><button class="page-link">2</button></li>
-            <li class="page-item"><button class="page-link">3</button></li>
-            <li class="page-item"><button class="page-link">4</button></li>
-            <li class="page-item"><button class="page-link">5</button></li>
-            <li class="page-item"><button class="page-link"><i class="bi bi-chevron-right"></i></button></li>
+            <li class="page-item" :class="{ disabled: page === 1 || loading }"><button class="page-link" @click="prevPage" :disabled="page === 1 || loading"><i class="bi bi-chevron-left"></i></button></li>
+            <li class="page-item" v-for="n in totalPages" :key="n" :class="{ active: page === n }"><button class="page-link" @click="goPage(n)" :disabled="loading">{{ n }}</button></li>
+            <li class="page-item" :class="{ disabled: page === totalPages || loading }"><button class="page-link" @click="nextPage" :disabled="page === totalPages || loading"><i class="bi bi-chevron-right"></i></button></li>
           </ul>
         </nav>
       </div>
@@ -90,23 +86,52 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import axios from 'axios';
 
-const rows = ref([
-  { key: 1, vehicleId: 'VHCL-1001', typeModel: 'MPV - STARIA', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Sophia Martinez', description: 'This report details a single incident...', remarks: 'This report details a single incident...' },
-  { key: 2, vehicleId: 'VHCL-1002', typeModel: 'CAR - Camry 2.5V', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Liam Johnson', description: 'This report details a single incident...', remarks: 'N/A' },
-  { key: 3, vehicleId: 'VHCL-1003', typeModel: 'CAR - Accord', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Ava Smith', description: 'This report details a single incident...', remarks: 'This report details a single incident...' },
-  { key: 4, vehicleId: 'VHCL-1004', typeModel: 'CAR - Camry 2.5V', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Mason Brown', description: 'This report details a single incident...', remarks: 'This report details a single incident...' },
-  { key: 5, vehicleId: 'VHCL-1005', typeModel: 'CAR - Accord', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Isabella Garcia', description: 'This report details a single incident...', remarks: 'N/A' },
-  { key: 6, vehicleId: 'VHCL-1006', typeModel: 'CAR - Accord', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Noah Wilson', description: 'This report details a single incident...', remarks: 'N/A' },
-  { key: 7, vehicleId: 'VHCL-1002', typeModel: 'CAR - Camry 2.5V', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Olivia Taylor', description: 'This report details a single incident...', remarks: 'N/A' },
-  { key: 8, vehicleId: 'VHCL-1003', typeModel: 'CAR - Accord', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Lucas Anderson', description: 'This report details a single incident...', remarks: 'This report details a single incident...' },
-  { key: 9, vehicleId: 'VHCL-1004', typeModel: 'CAR - Camry 2.5V', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Mia Thomas', description: 'This report details a single incident...', remarks: 'N/A' },
-  { key: 10, vehicleId: 'VHCL-1006', typeModel: 'CAR - Accord', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Jacob Jackson', description: 'This report details a single incident...', remarks: 'This report details a single incident...' },
-  { key: 11, vehicleId: 'VHCL-1005', typeModel: 'CAR - Accord', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Charlotte White', description: 'This report details a single incident...', remarks: 'N/A' },
-  { key: 12, vehicleId: 'VHCL-1002', typeModel: 'CAR - Camry 2.5V', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Amelia Harris', description: 'This report details a single incident...', remarks: 'N/A' },
-  { key: 13, vehicleId: 'VHCL-1003', typeModel: 'CAR - Accord', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'William Thompson', description: 'This report details a single incident...', remarks: 'This report details a single incident...' },
-]);
+const date = ref(new Date().toISOString().slice(0, 10));
+const vehicleQuery = ref('');
+const loading = ref(false);
+const rows = ref([]);
+const page = ref(1);
+const pageSize = ref(10);
+const totalCount = computed(() => rows.value.length);
+const startIndex = computed(() => (page.value - 1) * pageSize.value);
+const endIndex = computed(() => Math.min(startIndex.value + pageSize.value, totalCount.value));
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
+const pagedRows = computed(() => rows.value.slice(startIndex.value, startIndex.value + pageSize.value));
+
+function goPage(n) { if (n >= 1 && n <= totalPages.value) page.value = n; }
+function prevPage() { if (page.value > 1) page.value -= 1; }
+function nextPage() { if (page.value < totalPages.value) page.value += 1; }
+
+async function fetchIncidents() {
+  loading.value = true;
+  rows.value = [];
+  try {
+    const params = { date: date.value, vehicle_query: vehicleQuery.value };
+    const res = await axios.get('/web/reports/incidents', { params });
+    rows.value = res.data.rows || [];
+    page.value = 1;
+  } catch (e) {
+    console.error('Failed to fetch incidents', e);
+  } finally {
+    loading.value = false;
+  }
+}
+
+function exportPdf(row) {
+  const params = new URLSearchParams({ date: date.value, incident_id: String(row.incidentId || '') });
+  window.open('/web/reports/incidents/export-pdf?' + params.toString(), '_blank');
+}
+function exportExcel(row) {
+  const params = new URLSearchParams({ date: date.value, incident_id: String(row.incidentId || '') });
+  window.open('/web/reports/incidents/export-excel?' + params.toString(), '_blank');
+}
+
+onMounted(() => {
+  fetchIncidents();
+});
 </script>
 
 <style scoped>

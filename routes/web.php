@@ -259,5 +259,9 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/vehicle-status/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportVehicleStatusPdf']);
     Route::get('/device-options', [\App\Http\Controllers\ReportController::class, 'deviceOptions']);
     Route::get('/group-options', [\App\Http\Controllers\ReportController::class, 'groupOptions']);
+    // Incident Analysis
+    Route::get('/incidents', [\App\Http\Controllers\ReportController::class, 'incidents']);
+    Route::post('/incidents', [\App\Http\Controllers\ReportController::class, 'storeIncident']);
+    Route::get('/incidents/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportIncidentsPdf']);
+    Route::get('/incidents/export-excel', [\App\Http\Controllers\ReportController::class, 'exportIncidentsExcel']);
 });
-

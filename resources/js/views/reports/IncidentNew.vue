@@ -77,6 +77,7 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import axios from 'axios';
 
 const router = useRouter();
 
@@ -91,23 +92,31 @@ const form = ref({
 });
 
 const save = () => {
-  console.log('Saving...', form.value);
-  // Add save logic here
-  router.push('/reports/incident-analysis');
+  axios.post('/web/reports/incidents', form.value)
+    .then(() => {
+      router.push('/reports/incident-analysis');
+    })
+    .catch((e) => {
+      console.error('Failed to save incident', e);
+    });
 };
 
 const saveAndAdd = () => {
-  console.log('Saving and adding more...', form.value);
-  // Add save logic here, then reset form
-  form.value = {
-    vehicleId: '',
-    driverId: '',
-    incidentStart: '',
-    incidentEnd: '',
-    impactTime: '',
-    description: '',
-    remarks: ''
-  };
+  axios.post('/web/reports/incidents', form.value)
+    .then(() => {
+      form.value = {
+        vehicleId: '',
+        driverId: '',
+        incidentStart: '',
+        incidentEnd: '',
+        impactTime: '',
+        description: '',
+        remarks: ''
+      };
+    })
+    .catch((e) => {
+      console.error('Failed to save incident', e);
+    });
 };
 </script>
 
@@ -133,4 +142,3 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   width: auto;
 }
 </style>
-

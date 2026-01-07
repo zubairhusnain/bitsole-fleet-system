@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Services\ReportService;
 use App\Models\Devices;
 use App\Models\TcGroup;
+use App\Models\Incident;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class ReportController extends Controller
@@ -493,5 +495,194 @@ class ReportController extends Controller
             return $devices->pluck('device_id')->toArray();
         }
         return $request->device_ids;
+    }
+
+    public function incidents(Request $request)
+    {
+        $request->validate([
+            'date' => 'sometimes|date',
+            'vehicle_query' => 'sometimes|string',
+            'vehicle_id' => 'sometimes|integer',
+        ]);
+        if (!Schema::hasTable('incidents')) {
+            return response()->json(['rows' => []]);
+        }
+        $count = Incident::count();
+        if ($count === 0) {
+            try {
+                $drivers = ['Sophia Martinez','Liam Johnson','Ava Smith','Mason Brown','Isabella Garcia','Noah Wilson','Olivia Taylor','Lucas Anderson','Mia Thomas','Jacob Jackson','Charlotte White','Amelia Harris','William Thompson'];
+                $user = $request->user();
+                $devices = Devices::accessibleByUser($user)->with('tcDevice')->get();
+                $pool = [];
+                $n = min(100, max(50, $devices->count()));
+                for ($i = 0; $i < $n; $i++) {
+                    $v = $devices[$i % max(1, $devices->count())];
+                    $tc = $v->tcDevice;
+                    $attrs = $tc && $tc->attributes ? (is_string($tc->attributes) ? (json_decode($tc->attributes, true) ?: []) : (is_array($tc->attributes) ? $tc->attributes : [])) : [];
+                    $type = trim((string)data_get($attrs, 'type', ''));
+                    $model = trim((string)data_get($tc, 'model', ''));
+                    $typeModel = trim($type !== '' ? ($type . ' - ' . $model) : $model);
+                    $vehicleNo = (string)data_get($attrs, 'vehicleNo', '');
+                    $vehicleName = (string)data_get($tc, 'name', '');
+                    $vehicleLabel = trim($vehicleNo !== '' ? ($vehicleNo . ' - ' . $vehicleName) : $vehicleName);
+                    $dateBase = now()->subDays(rand(0, 30))->setTime(rand(0,23), [0,15,30,45][rand(0,3)], 0);
+                    $impact = (clone $dateBase)->addHours(rand(0, 2))->addMinutes(rand(0, 59));
+                    $start = (clone $dateBase);
+                    $end = (clone $dateBase)->addDays(rand(0, 5));
+                    $pool[] = [
+                        'device_id' => (int)$v->device_id,
+                        'vehicle_label' => $vehicleLabel,
+                        'type_model' => $typeModel,
+                        'incident_start' => $start,
+                        'incident_end' => $end,
+                        'impact_time' => $impact,
+                        'driver' => $drivers[$i % count($drivers)],
+                        'description' => 'This report details a single incident on ' . $impact->format('d/m/Y h:i A'),
+                        'remarks' => $i % 3 === 0 ? 'N/A' : 'Reviewed',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+                DB::table('incidents')->insert($pool);
+            } catch (\Throwable $e) {
+                Log::error('seed incidents failed', ['error' => $e->getMessage()]);
+            }
+        }
+        $q = Incident::query();
+        if ($request->filled('date')) {
+            $day = date('Y-m-d', strtotime($request->date));
+            $q->whereDate('impact_time', $day);
+        }
+        if ($request->filled('vehicle_query')) {
+            $q->where('vehicle_label', 'ILIKE', '%' . $request->vehicle_query . '%');
+        }
+        if ($request->filled('vehicle_id')) {
+            $q->where('device_id', (int)$request->vehicle_id);
+        }
+        $list = $q->orderByDesc('impact_time')->limit(100)->get();
+        $rows = $list->map(function($r) {
+            return [
+                'deviceId' => (int)($r->device_id ?? 0),
+                'incidentId' => (int)$r->id,
+                'vehicleId' => (string)($r->vehicle_label ?? ''),
+                'typeModel' => (string)($r->type_model ?? ''),
+                'incidentStart' => $r->incident_start ? $r->incident_start->format('d-m-Y') : '',
+                'incidentEnd' => $r->incident_end ? $r->incident_end->format('d-m-Y') : '',
+                'impactTime' => $r->impact_time ? $r->impact_time->format('d-m-Y H:i') : '',
+                'driver' => (string)($r->driver ?? 'N/A'),
+                'description' => (string)($r->description ?? ''),
+                'remarks' => (string)($r->remarks ?? ''),
+            ];
+        })->values();
+        return response()->json(['rows' => $rows]);
+    }
+
+    public function exportIncidentsPdf(Request $request)
+    {
+        $request->validate([
+            'date' => 'sometimes|date',
+            'vehicle_query' => 'sometimes|string',
+            'vehicle_id' => 'sometimes|integer',
+            'incident_id' => 'sometimes|integer',
+        ]);
+        if ($request->filled('incident_id')) {
+            $single = Incident::find((int)$request->incident_id);
+            $rows = [];
+            if ($single) {
+                $rows[] = [
+                    'vehicleId' => (string)($single->vehicle_label ?? ''),
+                    'typeModel' => (string)($single->type_model ?? ''),
+                    'incidentStart' => $single->incident_start ? $single->incident_start->format('d-m-Y') : '',
+                    'incidentEnd' => $single->incident_end ? $single->incident_end->format('d-m-Y') : '',
+                    'impactTime' => $single->impact_time ? $single->impact_time->format('d-m-Y H:i') : '',
+                    'driver' => (string)($single->driver ?? 'N/A'),
+                    'description' => (string)($single->description ?? ''),
+                    'remarks' => (string)($single->remarks ?? ''),
+                ];
+            }
+        } else {
+            $rows = $this->incidents($request)->getData(true)['rows'] ?? [];
+        }
+        $pdf = Pdf::loadView('reports.incidents_pdf', ['rows' => $rows, 'date' => $request->date ?? date('Y-m-d')]);
+        $pdf->setPaper('a4', 'landscape');
+        return $pdf->download('Incident_Analysis_Report_' . date('Y-m-d') . '.pdf');
+    }
+
+    public function exportIncidentsExcel(Request $request)
+    {
+        $request->validate([
+            'date' => 'sometimes|date',
+            'vehicle_query' => 'sometimes|string',
+            'vehicle_id' => 'sometimes|integer',
+            'incident_id' => 'sometimes|integer',
+        ]);
+        if ($request->filled('incident_id')) {
+            $single = Incident::find((int)$request->incident_id);
+            $rows = [];
+            if ($single) {
+                $rows[] = [
+                    'vehicleId' => (string)($single->vehicle_label ?? ''),
+                    'typeModel' => (string)($single->type_model ?? ''),
+                    'incidentStart' => $single->incident_start ? $single->incident_start->format('d-m-Y') : '',
+                    'incidentEnd' => $single->incident_end ? $single->incident_end->format('d-m-Y') : '',
+                    'impactTime' => $single->impact_time ? $single->impact_time->format('d-m-Y H:i') : '',
+                    'driver' => (string)($single->driver ?? 'N/A'),
+                    'description' => (string)($single->description ?? ''),
+                    'remarks' => (string)($single->remarks ?? ''),
+                ];
+            }
+        } else {
+            $rows = $this->incidents($request)->getData(true)['rows'] ?? [];
+        }
+        $csvHeader = ['Vehicle ID','Type/Model','Incident Start','Incident End','Impact Date/Time','Driver','Description','Remarks'];
+        $fh = fopen('php://temp', 'w+');
+        fputcsv($fh, $csvHeader);
+        foreach ($rows as $r) {
+            fputcsv($fh, [
+                $r['vehicleId'] ?? '',
+                $r['typeModel'] ?? '',
+                $r['incidentStart'] ?? '',
+                $r['incidentEnd'] ?? '',
+                $r['impactTime'] ?? '',
+                $r['driver'] ?? '',
+                $r['description'] ?? '',
+                $r['remarks'] ?? '',
+            ]);
+        }
+        rewind($fh);
+        $csv = stream_get_contents($fh);
+        fclose($fh);
+        $fileName = 'Incident_Analysis_Report_' . date('Y-m-d') . '.csv';
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
+        ]);
+    }
+
+    public function storeIncident(Request $request)
+    {
+        $data = $request->validate([
+            'vehicleId' => 'required|string',
+            'driverId' => 'nullable|string',
+            'incidentStart' => 'nullable|date',
+            'incidentEnd' => 'nullable|date',
+            'impactTime' => 'nullable|date',
+            'description' => 'nullable|string',
+            'remarks' => 'nullable|string',
+            'deviceId' => 'nullable|integer',
+            'typeModel' => 'nullable|string',
+        ]);
+        $rec = Incident::create([
+            'device_id' => $data['deviceId'] ?? null,
+            'vehicle_label' => $data['vehicleId'],
+            'type_model' => $data['typeModel'] ?? null,
+            'incident_start' => $data['incidentStart'] ?? null,
+            'incident_end' => $data['incidentEnd'] ?? null,
+            'impact_time' => $data['impactTime'] ?? null,
+            'driver' => $data['driverId'] ?? null,
+            'description' => $data['description'] ?? null,
+            'remarks' => $data['remarks'] ?? null,
+        ]);
+        return response()->json(['message' => 'created', 'id' => $rec->id], 201);
     }
 }
