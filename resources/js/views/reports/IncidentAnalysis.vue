@@ -7,99 +7,29 @@
         <li class="breadcrumb-item active" aria-current="page">Incident Analysis Report</li>
       </ol>
     </div>
-    <h4 class="mb-3">Incident Analysis Report</h4>
+    
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">Incident Analysis Report</h4>
+      <RouterLink to="/reports/incident/new" class="btn btn-dark btn-sm px-3 py-2">Add New Incident</RouterLink>
+    </div>
 
     <div class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
       <div class="card-body pt-2">
         <div class="row g-3 align-items-end">
-          <div class="col-12 col-md-3">
-            <label class="form-label small fw-semibold text-muted">Duration</label>
+          <div class="col-12 col-md-5">
+            <label class="form-label small fw-semibold text-muted">Date</label>
             <div class="input-group">
-              <input type="text" class="form-control" placeholder="dd/mm/yyyy - dd/mm/yyyy" />
+              <input type="text" class="form-control" placeholder="dd/mm/yyyy" />
               <span class="input-group-text bg-white"><i class="bi bi-calendar3"></i></span>
             </div>
           </div>
-          <div class="col-12 col-md-3">
+          <div class="col-12 col-md-5">
             <label class="form-label small fw-semibold text-muted">Vehicle</label>
-            <select class="form-select text-muted">
-              <option>-- Select Vehicle --</option>
-              <option>VGPS2563</option>
-              <option>VHCL-1006</option>
-              <option>VHCL-1009</option>
-              <option>VHCL-1011</option>
-            </select>
+            <input type="text" class="form-control" placeholder="--Select an Vehicle --" />
           </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label small fw-semibold text-muted">Incident Type</label>
-            <select class="form-select text-muted">
-              <option>— Select Type —</option>
-              <option>Overspeed</option>
-              <option>Harsh Braking</option>
-              <option>Harsh Acceleration</option>
-              <option>Power Disconnect</option>
-              <option>Door Open</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label small fw-semibold text-muted">Severity</label>
-            <select class="form-select text-muted">
-              <option>— Any —</option>
-              <option>Low</option>
-              <option>Medium</option>
-              <option>High</option>
-              <option>Critical</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label small fw-semibold text-muted">View Type</label>
-            <select class="form-select text-muted">
-              <option>Summary</option>
-              <option>Daily Breakdown</option>
-              <option>Monthly Summary</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label small fw-semibold text-muted">Report Format</label>
-            <select class="form-select text-muted">
-              <option>— Report Format —</option>
-              <option>Website</option>
-              <option>Excel</option>
-              <option>PDF</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-3 text-md-end ms-md-auto">
-            <button class="btn btn-primary w-100">Search</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card border rounded-3 shadow-0 mb-3">
-      <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Incident Report Result</h6></div>
-      <div class="card-body">
-        <div class="bg-light rounded-3 p-3">
-          <div class="row g-3">
-            <div class="col-12 col-md-3">
-              <div class="small text-muted">Vehicle ID</div>
-              <div class="fw-semibold">VGPS2563</div>
-            </div>
-            <div class="col-12 col-md-3">
-              <div class="small text-muted">Device ID</div>
-              <div class="fw-semibold">#34939829</div>
-            </div>
-            <div class="col-12 col-md-3">
-            <div class="small text-muted">Duration</div>
-            <div class="fw-semibold">2025/08/26 00:00 - 2025/08/31 23:59</div>
-          </div>
-            <div class="col-12 col-md-3">
-              <div class="small text-muted">View Type</div>
-              <div class="fw-semibold">Summary</div>
-            </div>
-            <div class="col-12">
-              <div class="small text-muted">Remarks</div>
-              <div class="fw-semibold">Incident analysis compiled from selected duration. Severity reflects configured thresholds. Map and playback options are available in detailed views.</div>
-            </div>
+          <div class="col-12 col-md-2">
+            <button class="btn btn-info text-white w-100">Submit</button>
           </div>
         </div>
       </div>
@@ -111,38 +41,30 @@
           <table class="table table-sm align-middle mb-0 table-striped w-100 text-nowrap">
             <thead class="table-dark">
               <tr>
-                <th>Date & Time</th>
-                <th>Incident Type</th>
-                <th class="text-center">Severity</th>
-                <th class="text-center">Vehicle ID</th>
-                <th class="text-center">Driver</th>
-                <th>Location</th>
-                <th class="text-center">Duration</th>
-                <th class="text-center">Action</th>
-              </tr>
-              <tr class="text-muted">
-                <th>—</th>
-                <th>—</th>
-                <th class="text-center">Low • High</th>
-                <th class="text-center">—</th>
-                <th class="text-center">—</th>
-                <th>—</th>
-                <th class="text-center">hh:mm:ss</th>
-                <th></th>
+                <th class="ps-3">Vehicle ID</th>
+                <th>Type/Model</th>
+                <th>Incident Start</th>
+                <th>Incident End</th>
+                <th>Impact Date/Time</th>
+                <th>Driver</th>
+                <th>Description</th>
+                <th>Remarks</th>
+                <th class="text-center pe-3">Action</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="row in rows" :key="row.key">
-                <td>{{ row.time }}</td>
-                <td>{{ row.type }}</td>
-                <td class="text-center">{{ row.severity }}</td>
-                <td class="text-center">{{ row.vehicle }}</td>
-                <td class="text-center">{{ row.driver }}</td>
-                <td>{{ row.location }}</td>
-                <td class="text-center">{{ row.duration }}</td>
-                <td class="text-center">
-                  <button class="btn btn-sm p-0 text-primary me-2"><i class="bi bi-eye"></i></button>
-                  <button class="btn btn-sm p-0 text-danger"><i class="bi bi-trash"></i></button>
+                <td class="ps-3">{{ row.vehicleId }}</td>
+                <td>{{ row.typeModel }}</td>
+                <td>{{ row.incidentStart }}</td>
+                <td>{{ row.incidentEnd }}</td>
+                <td>{{ row.impactTime }}</td>
+                <td>{{ row.driver }}</td>
+                <td class="text-truncate" style="max-width: 200px;">{{ row.description }}</td>
+                <td class="text-truncate" style="max-width: 200px;">{{ row.remarks }}</td>
+                <td class="text-center pe-3">
+                  <button class="btn btn-sm p-0 text-dark me-2"><i class="bi bi-file-earmark-excel fs-6"></i></button>
+                  <button class="btn btn-sm p-0 text-primary"><i class="bi bi-file-earmark-pdf fs-6"></i></button>
                 </td>
               </tr>
             </tbody>
@@ -150,7 +72,7 @@
         </div>
       </div>
       <div class="card-footer d-flex align-items-center py-2 bg-white border-top">
-        <div class="text-muted small me-auto">Showing 1 to 10 of 10 results</div>
+        <div class="text-muted small me-auto">Showing 1 to {{ rows.length }} of 1079 results</div>
         <nav aria-label="Pagination" class="ms-auto">
           <ul class="pagination pagination-sm mb-0 pagination-app">
             <li class="page-item disabled"><button class="page-link"><i class="bi bi-chevron-left"></i></button></li>
@@ -171,23 +93,27 @@
 import { ref } from 'vue';
 
 const rows = ref([
-  { key: 1, time: '2024/03/11 09:15:22', type: 'Overspeed', severity: 'High', vehicle: 'VGPS2563', driver: 'Adam', location: 'Kuala Lumpur, MY', duration: '00:03:12' },
-  { key: 2, time: '2024/03/12 14:41:03', type: 'Harsh Braking', severity: 'Medium', vehicle: 'VHCL-1006', driver: 'Bella', location: 'Shah Alam, MY', duration: '00:00:18' },
-  { key: 3, time: '2024/03/13 07:05:10', type: 'Power Disconnect', severity: 'Critical', vehicle: 'VHCL-1009', driver: 'Chong', location: 'Putrajaya, MY', duration: '00:10:45' },
-  { key: 4, time: '2024/03/14 17:20:55', type: 'Door Open', severity: 'Low', vehicle: 'VHCL-1011', driver: 'Danish', location: 'Johor Bahru, MY', duration: '00:01:02' },
-  { key: 5, time: '2024/03/15 12:33:47', type: 'Harsh Acceleration', severity: 'Medium', vehicle: 'VGPS2563', driver: 'Adam', location: 'Seremban, MY', duration: '00:00:22' },
-  { key: 6, time: '2024/03/16 08:12:19', type: 'Overspeed', severity: 'High', vehicle: 'VHCL-1006', driver: 'Bella', location: 'Klang, MY', duration: '00:02:35' },
-  { key: 7, time: '2024/03/17 19:40:01', type: 'Door Open', severity: 'Low', vehicle: 'VHCL-1009', driver: 'Chong', location: 'Kajang, MY', duration: '00:00:58' },
-  { key: 8, time: '2024/03/18 13:27:44', type: 'Harsh Braking', severity: 'Medium', vehicle: 'VHCL-1011', driver: 'Danish', location: 'Bangi, MY', duration: '00:00:15' },
-  { key: 9, time: '2024/03/19 11:01:06', type: 'Power Disconnect', severity: 'Critical', vehicle: 'VGPS2563', driver: 'Adam', location: 'Cyberjaya, MY', duration: '00:05:20' },
-  { key: 10, time: '2024/03/20 16:56:30', type: 'Overspeed', severity: 'High', vehicle: 'VHCL-1011', driver: 'Danish', location: 'Melaka, MY', duration: '00:04:11' },
+  { key: 1, vehicleId: 'VHCL-1001', typeModel: 'MPV - STARIA', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Sophia Martinez', description: 'This report details a single incident...', remarks: 'This report details a single incident...' },
+  { key: 2, vehicleId: 'VHCL-1002', typeModel: 'CAR - Camry 2.5V', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Liam Johnson', description: 'This report details a single incident...', remarks: 'N/A' },
+  { key: 3, vehicleId: 'VHCL-1003', typeModel: 'CAR - Accord', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Ava Smith', description: 'This report details a single incident...', remarks: 'This report details a single incident...' },
+  { key: 4, vehicleId: 'VHCL-1004', typeModel: 'CAR - Camry 2.5V', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Mason Brown', description: 'This report details a single incident...', remarks: 'This report details a single incident...' },
+  { key: 5, vehicleId: 'VHCL-1005', typeModel: 'CAR - Accord', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Isabella Garcia', description: 'This report details a single incident...', remarks: 'N/A' },
+  { key: 6, vehicleId: 'VHCL-1006', typeModel: 'CAR - Accord', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Noah Wilson', description: 'This report details a single incident...', remarks: 'N/A' },
+  { key: 7, vehicleId: 'VHCL-1002', typeModel: 'CAR - Camry 2.5V', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Olivia Taylor', description: 'This report details a single incident...', remarks: 'N/A' },
+  { key: 8, vehicleId: 'VHCL-1003', typeModel: 'CAR - Accord', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Lucas Anderson', description: 'This report details a single incident...', remarks: 'This report details a single incident...' },
+  { key: 9, vehicleId: 'VHCL-1004', typeModel: 'CAR - Camry 2.5V', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Mia Thomas', description: 'This report details a single incident...', remarks: 'N/A' },
+  { key: 10, vehicleId: 'VHCL-1006', typeModel: 'CAR - Accord', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Jacob Jackson', description: 'This report details a single incident...', remarks: 'This report details a single incident...' },
+  { key: 11, vehicleId: 'VHCL-1005', typeModel: 'CAR - Accord', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Charlotte White', description: 'This report details a single incident...', remarks: 'N/A' },
+  { key: 12, vehicleId: 'VHCL-1002', typeModel: 'CAR - Camry 2.5V', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'Amelia Harris', description: 'This report details a single incident...', remarks: 'N/A' },
+  { key: 13, vehicleId: 'VHCL-1003', typeModel: 'CAR - Accord', incidentStart: '09-08-2025', incidentEnd: '14-08-2025', impactTime: '09-08-2025 19:00', driver: 'William Thompson', description: 'This report details a single incident...', remarks: 'This report details a single incident...' },
 ]);
 </script>
 
 <style scoped>
-thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; }
-tbody tr td { font-size: 13px; }
-.panel .card-body { padding-top: 1rem; padding-bottom: 1rem; }
+thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; font-weight: 500; font-size: 0.85rem; }
+tbody tr td { font-size: 0.85rem; color: #4b5563; }
 .card-header h6 { font-weight: 600; }
 .table-striped tbody tr:nth-of-type(odd) { --bs-table-accent-bg: #f8f9fb; }
+.btn-info { background-color: #0ea5e9; border-color: #0ea5e9; }
+.btn-info:hover { background-color: #0284c7; border-color: #0284c7; }
 </style>
