@@ -10,23 +10,39 @@
     </div>
     <h4 class="mb-3">Create New Incident Report</h4>
 
+    <!-- Alerts -->
+    <div v-if="alert.message" :class="`alert alert-${alert.type} alert-dismissible fade show`" role="alert">
+      {{ alert.message }}
+      <button type="button" class="btn-close" @click="alert.message = ''"></button>
+    </div>
+
     <div class="card border rounded-3 shadow-0 mb-3">
       <div class="card-body p-4">
         <div class="row g-3">
-          <!-- Row 1: Vehicle ID & Driver -->
-          <div class="col-12 col-md-6">
-            <label class="form-label small fw-semibold text-muted">Vehicle ID</label>
-            <input type="text" class="form-control" placeholder="Enter Vehicle ID" v-model="form.vehicleId" />
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label small fw-semibold text-muted">Driver</label>
-            <select class="form-select text-muted" v-model="form.driverId">
-              <option value="">--Select Driver --</option>
-              <option value="1">Adam</option>
-              <option value="2">Bella</option>
-              <option value="3">Chong</option>
-              <option value="4">Danish</option>
+          <!-- Row 1: Vehicle & Driver -->
+          <div class="col-12 col-md-4">
+            <label class="form-label small fw-semibold text-muted">Vehicle</label>
+            <select class="form-select text-muted" v-model="form.deviceId" @change="onDeviceChange">
+              <option value="">-- Select Vehicle --</option>
+              <option v-for="opt in deviceOptions" :key="opt.id" :value="opt.id">{{ opt.name }}</option>
             </select>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label small fw-semibold text-muted">Type/Model</label>
+            <select class="form-select text-muted" v-model="form.typeModel">
+              <option value="">-- Select Type --</option>
+              <option value="Collision">Collision</option>
+              <option value="Overspeed">Overspeed</option>
+              <option value="Harsh Braking">Harsh Braking</option>
+              <option value="Geofence Exit">Geofence Exit</option>
+              <option value="Geofence Enter">Geofence Enter</option>
+              <option value="Idling">Idling</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label small fw-semibold text-muted">Driver</label>
+            <input type="text" class="form-control text-muted" placeholder="Enter Driver Name" v-model="form.driverId" />
           </div>
 
           <!-- Row 2: Incident Start & Incident End -->
@@ -75,14 +91,19 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 
 const router = useRouter();
 
+const deviceOptions = ref([]);
+const alert = ref({ message: '', type: '' });
+
 const form = ref({
-  vehicleId: '',
+  deviceId: '',
+  vehicleId: '', // Label
+  typeModel: '',
   driverId: '',
   incidentStart: '',
   incidentEnd: '',
@@ -91,21 +112,62 @@ const form = ref({
   remarks: ''
 });
 
+onMounted(() => {
+  loadDeviceOptions();
+});
+
+async function loadDeviceOptions() {
+  try {
+    const res = await axios.get('/web/reports/device-options');
+    deviceOptions.value = res.data || [];
+  } catch (e) {
+    console.error('Failed to load device options', e);
+  }
+}
+
+function onDeviceChange() {
+  const selected = deviceOptions.value.find(d => d.id === form.value.deviceId);
+  if (selected) {
+    form.value.vehicleId = selected.name || 'Unknown';
+  } else {
+    form.value.vehicleId = '';
+  }
+}
+
+function validate() {
+  if (!form.value.deviceId) {
+    alert.value = { message: 'Please select a vehicle.', type: 'danger' };
+    return false;
+  }
+  if (!form.value.incidentStart) {
+    alert.value = { message: 'Please select incident start time.', type: 'danger' };
+    return false;
+  }
+  return true;
+}
+
 const save = () => {
+  if (!validate()) return;
   axios.post('/web/reports/incidents', form.value)
     .then(() => {
       router.push('/reports/incident-analysis');
     })
     .catch((e) => {
       console.error('Failed to save incident', e);
+      alert.value = { message: 'Failed to save incident.', type: 'danger' };
     });
 };
 
 const saveAndAdd = () => {
+  if (!validate()) return;
   axios.post('/web/reports/incidents', form.value)
     .then(() => {
+      alert.value = { message: 'Incident saved successfully.', type: 'success' };
+      // Reset form but keep maybe vehicle? No, clear all usually.
       form.value = {
+        deviceId: '',
         vehicleId: '',
+        typeModel: '',
         driverId: '',
         incidentStart: '',
         incidentEnd: '',
@@ -113,9 +175,12 @@ const saveAndAdd = () => {
         description: '',
         remarks: ''
       };
+      // Scroll to top
+      window.scrollTo(0, 0);
     })
     .catch((e) => {
       console.error('Failed to save incident', e);
+      alert.value = { message: 'Failed to save incident.', type: 'danger' };
     });
 };
 </script>

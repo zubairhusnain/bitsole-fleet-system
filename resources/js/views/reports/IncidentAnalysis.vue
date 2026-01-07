@@ -13,6 +13,12 @@
       <RouterLink to="/reports/incident/new" class="btn btn-dark btn-sm px-3 py-2">Add New Incident</RouterLink>
     </div>
 
+    <!-- Alerts -->
+    <div v-if="alert.message" :class="`alert alert-${alert.type} alert-dismissible fade show`" role="alert">
+      {{ alert.message }}
+      <button type="button" class="btn-close" @click="alert.message = ''"></button>
+    </div>
+
     <div class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
       <div class="card-body pt-2">
@@ -26,7 +32,10 @@
           </div>
           <div class="col-12 col-md-5">
             <label class="form-label small fw-semibold text-muted">Vehicle</label>
-            <input type="text" class="form-control" placeholder="--Select an Vehicle --" v-model="vehicleQuery" />
+            <select class="form-select" v-model="filterVehicleId">
+              <option value="">-- All Vehicles --</option>
+              <option v-for="opt in deviceOptions" :key="opt.id" :value="opt.id">{{ opt.name }}</option>
+            </select>
           </div>
           <div class="col-12 col-md-2">
             <button class="btn btn-info text-white w-100" @click="fetchIncidents" :disabled="loading">Submit</button>
@@ -90,7 +99,9 @@ import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 
 const date = ref(new Date().toISOString().slice(0, 10));
-const vehicleQuery = ref('');
+const filterVehicleId = ref('');
+const deviceOptions = ref([]);
+const alert = ref({ message: '', type: '' });
 const loading = ref(false);
 const rows = ref([]);
 const page = ref(1);
@@ -105,16 +116,27 @@ function goPage(n) { if (n >= 1 && n <= totalPages.value) page.value = n; }
 function prevPage() { if (page.value > 1) page.value -= 1; }
 function nextPage() { if (page.value < totalPages.value) page.value += 1; }
 
+async function loadDeviceOptions() {
+  try {
+    const res = await axios.get('/web/reports/device-options');
+    deviceOptions.value = res.data || [];
+  } catch (e) {
+    console.error('Failed to load device options', e);
+  }
+}
+
 async function fetchIncidents() {
   loading.value = true;
   rows.value = [];
   try {
-    const params = { date: date.value, vehicle_query: vehicleQuery.value };
+    const params = { date: date.value, device_id: filterVehicleId.value };
     const res = await axios.get('/web/reports/incidents', { params });
     rows.value = res.data.rows || [];
     page.value = 1;
+    alert.value = { message: '', type: '' };
   } catch (e) {
     console.error('Failed to fetch incidents', e);
+    alert.value = { message: 'Failed to fetch incidents.', type: 'danger' };
   } finally {
     loading.value = false;
   }
@@ -130,6 +152,7 @@ function exportExcel(row) {
 }
 
 onMounted(() => {
+  loadDeviceOptions();
   fetchIncidents();
 });
 </script>
