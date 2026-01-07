@@ -10,7 +10,7 @@ use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
- 
+
 /**
  * Class ReportService
  * @package App\Services
@@ -2085,7 +2085,6 @@ class ReportService
             Log::error("Failed to fetch report data", ['error' => $e->getMessage()]);
         }
 
-        // Parse and Merge Responses
         $allTrips = [];
         $allStops = [];
         $allEvents = [];
@@ -2135,153 +2134,14 @@ class ReportService
             'events' => count($allEvents)
         ]);
 
-        $engineIntervals = collect([]);
-        if ($type === 'Engine Hours') {
-
-            $sortedEvents = collect($allEvents)->sortBy('eventTime')->values();
-            $currentStart = null;
-            $sortedEvents->each(function ($ev) use (&$currentStart, $engineIntervals) {
-                 if ($ev['type'] === 'ignitionOn') {
-                     $currentStart = $ev['eventTime'];
-                 } elseif ($ev['type'] === 'ignitionOff' && $currentStart) {
-                     $engineIntervals->push([
-                         'startTime' => $currentStart,
-                         'endTime' => $ev['eventTime'],
-                         'duration' => (strtotime($ev['eventTime']) - strtotime($currentStart)) * 1000
-                     ]);
-                     $currentStart = null;
-                 }
-            });
-        }
-
-        $finalRows = collect([]);
         $foundVehicleName = null;
-
-            // Capture vehicle name from first valid response if not yet found
-            if (!$foundVehicleName && count($allTrips) > 0) {
-                $first = $allTrips[0];
-                if (isset($first['deviceName'])) {
-                    $foundVehicleName = $first['deviceName'];
-                }
+        if (!$foundVehicleName && count($allTrips) > 0) {
+            $first = $allTrips[0];
+            if (isset($first['deviceName'])) {
+                $foundVehicleName = $first['deviceName'];
             }
-
-            // Process Rows
-            $batchRows = collect($allDates)->map(function ($date) use ($allTrips, $allStops, $engineIntervals, $type) {
-                $dayStart = strtotime("{$date} 00:00:00");
-                $dayEnd = strtotime("{$date} 23:59:59");
-
-                $tripMs = 0;
-                $idleMs = 0;
-                $distance = 0;
-                $hours = array_fill(0, 24, false);
-
-                // Filter Trips for this day
-                $dayTrips = array_filter($allTrips, function($t) use ($dayStart, $dayEnd) {
-                     $s = strtotime($t['startTime']);
-                     $e = strtotime($t['endTime']);
-                     return $e > $dayStart && $s < $dayEnd;
-                });
-
-                // Process Trips (Movement)
-                collect($dayTrips)->each(function ($t) use (&$distance, &$tripMs, &$hours, $date, $dayStart, $dayEnd, $type) {
-                    $s = strtotime($t['startTime']);
-                    $e = strtotime($t['endTime']);
-
-                    // Distance: Sum if trip starts on this day (matches legacy behavior)
-                    if (strpos($t['startTime'], $date) === 0) {
-                        $distance += $t['distance'] ?? 0;
-                    }
-
-                    // Overlap
-                    $overlapStart = max($s, $dayStart);
-                    $overlapEnd = min($e, $dayEnd);
-
-                    if ($overlapEnd > $overlapStart) {
-                        $dur = ($overlapEnd - $overlapStart) * 1000;
-                        $tripMs += $dur;
-
-                        if ($type !== 'Engine Hours') {
-                            $sh = (int)date('G', $overlapStart);
-                            $eh = (int)date('G', $overlapEnd);
-                            for ($h = $sh; $h <= $eh; $h++) $hours[$h] = true;
-                        }
-                    }
-                });
-
-                if ($type === 'Engine Hours') {
-                    $engineMs = 0;
-                    $relevantIntervals = $engineIntervals->filter(function($item) use ($dayStart, $dayEnd) {
-                         $s = strtotime($item['startTime']);
-                         $e = strtotime($item['endTime']);
-                         return $e > $dayStart && $s < $dayEnd;
-                    });
-
-                    $relevantIntervals->each(function ($item) use (&$engineMs, &$hours, $dayStart, $dayEnd) {
-                         $s = strtotime($item['startTime']);
-                         $e = strtotime($item['endTime']);
-
-                         $overlapStart = max($s, $dayStart);
-                         $overlapEnd = min($e, $dayEnd);
-                         if ($overlapEnd > $overlapStart) {
-                             $engineMs += ($overlapEnd - $overlapStart) * 1000;
-
-                             $sh = (int)date('G', $overlapStart);
-                             $eh = (int)date('G', $overlapEnd);
-                             for ($h = $sh; $h <= $eh; $h++) $hours[$h] = true;
-                         }
-                    });
-
-                    $idleMs = max(0, $engineMs - $tripMs);
-                    $totalMs = $engineMs;
-                } else {
-                    // Filter Stops
-                    $dayStops = array_filter($allStops, function($stop) use ($dayStart, $dayEnd) {
-                         $s = strtotime($stop['startTime']);
-                         $e = strtotime($stop['endTime']);
-                         return $e > $dayStart && $s < $dayEnd;
-                    });
-
-                    collect($dayStops)->each(function ($stop) use (&$idleMs, $dayStart, $dayEnd) {
-                        $s = strtotime($stop['startTime']);
-                        $e = strtotime($stop['endTime']);
-
-                        $overlapStart = max($s, $dayStart);
-                        $overlapEnd = min($e, $dayEnd);
-
-                        if ($overlapEnd > $overlapStart) {
-                            $idleMs += ($overlapEnd - $overlapStart) * 1000;
-                        }
-                    });
-                    $totalMs = $tripMs + $idleMs;
-                }
-
-                $usagePct = $totalMs > 0 ? round(($tripMs / $totalMs) * 100) : 0;
-
-                $h = floor($tripMs / 3600000);
-                $m = floor(($tripMs % 3600000) / 60000);
-                $moveStr = "{$h} hours {$m} minutes";
-
-                $ih = floor($idleMs / 3600000);
-                $im = floor(($idleMs % 3600000) / 60000);
-                $idleStr = "{$ih} hours {$im} minutes";
-
-                $ts = strtotime($date);
-                $dayLabel = date('d/m/Y l', $ts);
-
-                return [
-                    'day' => $dayLabel,
-                    'usage' => "{$usagePct}%",
-                    'move' => $moveStr,
-                    'idle' => $idleStr,
-                    'dist' => round($distance / 1000, 2) . ' KM',
-                    'hours' => $hours
-                ];
-            });
-
-            $finalRows = $finalRows->merge($batchRows);
-
-            // Explicitly unset large response array to free memory
-            unset($responses);
+        }
+        unset($responses);
 
         $vehicleRec = Devices::with('tcDevice')->where('device_id', $deviceId)->first();
         $tcDevice = $vehicleRec ? $vehicleRec->tcDevice : null;
@@ -2313,11 +2173,17 @@ class ReportService
              'summary' => [
                  'vehicleIdDisplay' => $vehicleIdDisplay,
                  'deviceId' => $uniqueId,
-                'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
-                'totalDays' => $totalDays
-            ],
-            'rows' => $finalRows->values()
-        ];
+                 'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
+                 'totalDays' => $totalDays
+             ],
+             'raw' => [
+                 'trips' => $allTrips,
+                 'stops' => $allStops,
+                 'events' => $allEvents
+             ],
+             'dates' => $allDates,
+             'type' => $type
+         ];
     }
 
 }
