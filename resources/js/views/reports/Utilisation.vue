@@ -279,6 +279,7 @@ async function fetchReport() {
           let idleMs = 0;
           let distance = 0;
           const hours = new Array(24).fill(false);
+          let totalMs = 0;
           if (poss && poss.length > 0 && tp !== 'Engine Hours') {
             const dayPoss = poss.filter(p => {
               const t = toMs(p.fixtime || p.servertime);
@@ -309,7 +310,7 @@ async function fetchReport() {
                 }
               }
               tripMs = moveMs;
-              const totalMs = Math.max(0, lastT - firstT);
+              totalMs = Math.max(0, lastT - firstT);
               idleMs = Math.max(0, totalMs - moveMs);
             }
           } else {
@@ -350,7 +351,7 @@ async function fetchReport() {
                 }
               }
               idleMs = Math.max(0, engineMs - tripMs);
-              var totalMs = engineMs;
+              totalMs = engineMs;
             } else {
               for (let k = 0; k < stps.length; k++) {
                 const st = stps[k];
@@ -364,7 +365,7 @@ async function fetchReport() {
                   idleMs += (oe - os);
                 }
               }
-              var totalMs = tripMs + idleMs;
+              totalMs = tripMs + idleMs;
             }
           }
           const usagePct = totalMs > 0 ? Math.round((tripMs / totalMs) * 100) : 0;
