@@ -24,17 +24,29 @@ function formatNumberKm(km) {
     return `${rounded} km`;
   }
 }
-
+ 
 export function formatOdometer(rawAttrs, ctx = {}) {
+    console.log('odometer key value ',rawAttrs);
   const attrs = parseAttrs(rawAttrs);
   const protocol = String(ctx?.protocol || '').toLowerCase();
   const preferNamed = !!ctx?.preferNamedOdometer;
   const userPriorityKeys = ['CAN_Total_Mileage_87', 'OBD_Total_Mileage_389', 'GNSS_Total_Odometer_16'];
   const distanceKeys = ['totalDistance', 'distance', 'tripDistance'];
   const primary = ['odometer', 'mileage', 'odometerKm', 'odometer_km'];
-  // Unified order: include 389 in IO check list for everyone
-  const orderIoFirst = [...userPriorityKeys, '16', '87', '50', '389', ...primary, ...distanceKeys];
-  const orderNamedFirst = [...userPriorityKeys, ...primary, ...distanceKeys, '16', '87', '50', '389'];
+  // Unified order: check ALL userPriorityKeys first, then specific IO IDs, then generic keys
+  const orderIoFirst = [
+    ...userPriorityKeys,
+    '87', '389', '16', '50',
+    ...primary,
+    ...distanceKeys
+  ];
+  // Unified order for Named First: Priority keys and their IOs should still precede generic 'odometer'
+  const orderNamedFirst = [
+    ...userPriorityKeys,
+    '87', '389', '16', '50',
+    ...primary,
+    ...distanceKeys
+  ];
 
   const orderedKeys = preferNamed ? orderNamedFirst : orderIoFirst;
   const getIoVal = (n) => {
@@ -58,7 +70,7 @@ export function formatOdometer(rawAttrs, ctx = {}) {
 
   let keyFound = null;
   // REMOVED pre-check for 16 to respect orderedKeys priority
-  for (const k of orderedKeys) { 
+  for (const k of orderedKeys) {
     // For numeric IO keys, check both raw and io-prefixed variants
     let val;
     if (k === '389' || k === '87' || k === '50' || k === '16') {
@@ -73,7 +85,25 @@ export function formatOdometer(rawAttrs, ctx = {}) {
     if (exists) {
         // Condition: Check for > -1 for ALL keys (especially IO IDs and priority keys)
         const n = parseNum(val);
-        if (n !== null && n <= -1) continue;
+        // if (n !== null && n <= -1) continue;
+        // Logic Update:
+        // 1. Priority Keys: skip if <= -1
+        // 2. IO Keys: skip if 0 (allow -1)
+        // 3. Others: skip if <= -1
+
+        if (n === null) continue;
+
+        const isIoKey = ['87', '389', '16', '50'].includes(k);
+        const isPriorityKey = userPriorityKeys.includes(k);
+
+        if (isIoKey) {
+          if (n === 0) continue;
+        } else if (isPriorityKey) {
+          if (n <= -1) continue;
+        } else {
+          // Default for others
+          if (n <= -1) continue;
+        }
 
         if (keyFound == null) { keyFound = k; break; }
     }
