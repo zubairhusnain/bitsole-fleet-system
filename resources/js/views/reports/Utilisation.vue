@@ -164,7 +164,7 @@ import UiAlert from '../../components/UiAlert.vue';
 const deviceOptions = ref([]);
 const selectedDeviceId = ref('');
 const selectedType = ref('Movement');
-const fromDate = ref(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+const fromDate = ref(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
 const toDate = ref(new Date().toISOString().slice(0, 10));
 const loading = ref(false);
 const errorMessage = ref(null);
@@ -206,7 +206,7 @@ async function loadDeviceOptions() {
     console.error('Failed to load devices', e);
   }
 }
-
+ 
 async function fetchReport() {
   if (!selectedDeviceId.value) {
     errorMessage.value = 'Please select a vehicle for this report.';
@@ -248,7 +248,10 @@ async function fetchReport() {
 onMounted(async () => {
   await loadDeviceOptions();
   if (selectedDeviceId.value) {
-    fetchReport();
+    // Add a small delay to prevent immediate request on page load
+    setTimeout(() => {
+      fetchReport();
+    }, 500);
   }
 });
 </script>
