@@ -559,7 +559,7 @@ class ReportController extends Controller
         if ($request->filled('vehicle_id')) {
             $q->where('device_id', (int)$request->vehicle_id);
         }
-        $list = $q->orderByDesc('impact_time')->limit(100)->get();
+        $list = $q->orderByDesc('impact_time')->orderByDesc('id')->limit(100)->get();
         $rows = $list->map(function($r) {
             return [
                 'deviceId' => (int)($r->device_id ?? 0),

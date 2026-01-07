@@ -151,8 +151,8 @@ function exportExcel(row) {
   window.open('/web/reports/incidents/export-excel?' + params.toString(), '_blank');
 }
 
-onMounted(() => {
-  loadDeviceOptions();
+onMounted(async () => {
+  await loadDeviceOptions();
   fetchIncidents();
 });
 </script>
