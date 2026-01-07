@@ -499,11 +499,6 @@ class ReportController extends Controller
 
     public function incidents(Request $request)
     {
-        $request->validate([
-            'date' => 'sometimes|date',
-            'vehicle_query' => 'sometimes|string',
-            'vehicle_id' => 'sometimes|integer',
-        ]);
         if (!Schema::hasTable('incidents')) {
             return response()->json(['rows' => []]);
         }
@@ -579,12 +574,6 @@ class ReportController extends Controller
 
     public function exportIncidentsPdf(Request $request)
     {
-        $request->validate([
-            'date' => 'sometimes|date',
-            'vehicle_query' => 'sometimes|string',
-            'vehicle_id' => 'sometimes|integer',
-            'incident_id' => 'sometimes|integer',
-        ]);
         if ($request->filled('incident_id')) {
             $single = Incident::find((int)$request->incident_id);
             $rows = [];
@@ -610,12 +599,6 @@ class ReportController extends Controller
 
     public function exportIncidentsExcel(Request $request)
     {
-        $request->validate([
-            'date' => 'sometimes|date',
-            'vehicle_query' => 'sometimes|string',
-            'vehicle_id' => 'sometimes|integer',
-            'incident_id' => 'sometimes|integer',
-        ]);
         if ($request->filled('incident_id')) {
             $single = Incident::find((int)$request->incident_id);
             $rows = [];

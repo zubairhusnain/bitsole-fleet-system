@@ -143,11 +143,15 @@ async function fetchIncidents() {
 }
 
 function exportPdf(row) {
-  const params = new URLSearchParams({ date: date.value, incident_id: String(row.incidentId || '') });
+  const params = new URLSearchParams();
+  if (date.value) params.append('date', date.value);
+  if (row.incidentId) params.append('incident_id', String(row.incidentId));
   window.open('/web/reports/incidents/export-pdf?' + params.toString(), '_blank');
 }
 function exportExcel(row) {
-  const params = new URLSearchParams({ date: date.value, incident_id: String(row.incidentId || '') });
+  const params = new URLSearchParams();
+  if (date.value) params.append('date', date.value);
+  if (row.incidentId) params.append('incident_id', String(row.incidentId));
   window.open('/web/reports/incidents/export-excel?' + params.toString(), '_blank');
 }
 
