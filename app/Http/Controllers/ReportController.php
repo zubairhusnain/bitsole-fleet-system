@@ -382,6 +382,28 @@ class ReportController extends Controller
         }
     }
 
+    public function utilisationDb(Request $request)
+    {
+        set_time_limit(300);
+        try {
+            $request->validate([
+                'from_date' => 'required|date',
+                'to_date' => 'required|date|after_or_equal:from_date',
+                'device_ids' => 'required|array|min:1',
+                'type' => 'sometimes|string|in:Movement,Engine Hours',
+            ]);
+            $from = \Carbon\Carbon::parse($request->from_date);
+            $to = \Carbon\Carbon::parse($request->to_date);
+            if ($from->diffInDays($to) > 90) {
+                return response()->json(['message' => 'Date range cannot exceed 90 days.'], 422);
+            }
+            $deviceId = $request->device_ids[0];
+            return $this->reportService->fetchUtilisationReportDb($request, $deviceId);
+        } catch (\Throwable $e) {
+            Log::error('utilisationDb failed', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to fetch report data.'], 500);
+        }
+    }
     public function deviceOptions(Request $request)
     {
         $user = $request->user();

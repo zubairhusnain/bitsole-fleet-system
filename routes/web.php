@@ -253,11 +253,11 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/vehicle-activity', [\App\Http\Controllers\ReportController::class, 'vehicleActivity']);
     Route::get('/idling', [\App\Http\Controllers\ReportController::class, 'idling']);
     Route::get('/utilisation', [\App\Http\Controllers\ReportController::class, 'utilisation']);
+    Route::get('/utilisation-db', [\App\Http\Controllers\ReportController::class, 'utilisationDb']);
     Route::get('/daily-breakdown-map', [\App\Http\Controllers\ReportController::class, 'dailyBreakdownMap']);
     Route::get('/vehicle-status', [\App\Http\Controllers\ReportController::class, 'vehicleStatus']);
     Route::get('/vehicle-status/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportVehicleStatusPdf']);
     Route::get('/device-options', [\App\Http\Controllers\ReportController::class, 'deviceOptions']);
     Route::get('/group-options', [\App\Http\Controllers\ReportController::class, 'groupOptions']);
 });
-
 

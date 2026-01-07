@@ -10,6 +10,7 @@ use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Class ReportService
@@ -2037,101 +2038,45 @@ class ReportService
             'Content-Type' => 'application/json'
         ];
 
-        // Generate dates for reporting
-        $allDates = [];
-        $cur = strtotime($request->from_date);
-        $endTs = strtotime($request->to_date);
-        while ($cur <= $endTs) {
-            $allDates[] = date('Y-m-d', $cur);
-            $cur = strtotime('+1 day', $cur);
-        }
+        $fromIso = $request->from_date . 'T00:00:00Z';
+        $toIso = (preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', $request->to_date) ? $request->to_date . ' 23:59:59' : $request->to_date);
+        $toIso = date('Y-m-d\\TH:i:00\\Z', strtotime($toIso));
 
-        // Generate 7-day chunks to balance load
-        $ranges = [];
-        $current = strtotime($request->from_date);
-        $end = strtotime($request->to_date);
-
-        while ($current <= $end) {
-            $chunkEnd = strtotime('+6 days', $current);
-            if ($chunkEnd > $end) $chunkEnd = $end;
-
-            $ranges[] = [
-                'start' => date('Y-m-d', $current),
-                'end' => date('Y-m-d', $chunkEnd)
-            ];
-
-            $current = strtotime('+1 day', $chunkEnd);
-        }
-
-        $responses = [];
-        try {
-            $responses = Http::pool(function (Pool $pool) use ($ranges, $baseUrl, $deviceId, $headers, $type) {
-                $reqs = [];
-                foreach ($ranges as $i => $range) {
-                    $fromIso = $range['start'] . 'T00:00:00Z';
-                    $toIso = $range['end'] . 'T23:59:59Z';
-
-                    $reqs[] = $pool->as("trips_{$i}")->timeout(300)->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?deviceId={$deviceId}&from={$fromIso}&to={$toIso}");
-
-                    if ($type !== 'Engine Hours') {
-                        $reqs[] = $pool->as("stops_{$i}")->timeout(300)->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?deviceId={$deviceId}&from={$fromIso}&to={$toIso}");
-                    } else {
-                        $reqs[] = $pool->as("events_{$i}")->timeout(300)->withHeaders($headers)->get("{$baseUrl}/api/reports/events?deviceId={$deviceId}&from={$fromIso}&to={$toIso}&type=ignitionOn&type=ignitionOff");
-                    }
-                }
-                return $reqs;
-            });
-        } catch (\Exception $e) {
-            Log::error("Failed to fetch report data", ['error' => $e->getMessage()]);
-        }
+        $tripResp = null;
+        $stopResp = null;
+        $eventResp = null;
 
         $allTrips = [];
         $allStops = [];
         $allEvents = [];
 
-        foreach ($ranges as $i => $range) {
-            // Trips
-            $tResp = $responses["trips_{$i}"] ?? null;
-            if ($tResp instanceof Response && $tResp->ok()) {
-                $json = $tResp->json();
-                if (is_array($json)) {
-                    $allTrips = array_merge($allTrips, $json);
-                }
-            } else {
-                 if ($tResp) Log::warning("Trips request failed for chunk {$i}", ['status' => $tResp->status()]);
-            }
-
-            // Stops
-            if ($type !== 'Engine Hours') {
-                $sResp = $responses["stops_{$i}"] ?? null;
-                if ($sResp instanceof Response && $sResp->ok()) {
-                    $json = $sResp->json();
-                    if (is_array($json)) {
-                        $allStops = array_merge($allStops, $json);
-                    }
-                } else {
-                     if ($sResp) Log::warning("Stops request failed for chunk {$i}", ['status' => $sResp->status()]);
-                }
-            }
-
-            // Events
-            if ($type === 'Engine Hours') {
-                $eResp = $responses["events_{$i}"] ?? null;
-                if ($eResp instanceof Response && $eResp->ok()) {
-                    $json = $eResp->json();
-                    if (is_array($json)) {
-                        $allEvents = array_merge($allEvents, $json);
-                    }
-                } else {
-                     if ($eResp) Log::warning("Events request failed for chunk {$i}", ['status' => $eResp->status()]);
-                }
-            }
+        if ($type !== 'Engine Hours') {
+            $tripResp = Http::timeout(300)->withHeaders($headers)->get("{$baseUrl}/api/reports/trips", [
+                'deviceId' => $deviceId,
+                'from' => $fromIso,
+                'to' => $toIso
+            ]);
+            $stopResp = Http::timeout(300)->withHeaders($headers)->get("{$baseUrl}/api/reports/stops", [
+                'deviceId' => $deviceId,
+                'from' => $fromIso,
+                'to' => $toIso
+            ]);
+            $allTrips = is_array($tripResp?->json()) ? $tripResp->json() : [];
+            $allStops = is_array($stopResp?->json()) ? $stopResp->json() : [];
+        } else {
+            $eventResp = Http::timeout(300)->withHeaders($headers)->get("{$baseUrl}/api/reports/events", [
+                'deviceId' => $deviceId,
+                'from' => $fromIso,
+                'to' => $toIso,
+                'type' => ['ignitionOn', 'ignitionOff']
+            ]);
+            $allEvents = is_array($eventResp?->json()) ? $eventResp->json() : [];
         }
 
         Log::info("Fetched Total Data", [
-            'trips' => count($allTrips),
-            'stops' => count($allStops),
-            'events' => count($allEvents)
+            'trips' => is_array($allTrips) ? count($allTrips) : 0,
+            'stops' => is_array($allStops) ? count($allStops) : 0,
+            'events' => is_array($allEvents) ? count($allEvents) : 0
         ]);
 
         $foundVehicleName = null;
@@ -2181,9 +2126,89 @@ class ReportService
                  'stops' => $allStops,
                  'events' => $allEvents
              ],
-             'dates' => $allDates,
              'type' => $type
          ];
     }
 
+    public function fetchUtilisationReportDb($request, $deviceId)
+    {
+        $type = $request->type ?? 'Movement';
+        $fromStr = $request->from_date;
+        $toStr = $request->to_date;
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
+            $toStr .= ' 23:59:59';
+        }
+        $fromTs = strtotime($fromStr);
+        $toTs = strtotime($toStr);
+        $fromIso = date('Y-m-d H:i:s', $fromTs);
+        $toIso = date('Y-m-d H:i:s', $toTs);
+
+        $vehicleRec = Devices::with('tcDevice')->whereHas('tcDevice', function ($q) use ($deviceId) {
+            $q->where('id', (int)$deviceId);
+        })->first();
+        if (!$vehicleRec) {
+            $vehicleRec = Devices::with('tcDevice')->where('device_id', $deviceId)->first();
+        }
+        $tcDevice = $vehicleRec ? $vehicleRec->tcDevice : null;
+        $uniqueId = $tcDevice ? $tcDevice->uniqueid : $deviceId;
+        $attributes = $tcDevice && $tcDevice->attributes ? $tcDevice->attributes : [];
+        if (is_string($attributes)) {
+            $attributes = json_decode($attributes, true);
+        }
+        $vehicleName = $tcDevice->name ?? 'Unknown';
+        $vehicleNo = $attributes['vehicleNo'] ?? null;
+        if ($vehicleNo) {
+            $vehicleIdDisplay = "{$vehicleNo} - {$vehicleName}";
+        } else {
+            $vehicleIdDisplay = $vehicleName;
+        }
+        $totalDays = max(1, round(($toTs - strtotime($fromStr)) / (60 * 60 * 24)) + 1);
+
+        $positions = [];
+        $events = [];
+
+        if ($type !== 'Engine Hours') {
+            $positions = DB::connection('pgsql')
+                ->table('tc_positions')
+                ->select('id', 'deviceid', 'fixtime', 'servertime', 'latitude', 'longitude', 'speed', 'course', 'address', 'attributes')
+                ->where('deviceid', (int)$deviceId)
+                ->whereBetween('fixtime', [$fromIso, $toIso])
+                ->orderBy('fixtime')
+                ->limit(50000)
+                ->get()
+                ->map(function ($row) {
+                    return (array)$row;
+                })
+                ->toArray();
+        } else {
+            $events = DB::connection('pgsql')
+                ->table('tc_events')
+                ->select('id', 'deviceid', 'type', 'eventtime', 'attributes')
+                ->where('deviceid', (int)$deviceId)
+                ->whereBetween('eventtime', [$fromIso, $toIso])
+                ->whereIn('type', ['ignitionOn', 'ignitionOff'])
+                ->orderBy('eventtime')
+                ->limit(200000)
+                ->get()
+                ->map(function ($row) {
+                    return (array)$row;
+                })
+                ->toArray();
+        }
+
+        return [
+            'summary' => [
+                'vehicleIdDisplay' => $vehicleIdDisplay,
+                'deviceId' => $uniqueId,
+                'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
+                'totalDays' => $totalDays
+            ],
+            'raw' => [
+                'positions' => $positions,
+                'events' => $events
+            ],
+            'type' => $type
+        ];
+    }
+ 
 }
