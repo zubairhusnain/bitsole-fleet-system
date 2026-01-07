@@ -6,7 +6,7 @@
         <li class="breadcrumb-item">Reports & Analytics</li>
         <li class="breadcrumb-item active" aria-current="page">Utilisation Report</li>
       </ol>
-    </div>
+    </div>  
     <h4 class="mb-3">Utilisation Report</h4>
     <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = ''" />
     <div class="card panel border rounded-3 shadow-0 mb-3">
@@ -123,9 +123,9 @@
                 <td class="py-3">{{ row.dist }}</td>
                 <td class="py-3">
                   <div class="d-flex gap-1">
-                    <div v-for="(active, i) in row.hours" :key="i" class="d-flex flex-column align-items-center" style="width: 14px;">
-                        <span class="text-muted mb-1" style="font-size: 8px; line-height: 1;">{{ String(i + 1).padStart(2, '0') }}</span>
-                        <div class="rounded-1" :style="{ width: '100%', height: '12px', backgroundColor: active ? '#0ea5e9' : '#e5e7eb' }"></div>
+                    <div v-for="(active, i) in row.hours" :key="i" class="d-flex flex-column align-items-center" style="width: 25px;">
+                        <span class="text-muted mb-1" style="font-size: 10px; line-height: 1;">{{ String(i + 1).padStart(2, '0') }}</span>
+                        <div class="rounded-1" :style="{ width: '100%', height: '20px', backgroundColor: active ? '#0ea5e9' : '#e5e7eb' }"></div>
                     </div>
                   </div>
                 </td>
@@ -226,171 +226,7 @@ async function fetchReport() {
     const response = await axios.get('/web/reports/utilisation-db', { params });
     const data = response.data;
 
-    if (data && data.raw) {
-      const dates = Array.isArray(data.dates) && data.dates.length ? data.dates : (() => {
-        const out = [];
-        const start = new Date(fromDate.value);
-        const end = new Date(toDate.value);
-        let cur = new Date(start);
-        while (cur <= end) {
-          out.push(new Date(cur).toISOString().slice(0, 10));
-          cur.setDate(cur.getDate() + 1);
-        }
-        return out;
-      })();
-      const typeSel = data.type || selectedType.value;
-      const trips = Array.isArray(data.raw.trips) ? data.raw.trips : [];
-      const stops = Array.isArray(data.raw.stops) ? data.raw.stops : [];
-      const events = Array.isArray(data.raw.events) ? data.raw.events : [];
-      const positions = Array.isArray(data.raw.positions) ? data.raw.positions : [];
-      const intervals = (() => {
-        if (typeSel !== 'Engine Hours') return [];
-        const evs = [...events].sort((a, b) => new Date(a.eventTime) - new Date(b.eventTime));
-        let start = null;
-        const out = [];
-        for (let i = 0; i < evs.length; i++) {
-          const ev = evs[i];
-          if (ev.type === 'ignitionOn') {
-            start = ev.eventTime;
-          } else if (ev.type === 'ignitionOff' && start) {
-            out.push({ startTime: start, endTime: ev.eventTime });
-            start = null;
-          }
-        }
-        return out;
-      })();
-      const toMs = (t) => new Date(t).getTime();
-      const haversine = (lat1, lon1, lat2, lon2) => {
-        const toRad = (v) => v * Math.PI / 180;
-        const R = 6371;
-        const dLat = toRad(lat2 - lat1);
-        const dLon = toRad(lon2 - lon1);
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
-      };
-      const computeRows = (ds, trs, stps, ints, tp, poss) => {
-        const out = [];
-        for (let i = 0; i < ds.length; i++) {
-          const d = ds[i];
-          const dayStart = new Date(d + 'T00:00:00').getTime();
-          const dayEnd = new Date(d + 'T23:59:59').getTime();
-          let tripMs = 0;
-          let idleMs = 0;
-          let distance = 0;
-          const hours = new Array(24).fill(false);
-          let totalMs = 0;
-          if (poss && poss.length > 0 && tp !== 'Engine Hours') {
-            const dayPoss = poss.filter(p => {
-              const t = toMs(p.fixtime || p.servertime);
-              return t >= dayStart && t <= dayEnd;
-            }).sort((a,b) => toMs(a.fixtime || a.servertime) - toMs(b.fixtime || b.servertime));
-            if (dayPoss.length > 1) {
-              const firstT = toMs(dayPoss[0].fixtime || dayPoss[0].servertime);
-              const lastT = toMs(dayPoss[dayPoss.length - 1].fixtime || dayPoss[dayPoss.length - 1].servertime);
-              let moveMs = 0;
-              for (let x = 1; x < dayPoss.length; x++) {
-                const prev = dayPoss[x - 1];
-                const cur = dayPoss[x];
-                const pt = toMs(prev.fixtime || prev.servertime);
-                const ct = toMs(cur.fixtime || cur.servertime);
-                const dt = Math.max(0, ct - pt);
-                const spk = (prev.speed || 0);
-                const kmh = spk * 1.852;
-                const moving = kmh > 5;
-                if (typeof prev.latitude === 'number' && typeof prev.longitude === 'number' && typeof cur.latitude === 'number' && typeof cur.longitude === 'number') {
-                  const dkm = haversine(prev.latitude, prev.longitude, cur.latitude, cur.longitude);
-                  distance += dkm * 1000;
-                }
-                if (moving) {
-                  moveMs += dt;
-                  const sh = new Date(pt).getHours();
-                  const eh = new Date(ct).getHours();
-                  for (let h = sh; h <= eh; h++) hours[h] = true;
-                }
-              }
-              tripMs = moveMs;
-              totalMs = Math.max(0, lastT - firstT);
-              idleMs = Math.max(0, totalMs - moveMs);
-            }
-          } else {
-            for (let j = 0; j < trs.length; j++) {
-              const t = trs[j];
-              if (!t.startTime || !t.endTime) continue;
-              const s = new Date(t.startTime).getTime();
-              const e = new Date(t.endTime).getTime();
-              if (e <= dayStart || s >= dayEnd) continue;
-              if (t.startTime.slice(0, 10) === d) {
-                distance += t.distance || 0;
-              }
-              const os = Math.max(s, dayStart);
-              const oe = Math.min(e, dayEnd);
-              if (oe > os) {
-                tripMs += (oe - os);
-                if (tp !== 'Engine Hours') {
-                  const sh = new Date(os).getHours();
-                  const eh = new Date(oe).getHours();
-                  for (let h = sh; h <= eh; h++) hours[h] = true;
-                }
-              }
-            }
-            if (tp === 'Engine Hours') {
-              let engineMs = 0;
-              for (let k = 0; k < ints.length; k++) {
-                const it = ints[k];
-                const s = new Date(it.startTime).getTime();
-                const e = new Date(it.endTime).getTime();
-                if (e <= dayStart || s >= dayEnd) continue;
-                const os = Math.max(s, dayStart);
-                const oe = Math.min(e, dayEnd);
-                if (oe > os) {
-                  engineMs += (oe - os);
-                  const sh = new Date(os).getHours();
-                  const eh = new Date(oe).getHours();
-                  for (let h = sh; h <= eh; h++) hours[h] = true;
-                }
-              }
-              idleMs = Math.max(0, engineMs - tripMs);
-              totalMs = engineMs;
-            } else {
-              for (let k = 0; k < stps.length; k++) {
-                const st = stps[k];
-                if (!st.startTime || !st.endTime) continue;
-                const s = new Date(st.startTime).getTime();
-                const e = new Date(st.endTime).getTime();
-                if (e <= dayStart || s >= dayEnd) continue;
-                const os = Math.max(s, dayStart);
-                const oe = Math.min(e, dayEnd);
-                if (oe > os) {
-                  idleMs += (oe - os);
-                }
-              }
-              totalMs = tripMs + idleMs;
-            }
-          }
-          const usagePct = totalMs > 0 ? Math.round((tripMs / totalMs) * 100) : 0;
-          const h = Math.floor(tripMs / 3600000);
-          const m = Math.floor((tripMs % 3600000) / 60000);
-          const moveStr = h + ' hours ' + m + ' minutes';
-          const ih = Math.floor(idleMs / 3600000);
-          const im = Math.floor((idleMs % 3600000) / 60000);
-          const idleStr = ih + ' hours ' + im + ' minutes';
-          const dayLabel = new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', weekday: 'long' }).replace(',', '');
-          out.push({
-            day: dayLabel,
-            usage: usagePct + '%',
-            move: moveStr,
-            idle: idleStr,
-            dist: (Math.round((distance / 1000) * 100) / 100) + ' KM',
-            hours
-          });
-        }
-        return out;
-      };
-      rows.value = computeRows(dates, trips, stops, intervals, typeSel, positions);
-    } else {
-      rows.value = data.rows || [];
-    }
+    rows.value = data.rows || [];
     summary.value = data.summary || {
         vehicleIdDisplay: '',
         deviceId: '',

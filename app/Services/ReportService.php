@@ -2135,14 +2135,14 @@ class ReportService
         $type = $request->type ?? 'Movement';
         $fromStr = $request->from_date;
         $toStr = $request->to_date;
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
-            $toStr .= ' 23:59:59';
-        }
-        $fromTs = strtotime($fromStr);
-        $toTs = strtotime($toStr);
+
+        // Ensure proper timestamps
+        $fromTs = strtotime($fromStr . ' 00:00:00');
+        $toTs = strtotime($toStr . ' 23:59:59');
         $fromIso = date('Y-m-d H:i:s', $fromTs);
         $toIso = date('Y-m-d H:i:s', $toTs);
 
+        // Fetch Device Info
         $vehicleRec = Devices::with('tcDevice')->whereHas('tcDevice', function ($q) use ($deviceId) {
             $q->where('id', (int)$deviceId);
         })->first();
@@ -2157,43 +2157,202 @@ class ReportService
         }
         $vehicleName = $tcDevice->name ?? 'Unknown';
         $vehicleNo = $attributes['vehicleNo'] ?? null;
-        if ($vehicleNo) {
-            $vehicleIdDisplay = "{$vehicleNo} - {$vehicleName}";
-        } else {
-            $vehicleIdDisplay = $vehicleName;
-        }
-        $totalDays = max(1, round(($toTs - strtotime($fromStr)) / (60 * 60 * 24)) + 1);
+        $vehicleIdDisplay = $vehicleNo ? "{$vehicleNo} - {$vehicleName}" : $vehicleName;
+        $totalDays = max(1, round(($toTs - $fromTs) / (60 * 60 * 24)));
 
-        $positions = [];
-        $events = [];
+        $rows = [];
+        $startDate = new \DateTime($fromStr);
+        $endDate = new \DateTime($toStr);
+        $endDate->modify('+1 day');
+        $period = new \DatePeriod($startDate, new \DateInterval('P1D'), $endDate);
 
         if ($type !== 'Engine Hours') {
+            // Movement Report (Positions based)
             $positions = DB::connection('pgsql')
                 ->table('tc_positions')
-                ->select('id', 'deviceid', 'fixtime', 'servertime', 'latitude', 'longitude', 'speed', 'course', 'address', 'attributes')
+                ->select('fixtime', 'latitude', 'longitude', 'speed')
                 ->where('deviceid', (int)$deviceId)
                 ->whereBetween('fixtime', [$fromIso, $toIso])
                 ->orderBy('fixtime')
-                ->limit(50000)
+                ->limit(500000) // Increased limit for larger ranges
                 ->get()
-                ->map(function ($row) {
-                    return (array)$row;
-                })
-                ->toArray();
+                ->groupBy(function($item) {
+                    return substr($item->fixtime, 0, 10);
+                });
+
+            foreach ($period as $dt) {
+                $dateStr = $dt->format('Y-m-d');
+                $dayStart = strtotime($dateStr . ' 00:00:00') * 1000;
+                $dayEnd = strtotime($dateStr . ' 23:59:59') * 1000;
+
+                $dayPositions = isset($positions[$dateStr]) ? $positions[$dateStr] : [];
+
+                $tripMs = 0;
+                $distance = 0;
+                $totalMs = 0;
+                $hourlyMoveMs = array_fill(0, 24, 0);
+
+                $count = count($dayPositions);
+                if ($count > 1) {
+                    $firstT = strtotime($dayPositions[0]->fixtime) * 1000;
+                    $lastT = strtotime($dayPositions[$count - 1]->fixtime) * 1000;
+                    $totalMs = max(0, $lastT - $firstT);
+
+                    for ($i = 1; $i < $count; $i++) {
+                        $prev = $dayPositions[$i - 1];
+                        $cur = $dayPositions[$i];
+
+                        $pt = strtotime($prev->fixtime) * 1000;
+                        $ct = strtotime($cur->fixtime) * 1000;
+                        $dtMs = max(0, $ct - $pt);
+
+                        $speed = $prev->speed ?? 0;
+                        $kmh = $speed * 1.852; // knots to kmh
+
+                        // Distance
+                        if ($prev->latitude && $prev->longitude && $cur->latitude && $cur->longitude) {
+                             $distance += $this->haversine($prev->latitude, $prev->longitude, $cur->latitude, $cur->longitude) * 1000;
+                        }
+
+                        // Movement logic
+                        if ($kmh > 5) {
+                            $tripMs += $dtMs;
+                            $midTime = $pt + ($dtMs / 2);
+                            $h = (int)date('H', $midTime / 1000);
+                            if (isset($hourlyMoveMs[$h])) {
+                                $hourlyMoveMs[$h] += $dtMs;
+                            }
+                        }
+                    }
+                }
+
+                $idleMs = max(0, $totalMs - $tripMs);
+                $usagePct = $totalMs > 0 ? round(($tripMs / $totalMs) * 100) : 0;
+
+                // Blue boxes logic
+                $hours = array_fill(0, 24, false);
+                $totalMoveHours = ceil($tripMs / 3600000);
+                if ($totalMoveHours > 0) {
+                    arsort($hourlyMoveMs);
+                    $topHours = array_keys(array_slice($hourlyMoveMs, 0, $totalMoveHours, true));
+                    foreach ($topHours as $h) {
+                        $hours[$h] = true;
+                    }
+                }
+
+                $rows[] = [
+                    'day' => $dt->format('l d/m/Y'),
+                    'usage' => $usagePct . '%',
+                    'move' => $this->formatDurationMs($tripMs),
+                    'idle' => $this->formatDurationMs($idleMs),
+                    'dist' => round($distance / 1000, 2) . ' KM',
+                    'hours' => $hours
+                ];
+            }
+
         } else {
+            // Engine Hours Report (Events based)
             $events = DB::connection('pgsql')
                 ->table('tc_events')
-                ->select('id', 'deviceid', 'type', 'eventtime', 'attributes')
+                ->select('type', 'eventtime')
                 ->where('deviceid', (int)$deviceId)
                 ->whereBetween('eventtime', [$fromIso, $toIso])
                 ->whereIn('type', ['ignitionOn', 'ignitionOff'])
                 ->orderBy('eventtime')
                 ->limit(200000)
-                ->get()
-                ->map(function ($row) {
-                    return (array)$row;
-                })
-                ->toArray();
+                ->get();
+
+            // Build intervals
+            $intervals = [];
+            $start = null;
+            foreach ($events as $ev) {
+                if ($ev->type === 'ignitionOn') {
+                    $start = $ev->eventtime;
+                } elseif ($ev->type === 'ignitionOff' && $start) {
+                    $intervals[] = ['start' => strtotime($start) * 1000, 'end' => strtotime($ev->eventtime) * 1000];
+                    $start = null;
+                }
+            }
+
+            foreach ($period as $dt) {
+                $dateStr = $dt->format('Y-m-d');
+                $dayStart = strtotime($dateStr . ' 00:00:00') * 1000;
+                $dayEnd = strtotime($dateStr . ' 23:59:59') * 1000;
+
+                $engineMs = 0;
+                $hourlyEngineMs = array_fill(0, 24, 0);
+
+                // Track min start and max end for "span" calculation (Usage/Idle)
+                $minStart = null;
+                $maxEnd = null;
+
+                foreach ($intervals as $int) {
+                    $s = $int['start'];
+                    $e = $int['end'];
+
+                    if ($e <= $dayStart || $s >= $dayEnd) continue;
+
+                    $os = max($s, $dayStart);
+                    $oe = min($e, $dayEnd);
+
+                    if ($oe > $os) {
+                        $diff = $oe - $os;
+                        $engineMs += $diff;
+
+                        // Update span
+                        if ($minStart === null || $os < $minStart) $minStart = $os;
+                        if ($maxEnd === null || $oe > $maxEnd) $maxEnd = $oe;
+
+                        // Hourly distribution
+                        $sh = (int)date('H', $os / 1000);
+                        $eh = (int)date('H', $oe / 1000);
+
+                        // Simple distribution: if it spans multiple hours, we might just add to start hour or split it.
+                        // For accuracy, let's split it.
+                        for ($h = $sh; $h <= $eh; $h++) {
+                            $hStart = strtotime($dateStr . " $h:00:00") * 1000;
+                            $hEnd = strtotime($dateStr . " $h:59:59") * 1000 + 1000; // end of hour
+
+                            $hos = max($os, $hStart);
+                            $hoe = min($oe, $hEnd);
+
+                            if ($hoe > $hos) {
+                                $hourlyEngineMs[$h] += ($hoe - $hos);
+                            }
+                        }
+                    }
+                }
+
+                // Usage & Idle Logic (Consistent with Movement Report)
+                $totalMs = 0;
+                if ($minStart !== null && $maxEnd !== null) {
+                    $totalMs = max(0, $maxEnd - $minStart);
+                }
+
+                $idleMs = max(0, $totalMs - $engineMs);
+                $usagePct = $totalMs > 0 ? round(($engineMs / $totalMs) * 100) : 0;
+
+                // Blue boxes logic (Quantity based)
+                $hours = array_fill(0, 24, false);
+                $totalEngineHours = ceil($engineMs / 3600000);
+
+                if ($totalEngineHours > 0) {
+                    arsort($hourlyEngineMs);
+                    $topHours = array_keys(array_slice($hourlyEngineMs, 0, $totalEngineHours, true));
+                    foreach ($topHours as $h) {
+                        $hours[$h] = true;
+                    }
+                }
+
+                $rows[] = [
+                    'day' => $dt->format('l d/m/Y'),
+                    'usage' => $usagePct . '%',
+                    'move' => $this->formatDurationMs($engineMs),
+                    'idle' => $this->formatDurationMs($idleMs),
+                    'dist' => '0 KM',
+                    'hours' => $hours
+                ];
+            }
         }
 
         return [
@@ -2203,12 +2362,26 @@ class ReportService
                 'durationDisplay' => "{$request->from_date} 00:00 - {$request->to_date} 23:59",
                 'totalDays' => $totalDays
             ],
-            'raw' => [
-                'positions' => $positions,
-                'events' => $events
-            ],
+            'rows' => $rows,
             'type' => $type
         ];
     }
- 
+
+    private function haversine($lat1, $lon1, $lat2, $lon2) {
+        $earthRadius = 6371;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+        $a = sin($dLat / 2) * sin($dLat / 2) +
+             cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+             sin($dLon / 2) * sin($dLon / 2);
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+        return $earthRadius * $c;
+    }
+
+    private function formatDurationMs($ms) {
+        $hours = floor($ms / 3600000);
+        $minutes = floor(($ms % 3600000) / 60000);
+        return "{$hours} hours {$minutes} minutes";
+    }
+
 }
