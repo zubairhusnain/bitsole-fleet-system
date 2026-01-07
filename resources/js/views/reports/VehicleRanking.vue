@@ -10,150 +10,149 @@
     <h4 class="mb-3">Vehicle Ranking Report</h4>
 
     <div class="card panel border rounded-3 shadow-0 mb-3">
-      <div class="card-header"><h6 class="mb-0">Search Option</h6></div>
-      <div class="card-body">
-        <div class="row g-3 align-items-end">
-          <div class="col-12 col-md-3">
-            <label class="form-label small">Duration</label>
-            <input type="text" class="form-control" placeholder="dd/mm/yyyy - dd/mm/yyyy" />
+      <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
+      <div class="card-body pt-2">
+        <form @submit.prevent="fetchRanking">
+          <div class="row g-3 align-items-end">
+            <div class="col-12 col-md-4">
+              <label class="form-label small fw-semibold text-muted">Duration</label>
+              <div class="input-group">
+                <input type="date" class="form-control" v-model="fromDate" required />
+                <span class="input-group-text bg-white border-start-0 border-end-0">to</span>
+                <input type="date" class="form-control" v-model="toDate" required />
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small fw-semibold text-muted">Type</label>
+              <select class="form-select" v-model="rankingType">
+                <option value="percentage">Ranking by Percentage</option>
+                <option value="points">Ranking by Total Points</option>
+                <option value="behaviour">Driving Behaviour</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-4">
+              <button type="submit" class="btn btn-info text-white w-100" :disabled="loading">
+                <span v-if="loading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Submit
+              </button>
+            </div>
           </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label small">Ranking Metric</label>
-            <select class="form-select">
-              <option>— Select Metric —</option>
-              <option>Travelled Distance</option>
-              <option>Utilisation</option>
-              <option>Idling Duration</option>
-              <option>Fuel Efficiency</option>
-              <option>Speed Violations</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label small">Report Format</label>
-            <select class="form-select">
-              <option>— Report Format —</option>
-              <option>Website</option>
-              <option>Excel</option>
-              <option>PDF</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-3 text-md-end">
-            <button class="btn btn-app-dark w-100">Submit</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card border rounded-3 shadow-0 mb-3">
-      <div class="card-header"><h6 class="mb-0">Ranking Report Result</h6></div>
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-12 col-md-3">
-            <div class="small text-muted">Total Vehicles</div>
-            <div class="fw-semibold">10 Vehicles</div>
-          </div>
-          <div class="col-12 col-md-3">
-            <div class="small text-muted">Duration</div>
-            <div class="fw-semibold">2024/03/11 - 2024/03/20</div>
-          </div>
-          <div class="col-12 col-md-3">
-            <div class="small text-muted">Top Performer</div>
-            <div class="fw-semibold">Apex Predator S (98.5)</div>
-          </div>
-          <div class="col-12 col-md-3">
-            <div class="small text-muted">Average Score</div>
-            <div class="fw-semibold">89.1</div>
-          </div>
-        </div>
+        </form>
       </div>
     </div>
 
     <div class="card border rounded-3 shadow-0">
       <div class="card-body p-0">
         <div class="table-responsive">
-          <table class="table table-sm align-middle mb-0 table-striped">
+          <table class="table table-sm align-middle mb-0 table-striped w-100 text-nowrap">
             <thead class="table-dark">
               <tr>
+                <th class="ps-3">Vehicle ID</th>
+                <th>Type/Model</th>
+                <th class="text-center">Distance</th>
+                <th class="text-center">Duration</th>
+                <th class="text-center">Total HA</th>
+                <th class="text-center">Total HB</th>
+                <th class="text-center">Total HC</th>
+                <th class="text-center">Total SV</th>
+                <th class="text-center">Points</th>
+                <th class="text-center">Percentage</th>
                 <th class="text-center">Rank</th>
-                <th>Vehicle ID</th>
-                <th>Vehicle Name</th>
-                <th class="text-center">Travelled Distance (KM)</th>
-                <th class="text-center">Idling Duration (Hours)</th>
-                <th class="text-center">Utilisation(%)</th>
-                <th class="text-center">Avg. Fuel Consumption (L)</th>
-                <th class="text-center">Score</th>
-              </tr>
-              <tr class="text-muted">
-                <th class="text-center">—</th>
-                <th></th>
-                <th></th>
-                <th class="text-center">Total</th>
-                <th class="text-center">Total</th>
-                <th class="text-center">—</th>
-                <th class="text-center">Avg. Litres</th>
-                <th class="text-center">—</th>
+                <th class="text-center pe-3">Action</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in rows" :key="row.rank">
+              <tr v-if="loading">
+                <td colspan="12" class="text-center py-4">Loading data...</td>
+              </tr>
+              <tr v-else-if="rows.length === 0">
+                <td colspan="12" class="text-center py-4">No data found</td>
+              </tr>
+              <tr v-else v-for="(row, index) in rows" :key="index">
+                <td class="ps-3">{{ row.vehicleId }}</td>
+                <td>{{ row.typeModel }}</td>
+                <td class="text-center">{{ row.distance }}</td>
+                <td class="text-center">{{ row.duration }}</td>
+                <td class="text-center">{{ row.totalHA || 'N/A' }}</td>
+                <td class="text-center">{{ row.totalHB || 'N/A' }}</td>
+                <td class="text-center">{{ row.totalHC || 'N/A' }}</td>
+                <td class="text-center">{{ row.totalSV || 'N/A' }}</td>
+                <td class="text-center fw-bold" :class="row.points < 0 ? 'text-danger' : 'text-dark'">{{ row.points }}</td>
                 <td class="text-center">
-                  <span v-if="row.rank <= 3" class="me-1">
-                    <i class="bi" :class="row.rank === 1 ? 'bi-trophy-fill text-warning' : (row.rank === 2 ? 'bi-trophy-fill text-secondary' : 'bi-trophy-fill text-bronze')"></i>
-                  </span>
-                  {{ row.rank }}
+                  <span class="badge rounded-1 px-2 py-1 text-dark" :style="{ backgroundColor: getPercentageColor(row.percentage) }">{{ row.percentage }}%</span>
                 </td>
-                <td>{{ row.id }}</td>
-                <td>{{ row.name }}</td>
-                <td class="text-center">{{ row.distTotal }}</td>
-                <td class="text-center">{{ row.idleTotal }}</td>
-                <td class="text-center">{{ row.util }}</td>
-                <td class="text-center">{{ row.avgLitres }}</td>
-                <td class="text-center">{{ row.score }}</td>
+                <td class="text-center">{{ row.rank }}</td>
+                <td class="text-center pe-3">
+                  <button class="btn btn-sm p-0 text-dark me-2"><i class="bi bi-file-earmark-excel fs-5"></i></button>
+                  <button class="btn btn-sm p-0 text-info"><i class="bi bi-file-earmark-pdf fs-5"></i></button>
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
-      <div class="card-footer d-flex align-items-center py-2">
-        <div class="text-muted small me-auto">Showing 1 to 10 of 10 results</div>
-        <nav aria-label="Pagination" class="ms-auto">
-          <ul class="pagination pagination-sm mb-0 pagination-app">
-            <li class="page-item disabled"><button class="page-link">‹</button></li>
-            <li class="page-item active"><button class="page-link">1</button></li>
-            <li class="page-item"><button class="page-link">2</button></li>
-            <li class="page-item"><button class="page-link">3</button></li>
-            <li class="page-item"><button class="page-link">4</button></li>
-            <li class="page-item"><button class="page-link">5</button></li>
-            <li class="page-item"><button class="page-link">›</button></li>
-          </ul>
-        </nav>
+      <div class="card-footer d-flex align-items-center py-2 bg-white border-top">
+        <div class="text-muted small me-auto">Showing {{ rows.length }} results</div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import axios from 'axios';
 
-const rows = ref([
-  { rank: 1, id: 'VHCL-1010', name: 'Apex Predator S', distTotal: '5900.6', idleTotal: '210.7', util: '92%', avgLitres: '510.55', score: '98.5' },
-  { rank: 2, id: 'VHCL-1006', name: 'Shadow Hunter 12', distTotal: '6200.7', idleTotal: '190.5', util: '90%', avgLitres: '520.25', score: '96.2' },
-  { rank: 3, id: 'VHCL-1009', name: 'Meteor Strike 11', distTotal: '5200.2', idleTotal: '185.0', util: '88%', avgLitres: '460.80', score: '94.0' },
-  { rank: 4, id: 'VHCL-1002', name: 'Turbo Hawk ZR', distTotal: '5680.5', idleTotal: '175.6', util: '86%', avgLitres: '412.75', score: '91.3' },
-  { rank: 5, id: 'VHCL-1011', name: 'Falcon Cruiser Z', distTotal: '5300.9', idleTotal: '195.2', util: '85%', avgLitres: '485.60', score: '90.1' },
-  { rank: 6, id: 'VHCL-1005', name: 'Raptor GT', distTotal: '5000.4', idleTotal: '160.4', util: '83%', avgLitres: '450.00', score: '88.7' },
-  { rank: 7, id: 'VHCL-1004', name: 'Lunar Explorer 5', distTotal: '4550.0', idleTotal: '140.2', util: '81%', avgLitres: '376.85', score: '86.5' },
-  { rank: 8, id: 'VHCL-1007', name: 'Volt Fusion R', distTotal: '4500.1', idleTotal: '145.8', util: '79%', avgLitres: '389.90', score: '84.2' },
-  { rank: 9, id: 'VHCL-1008', name: 'Quantum Leap 6', distTotal: '4700.3', idleTotal: '155.4', util: '77%', avgLitres: '395.75', score: '82.0' },
-  { rank: 10, id: 'VHCL-1003', name: 'Stealth Chaser X', distTotal: '3000.8', idleTotal: '130.0', util: '75%', avgLitres: '298.90', score: '80.4' },
-]);
+const rows = ref([]);
+const loading = ref(false);
+const fromDate = ref('');
+const toDate = ref('');
+const rankingType = ref('percentage');
+
+// Set default dates (current month)
+onMounted(() => {
+  const now = new Date();
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  
+  fromDate.value = firstDay.toISOString().split('T')[0];
+  toDate.value = lastDay.toISOString().split('T')[0];
+  
+  // Optional: Auto fetch on load
+  // fetchRanking(); 
+});
+
+const fetchRanking = async () => {
+  loading.value = true;
+  try {
+    const response = await axios.get('/web/reports/vehicle-ranking', {
+      params: {
+        from_date: fromDate.value,
+        to_date: toDate.value,
+        type: rankingType.value
+      }
+    });
+    rows.value = response.data;
+  } catch (error) {
+    console.error('Error fetching ranking:', error);
+    // Keep mock data or clear it? Let's clear it to show error state if needed, but for now just log
+    rows.value = []; 
+  } finally {
+    loading.value = false;
+  }
+};
+
+const getPercentageColor = (val) => {
+  if (val >= 70) return '#d4edda'; // light green
+  if (val >= 40) return '#fff3cd'; // light yellow
+  return '#f8d7da'; // light red
+};
 </script>
 
 <style scoped>
-thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; }
-tbody tr td { font-size: 13px; }
-.panel .card-body { padding-top: 1rem; padding-bottom: 1rem; }
-.text-bronze { color: #cd7f32; }
-.card-header h6 { font-weight: 600; }
-.table-striped tbody tr:nth-of-type(odd) { --bs-table-accent-bg: #f8f9fb; }
+thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; vertical-align: middle; font-weight: 500; font-size: 13px; border-bottom: none; }
+tbody tr td { font-size: 13px; color: #333; }
+.badge { font-weight: 600; font-size: 12px; }
+.form-label { font-size: 0.85rem; }
+.pagination-app .page-item.active .page-link { background-color: #0b0f28; border-color: #0b0f28; color: white; }
+.pagination-app .page-link { color: #333; }
 </style>

@@ -10,6 +10,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Support\Facades\Config;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class ReportController extends Controller
@@ -700,5 +703,106 @@ class ReportController extends Controller
             'remarks' => $data['remarks'] ?? null,
         ]);
         return response()->json(['message' => 'created', 'id' => $rec->id], 201);
+    }
+
+    public function vehicleRanking(Request $request)
+    {
+        $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date . ' 00:00:00'));
+        $to = date('Y-m-d\TH:i:00\Z', strtotime($request->to_date . ' 23:59:59'));
+
+        $sessionId = $request->user()->traccarSession ?? session('cookie');
+
+        // Base URL from Config
+        $base = Config::get('constants.Constants.host');
+        $base = is_string($base) ? rtrim($base, '/') : '';
+
+        // Query string
+        $query = 'from=' . $from . '&to=' . $to;
+        $eventsQuery = $query . '&type=alarm&type=deviceOverspeed';
+
+        // Execute requests in parallel
+        $responses = Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+            'Cookie' => $sessionId
+        ])->pool(fn (Pool $pool) => [
+            $pool->timeout(300)->get($base . '/api/reports/summary?' . $query),
+            $pool->timeout(300)->get($base . '/api/reports/events?' . $eventsQuery),
+        ]);
+
+        // Process Summary Response
+        $summaries = [];
+        if ($responses[0]->successful()) {
+            $summaries = $responses[0]->json();
+        }
+
+        // Process Events Response
+        $events = [];
+        if ($responses[1]->successful()) {
+            $events = $responses[1]->json();
+        }
+
+        $summaryMap = collect($summaries)->keyBy('deviceId');
+
+        // Fetch local device details for Model/Type
+        $deviceIds = array_column($summaries, 'deviceId');
+        $tcDevices = \App\Models\TcDevice::whereIn('id', $deviceIds)->get()->keyBy('id');
+
+        $eventsByDevice = collect($events)->groupBy('deviceId');
+
+        // 3. Process
+        $rows = [];
+        foreach ($summaries as $sum) {
+            $deviceId = $sum['deviceId'];
+            $evs = $eventsByDevice[$deviceId] ?? collect([]);
+            $tcDev = $tcDevices[$deviceId] ?? null;
+
+            $distanceM = $sum['distance'] ?? 0;
+            $engineHoursMs = $sum['engineHours'] ?? 0;
+
+            // Counts
+            $ha = $evs->filter(fn($e) => isset($e['attributes']['alarm']) && $e['attributes']['alarm'] === 'hardAcceleration')->count();
+            $hb = $evs->filter(fn($e) => isset($e['attributes']['alarm']) && $e['attributes']['alarm'] === 'hardBraking')->count();
+            $hc = $evs->filter(fn($e) => isset($e['attributes']['alarm']) && $e['attributes']['alarm'] === 'hardCornering')->count();
+            $sv = $evs->where('type', 'deviceOverspeed')->count();
+
+            // Calculate Points (100 - penalties)
+            $points = 100 - ($ha * 5) - ($hb * 5) - ($hc * 5) - ($sv * 10);
+
+            $model = $tcDev ? ($tcDev->model ?? $tcDev->category ?? 'N/A') : 'N/A';
+
+            $rows[] = [
+                'vehicleId' => $sum['deviceName'] ?? 'Unknown',
+                'typeModel' => $model,
+                'distance' => round($distanceM / 1000, 2) . ' KM',
+                'duration' => $this->formatDuration($engineHoursMs),
+                'totalHA' => $ha ?: 0,
+                'totalHB' => $hb ?: 0,
+                'totalHC' => $hc ?: 0,
+                'totalSV' => $sv ?: 0,
+                'points' => $points,
+                'percentage' => max(0, min(100, $points)),
+            ];
+        }
+
+        // Sort by Points Descending
+        usort($rows, function($a, $b) {
+            return $b['points'] <=> $a['points'];
+        });
+
+        // Add Rank
+        foreach ($rows as $k => &$row) {
+            $row['rank'] = $k + 1;
+        }
+
+        return $rows;
+    }
+
+    private function formatDuration($ms) {
+        $seconds = floor($ms / 1000);
+        $h = floor($seconds / 3600);
+        $m = floor(($seconds % 3600) / 60);
+        $s = $seconds % 60;
+        return sprintf('%dh %dm %ds', $h, $m, $s);
     }
 }

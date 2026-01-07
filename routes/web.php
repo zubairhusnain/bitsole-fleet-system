@@ -264,4 +264,5 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::post('/incidents', [\App\Http\Controllers\ReportController::class, 'storeIncident']);
     Route::get('/incidents/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportIncidentsPdf']);
     Route::get('/incidents/export-excel', [\App\Http\Controllers\ReportController::class, 'exportIncidentsExcel']);
+    Route::get('/vehicle-ranking', [\App\Http\Controllers\ReportController::class, 'vehicleRanking']);
 });
