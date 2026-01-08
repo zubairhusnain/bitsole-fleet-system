@@ -51,6 +51,7 @@ class ReportService
     {
         $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date . ' 00:00:00'));
         $to = date('Y-m-d\TH:i:00\Z', strtotime($request->to_date . ' 23:59:59'));
+
         $vehicleIds = $request->vehicle_ids ?? [];
 
         $sessionId = $request->user()->traccarSession ?? session('cookie');
@@ -66,30 +67,44 @@ class ReportService
             }
         }
 
-        $eventsQuery = $query . '&type=alarm&type=deviceOverspeed';
+        $eventsQuery = $query;
 
         Log::info('VehicleRanking Service Request', ['query' => $query]);
 
-        $headers = ['Content-Type: application/json', 'Accept: application/json'];
+        $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
+
+        // Parallel Requests
+        $responses = Http::pool(function (Pool $pool) use ($baseUrl, $sessionId, $query, $eventsQuery) {
+            $reqHeaders = [
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+                'Cookie' => $sessionId
+            ];
+            // Filter events to reduce payload size
+            $eventsQueryFiltered = $eventsQuery . '&type=alarm&type=deviceOverspeed';
+
+            return [
+                $pool->as('summary')->withHeaders($reqHeaders)->get($baseUrl . '/api/reports/summary?' . $query),
+                $pool->as('events')->withHeaders($reqHeaders)->get($baseUrl . '/api/reports/events?' . $eventsQueryFiltered),
+            ];
+        });
 
         // 1. Summary
-        $summaryRaw = static::curl('/api/reports/summary?' . $query, 'GET', $sessionId, '', $headers);
         $summaries = [];
-        if ($summaryRaw->responseCode == 200) {
-            $summaries = json_decode($summaryRaw->response, true);
+        if ($responses['summary']->ok()) {
+            $summaries = $responses['summary']->json();
         } else {
-            Log::error('VehicleRanking Service Summary Failed', ['code' => $summaryRaw->responseCode, 'error' => $summaryRaw->error ?? '']);
+            Log::error('VehicleRanking Service Summary Failed', ['status' => $responses['summary']->status(), 'body' => $responses['summary']->body()]);
         }
 
         // 2. Events
-        $eventsRaw = static::curl('/api/reports/events?' . $eventsQuery, 'GET', $sessionId, '', $headers);
         $events = [];
-        if ($eventsRaw->responseCode == 200) {
-            $events = json_decode($eventsRaw->response, true);
+        if ($responses['events']->ok()) {
+            $events = $responses['events']->json();
         } else {
-             Log::error('VehicleRanking Service Events Failed', ['code' => $eventsRaw->responseCode, 'error' => $eventsRaw->error ?? '']);
+             Log::error('VehicleRanking Service Events Failed', ['status' => $responses['events']->status(), 'body' => $responses['events']->body()]);
         }
-
+// dd('  summaries ', $summaries,$eventsQuery,$events);
         // Fetch local device details for Model/Type
         $deviceIds = collect($summaries)->pluck('deviceId');
         $tcDevices = \App\Models\TcDevice::whereIn('id', $deviceIds)->get()->keyBy('id');
@@ -144,7 +159,7 @@ class ReportService
         return sprintf('%dh %dm %ds', $h, $m, $s);
     }
 
-    
+
     public function yearlyReportDashboard($request)
     {
         // ------------------------------------------------------------------ 1) Session, device, dates

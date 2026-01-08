@@ -7,7 +7,7 @@
         <li class="breadcrumb-item active" aria-current="page">Vehicle Ranking Report</li>
       </ol>
     </div>
-    <h4 class="mb-3">Vehicle Ranking Report</h4> 
+    <h4 class="mb-3">Vehicle Ranking Report <i class="bi bi-info-circle text-muted ms-2" style="font-size: 0.6em; cursor: help;" title="Starts at 100 points. Penalties: Hard Accel/Brake/Cornering (-5 each), Speeding (-10 each)."></i></h4>
     <div class="card panel border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
       <div class="card-body pt-2">
@@ -57,12 +57,12 @@
                 <th>Type/Model</th>
                 <th class="text-center">Distance</th>
                 <th class="text-center">Duration</th>
-                <th class="text-center">Total HA</th>
-                <th class="text-center">Total HB</th>
-                <th class="text-center">Total HC</th>
-                <th class="text-center">Total SV</th>
-                <th class="text-center">Points</th>
-                <th class="text-center">Percentage</th>
+                <th class="text-center" title="Total number of hard acceleration events">Total HA <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
+                <th class="text-center" title="Total number of hard braking events">Total HB <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
+                <th class="text-center" title="Total number of hard cornering events">Total HC <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
+                <th class="text-center" title="Total number of speed limit violations">Total SV <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
+                <th class="text-center" title="Driver safety score (starts at 100)">Points <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
+                <th class="text-center" title="Overall performance rating">Percentage <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
                 <th class="text-center">Rank</th>
                 <th class="text-center pe-3">Action</th>
               </tr>
@@ -79,10 +79,10 @@
                 <td>{{ row.typeModel }}</td>
                 <td class="text-center">{{ row.distance }}</td>
                 <td class="text-center">{{ row.duration }}</td>
-                <td class="text-center">{{ row.totalHA || 'N/A' }}</td>
-                <td class="text-center">{{ row.totalHB || 'N/A' }}</td>
-                <td class="text-center">{{ row.totalHC || 'N/A' }}</td>
-                <td class="text-center">{{ row.totalSV || 'N/A' }}</td>
+                <td class="text-center">{{ row.totalHA }}</td>
+                <td class="text-center">{{ row.totalHB }}</td>
+                <td class="text-center">{{ row.totalHC }}</td>
+                <td class="text-center">{{ row.totalSV }}</td>
                 <td class="text-center fw-bold" :class="row.points < 0 ? 'text-danger' : 'text-dark'">{{ row.points }}</td>
                 <td class="text-center">
                   <span class="badge rounded-1 px-2 py-1 text-dark" :style="{ backgroundColor: getPercentageColor(row.percentage) }">{{ row.percentage }}%</span>
@@ -116,19 +116,22 @@ const rankingType = ref('percentage');
 const filterVehicleId = ref('');
 const deviceOptions = ref([]);
 
-// Set default dates (current month)
+// Set default dates (one week)
 onMounted(async () => {
   const now = new Date();
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(now.getDate() - 7);
 
-  fromDate.value = firstDay.toISOString().split('T')[0];
-  toDate.value = lastDay.toISOString().split('T')[0];
+  fromDate.value = oneWeekAgo.toISOString().split('T')[0];
+  toDate.value = now.toISOString().split('T')[0];
 
   await loadDeviceOptions();
 
-  // Auto fetch on load
-  fetchRanking();
+  // Auto select first device if available and fetch
+  if (deviceOptions.value.length > 0) {
+    filterVehicleId.value = deviceOptions.value[0].id;
+    fetchRanking();
+  }
 });
 
 const loadDeviceOptions = async () => {
