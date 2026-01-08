@@ -351,11 +351,11 @@ async function submit() {
     if (attrsOut.fuelType && !attrsOut.fuel_type) attrsOut.fuel_type = attrsOut.fuelType;
     const keptPhotos = existingPhotos.value.filter(Boolean);
     attrsOut.photos = keptPhotos;
+    attrsOut.speedLimit = form.speedLimit ?? '';
     fd.append('attributes', JSON.stringify(attrsOut));
     blobs.value.forEach((file, i) => { if (file) fd.append(`images[${i}]`, file); });
     // Use POST with method override to ensure Laravel parses multipart fields/files
     fd.append('_method', 'PUT');
-    fd.append('speedLimit', form.speedLimit ?? '');
 
     const { data } = await axios.post(`/web/vehicles/${deviceId}`, fd);
     message.value = 'Vehicle updated successfully.';

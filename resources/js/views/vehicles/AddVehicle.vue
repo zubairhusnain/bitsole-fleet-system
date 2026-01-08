@@ -279,10 +279,9 @@ async function submit() {
     {
       const attrs = { ...form.attributes };
       if (attrs.fuelType && !attrs.fuel_type) attrs.fuel_type = attrs.fuelType;
-      // Removed maxSpeed assignment
+      attrs.speedLimit = form.speedLimit ?? '';
       fd.append('attributes', JSON.stringify(attrs));
     }
-    fd.append('speedLimit', form.speedLimit ?? '');
     blobs.value.forEach((file, i) => { if (file) fd.append(`images[${i}]`, file); });
 
     const { data } = await axios.post('/web/vehicles', fd);
