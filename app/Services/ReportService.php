@@ -184,10 +184,35 @@ class ReportService
             });
         }
 
-        return $sortedRows->values()->map(function ($row, $index) {
-            $row['rank'] = $index + 1;
-            return $row;
-        });
+        $singleSelected = false;
+        if ($request->has('vehicle_ids')) {
+            $ids = $request->vehicle_ids;
+            if (is_array($ids)) {
+                $singleSelected = count($ids) === 1;
+            } elseif (is_string($ids)) {
+                $singleSelected = count(array_filter(explode(',', $ids))) === 1;
+            }
+        }
+
+        if ($singleSelected) {
+            return $sortedRows->values()->map(function ($row) {
+                $row['rank'] = 1;
+                return $row;
+            });
+        } else {
+            $allSame = $sortedRows->pluck('points')->unique()->count() === 1;
+            if ($allSame) {
+                return $sortedRows->values()->map(function ($row) {
+                    $row['rank'] = 1;
+                    return $row;
+                });
+            } else {
+                return $sortedRows->values()->map(function ($row, $index) {
+                    $row['rank'] = $index + 1;
+                    return $row;
+                });
+            }
+        }
     }
 
     private function formatDurationHms($ms) {
