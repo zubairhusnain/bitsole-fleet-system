@@ -175,6 +175,15 @@ class ReportService
 
         $sortedRows = $sortDesc ? $rows->sortByDesc($sortBy) : $rows->sortBy($sortBy);
 
+        // If listing all devices or sorting by points, enforce points-based rank with stable tie-breaker
+        if (empty($vehicleIds) || ($sortBy === 'points' && $sortDesc === true)) {
+            $sortedRows = $rows->sort(function ($a, $b) {
+                $cmp = ($b['points'] <=> $a['points']);
+                if ($cmp !== 0) return $cmp;
+                return strcmp((string)$a['vehicleId'], (string)$b['vehicleId']);
+            });
+        }
+
         return $sortedRows->values()->map(function ($row, $index) {
             $row['rank'] = $index + 1;
             return $row;

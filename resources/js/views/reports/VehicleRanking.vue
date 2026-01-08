@@ -112,7 +112,7 @@ const rows = ref([]);
 const loading = ref(false);
 const fromDate = ref('');
 const toDate = ref('');
-const rankingType = ref('percentage');
+const rankingType = ref('points');
 const filterVehicleId = ref('');
 const deviceOptions = ref([]);
 
