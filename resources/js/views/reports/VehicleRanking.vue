@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div>  
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
         <li class="breadcrumb-item"><RouterLink to="/dashboard">Dashboard</RouterLink></li>
@@ -7,7 +7,7 @@
         <li class="breadcrumb-item active" aria-current="page">Vehicle Ranking Report</li>
       </ol>
     </div>
-    <h4 class="mb-3">Vehicle Ranking Report <i class="bi bi-info-circle text-muted ms-2" style="font-size: 0.6em; cursor: help;" title="Starts at 100 points. Penalties: Hard Accel/Brake/Cornering (-5 each), Speeding (-10 each)."></i></h4>
+    <h4 class="mb-3">Vehicle Ranking Report <i class="bi bi-info-circle text-muted ms-2" style="font-size: 0.6em; cursor: help;" data-bs-toggle="tooltip" data-bs-html="true" title="<div class='text-start'><strong>Vehicle Ranking System</strong><br>Every vehicle starts with <strong>100 points</strong>.<br>Points are deducted for unsafe events:<br>• Hard Acceleration: -5 pts<br>• Hard Braking: -5 pts<br>• Hard Cornering: -5 pts<br>• Speeding: -10 pts<br>Higher score indicates safer driving.</div>"></i></h4>
     <div class="card panel border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
       <div class="card-body pt-2">
@@ -57,12 +57,12 @@
                 <th>Type/Model</th>
                 <th class="text-center">Distance</th>
                 <th class="text-center">Duration</th>
-                <th class="text-center" title="Total number of hard acceleration events">Total HA <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
-                <th class="text-center" title="Total number of hard braking events">Total HB <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
-                <th class="text-center" title="Total number of hard cornering events">Total HC <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
-                <th class="text-center" title="Total number of speed limit violations">Total SV <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
-                <th class="text-center" title="Driver safety score (starts at 100)">Points <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
-                <th class="text-center" title="Overall performance rating">Percentage <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
+                <th class="text-center" data-bs-toggle="tooltip" title="Total number of hard acceleration events">Total HA <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
+                <th class="text-center" data-bs-toggle="tooltip" title="Total number of hard braking events">Total HB <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
+                <th class="text-center" data-bs-toggle="tooltip" title="Total number of hard cornering events">Total HC <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
+                <th class="text-center" data-bs-toggle="tooltip" title="Total number of speed limit violations">Total SV <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
+                <th class="text-center" data-bs-toggle="tooltip" title="Driver safety score (starts at 100)">Points <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
+                <th class="text-center" data-bs-toggle="tooltip" title="Overall performance rating">Percentage <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
                 <th class="text-center">Rank</th>
                 <th class="text-center pe-3">Action</th>
               </tr>
@@ -105,7 +105,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 import axios from 'axios';
 
 const rows = ref([]);
@@ -124,6 +124,16 @@ onMounted(async () => {
 
   fromDate.value = oneWeekAgo.toISOString().split('T')[0];
   toDate.value = now.toISOString().split('T')[0];
+
+  // Initialize tooltips
+  nextTick(() => {
+    if (window.bootstrap && window.bootstrap.Tooltip) {
+      const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+      tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new window.bootstrap.Tooltip(tooltipTriggerEl);
+      });
+    }
+  });
 
   await loadDeviceOptions();
 
