@@ -1,7 +1,7 @@
 <template>
-  <div>
+  <div> 
     <ReportSummary :summary="summaryData" :vehicle="vehicleInfo" :dateRange="{start: startDate, end: endDate}" />
-    <ChartAndKPIs :summaryData="summaryData" :trips="rowsDailyTrips" :stops="rowsDailyStops" :startDate="startDate" :endDate="endDate" />
+    <ChartAndKPIs :summary="summaryData" :trips="rowsDailyTrips" :stops="rowsDailyStops" :startDate="startDate" :endDate="endDate" />
   </div>
 </template>
 
