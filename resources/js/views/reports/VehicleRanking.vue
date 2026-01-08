@@ -1,5 +1,5 @@
 <template>
-  <div>  
+  <div>
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
         <li class="breadcrumb-item"><RouterLink to="/dashboard">Dashboard</RouterLink></li>
@@ -137,11 +137,7 @@ onMounted(async () => {
 
   await loadDeviceOptions();
 
-  // Auto select first device if available and fetch
-  if (deviceOptions.value.length > 0) {
-    filterVehicleId.value = deviceOptions.value[0].id;
-    fetchRanking();
-  }
+  fetchRanking();
 });
 
 const loadDeviceOptions = async () => {

@@ -59,8 +59,12 @@ class ReportService
         // Query string
         $query = 'from=' . $from . '&to=' . $to;
 
-        // If vehicle_ids provided, append multiple deviceId parameters using Collection
-        if (!empty($vehicleIds)) {
+        if (empty($vehicleIds)) {
+            $accessible = Devices::accessibleByUser($request->user())->pluck('device_id')->all();
+            if (!empty($accessible)) {
+                $query .= collect($accessible)->map(fn($vid) => '&deviceId=' . $vid)->implode('');
+            }
+        } else {
             $vehicleIds = is_string($vehicleIds) ? explode(',', $vehicleIds) : $vehicleIds;
             if (is_array($vehicleIds)) {
                 $query .= collect($vehicleIds)->map(fn($vid) => '&deviceId=' . $vid)->implode('');
