@@ -1,48 +1,7 @@
 <template>
   <div>
     <ReportSummary :summary="summaryData" :vehicle="vehicleInfo" :dateRange="{start: startDate, end: endDate}" />
-    <ChartAndKPIs :summary="summaryData" :trips="rowsDailyTrips" :stops="rowsDailyStops" :startDate="startDate" :endDate="endDate" />
-    <div class="card border rounded-3 shadow-0">
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-sm align-middle mb-0 table-striped w-100 text-nowrap">
-            <thead class="table-dark">
-              <tr>
-                <th class="py-2 ps-3">Date</th>
-                <th class="py-2">Start Time</th>
-                <th class="py-2">Start Location</th>
-                <th class="py-2">Start Remarks</th>
-                <th class="py-2">End Time</th>
-                <th class="py-2">End Location</th>
-                <th class="py-2">End Remarks</th>
-                <th class="py-2 pe-3 text-end">Travelled Dist</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="r in rowsDailyTrips" :key="r.key">
-                <td class="ps-3"><a href="#" class="text-decoration-none fw-semibold text-primary">{{ r.date }}</a></td>
-                <td>{{ r.startTime }}</td>
-                <td><a href="#" class="text-decoration-none text-primary">{{ r.startLocation }}</a></td>
-                <td>
-                  {{ r.startRemarks !== '-' ? r.startRemarks : '' }}
-                  <span v-if="r.startPic" class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size: 10px;">OUT PIC</span>
-                </td>
-                <td>{{ r.endTime }}</td>
-                <td><a href="#" class="text-decoration-none text-primary">{{ r.endLocation }}</a></td>
-                <td>
-                  {{ r.endRemarks !== '-' ? r.endRemarks : '' }}
-                  <span v-if="r.endPic" class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size: 10px;">OUT PIC</span>
-                </td>
-                <td class="text-end pe-3">{{ r.distance }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div class="card-footer d-flex align-items-center py-2 bg-white border-top">
-          <div class="text-muted small me-auto">Showing {{ rowsDailyTrips.length }} results</div>
-        </div>
-    </div>
+    <ChartAndKPIs :summaryData="summaryData" :trips="rowsDailyTrips" :stops="rowsDailyStops" :startDate="startDate" :endDate="endDate" />
   </div>
 </template>
 

@@ -1160,7 +1160,7 @@ class ReportService
 
         // Fuel - Placeholder
         $totalFuel = 0;
-
+ 
         return [
             'rows' => $rows,
             'stops' => $stopsFormatted,
@@ -1687,7 +1687,7 @@ class ReportService
             // 2. Events (with location)
             $eventsData = DB::connection('pgsql')->select("
                 SELECT
-                    e.id, e.type, e.eventtime as eventTime, e.deviceid as deviceId, e.attributes, e.positionid as positionId,
+                    e.id, e.type, e.eventtime, e.deviceid, e.attributes, e.positionid,
                     p.latitude, p.longitude, p.address
                 FROM tc_events e
                 LEFT JOIN tc_positions p ON e.positionid = p.id
@@ -1699,10 +1699,10 @@ class ReportService
                 $allEvents[] = [
                     'id' => $e->id,
                     'type' => $e->type,
-                    'eventTime' => date('Y-m-d\TH:i:s.v\Z', strtotime($e->eventTime)),
-                    'deviceId' => $e->deviceId,
+                    'eventTime' => date('Y-m-d\TH:i:s.v\Z', strtotime($e->eventtime)),
+                    'deviceId' => $e->deviceid,
                     'attributes' => json_decode($e->attributes, true),
-                    'positionId' => $e->positionId,
+                    'positionId' => $e->positionid,
                     'latitude' => $e->latitude,
                     'longitude' => $e->longitude,
                     'address' => $e->address
@@ -1711,7 +1711,7 @@ class ReportService
 
             // 3. Routes (Positions)
             $positions = DB::connection('pgsql')->select("
-                SELECT id, deviceid as deviceId, fixtime as fixTime, latitude, longitude, speed, course, address, attributes
+                SELECT id, deviceid, fixtime, latitude, longitude, speed, course, address, attributes
                 FROM tc_positions
                 WHERE deviceid = ?
                   AND fixtime BETWEEN ? AND ?
@@ -1721,8 +1721,8 @@ class ReportService
             foreach ($positions as $p) {
                 $allRoutes[] = [
                     'id' => $p->id,
-                    'deviceId' => $p->deviceId,
-                    'fixTime' => date('Y-m-d\TH:i:s.v\Z', strtotime($p->fixTime)),
+                    'deviceId' => $p->deviceid,
+                    'fixTime' => date('Y-m-d\TH:i:s.v\Z', strtotime($p->fixtime)),
                     'latitude' => $p->latitude,
                     'longitude' => $p->longitude,
                     'speed' => $p->speed,

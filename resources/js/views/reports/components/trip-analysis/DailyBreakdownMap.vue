@@ -9,51 +9,49 @@
               <div class="fw-bold">Date</div>
               <div class="fw-bold">Distance</div>
           </div>
-
+ 
           <div class="overflow-auto custom-scrollbar flex-grow-1">
             <div class="list-group list-group-flush">
-              <template v-for="day in displayedRows" :key="day.key">
+              <template v-for="day in displayedRows" :key="day.key || (String(day.date || '') + '_' + String(day.deviceId || ''))">
                 <!-- Day Header -->
                 <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3"
                      :class="{
-                        'bg-light': !day.isOpen,
-                        'bg-white': day.isOpen && activeDay !== day,
+                        'bg-light': activeDay !== day,
                         'bg-primary-subtle text-primary border-start border-4 border-primary': activeDay === day
                      }"
-                     @click="toggleDay(day)"
+                     @click="selectDay(day)"
                      role="button"
                      style="cursor: pointer;">
                   <div>
-                    <div class="fw-bold">{{ cleanDate(day.date) }}</div>
+                    <div class="fw-bold">{{ cleanDate(getDayDate(day)) }}</div>
                   </div>
                   <div class="d-flex align-items-center gap-2">
-                    <div class="small fw-bold" :class="activeDay === day ? 'text-primary' : 'text-dark'">{{ day.distance }}</div>
-                    <i class="bi" :class="day.isOpen ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                    <div class="small fw-bold" :class="activeDay === day ? 'text-primary' : 'text-dark'">{{ getDayDistance(day) }}</div>
                   </div>
                 </div>
 
 
                 <!-- Day Details (Timeline) -->
-                <div v-if="day.isOpen" class="bg-white">
+                <div class="bg-white">
                   <!-- Summary Box -->
                   <div class="p-3 m-3 rounded-3 bg-info-subtle text-dark">
-                    <div class="fw-bold mb-2 small text-uppercase text-primary-emphasis">Summary for {{ cleanDate(day.summary.date) }}</div>
+                    <div class="fw-bold mb-2 small text-uppercase text-primary-emphasis">Summary for {{ cleanDate(getSummaryDate(day)) }}</div>
                     <div class="row g-2">
                       <div class="col-6">
                         <div class="text-muted small" style="font-size: 0.75rem;">Total Distance</div>
-                        <div class="fw-bold">{{ day.summary.dist }}</div>
+                        <div class="fw-bold">{{ getSummaryDistance(day) }}</div>
                       </div>
                       <div class="col-6">
                         <div class="text-muted small" style="font-size: 0.75rem;">Total Duration</div>
-                        <div class="fw-bold">{{ day.summary.dur }}</div>
+                        <div class="fw-bold">{{ getSummaryDuration(day) }}</div>
                       </div>
                       <div class="col-6">
                         <div class="text-muted small" style="font-size: 0.75rem;">Total Idling</div>
-                        <div class="fw-bold">{{ day.summary.idle }}</div>
+                        <div class="fw-bold">{{ getSummaryIdle(day) }}</div>
                       </div>
                       <div class="col-6">
                         <div class="text-muted small" style="font-size: 0.75rem;">Behaviour</div>
-                        <div class="fw-bold text-danger">{{ day.summary.behav }}</div>
+                        <div class="fw-bold text-danger">{{ getSummaryBehaviour(day) }}</div>
                       </div>
                     </div>
                   </div>
@@ -62,7 +60,7 @@
                   <div class="px-3 pb-3 position-relative">
                     <div class="timeline-line"></div>
 
-                    <div v-for="(item, idx) in day.timeline" :key="idx" class="d-flex mb-3 position-relative z-1">
+                    <div v-for="(item, idx) in (day.timeline || [])" :key="idx" class="d-flex mb-3 position-relative z-1">
                       <template v-if="!item.hidden">
                       <!-- Icon/Dot Column -->
                       <div class="d-flex flex-column align-items-center me-3" style="width: 24px;">
@@ -159,7 +157,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, onUnmounted, watch, computed } from 'vue';
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -240,6 +238,72 @@ function cleanDate(d) {
     return d.replace(' - ', ' | ');
 }
 
+function getDayDate(day) {
+    return day && day.date ? day.date : '';
+}
+
+function getDayDistance(day) {
+    if (!day) return '';
+    return day.distance || day.totalDistance || (day.summary && day.summary.dist) || '';
+}
+
+function getSummary(day) {
+    return day && day.summary ? day.summary : {};
+}
+
+function getSummaryDate(day) {
+    const s = getSummary(day);
+    return s.date || getDayDate(day);
+}
+
+function getSummaryDistance(day) {
+    const s = getSummary(day);
+    return s.dist || (day && (day.totalDistance || day.distance)) || '';
+}
+
+function getSummaryDuration(day) {
+    const s = getSummary(day);
+    return s.dur || (day && day.totalDuration) || '';
+}
+
+function getSummaryIdle(day) {
+    const s = getSummary(day);
+    return s.idle || (day && day.totalIdle) || '';
+}
+
+function getSummaryBehaviour(day) {
+    const s = getSummary(day);
+    if (s.behav) return s.behav;
+    const t = day && day.timeline ? day.timeline : null;
+    const computed = computeBehaviour(t);
+    return computed || '-';
+}
+
+function computeBehaviour(timeline) {
+    if (!Array.isArray(timeline)) return '';
+    let sv = 0;
+    let ha = 0;
+    let hb = 0;
+    const re = /(\d+)\s*(SV|HA|HB)\b/g;
+    for (const item of timeline) {
+        const alert = item && item.alert ? String(item.alert) : '';
+        re.lastIndex = 0;
+        let match;
+        while ((match = re.exec(alert)) !== null) {
+            const n = Number(match[1]) || 0;
+            const code = match[2];
+            if (code === 'SV') sv += n;
+            else if (code === 'HA') ha += n;
+            else if (code === 'HB') hb += n;
+        }
+    }
+    const parts = [];
+    if (sv > 0) parts.push(`${sv} SV`);
+    if (ha > 0) parts.push(`${ha} HA`);
+    if (hb > 0) parts.push(`${hb} HB`);
+    return parts.join(', ');
+}
+
 function getTypeColor(type) {
     switch(type) {
         case 'start': return 'text-primary';
@@ -250,25 +314,12 @@ function getTypeColor(type) {
     }
 }
 
-function toggleDay(day) {
-    if (day.isOpen) {
-        // If already open, check if it's the active one
-        if (activeDay.value === day) {
-            // It is active, so close it and clear map
-            day.isOpen = false;
-            activeDay.value = null;
-            clearMapLayers();
-        } else {
-            // It's open but not active, so make it active (switch map view)
-            activeDay.value = day;
-            loadDayOnMap(day);
-        }
-    } else {
-        // Closed, so open it and make it active
-        day.isOpen = true;
-        activeDay.value = day;
-        loadDayOnMap(day);
+function selectDay(day) {
+    if (activeDay.value === day) {
+        return;
     }
+    activeDay.value = day;
+    loadDayOnMap(day);
 }
 
 function clearMapLayers() {
@@ -315,25 +366,34 @@ function loadDayOnMap(day) {
     // Initialize playback marker at start
     playbackIndex.value = 0;
     const startPt = day.route[0];
-    playbackMarker = L.circleMarker([startPt[0], startPt[1]], {
-        radius: 8,
-        fillColor: 'green',
-        color: '#fff',
-        weight: 2,
-        fillOpacity: 1
-    }).addTo(map);
+    playbackMarker = L.marker([startPt[0], startPt[1]]).addTo(map);
 }
 
 function seekToTime(day, timeSort) {
-    // Find index in route closest to this time
-    // For now, just simplistic mapping or finding closest timestamp
-    // Assuming route points have timestamp at index 2
-    if (!day.route) return;
+    if (!day || !Array.isArray(day.route) || day.route.length === 0) return;
+    if (!timeSort) {
+        restartPlayback();
+        return;
+    }
 
-    // This is a simplification. Real implementation would search for closest timestamp.
-    // Since we don't have exact timestamps in timeline items in static data (only display time),
-    // we'll just restart for now or find approx index.
-    restartPlayback();
+    const targetMs = Number(timeSort) * 1000;
+    let bestIndex = 0;
+    let bestDiff = Infinity;
+
+    for (let i = 0; i < day.route.length; i++) {
+        const pt = day.route[i];
+        const t = Array.isArray(pt) ? Number(pt[2]) : NaN;
+        if (!Number.isFinite(t)) continue;
+        const diff = Math.abs(t - targetMs);
+        if (diff < bestDiff) {
+            bestDiff = diff;
+            bestIndex = i;
+        }
+    }
+
+    playbackIndex.value = bestIndex;
+    updatePlaybackMarker();
+    stopPlayback();
 }
 
 // Playback Logic

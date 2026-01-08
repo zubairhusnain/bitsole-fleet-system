@@ -78,9 +78,9 @@
 
   </div>
 </template>
-
+ 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import DailyBreakdown from './components/trip-analysis/DailyBreakdown.vue';
 import DailyBreakdownMap from './components/trip-analysis/DailyBreakdownMap.vue';
@@ -229,6 +229,13 @@ const handleViewDetails = (row) => {
   viewType.value = 'Daily Breakdown';
   handleSearch();
 };
+
+watch(viewType, () => {
+    if (!vehicle.value && vehicles.value.length > 0) {
+        vehicle.value = vehicles.value[0].device_id;
+    }
+    handleSearch();
+});
 
 onMounted(() => {
   fetchVehicles();
