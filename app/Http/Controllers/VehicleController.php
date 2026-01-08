@@ -114,7 +114,7 @@ class VehicleController extends Controller
         }
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
-            'type','manufacturer','color','registration','plate','odometer','fuelAverage','maxSpeed','speedLimit','photos','fuelTankCapacity','trackerModel',
+            'type','manufacturer','color','registration','plate','odometer','fuelAverage','maxSpeed','photos','fuelTankCapacity','trackerModel',
             'fuelType','fuel_type','vehicleNo'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
@@ -126,8 +126,9 @@ class VehicleController extends Controller
                 return response()->json(['message' => 'Max Speed must be numeric and >= 0'], 422);
             }
         }
-        if (array_key_exists('speedLimit', $attributes) && $attributes['speedLimit'] !== null && $attributes['speedLimit'] !== '') {
-            $slStr = (string) $attributes['speedLimit'];
+        $speedLimitTop = $request->input('speedLimit');
+        if ($speedLimitTop !== null && $speedLimitTop !== '') {
+            $slStr = (string) $speedLimitTop;
             if (!preg_match('/^\d+$/', $slStr)) {
                 return response()->json(['message' => 'Speed Limit must be numeric and >= 0'], 422);
             }
@@ -163,7 +164,7 @@ class VehicleController extends Controller
         }
 
         // Merge back into request for DeviceService consumption
-        $request->merge(['attributes' => $attributes]);
+        $request->merge(['attributes' => $attributes, 'speedLimit' => $speedLimitTop]);
 
         // Call tracking server via DeviceService
         $tracking = \App\Services\DeviceService::deviceAdd($request);
@@ -277,7 +278,7 @@ class VehicleController extends Controller
         }
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
-            'type','manufacturer','color','registration','plate','odometer','fuelAverage','maxSpeed','speedLimit','photos','fuelTankCapacity','trackerModel',
+            'type','manufacturer','color','registration','plate','odometer','fuelAverage','maxSpeed','photos','fuelTankCapacity','trackerModel',
             'fuelType','fuel_type','vehicleNo'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
@@ -289,8 +290,9 @@ class VehicleController extends Controller
                 return response()->json(['message' => 'Max Speed must be numeric and >= 0'], 422);
             }
         }
-        if (array_key_exists('speedLimit', $attributes) && $attributes['speedLimit'] !== null && $attributes['speedLimit'] !== '') {
-            $slStr = (string) $attributes['speedLimit'];
+        $speedLimitTop = $request->input('speedLimit');
+        if ($speedLimitTop !== null && $speedLimitTop !== '') {
+            $slStr = (string) $speedLimitTop;
             if (!preg_match('/^\d+$/', $slStr)) {
                 return response()->json(['message' => 'Speed Limit must be numeric and >= 0'], 422);
             }
@@ -363,6 +365,7 @@ class VehicleController extends Controller
             'uniqueId' => $request->input('uniqueId'),
             'model' => $request->input('model'),
             'attributes' => $attributes,
+            'speedLimit' => $speedLimitTop,
         ]);
 
         $tracking = app(\App\Services\DeviceService::class)->deviceUpdate($request);
