@@ -9,9 +9,7 @@
     </div>
     <h4 class="mb-3">Idling Report</h4>
 
-    <div v-if="errorMessage" class="alert alert-danger py-2 px-3 small mb-3">
-        {{ errorMessage }}
-    </div>
+    <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = null" />
 
     <div class="card panel border rounded-3 shadow-0 mb-3">
       <div class="card-header"><h6 class="mb-0">Search Option</h6></div>
@@ -24,7 +22,7 @@
                 <span class="input-group-text bg-white">-</span>
                 <input type="date" v-model="toDate" class="form-control" />
             </div>
-          </div> 
+          </div>
           <div class="col-12 col-md-3">
             <label class="form-label small">Vehicle</label>
             <select v-model="selectedDevice" class="form-select">
@@ -166,6 +164,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 
 // State

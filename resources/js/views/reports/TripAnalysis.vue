@@ -9,9 +9,7 @@
     </div>
     <h4 class="mb-3">Trip Analysis Report</h4>
 
-    <div v-if="errorMessage" class="alert alert-danger py-2 px-3 small mb-3">
-        {{ errorMessage }}
-    </div>
+    <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = null" />
 
     <div class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
@@ -83,6 +81,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
+import UiAlert from '../../components/UiAlert.vue';
 import DailyBreakdown from './components/trip-analysis/DailyBreakdown.vue';
 import DailyBreakdownMap from './components/trip-analysis/DailyBreakdownMap.vue';
 import DailySummary from './components/trip-analysis/DailySummary.vue';

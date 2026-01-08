@@ -8,6 +8,9 @@
       </ol>
     </div>
     <h4 class="mb-3">Vehicle Status Report</h4>
+
+    <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = null" />
+
     <div class="card panel border rounded-3 shadow-0 mb-3">
       <div class="card-header"><h6 class="mb-0">Search Option</h6></div>
       <div class="card-body">
@@ -135,6 +138,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
+import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { formatTelemetry } from '../../utils/telemetry';
 
@@ -145,6 +149,7 @@ const selectedVehicleId = ref('');
 const selectedGroupId = ref('');
 const selectedFormat = ref('Website');
 const loading = ref(true);
+const errorMessage = ref(null);
 const currentPage = ref(1);
 const itemsPerPage = 16;
 
@@ -278,6 +283,7 @@ const processVehicleData = (list) => {
 };
 
 const downloadCSV = async () => {
+    errorMessage.value = null;
     try {
         const params = {
             vehicle_id: selectedVehicleId.value,
@@ -314,12 +320,13 @@ const downloadCSV = async () => {
 
     } catch (e) {
         console.error('Export failed:', e);
-        alert('Export failed. Please try again.');
+        errorMessage.value = 'Export failed. Please try again.';
     }
 };
 
 const downloadPDF = async () => {
     loading.value = true;
+    errorMessage.value = null;
     try {
         const params = {
             vehicle_id: selectedVehicleId.value,
@@ -340,7 +347,7 @@ const downloadPDF = async () => {
 
     } catch (e) {
         console.error('PDF Export failed:', e);
-        alert('PDF Export failed. Please try again.');
+        errorMessage.value = 'PDF Export failed. Please try again.';
     } finally {
         loading.value = false;
     }
@@ -348,6 +355,7 @@ const downloadPDF = async () => {
 
 // Fetch Data
 const fetchVehicles = async () => {
+    errorMessage.value = null;
     if (selectedFormat.value === 'Excel') {
         downloadCSV();
         return;
@@ -374,6 +382,7 @@ const fetchVehicles = async () => {
         vehicles.value = processVehicleData(list);
     } catch (err) {
         console.error("Failed to fetch vehicles", err);
+        errorMessage.value = 'Failed to fetch vehicles. Please try again.';
     } finally {
         loading.value = false;
     }

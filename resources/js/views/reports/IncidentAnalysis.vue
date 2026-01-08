@@ -14,10 +14,7 @@
     </div>
 
     <!-- Alerts -->
-    <div v-if="alert.message" :class="`alert alert-${alert.type} alert-dismissible fade show`" role="alert">
-      {{ alert.message }}
-      <button type="button" class="btn-close" @click="alert.message = ''"></button>
-    </div>
+    <UiAlert :show="!!alert.message" :message="alert.message" :variant="alert.type" dismissible @dismiss="alert.message = ''" />
 
     <div class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
@@ -102,7 +99,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
+import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 
 const fromDate = ref('');

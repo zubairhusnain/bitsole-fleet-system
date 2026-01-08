@@ -9,9 +9,7 @@
     </div>
     <h4 class="mb-3">Asset Activity Report</h4>
 
-    <div v-if="errorMessage" class="alert alert-danger py-2 px-3 small mb-3">
-        {{ errorMessage }}
-    </div>
+    <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = null" />
 
     <div class="card panel border rounded-3 shadow-0 mb-3">
       <div class="card-header"><h6 class="mb-0">Search Option</h6></div>
@@ -168,6 +166,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
+import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 
 const startDate = ref('');

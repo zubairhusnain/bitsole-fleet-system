@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Support\Facades\Config;
-use Barryvdh\DomPDF\Facade\Pdf; 
+use Barryvdh\DomPDF\Facade\Pdf;
 class ReportController extends Controller
 {
     /**
@@ -202,10 +202,9 @@ class ReportController extends Controller
             return response()->json([]);
         }
 
-        return $this->reportService->fetchFleetSummary($request, $deviceIds);
+        return $this->reportService->fetchFleetSummaryDb($request, $deviceIds);
     }
-
-    public function dailyTrips(Request $request)
+     public function dailyTrips(Request $request)
     {
         $request->validate([
             'from_date' => 'required|date',
@@ -235,7 +234,7 @@ class ReportController extends Controller
         ]);
         $deviceIds = $this->getDeviceIds($request);
         if (empty($deviceIds)) return response()->json([]);
-        return $this->reportService->fetchDailySummary($request, $deviceIds);
+        return $this->reportService->fetchDailySummaryDb($request, $deviceIds);
     }
 
     public function monthlySummary(Request $request)

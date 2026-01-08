@@ -9,9 +9,7 @@
     </div>
     <h4 class="mb-3">Vehicle Activity Report</h4>
 
-    <div v-if="errorMessage" class="alert alert-danger py-2 px-3 small mb-3">
-        {{ errorMessage }}
-    </div>
+    <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = null" />
 
     <div class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
@@ -184,6 +182,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
 

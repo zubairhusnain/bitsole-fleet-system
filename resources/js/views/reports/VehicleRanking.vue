@@ -8,6 +8,9 @@
       </ol>
     </div>
     <h4 class="mb-3">Vehicle Ranking Report <i class="bi bi-info-circle text-muted ms-2" style="font-size: 0.6em; cursor: help;" data-bs-toggle="tooltip" data-bs-html="true" title="<div class='text-start'><strong>Vehicle Ranking System</strong><br>Every vehicle starts with <strong>100 points</strong>.<br>Points are deducted for unsafe events:<br>• Hard Acceleration: -5 pts<br>• Hard Braking: -5 pts<br>• Hard Cornering: -5 pts<br>• Speeding: -10 pts<br>Higher score indicates safer driving.</div>"></i></h4>
+
+    <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = null" />
+
     <div class="card panel border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
       <div class="card-body pt-2">
@@ -106,10 +109,12 @@
 
 <script setup>
 import { ref, onMounted, nextTick } from 'vue';
+import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 
 const rows = ref([]);
 const loading = ref(false);
+const errorMessage = ref(null);
 const fromDate = ref('');
 const toDate = ref('');
 const rankingType = ref('points');
@@ -151,6 +156,7 @@ const loadDeviceOptions = async () => {
 
 const fetchRanking = async () => {
   loading.value = true;
+  errorMessage.value = null;
   try {
     const params = {
         from_date: fromDate.value,
@@ -164,7 +170,7 @@ const fetchRanking = async () => {
     rows.value = response.data;
   } catch (error) {
     console.error('Error fetching ranking:', error);
-    // Keep mock data or clear it? Let's clear it to show error state if needed, but for now just log
+    errorMessage.value = 'Failed to load vehicle ranking data. Please try again.';
     rows.value = [];
   } finally {
     loading.value = false;

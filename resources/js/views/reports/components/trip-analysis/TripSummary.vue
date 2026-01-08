@@ -46,7 +46,7 @@
                 <td class="text-center">{{ r.fuelRefillFreq }}</td>
                 <td class="text-center">{{ r.speed }}</td>
                 <td class="text-center">
-                  <button class="btn btn-sm btn-link text-primary p-0" @click="$emit('view-details', r)" title="View Details"><i class="bi bi-eye"></i></button>
+                  <button class="btn btn-sm btn-link text-primary p-0" @click="$emit('view-details', r)"><i class="bi bi-eye"></i></button>
                 </td>
               </tr> 
             </tbody>
