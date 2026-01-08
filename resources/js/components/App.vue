@@ -181,7 +181,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item d-testingmode" :class="{ 'menu-open': route.path.startsWith('/reports') }" v-if="!isAdminOrDistributor && hasPerm('reports','read')">
+                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode,'menu-open': route.path.startsWith('/reports') }" v-if="hasPerm('reports','read')">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/reports') }">
                                 <i class="nav-icon bi bi-bar-chart"></i>
                                 <p>
@@ -341,6 +341,7 @@ let echoChannel = null;
 const isTestingMode = ref(false);
 provide('isTestingMode', isTestingMode);
 
+
 const checkTestingMode = () => {
     // Check for environment variable configuration
     const envTestingMode = import.meta.env.VITE_TESTING_MODE;
@@ -349,7 +350,7 @@ const checkTestingMode = () => {
     const rawQ = route.query.testingmode ?? route.query.testingMode;
     const q = rawQ !== null && rawQ !== undefined ? String(rawQ) : null;
 
-    if (envTestingMode === 'true') { 
+    if (envTestingMode === 'true') {
         isTestingMode.value = true;
     } else if (q === '1') {
         console.log('testingMode on hai');

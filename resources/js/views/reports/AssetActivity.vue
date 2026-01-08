@@ -9,86 +9,69 @@
     </div>
     <h4 class="mb-3">Asset Activity Report</h4>
 
+    <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = null" />
+
     <div class="card panel border rounded-3 shadow-0 mb-3">
       <div class="card-header"><h6 class="mb-0">Search Option</h6></div>
       <div class="card-body">
         <div class="row g-3 align-items-end">
-          <div class="col-12 col-md-3">
-            <label class="form-label small">Duration</label>
-            <input type="text" class="form-control" placeholder="dd/mm/yyyy - dd/mm/yyyy" />
+          <div class="col-12 col-md-2">
+            <label class="form-label small">Start Date</label>
+            <input v-model="startDate" type="datetime-local" class="form-control" />
+          </div>
+          <div class="col-12 col-md-2">
+            <label class="form-label small">End Date</label>
+            <input v-model="endDate" type="datetime-local" class="form-control" />
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label small">Vehicle</label>
-            <select class="form-select">
-              <option>-- Select an Vehicle --</option>
-              <option>VGPS2563</option>
-              <option>VHCL-1006</option>
-              <option>VHCL-1009</option>
+            <select v-model="vehicle" class="form-select">
+              <option value="">-- All Vehicles --</option>
+              <option v-for="v in vehicles" :key="v.id" :value="v.device_id">{{ v.name }}</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-2">
+            <label class="form-label small">Row Limit</label>
+            <select class="form-select" v-model="apiLimit">
+              <option :value="100">100 Records</option>
+              <option :value="200">200 Records</option>
+              <option :value="500">500 Records</option>
+              <option :value="1000">1000 Records</option>
+              <option :value="2000">2000 Records</option>
             </select>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label small">Search Filter</label>
-            <select class="form-select">
-              <option>-- Search Filter --</option>
-              <option>Door Sensor</option>
-              <option>Exceptions</option>
-              <option>Power Disconnection</option>
-              <option>Ignition</option>
-              <option>Idling</option>
-              <option>Seatbelt</option>
-              <option>Trailer</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-3 text-md-end">
-            <button class="btn btn-app-dark w-100">Submit</button>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label small">Report Format</label>
-            <select class="form-select">
-              <option>— Report Format —</option>
-              <option>Website</option>
-              <option>Map</option>
-              <option>Excel</option>
-              <option>PDF</option>
-              <option>Google Earth KML</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label small">Map Option</label>
-            <select class="form-select">
-              <option>— Map Option —</option>
-              <option>Icon</option>
-              <option>Line</option>
-              <option>Playback</option>
-            </select>
+            <button class="btn btn-app-dark w-100" @click="handleSearch" :disabled="loading">
+              Submit
+            </button>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="card border rounded-3 shadow-0 mb-3">
+    <div v-if="headerInfo" class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header"><h6 class="mb-0">Vehicle Activity Report Result</h6></div>
       <div class="card-body">
         <div class="row g-3">
           <div class="col-12 col-md-3">
             <div class="small text-muted">Vehicle ID</div>
-            <div class="fw-semibold">VGPS2563</div>
+            <div class="fw-semibold">{{ headerInfo.vehicleId }}</div>
           </div>
           <div class="col-12 col-md-3">
             <div class="small text-muted">Device ID</div>
-            <div class="fw-semibold">#34939829</div>
+            <div class="fw-semibold">#{{ headerInfo.deviceId }}</div>
           </div>
           <div class="col-12 col-md-3">
             <div class="small text-muted">Duration</div>
-            <div class="fw-semibold">2024/03/11 00:00 - 2024/03/20 23:59</div>
+            <div class="fw-semibold">{{ headerInfo.duration }}</div>
           </div>
           <div class="col-12 col-md-3">
-            <div class="small text-muted">View Type</div>
-            <div class="fw-semibold">Summery</div>
+            <div class="small text-muted">Last Report</div>
+            <div class="fw-semibold">{{ headerInfo.lastReport }}</div>
           </div>
           <div class="col-12">
-            <div class="small text-muted">Remarks</div>
-            <div class="fw-semibold">Average fuel consumption calculated up to 6 months of data. Fuel refill amount shown for duration selected. Fuel refill amount does not imply fuel consumed in the same duration selected.</div>
+            <div class="small text-muted">Last Location</div>
+            <div class="fw-semibold text-primary">{{ headerInfo.lastLocation }}</div>
           </div>
         </div>
       </div>
@@ -97,56 +80,83 @@
     <div class="card border rounded-3 shadow-0">
       <div class="card-body p-0">
         <div class="table-responsive">
-          <table class="table table-sm align-middle mb-0 table-striped">
+          <table class="table table-sm align-middle mb-0 table-hover">
             <thead class="table-dark">
               <tr>
-                <th>Activity Duration (Hours)</th>
-                <th class="text-center">Idling Duration (Hours)</th>
-                <th class="text-center">Utilisation (%)</th>
-                <th class="text-center">Avg. Fuel Consumption</th>
-                <th class="text-center">Fuel Refill (L)</th>
-                <th class="text-center">Fuel Refill (Frequency)</th>
-                <th class="text-center">Max Speed (Km/h)</th>
-                <th class="text-center">Action</th>
-              </tr>
-              <tr class="text-muted">
-                <th>Avg. Per Day</th>
-                <th class="text-center">Total • Avg. Per Day</th>
-                <th class="text-center">—</th>
-                <th class="text-center">Avg. Litres • Avg. KM/L</th>
-                <th class="text-center">Total</th>
-                <th class="text-center">Count</th>
-                <th class="text-center">—</th>
-                <th></th>
+                <th>Vehicle</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Status</th>
+                <th>Longitude</th>
+                <th>Latitude</th>
+                <th>Location</th>
+                <th>Direction</th>
+                <th>Speed</th>
+                <th>GSM Signal</th>
+                <th>GPS Signal</th>
+                <th>Power</th>
+                <th>Ignition</th>
+                <th>Fuel</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in rows" :key="row.key">
-                <td>{{ row.activePerDay }}</td>
-                <td class="text-center">{{ row.idleTotal }} • {{ row.idlePerDay }}</td>
-                <td class="text-center">{{ row.util }}</td>
-                <td class="text-center">{{ row.avgLitres }} • {{ row.avgKml }}</td>
-                <td class="text-center">{{ row.refillL }}</td>
-                <td class="text-center">{{ row.refillFreq }}</td>
-                <td class="text-center">{{ row.speed }}</td>
-                <td class="text-center">
-                  <i class="bi bi-eye text-primary me-2" role="button"></i>
-                  <i class="bi bi-trash text-danger" role="button"></i>
+              <tr v-if="loading">
+                <td colspan="13" class="text-center py-4">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
                 </td>
+              </tr>
+              <template v-else-if="groupedRows.length">
+                <template v-for="(group, gIndex) in groupedRows" :key="gIndex">
+                  <tr class="table-light">
+                    <td colspan="13" class="fw-bold text-primary">{{ group.date }}</td>
+                  </tr>
+                  <tr v-for="row in group.rows" :key="row.key">
+                    <td>{{ row.vehicle }}</td>
+                    <td>{{ row.date }}</td>
+                    <td>{{ row.time }}</td>
+                    <td>{{ row.status }}</td>
+                    <td>{{ row.lon }}</td>
+                    <td>{{ row.lat }}</td>
+                    <td>
+                      <div class="text-truncate" style="max-width: 200px;" :title="row.location">{{ row.location }}</div>
+                    </td>
+                    <td class="text-center">
+                      <i class="bi bi-arrow-up text-primary" :style="{ transform: `rotate(${row.direction}deg)`, display: 'inline-block' }"></i>
+                    </td>
+                    <td>{{ row.speed }}</td>
+                    <td>
+                      <i class="bi bi-reception-4 text-success" v-if="row.gsm"></i>
+                      <span v-else>-</span>
+                    </td>
+                    <td>
+                       <i class="bi bi-broadcast text-success" v-if="row.gps"></i>
+                       <span v-else>-</span>
+                    </td>
+                    <td class="text-info fw-bold">{{ row.power }}</td>
+                    <td>
+                      <span v-if="row.ignition" class="badge bg-success bg-opacity-10 text-success border border-success">ON</span>
+                      <span v-else class="badge bg-danger bg-opacity-10 text-danger border border-danger">OFF</span>
+                    </td>
+                    <td>{{ row.fuel }}</td>
+                  </tr>
+                </template>
+              </template>
+              <tr v-else-if="!loading && hasSearched">
+                <td colspan="13" class="text-center py-4 text-muted">No data found for the selected period.</td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
       <div class="card-footer d-flex align-items-center py-2">
-        <div class="text-muted small me-auto">Showing 1 to 10 of 10 results</div>
+        <div class="text-muted small me-auto">Showing {{ startIndex + 1 }} to {{ Math.min(startIndex + pageSize, totalCount) }} of {{ totalCount }} results</div>
         <nav aria-label="Pagination" class="ms-auto">
           <ul class="pagination pagination-sm mb-0 pagination-app">
-            <li class="page-item disabled"><button class="page-link">‹</button></li>
-            <li class="page-item active"><button class="page-link">1</button></li>
-            <li class="page-item"><button class="page-link">2</button></li>
-            <li class="page-item"><button class="page-link">3</button></li>
-            <li class="page-item"><button class="page-link">›</button></li>
+            <li class="page-item" :class="{ disabled: page === 1 }"><button class="page-link" @click="prevPage">‹</button></li>
+            <li class="page-item" v-for="n in totalPages" :key="n" :class="{ active: page === n }"><button class="page-link" @click="goPage(n)">{{ n }}</button></li>
+            <li class="page-item" :class="{ disabled: page === totalPages }"><button class="page-link" @click="nextPage">›</button></li>
           </ul>
         </nav>
       </div>
@@ -155,26 +165,117 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, computed } from 'vue';
+import UiAlert from '../../components/UiAlert.vue';
+import axios from 'axios';
 
-const rows = ref([
-  { key: 1, activePerDay: '8.5', idleTotal: '42.5', idlePerDay: '4.2', util: '85%', avgLitres: '12.5', avgKml: '8.2', refillL: '450', refillFreq: '3', speed: '95' },
-  { key: 2, activePerDay: '7.2', idleTotal: '35.0', idlePerDay: '3.5', util: '78%', avgLitres: '10.8', avgKml: '9.5', refillL: '380', refillFreq: '2', speed: '88' },
-  { key: 3, activePerDay: '9.1', idleTotal: '55.2', idlePerDay: '5.5', util: '92%', avgLitres: '14.2', avgKml: '7.8', refillL: '520', refillFreq: '4', speed: '102' },
-  { key: 4, activePerDay: '6.5', idleTotal: '28.4', idlePerDay: '2.8', util: '65%', avgLitres: '9.5', avgKml: '10.2', refillL: '320', refillFreq: '2', speed: '85' },
-  { key: 5, activePerDay: '8.8', idleTotal: '48.6', idlePerDay: '4.8', util: '88%', avgLitres: '13.5', avgKml: '8.0', refillL: '480', refillFreq: '3', speed: '98' },
-  { key: 6, activePerDay: '7.9', idleTotal: '38.2', idlePerDay: '3.8', util: '82%', avgLitres: '11.8', avgKml: '8.8', refillL: '410', refillFreq: '3', speed: '92' },
-  { key: 7, activePerDay: '5.5', idleTotal: '22.0', idlePerDay: '2.2', util: '55%', avgLitres: '8.2', avgKml: '11.5', refillL: '250', refillFreq: '1', speed: '80' },
-  { key: 8, activePerDay: '9.5', idleTotal: '60.5', idlePerDay: '6.0', util: '95%', avgLitres: '15.5', avgKml: '7.2', refillL: '580', refillFreq: '4', speed: '105' },
-  { key: 9, activePerDay: '6.8', idleTotal: '32.5', idlePerDay: '3.2', util: '72%', avgLitres: '10.2', avgKml: '9.8', refillL: '350', refillFreq: '2', speed: '86' },
-  { key: 10, activePerDay: '8.2', idleTotal: '45.0', idlePerDay: '4.5', util: '86%', avgLitres: '12.8', avgKml: '8.5', refillL: '460', refillFreq: '3', speed: '94' },
-]);
+const startDate = ref('');
+const endDate = ref('');
+const vehicle = ref('');
+const vehicles = ref([]);
+const apiLimit = ref(100);
+const loading = ref(false);
+const errorMessage = ref(null);
+const rows = ref([]);
+const headerInfo = ref(null);
+const hasSearched = ref(false);
+
+// Pagination
+const page = ref(1);
+const pageSize = ref(100);
+
+const totalCount = computed(() => rows.value.length);
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
+const startIndex = computed(() => (page.value - 1) * pageSize.value);
+
+const pagedRows = computed(() => {
+  return rows.value.slice(startIndex.value, startIndex.value + pageSize.value);
+});
+
+const groupedRows = computed(() => {
+  if (!pagedRows.value.length) return [];
+  const groups = {};
+  pagedRows.value.forEach(row => {
+    if (!groups[row.groupDate]) {
+      groups[row.groupDate] = [];
+    }
+    groups[row.groupDate].push(row);
+  });
+  return Object.keys(groups).map(date => ({
+    date,
+    rows: groups[date]
+  }));
+});
+
+function goPage(n) { page.value = n; }
+function prevPage() { if (page.value > 1) page.value--; }
+function nextPage() { if (page.value < totalPages.value) page.value++; }
+
+onMounted(async () => {
+  // Set default dates (Last 7 Days)
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(start.getDate() - 7); // Go back 7 days
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+
+  startDate.value = toIsoLocal(start);
+  endDate.value = toIsoLocal(end);
+
+  // Fetch vehicles
+  try {
+    const { data } = await axios.get('/web/reports/device-options');
+    vehicles.value = data.options || [];
+  } catch (e) {
+    console.error('Failed to load vehicles', e);
+  }
+
+  // Auto search on load
+  handleSearch();
+});
+
+function toIsoLocal(d) {
+  const pad = (n) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+async function handleSearch() {
+  loading.value = true;
+  hasSearched.value = true;
+  errorMessage.value = null;
+  rows.value = [];
+  headerInfo.value = null;
+
+  const deviceIds = vehicle.value ? [vehicle.value] : [];
+
+  try {
+    const { data } = await axios.get('/web/reports/asset-activity', {
+      params: {
+        from_date: startDate.value,
+        to_date: endDate.value,
+        device_ids: deviceIds,
+        limit: apiLimit.value
+      }
+    });
+
+    if (data.rows) {
+      rows.value = data.rows;
+      headerInfo.value = data.header;
+    }
+  } catch (e) {
+    console.error('Error fetching asset activity', e);
+    errorMessage.value = e.response?.data?.message || 'Failed to load report data.';
+  } finally {
+    loading.value = false;
+  }
+}
 </script>
 
 <style scoped>
-thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; }
-tbody tr td { font-size: 13px; }
+thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; font-weight: 500; font-size: 0.85rem; }
+tbody tr td { font-size: 13px; vertical-align: middle; }
 .panel .card-body { padding-top: 1rem; padding-bottom: 1rem; }
 .card-header h6 { font-weight: 600; }
-.table-striped tbody tr:nth-of-type(odd) { --bs-table-accent-bg: #f8f9fb; }
 </style>

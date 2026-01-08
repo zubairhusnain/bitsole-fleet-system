@@ -1677,7 +1677,7 @@ const totalHoursDisplay = computed(() => {
     return `${h} h ${m} m`;
 });
 const fuelAverage = computed(() => pickAttr(['fuelAverage']));
-const maxSpeed = computed(() => pickAttr(['maxSpeed']));
+const maxSpeed = computed(() => pickAttr(['speedLimit']));
 const speedLimit = computed(() => pickAttr(['speedLimit']));
 function devicePickAttr(keys) {
     const fromDetail = deviceAttrsFromDetail.value || {};
@@ -1837,7 +1837,7 @@ const batteryDisplay = computed(() => {
             return `${Math.round(n)} %`;
         }
         return hasPercentUnit(s) ? s : `${s} %`;
-    } 
+    }
     const bv = a.battery;
     if (bv !== undefined && bv !== null && bv !== '') {
         const s = String(bv).trim();

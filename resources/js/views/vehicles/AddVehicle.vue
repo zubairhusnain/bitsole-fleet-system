@@ -99,7 +99,7 @@
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Max Speed</label>
-              <input v-model="form.attributes.maxSpeed" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="e.g. 120" />
+              <input v-model="form.speedLimit" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="e.g. 120" />
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Fuel Tank Capacity (Liters)</label>
@@ -156,6 +156,7 @@ const form = reactive({
   uniqueId: '', /** vehicleId **/
   name: '',
   model: '',
+  speedLimit: '',
   attributes: {
     vehicleNo: '',
     type: '',
@@ -166,7 +167,6 @@ const form = reactive({
 
     fuelAverage: '',
     fuelType: '',
-    maxSpeed: '',
     trackerModel: '',
     fuelTankCapacity: ''
   },
@@ -242,9 +242,9 @@ async function submit() {
     return;
   }
 
-  // Validate numeric fields: maxSpeed
-  if (form.attributes.maxSpeed !== '' && form.attributes.maxSpeed !== null) {
-    const msStr = String(form.attributes.maxSpeed);
+  // Validate numeric fields: max speed
+  if (form.speedLimit !== '' && form.speedLimit !== null) {
+    const msStr = String(form.speedLimit);
     if (!/^\d+$/.test(msStr)) {
       error.value = 'Max Speed must be numeric and >= 0';
       return;
@@ -279,6 +279,7 @@ async function submit() {
     {
       const attrs = { ...form.attributes };
       if (attrs.fuelType && !attrs.fuel_type) attrs.fuel_type = attrs.fuelType;
+      attrs.speedLimit = form.speedLimit ?? '';
       fd.append('attributes', JSON.stringify(attrs));
     }
     blobs.value.forEach((file, i) => { if (file) fd.append(`images[${i}]`, file); });

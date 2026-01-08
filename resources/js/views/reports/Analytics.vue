@@ -8,16 +8,19 @@
       </ol>
     </div>
     <h4 class="mb-3">Analytics Overview</h4>
-
     <div class="card panel border rounded-3 shadow-0 mb-3">
-      <div class="card-header"><h6 class="mb-0">Search Option</h6></div>
+      <div class="card-header"><h6 class="mb-0">Search Option </h6></div>
       <div class="card-body">
         <div class="row g-3 align-items-end">
-          <div class="col-12 col-md-4">
-            <label class="form-label small">Duration</label>
-            <input type="text" class="form-control" placeholder="dd/mm/yyyy - dd/mm/yyyy" />
+          <div class="col-12 col-md-3">
+            <label class="form-label small">Start Date</label>
+            <input type="datetime-local" class="form-control" v-model="startDate" />
           </div>
-          <div class="col-12 col-md-4">
+          <div class="col-12 col-md-3">
+            <label class="form-label small">End Date</label>
+            <input type="datetime-local" class="form-control" v-model="endDate" />
+          </div>
+          <div class="col-12 col-md-3">
             <label class="form-label small">Vehicle Group</label>
             <select class="form-select">
               <option>-- Select Group --</option>
@@ -26,7 +29,7 @@
               <option>Group B</option>
             </select>
           </div>
-          <div class="col-12 col-md-4 text-md-end">
+          <div class="col-12 col-md-3 text-md-end">
             <button class="btn btn-app-dark w-100">Submit</button>
           </div>
         </div>
@@ -83,6 +86,10 @@
 </template>
 
 <script setup>
+import { ref } from 'vue';
+
+const startDate = ref('');
+const endDate = ref('');
 // Analytics logic here
 </script>
 

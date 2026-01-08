@@ -93,7 +93,7 @@ const routes = [
   { path: '/reports/idling', name: 'reports-idling', component: ReportsIdling, meta: { requiresAuth: true, title: 'Idling Report', moduleKey: 'reports', action: 'read' } },
   { path: '/reports/utilisation', name: 'reports-utilisation', component: ReportsUtilisation, meta: { requiresAuth: true, title: 'Utilisation Report', moduleKey: 'reports', action: 'read' } },
   { path: '/reports/incident-analysis', name: 'reports-incident-analysis', component: ReportsIncidentAnalysis, meta: { requiresAuth: true, title: 'Incident Analysis Report', moduleKey: 'reports', action: 'read' } },
-  { path: '/reports/incident/new', name: 'reports-incident-new', component: ReportsIncidentNew, meta: { requiresAuth: true, title: 'Create New Incident Report', moduleKey: 'reports', action: 'read' } },
+  { path: '/reports/incident/new', name: 'reports-incident-new', component: ReportsIncidentNew, meta: { requiresAuth: true, title: 'Create New Incident Report', moduleKey: 'reports', action: 'create' } },
   { path: '/reports/vehicle-ranking', name: 'reports-vehicle-ranking', component: ReportsVehicleRanking, meta: { requiresAuth: true, title: 'Vehicle Ranking Report', moduleKey: 'reports', action: 'read' } },
   { path: '/alerts', name: 'alerts', component: Alerts, meta: { requiresAuth: true, title: 'Alerts & Notifications' } },
   { path: '/fuel', name: 'fuel', component: Fuel, meta: { requiresAuth: true, title: 'Fuel Management', moduleKey: 'fuel', action: 'read' } },

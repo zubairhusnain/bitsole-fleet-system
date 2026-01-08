@@ -105,7 +105,7 @@
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Max Speed</label>
-              <input v-model="form.attributes.maxSpeed" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="e.g. 120" />
+              <input v-model="form.speedLimit" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="e.g. 120" />
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Fuel Tank Capacity (Liters)</label>
@@ -164,6 +164,7 @@ const form = reactive({
   name: '',
   uniqueId: '',
   model: '',
+  speedLimit: '',
   attributes: {
     vehicleNo: '',
     type: '',
@@ -174,7 +175,6 @@ const form = reactive({
 
     fuelAverage: '',
     fuelType: '',
-    maxSpeed: '',
     trackerModel: ''
   }
 });
@@ -277,7 +277,7 @@ function hydrateFormFromTc(tc) {
   form.attributes.fuelType = (
     attrs.fuelType || attrs.fuel_type || attrs.FuelType || attrs.fueltype || ''
   );
-  form.attributes.maxSpeed = attrs.maxSpeed || attrs.speedLimit || '';
+  form.speedLimit = attrs.speedLimit || '';
   form.attributes.trackerModel = attrs.trackerModel || attrs.deviceModel || attrs.gpsModel || attrs.teltonikaModel || tc.model || '';
   form.attributes.fuelTankCapacity = attrs.fuelTankCapacity || attrs.FuelTankCapacity || attrs.fueltankcapacity || '';
 
@@ -314,9 +314,9 @@ async function submit() {
   message.value = '';
   error.value = '';
 
-  // Validate numeric fields: maxSpeed
-  if (form.attributes.maxSpeed !== '' && form.attributes.maxSpeed !== null) {
-    const msStr = String(form.attributes.maxSpeed);
+  // Validate numeric fields: max speed
+  if (form.speedLimit !== '' && form.speedLimit !== null) {
+    const msStr = String(form.speedLimit);
     if (!/^\d+$/.test(msStr)) {
       error.value = 'Max Speed must be numeric and >= 0';
       return;
@@ -351,6 +351,7 @@ async function submit() {
     if (attrsOut.fuelType && !attrsOut.fuel_type) attrsOut.fuel_type = attrsOut.fuelType;
     const keptPhotos = existingPhotos.value.filter(Boolean);
     attrsOut.photos = keptPhotos;
+    attrsOut.speedLimit = form.speedLimit ?? '';
     fd.append('attributes', JSON.stringify(attrsOut));
     blobs.value.forEach((file, i) => { if (file) fd.append(`images[${i}]`, file); });
     // Use POST with method override to ensure Laravel parses multipart fields/files

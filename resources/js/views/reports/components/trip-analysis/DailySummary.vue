@@ -1,47 +1,7 @@
 <template>
   <div>
-    <ReportSummary />
-    <ChartAndKPIs />
-    <div class="card border rounded-3 shadow-0">
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-sm align-middle mb-0 table-striped">
-            <thead class="table-dark">
-              <tr>
-                <th class="ps-3">Date</th>
-                <th class="text-end">Travelled Distance</th>
-                <th class="text-end">Trip Duration</th>
-                <th class="text-end">Idle Duration</th>
-                <th class="text-end pe-3">Idle Percentage</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="r in rowsDailySummary" :key="r.key">
-                <td class="ps-3">{{ r.date }}</td>
-                <td class="text-end">{{ r.distance }}</td>
-                <td class="text-end">{{ r.trip }}</td>
-                <td class="text-end">{{ r.idle }}</td>
-                <td class="text-end pe-3">{{ r.idlePct }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="d-flex justify-content-between align-items-center p-2 small text-muted">
-          <div>Showing 1 to 18 of 1079 results</div>
-          <nav>
-            <ul class="pagination pagination-sm mb-0">
-              <li class="page-item disabled"><span class="page-link">&lt;</span></li>
-              <li class="page-item active"><span class="page-link">1</span></li>
-              <li class="page-item"><span class="page-link">2</span></li>
-              <li class="page-item"><span class="page-link">3</span></li>
-              <li class="page-item"><span class="page-link">4</span></li>
-              <li class="page-item"><span class="page-link">5</span></li>
-              <li class="page-item"><span class="page-link">&gt;</span></li>
-            </ul>
-          </nav>
-        </div>
-      </div>
-    </div>
+    <ReportSummary :summary="summary" :vehicle="vehicle" :dateRange="{start: startDate, end: endDate}" viewType="Summary" />
+    <ChartAndKPIs :summary="summary" :precomputedChartData="chartData" :startDate="startDate" :endDate="endDate" />
   </div>
 </template>
 
@@ -53,7 +13,21 @@ defineProps({
   rowsDailySummary: {
     type: Array,
     required: true
-  }
+  },
+  summary: {
+    type: Object,
+    default: () => ({})
+  },
+  chartData: {
+    type: Array,
+    default: () => []
+  },
+  vehicle: {
+    type: Object,
+    default: () => null
+  },
+  startDate: String,
+  endDate: String
 });
 </script>
 

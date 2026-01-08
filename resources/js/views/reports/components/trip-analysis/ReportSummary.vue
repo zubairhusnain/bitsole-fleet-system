@@ -4,30 +4,66 @@
     <div class="card-body pt-0">
       <div class="row g-3">
         <div class="col-12 col-md-3">
-          <div class="small text-muted">Vehicle ID</div>
-          <div class="fw-semibold">VGPS2563</div>
+          <div class="small text-muted">Vehicle Name</div>
+          <div class="fw-semibold">{{ vehicle?.name || '-' }}</div>
         </div>
         <div class="col-12 col-md-3">
           <div class="small text-muted">Device ID</div>
-          <div class="fw-semibold">#34939829</div>
+          <div class="fw-semibold">{{ vehicle?.uniqueId || vehicle?.device_id || '-' }}</div>
         </div>
         <div class="col-12 col-md-3">
           <div class="small text-muted">Duration</div>
-          <div class="fw-semibold">2025-08-26 00:00 - 2025-08-31 23:59</div>
+          <div class="fw-semibold">{{ formatTime(dateRange?.start) }} - {{ formatTime(dateRange?.end) }}</div>
         </div>
         <div class="col-12 col-md-3">
           <div class="small text-muted">View Type</div>
-          <div class="fw-semibold">Summary</div>
+          <div class="fw-semibold">{{ viewType }}</div>
         </div>
         <div class="col-12">
           <div class="small text-muted">Remarks</div>
-          <div class="fw-semibold">Average fuel consumption calculated up to 6 months of data. Fuel refill amount shown for duration selected. Fuel refill amount does not imply fuel consumed in the same duration selected.</div>
+          <div class="fw-semibold">{{ remarksText }}</div>
         </div>
       </div>
     </div>
   </div>
 </template>
-
+ 
 <script setup>
-// Props could be added here if we want to make it dynamic later
+import { computed } from 'vue';
+
+const props = defineProps({
+  summary: Object,
+  vehicle: Object,
+  dateRange: Object,
+  viewType: {
+    type: String,
+    default: 'Daily Breakdown'
+  }
+});
+
+const remarksText = computed(() => {
+  switch (props.viewType) {
+    case 'Daily Breakdown':
+    case 'Daily Breakdown (with map)':
+      return 'Summary data (Total Distance, Duration, Idle) is calculated by aggregating all individual trips and stops for the selected vehicle within the date range.';
+    case 'Summary':
+    case 'Daily Summary':
+      return 'Summary data is derived by summing daily totals for the selected vehicle. Each day\'s values are pre-aggregated from that day\'s trips and stops.';
+    case 'Daily Summary List':
+      return 'Summary data represents the grand total of all daily records shown in the list. It aggregates performance metrics across all listed vehicles and days.';
+    case 'Monthly Summary':
+      return 'Summary data is derived by summing monthly totals for the selected vehicle. Each month\'s values are pre-aggregated from all daily activities within that month.';
+    case 'Monthly Summary List':
+      return 'Summary data represents the grand total of all monthly records shown in the list. It aggregates performance metrics across all listed vehicles and months.';
+    case 'Trip Summary':
+      return 'Summary data is calculated by summing the specific metrics (Distance, Duration) of every individual trip log displayed in the report table below.';
+    default:
+      return 'Average fuel consumption calculated up to 6 months of data. Fuel refill amount shown for duration selected. Fuel refill amount does not imply fuel consumed in the same duration selected.';
+  }
+});
+
+const formatTime = (t) => {
+  if (!t) return '';
+  return t.replace('T', ' ');
+};
 </script>

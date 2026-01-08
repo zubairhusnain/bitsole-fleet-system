@@ -114,24 +114,19 @@ class VehicleController extends Controller
         }
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
-            'type','manufacturer','color','registration','plate','odometer','fuelAverage','maxSpeed','speedLimit','photos','fuelTankCapacity','trackerModel',
-            'fuelType','fuel_type','vehicleNo'
+            'type','manufacturer','color','registration','plate','odometer','fuelAverage','photos','fuelTankCapacity','trackerModel',
+            'fuelType','fuel_type','vehicleNo','speedLimit'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
         // Validate numeric attributes
-        if (array_key_exists('maxSpeed', $attributes) && $attributes['maxSpeed'] !== null && $attributes['maxSpeed'] !== '') {
-            $msStr = (string) $attributes['maxSpeed'];
-            if (!preg_match('/^\d+$/', $msStr)) {
-                return response()->json(['message' => 'Max Speed must be numeric and >= 0'], 422);
-            }
-        }
         if (array_key_exists('speedLimit', $attributes) && $attributes['speedLimit'] !== null && $attributes['speedLimit'] !== '') {
             $slStr = (string) $attributes['speedLimit'];
             if (!preg_match('/^\d+$/', $slStr)) {
                 return response()->json(['message' => 'Speed Limit must be numeric and >= 0'], 422);
             }
         }
+
         if (array_key_exists('fuelTankCapacity', $attributes) && $attributes['fuelTankCapacity'] !== null && $attributes['fuelTankCapacity'] !== '') {
             $capStr = (string) $attributes['fuelTankCapacity'];
             if (!preg_match('/^\d+(?:\.\d+)?$/', $capStr)) {
@@ -277,24 +272,19 @@ class VehicleController extends Controller
         }
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
-            'type','manufacturer','color','registration','plate','odometer','fuelAverage','maxSpeed','speedLimit','photos','fuelTankCapacity','trackerModel',
-            'fuelType','fuel_type','vehicleNo'
+            'type','manufacturer','color','registration','plate','odometer','fuelAverage','photos','fuelTankCapacity','trackerModel',
+            'fuelType','fuel_type','vehicleNo','speedLimit'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
         // Validate numeric attributes
-        if (array_key_exists('maxSpeed', $attributes) && $attributes['maxSpeed'] !== null && $attributes['maxSpeed'] !== '') {
-            $msStr = (string) $attributes['maxSpeed'];
-            if (!preg_match('/^\d+$/', $msStr)) {
-                return response()->json(['message' => 'Max Speed must be numeric and >= 0'], 422);
-            }
-        }
         if (array_key_exists('speedLimit', $attributes) && $attributes['speedLimit'] !== null && $attributes['speedLimit'] !== '') {
             $slStr = (string) $attributes['speedLimit'];
             if (!preg_match('/^\d+$/', $slStr)) {
                 return response()->json(['message' => 'Speed Limit must be numeric and >= 0'], 422);
             }
         }
+
         if (array_key_exists('fuelTankCapacity', $attributes) && $attributes['fuelTankCapacity'] !== null && $attributes['fuelTankCapacity'] !== '') {
             $capStr = (string) $attributes['fuelTankCapacity'];
             if (!preg_match('/^\d+(?:\.\d+)?$/', $capStr)) {
@@ -366,6 +356,7 @@ class VehicleController extends Controller
         ]);
 
         $tracking = app(\App\Services\DeviceService::class)->deviceUpdate($request);
+
         if (!isset($tracking->responseCode) || $tracking->responseCode < 200 || $tracking->responseCode >= 300) {
             return response()->json([
                 'message' => 'Failed to update device on tracking server',

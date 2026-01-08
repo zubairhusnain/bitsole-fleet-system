@@ -793,7 +793,7 @@ class DeviceService
         // Build sanitized payload with only supported Traccar fields
         $allowed = [
             'id', 'name', 'uniqueId', 'phone', 'model', 'category',
-            'groupId', 'calendarId', 'contact', 'disabled', 'expirationTime', 'attributes'
+            'groupId', 'calendarId', 'contact', 'disabled', 'expirationTime', 'speedLimit', 'attributes'
         ];
 
         $input = $request->all();
@@ -837,7 +837,7 @@ class DeviceService
         }
 
         // Whitelist supported fields
-        $allowed = ['id','name','uniqueId','phone','model','category','groupId','calendarId','contact','disabled','expirationTime','attributes'];
+        $allowed = ['id','name','uniqueId','phone','model','category','groupId','calendarId','contact','disabled','expirationTime','speedLimit','attributes'];
         $data = [];
         foreach ($allowed as $key) {
             if (array_key_exists($key, $input)) {

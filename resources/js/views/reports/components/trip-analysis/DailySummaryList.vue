@@ -22,23 +22,12 @@
               <td class="text-end">{{ r.idle }}</td>
               <td class="text-end pe-3">{{ r.idlePct }}</td>
             </tr>
-          </tbody>
+          </tbody> 
         </table>
-      </div>
-    </div>
+      </div> 
+    </div>  
     <div class="card-footer d-flex align-items-center py-2 bg-white border-top">
-      <div class="text-muted small me-auto">Showing 1 to 16 of 1079 results</div>
-      <nav aria-label="Pagination" class="ms-auto">
-        <ul class="pagination pagination-sm mb-0 pagination-app">
-          <li class="page-item disabled"><button class="page-link"><i class="bi bi-chevron-left"></i></button></li>
-          <li class="page-item active"><button class="page-link">1</button></li>
-          <li class="page-item"><button class="page-link">2</button></li>
-          <li class="page-item"><button class="page-link">3</button></li>
-          <li class="page-item"><button class="page-link">4</button></li>
-          <li class="page-item"><button class="page-link">5</button></li>
-          <li class="page-item"><button class="page-link"><i class="bi bi-chevron-right"></i></button></li>
-        </ul>
-      </nav>
+      <div class="text-muted small me-auto">Showing {{ rowsDailyVehicleList.length }} results</div>
     </div>
   </div>
 </template>
