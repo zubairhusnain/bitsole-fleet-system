@@ -277,7 +277,7 @@ function hydrateFormFromTc(tc) {
   form.attributes.fuelType = (
     attrs.fuelType || attrs.fuel_type || attrs.FuelType || attrs.fueltype || ''
   );
-  form.speedLimit = attrs.maxSpeed || attrs.speedLimit || '';
+  form.speedLimit = attrs.speedLimit || '';
   form.attributes.trackerModel = attrs.trackerModel || attrs.deviceModel || attrs.gpsModel || attrs.teltonikaModel || tc.model || '';
   form.attributes.fuelTankCapacity = attrs.fuelTankCapacity || attrs.FuelTankCapacity || attrs.fueltankcapacity || '';
 

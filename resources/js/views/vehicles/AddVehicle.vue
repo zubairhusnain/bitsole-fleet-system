@@ -279,11 +279,7 @@ async function submit() {
     {
       const attrs = { ...form.attributes };
       if (attrs.fuelType && !attrs.fuel_type) attrs.fuel_type = attrs.fuelType;
-      if (form.speedLimit !== '' && form.speedLimit !== null) {
-        attrs.maxSpeed = form.speedLimit;
-      } else {
-        attrs.maxSpeed = '';
-      }
+      // Removed maxSpeed assignment
       fd.append('attributes', JSON.stringify(attrs));
     }
     fd.append('speedLimit', form.speedLimit ?? '');
