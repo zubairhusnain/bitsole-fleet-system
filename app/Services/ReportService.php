@@ -1154,6 +1154,7 @@ class ReportService
         // Summary
         $totalDistance = collect($allTrips)->sum('distance');
         $totalDuration = collect($allTrips)->sum('duration');
+        $totalIdle = collect($allStops)->sum('duration');
         $maxSpeed = collect($allTrips)->max('maxSpeed') ?? 0;
         if ($maxSpeed > 162) $maxSpeed = 0; // Sanity check
 
@@ -1164,10 +1165,12 @@ class ReportService
             'rows' => $rows,
             'stops' => $stopsFormatted,
             'summary' => [
-                 'totalDistance' => round($totalDistance / 1000, 2) . ' KM',
-                 'totalDuration' => $this->formatDurationHms($totalDuration),
-                 'maxSpeed' => round($maxSpeed * 1.852, 1) . ' km/h',
-                 'spentFuel' => round($totalFuel, 2) . ' L'
+                 'totalDistance' => $totalDistance,
+                 'totalDuration' => $totalDuration,
+                 'totalIdle' => $totalIdle,
+                 'totalFuel' => $totalFuel,
+                 'avgKmL' => 0,
+                 'maxSpeed' => $maxSpeed * 1.852,
             ]
         ];
     }
@@ -1285,15 +1288,12 @@ class ReportService
     public function fetchDailySummary($request, $deviceIds)
     {
         try {
-            $fromStr = $request->from_date;
-            $toStr = $request->to_date;
-            $fromIso = date('Y-m-d H:i:s', strtotime($fromStr . ' 00:00:00'));
-            $toIso = date('Y-m-d H:i:s', strtotime($toStr . ' 23:59:59'));
+            $fromIso = \Carbon\Carbon::parse($request->from_date)->startOfDay()->format('Y-m-d H:i:s');
+            $toIso = \Carbon\Carbon::parse($request->to_date)->endOfDay()->format('Y-m-d H:i:s');
 
-            $idsStr = implode(',', array_map('intval', $deviceIds));
-            if (empty($idsStr)) {
+            if (empty($deviceIds)) {
                 return [
-                    'rows' => collect()->values(),
+                    'rows' => [],
                     'summary' => [
                         'totalDistance' => 0,
                         'totalDuration' => 0,
@@ -1301,92 +1301,145 @@ class ReportService
                         'totalFuel' => 0,
                         'avgKmL' => 0
                     ],
-                    'chart' => collect()->values()
+                    'chart' => []
                 ];
             }
 
-            $rowsRaw = DB::connection('pgsql')->select("
-                WITH day_stats AS (
-                    SELECT
-                        deviceid,
-                        DATE(fixtime) AS day,
-                        MIN(fixtime) AS start_time,
-                        MAX(fixtime) AS end_time
-                    FROM tc_positions
-                    WHERE deviceid IN ($idsStr)
-                      AND fixtime BETWEEN ? AND ?
-                    GROUP BY deviceid, DATE(fixtime)
-                )
-                SELECT
-                    ds.deviceid,
-                    ds.day,
-                    sp.attributes AS start_attrs,
-                    ep.attributes AS end_attrs
-                FROM day_stats ds
-                LEFT JOIN tc_positions sp ON sp.deviceid = ds.deviceid AND sp.fixtime = ds.start_time
-                LEFT JOIN tc_positions ep ON ep.deviceid = ds.deviceid AND ep.fixtime = ds.end_time
-                ORDER BY ds.day ASC, ds.deviceid ASC
-            ", [$fromIso, $toIso]);
-
             $tcDevices = \App\Models\TcDevice::whereIn('id', $deviceIds)->get()->keyBy('id');
+            $dailyStats = [];
 
-            $rows = collect($rowsRaw)->map(function ($r) use ($tcDevices) {
-                $startAttrs = $r->start_attrs ? json_decode($r->start_attrs, true) : [];
-                $endAttrs = $r->end_attrs ? json_decode($r->end_attrs, true) : [];
+            foreach ($deviceIds as $deviceId) {
+                $trips = $this->fetchTripsDb($deviceId, $fromIso, $toIso);
 
-                $distanceM = max(0, ($endAttrs['totalDistance'] ?? 0) - ($startAttrs['totalDistance'] ?? 0));
-                $durationMs = max(0, ($endAttrs['hours'] ?? 0) - ($startAttrs['hours'] ?? 0));
+                foreach ($trips as $trip) {
+                    $day = date('Y-m-d', strtotime($trip['startTime']));
+                    $key = $deviceId . '|' . $day;
+
+                    if (!isset($dailyStats[$key])) {
+                        $dailyStats[$key] = [
+                            'deviceid' => $deviceId,
+                            'day' => $day,
+                            'distance_m' => 0,
+                            'trip_ms' => 0,
+                            'idle_ms' => 0,
+                            'trips' => []
+                        ];
+                    }
+
+                    $dailyStats[$key]['distance_m'] += $trip['distance'];
+                    $dailyStats[$key]['trip_ms'] += $trip['duration'];
+                    $dailyStats[$key]['trips'][] = $trip;
+                }
+            }
+
+            // Calculate idle time
+            foreach ($dailyStats as $key => &$stat) {
+                usort($stat['trips'], fn($a, $b) => strcmp($a['startTime'], $b['startTime']));
+                $trips = $stat['trips'];
                 $idleMs = 0;
+                for ($i = 0; $i < count($trips) - 1; $i++) {
+                    $stopStart = strtotime($trips[$i]['endTime']);
+                    $stopEnd = strtotime($trips[$i+1]['startTime']);
+                    $gap = ($stopEnd - $stopStart) * 1000;
+                    if ($gap > 180000) { // > 3 mins in ms
+                        $idleMs += $gap;
+                    }
+                }
+                $stat['idle_ms'] = $idleMs;
+                unset($stat['trips']);
+            }
 
-                $durH = floor($durationMs / 3600000);
-                $durM = floor(($durationMs % 3600000) / 60000);
-                $durS = floor((($durationMs % 3600000) % 60000) / 1000);
+            $groupBy = (string)($request->group_by ?? '');
+            $rows = collect($dailyStats)->values();
 
-                $idleH = floor($idleMs / 3600000);
-                $idleM = floor(($idleMs % 3600000) / 60000);
-                $idleS = floor((($idleMs % 3600000) % 60000) / 1000);
+            if ($groupBy === 'vehicle') {
+                $rows = $rows->groupBy('deviceid')->map(function ($group) use ($tcDevices) {
+                    $first = $group->first();
+                    $deviceId = $first['deviceid'];
+                    $dev = $tcDevices->get($deviceId);
+                    $vehicleName = $dev ? ($dev->name ?? 'Unknown') : 'Unknown';
 
-                $totalTime = $durationMs + $idleMs;
-                $pct = $totalTime > 0 ? round(($idleMs / $totalTime) * 100, 1) : 0;
+                    return [
+                        'key' => $deviceId,
+                        'vehicleId' => $deviceId,
+                        'vehicle' => $vehicleName,
+                        'distance_m' => $group->sum('distance_m'),
+                        'trip_ms' => $group->sum('trip_ms'),
+                        'idle_ms' => $group->sum('idle_ms'),
+                    ];
+                });
+            } elseif ($groupBy === 'date') {
+                 $rows = $rows->groupBy('day')->map(function ($group) {
+                    $first = $group->first();
+                    $day = $first['day'];
+                    return [
+                        'key' => $day,
+                        'date' => date('d/m/Y', strtotime($day)),
+                        'dateRaw' => $day,
+                        'distance_m' => $group->sum('distance_m'),
+                        'trip_ms' => $group->sum('trip_ms'),
+                        'idle_ms' => $group->sum('idle_ms'),
+                    ];
+                 });
+            } else {
+                 $rows = $rows->map(function ($r) use ($tcDevices) {
+                    $deviceId = $r['deviceid'];
+                    $dev = $tcDevices->get($deviceId);
+                    $vehicleName = $dev ? ($dev->name ?? 'Unknown') : 'Unknown';
+                    $day = $r['day'];
 
-                $deviceId = $r->deviceid;
-                $dev = $tcDevices->get($deviceId);
-                $vehicleName = $dev ? ($dev->name ?? 'Unknown') : 'Unknown';
+                    return [
+                        'key' => $deviceId . '_' . $day,
+                        'date' => date('d/m/Y', strtotime($day)),
+                        'dateRaw' => $day,
+                        'vehicleId' => $deviceId,
+                        'vehicle' => $vehicleName,
+                        'distance_m' => $r['distance_m'],
+                        'trip_ms' => $r['trip_ms'],
+                        'idle_ms' => $r['idle_ms'],
+                    ];
+                 });
+            }
 
-                $dateRaw = $r->day;
-                $dateFmt = date('d/m/Y', strtotime($dateRaw));
+            // Formatting
+            $rows = $rows->map(function ($r) {
+                 $distKm = round($r['distance_m'] / 1000, 2);
 
-                return [
-                    'key' => $deviceId . '_' . $dateRaw,
-                    'date' => $dateFmt,
-                    'dateRaw' => $dateRaw,
-                    'vehicleId' => $deviceId,
-                    'vehicle' => $vehicleName,
-                    'distance' => round($distanceM / 1000, 2) . ' KM',
-                    'distance_m' => $distanceM,
-                    'trip' => sprintf('%dh %dm %ds', $durH, $durM, $durS),
-                    'trip_ms' => $durationMs,
-                    'idle' => sprintf('%dh %dm %ds', $idleH, $idleM, $idleS),
-                    'idle_ms' => $idleMs,
-                    'idlePct' => $pct . '%'
-                ];
-            });
+                 $tripMs = $r['trip_ms'];
+                 $durH = floor($tripMs / 3600000);
+                 $durM = floor(($tripMs % 3600000) / 60000);
+                 $durS = floor(($tripMs % 60000) / 1000);
+
+                 $idleMs = $r['idle_ms'];
+                 $idleH = floor($idleMs / 3600000);
+                 $idleM = floor(($idleMs % 3600000) / 60000);
+                 $idleS = floor(($idleMs % 60000) / 1000);
+
+                 $totalTime = $tripMs + $idleMs;
+                 $pct = ($totalTime > 0) ? round(($idleMs / $totalTime) * 100, 1) : 0;
+
+                 $r['distance'] = $distKm . ' KM';
+                 $r['trip'] = sprintf('%dh %dm %ds', $durH, $durM, $durS);
+                 $r['idle'] = sprintf('%dh %dm %ds', $idleH, $idleM, $idleS);
+                 $r['idlePct'] = $pct . '%';
+                 return $r;
+            })->values();
 
             $totalDistance = $rows->sum('distance_m');
             $totalDuration = $rows->sum('trip_ms');
             $totalIdle = $rows->sum('idle_ms');
 
-            $chartData = $rows->map(function($r) {
-                return [
-                    'date' => $r['dateRaw'],
-                    'distance' => $r['distance_m'],
-                    'tripDuration' => $r['trip_ms'],
-                    'idleDuration' => $r['idle_ms']
-                ];
-            });
+             $chartData = $rows->groupBy('dateRaw')->map(function ($group, $date) {
+                 return [
+                    'date' => $date,
+                    'distance' => $group->sum('distance_m'),
+                    'tripDuration' => $group->sum('trip_ms'),
+                    'idleDuration' => $group->sum('idle_ms')
+                 ];
+             })->values()->sortBy('date');
 
             return [
-                'rows' => $rows->values(),
+                'rows' => $rows,
                 'summary' => [
                     'totalDistance' => $totalDistance,
                     'totalDuration' => $totalDuration,
@@ -1399,7 +1452,7 @@ class ReportService
         } catch (\Throwable $e) {
             Log::error('fetchDailySummaryDb failed', ['error' => $e->getMessage()]);
             return [
-                'rows' => collect()->values(),
+                'rows' => [],
                 'summary' => [
                     'totalDistance' => 0,
                     'totalDuration' => 0,
@@ -1407,7 +1460,7 @@ class ReportService
                     'totalFuel' => 0,
                     'avgKmL' => 0
                 ],
-                'chart' => collect()->values()
+                'chart' => []
             ];
         }
     }
@@ -1419,136 +1472,184 @@ class ReportService
 
     public function fetchMonthlySummary($request, $deviceIds)
     {
-        $sessionId = $request->user()->traccarSession ?? session('cookie');
-        $from = date('Y-m-d\TH:i:00\Z', strtotime($request->from_date));
-
-        $toStr = $request->to_date;
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $toStr)) {
-            $toStr .= ' 23:59:59';
-        }
-        $to = date('Y-m-d\TH:i:00\Z', strtotime($toStr));
-
-        $deviceQuery = collect($deviceIds)->map(function($id) {
-            return "deviceId={$id}";
-        })->implode('&');
-        $fullQuery = "{$deviceQuery}&from={$from}&to={$to}";
-
-        $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
-        if (empty($baseUrl)) {
-             Log::error('ReportService: Traccar Host URL is not configured.');
-             return [];
-        }
-
-        $headers = [
-            'Cookie' => $sessionId,
-            'Accept' => 'application/json',
-            'Content-Type' => 'application/json'
-        ];
-
         try {
-            $responses = Http::pool(fn (Pool $pool) => [
-                $pool->as('trips')->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
-                $pool->as('stops')->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
-            ]);
-        } catch (\Exception $e) {
-            Log::error('fetchMonthlySummary exception', ['error' => $e->getMessage()]);
-            return [];
-        }
+            $fromIso = \Carbon\Carbon::parse($request->from_date)->startOfDay()->format('Y-m-d H:i:s');
+            $toIso = \Carbon\Carbon::parse($request->to_date)->endOfDay()->format('Y-m-d H:i:s');
 
-        $allTrips = ($responses['trips']->ok()) ? $responses['trips']->json() : [];
-        $allStops = ($responses['stops']->ok()) ? $responses['stops']->json() : [];
-
-
-        $trips = collect($allTrips);
-        $stops = collect($allStops);
-
-        $groupBy = $request->group_by ?? 'vehicle_month';
-
-        // Group by Month and Device
-        if ($groupBy === 'month') {
-            $grouped = $trips->groupBy(function($item) {
-                 return date('Y-m', strtotime($item['startTime']));
-            });
-        } else {
-            $grouped = $trips->groupBy(function($item) {
-                 return date('Y-m', strtotime($item['startTime'])) . '_' . $item['deviceId'];
-            });
-        }
-
-        $result = $grouped->map(function ($monthTrips, $key) use ($stops, $groupBy) {
-            if ($groupBy === 'month') {
-                $month = $key;
-                $deviceId = null;
-                $monthStops = $stops->filter(function($stop) use ($month) {
-                    return date('Y-m', strtotime($stop['startTime'])) == $month;
-                });
-            } else {
-                list($month, $deviceId) = explode('_', $key);
-                $monthStops = $stops->filter(function($stop) use ($month, $deviceId) {
-                    return $stop['deviceId'] == $deviceId && date('Y-m', strtotime($stop['startTime'])) == $month;
-                });
+            if (empty($deviceIds)) {
+                return [
+                    'rows' => [],
+                    'summary' => [
+                        'totalDistance' => 0,
+                        'totalDuration' => 0,
+                        'totalIdle' => 0,
+                        'totalFuel' => 0,
+                        'avgKmL' => 0
+                    ],
+                    'chart' => []
+                ];
             }
 
-            $distance = $monthTrips->sum('distance');
-            $durationMs = $monthTrips->sum('duration');
-            $idleMs = $monthStops->sum('duration');
+            $tcDevices = \App\Models\TcDevice::whereIn('id', $deviceIds)->get()->keyBy('id');
+            $monthlyStats = [];
 
-            $durH = floor($durationMs / 3600000);
-            $durM = floor(($durationMs % 3600000) / 60000);
+            foreach ($deviceIds as $deviceId) {
+                $trips = $this->fetchTripsDb($deviceId, $fromIso, $toIso);
 
-            $idleH = floor($idleMs / 3600000);
-            $idleM = floor(($idleMs % 3600000) / 60000);
+                foreach ($trips as $trip) {
+                    $month = date('Y-m', strtotime($trip['startTime']));
+                    $key = $deviceId . '|' . $month;
 
-            $totalTime = $durationMs + $idleMs;
-            $pct = $totalTime > 0 ? round(($idleMs / $totalTime) * 100, 1) : 0;
+                    if (!isset($monthlyStats[$key])) {
+                        $monthlyStats[$key] = [
+                            'deviceid' => $deviceId,
+                            'month' => $month,
+                            'distance_m' => 0,
+                            'trip_ms' => 0,
+                            'idle_ms' => 0,
+                            'trips' => []
+                        ];
+                    }
 
-            // Format date 08/2025
-            $dateStr = date('m/Y', strtotime($month));
+                    $monthlyStats[$key]['distance_m'] += $trip['distance'];
+                    $monthlyStats[$key]['trip_ms'] += $trip['duration'];
+                    $monthlyStats[$key]['trips'][] = $trip;
+                }
+            }
+
+            // Calculate idle time
+            foreach ($monthlyStats as $key => &$stat) {
+                usort($stat['trips'], fn($a, $b) => strcmp($a['startTime'], $b['startTime']));
+                $trips = $stat['trips'];
+                $idleMs = 0;
+                for ($i = 0; $i < count($trips) - 1; $i++) {
+                    $stopStart = strtotime($trips[$i]['endTime']);
+                    $stopEnd = strtotime($trips[$i+1]['startTime']);
+                    $gap = ($stopEnd - $stopStart) * 1000;
+                    if ($gap > 180000) { // > 3 mins in ms
+                        $idleMs += $gap;
+                    }
+                }
+                $stat['idle_ms'] = $idleMs;
+                unset($stat['trips']);
+            }
+
+            $groupBy = (string)($request->group_by ?? '');
+            $rows = collect($monthlyStats)->values();
+
+            if ($groupBy === 'vehicle') {
+                $rows = $rows->groupBy('deviceid')->map(function ($group) use ($tcDevices) {
+                    $first = $group->first();
+                    $deviceId = $first['deviceid'];
+                    $dev = $tcDevices->get($deviceId);
+                    $vehicleName = $dev ? ($dev->name ?? 'Unknown') : 'Unknown';
+
+                    return [
+                        'key' => $deviceId,
+                        'vehicleId' => $deviceId,
+                        'vehicle' => $vehicleName,
+                        'distance_m' => $group->sum('distance_m'),
+                        'trip_ms' => $group->sum('trip_ms'),
+                        'idle_ms' => $group->sum('idle_ms'),
+                    ];
+                });
+            } else {
+                 if ($groupBy === 'date') {
+                     $rows = $rows->groupBy('month')->map(function ($group) {
+                        $first = $group->first();
+                        $month = $first['month'];
+                        return [
+                            'key' => $month,
+                            'date' => date('m/Y', strtotime($month . '-01')),
+                            'dateRaw' => $month,
+                            'distance_m' => $group->sum('distance_m'),
+                            'trip_ms' => $group->sum('trip_ms'),
+                            'idle_ms' => $group->sum('idle_ms'),
+                        ];
+                     });
+                 } else {
+                     $rows = $rows->map(function ($r) use ($tcDevices) {
+                        $deviceId = $r['deviceid'];
+                        $dev = $tcDevices->get($deviceId);
+                        $vehicleName = $dev ? ($dev->name ?? 'Unknown') : 'Unknown';
+                        $month = $r['month'];
+
+                        return [
+                            'key' => $deviceId . '_' . $month,
+                            'date' => date('m/Y', strtotime($month . '-01')),
+                            'dateRaw' => $month,
+                            'vehicleId' => $deviceId,
+                            'vehicle' => $vehicleName,
+                            'distance_m' => $r['distance_m'],
+                            'trip_ms' => $r['trip_ms'],
+                            'idle_ms' => $r['idle_ms'],
+                        ];
+                     });
+                 }
+            }
+
+            // Formatting
+            $rows = $rows->map(function ($r) {
+                 $distKm = round($r['distance_m'] / 1000, 2);
+
+                 $tripMs = $r['trip_ms'];
+                 $durH = floor($tripMs / 3600000);
+                 $durM = floor(($tripMs % 3600000) / 60000);
+                 $durS = floor(($tripMs % 60000) / 1000);
+
+                 $idleMs = $r['idle_ms'];
+                 $idleH = floor($idleMs / 3600000);
+                 $idleM = floor(($idleMs % 3600000) / 60000);
+                 $idleS = floor(($idleMs % 60000) / 1000);
+
+                 $totalTime = $tripMs + $idleMs;
+                 $pct = ($totalTime > 0) ? round(($idleMs / $totalTime) * 100, 1) : 0;
+
+                 $r['distance'] = $distKm . ' KM';
+                 $r['trip'] = sprintf('%dh %dm %ds', $durH, $durM, $durS);
+                 $r['idle'] = sprintf('%dh %dm %ds', $idleH, $idleM, $idleS);
+                 $r['idlePct'] = $pct . '%';
+                 return $r;
+            })->values();
+
+            $totalDistance = $rows->sum('distance_m');
+            $totalDuration = $rows->sum('trip_ms');
+            $totalIdle = $rows->sum('idle_ms');
+
+             $chartData = $rows->groupBy('dateRaw')->map(function ($group, $date) {
+                 return [
+                    'date' => $date,
+                    'distance' => $group->sum('distance_m'),
+                    'tripDuration' => $group->sum('trip_ms'),
+                    'idleDuration' => $group->sum('idle_ms')
+                 ];
+             })->values()->sortBy('date');
 
             return [
-                'key' => $key, // Unique key for frontend (YYYY-MM or YYYY-MM_deviceId)
-                'date' => $dateStr,
-                'dateRaw' => $month, // YYYY-MM for sorting
-                'vehicleId' => $deviceId ?? 'All',
-                'vehicle' => $deviceId ? ($monthTrips->first()['deviceName'] ?? 'Unknown') : 'All Vehicles',
-                'distance' => round($distance / 1000, 2) . ' KM',
-                'distance_m' => $distance,
-                'trip' => sprintf('%dd %02dh %02dm', floor($durH/24), $durH%24, $durM),
-                'trip_ms' => $durationMs,
-                'idle' => sprintf('%dh %dm', $idleH, $idleM),
-                'idle_ms' => $idleMs,
-                'idlePct' => $pct . '%'
+                'rows' => $rows,
+                'summary' => [
+                    'totalDistance' => $totalDistance,
+                    'totalDuration' => $totalDuration,
+                    'totalIdle' => $totalIdle,
+                    'totalFuel' => 0,
+                    'avgKmL' => 0
+                ],
+                'chart' => $chartData->values()
             ];
-        });
-
-        $rows = $result->values();
-
-        // Calculate Totals for Summary Widget
-        $totalDistance = $rows->sum('distance_m');
-        $totalDuration = $rows->sum('trip_ms');
-        $totalIdle = $rows->sum('idle_ms');
-
-        // Chart Data
-        $chartData = $rows->map(function($r) {
+        } catch (\Throwable $e) {
+            Log::error('fetchMonthlySummary failed', ['error' => $e->getMessage()]);
             return [
-                'date' => $r['dateRaw'],
-                'distance' => $r['distance_m'],
-                'tripDuration' => $r['trip_ms'],
-                'idleDuration' => $r['idle_ms']
+                'rows' => [],
+                'summary' => [
+                    'totalDistance' => 0,
+                    'totalDuration' => 0,
+                    'totalIdle' => 0,
+                    'totalFuel' => 0,
+                    'avgKmL' => 0
+                ],
+                'chart' => []
             ];
-        });
-
-        return [
-            'rows' => $rows,
-            'summary' => [
-                'totalDistance' => $totalDistance,
-                'totalDuration' => $totalDuration,
-                'totalIdle' => $totalIdle,
-                'totalFuel' => 0,
-                'avgKmL' => 0
-            ],
-            'chart' => $chartData
-        ];
+        }
     }
 
     public function fetchDailyBreakdownMap($request, $deviceIds)

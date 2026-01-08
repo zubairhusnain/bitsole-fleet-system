@@ -142,11 +142,11 @@
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
                     <span class="small fw-semibold text-muted">Average Fuel Consumption (km/litre)</span>
-                    <span class="fw-bold">{{ (summary?.avgKmL || 0) }} Km/l</span>
+                    <span class="fw-bold">{{ toNumber(summary?.avgKmL) }} Km/l</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2">
                     <span class="small fw-semibold text-muted">Total Fuel Usage (litre)</span>
-                    <span class="fw-bold">{{ (summary?.totalFuel || 0).toFixed(1) }} Litre</span>
+                    <span class="fw-bold">{{ toNumber(summary?.totalFuel).toFixed(1) }} Litre</span>
                 </div>
             </div>
           </div>
@@ -180,10 +180,16 @@ const props = defineProps({
   endDate: String
 });
 
+const toNumber = (v) => {
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
 // Helper to format duration
 const formatDuration = (ms) => {
-  if (!ms) return '0s';
-  const sec = Math.floor(ms / 1000);
+  const safeMs = toNumber(ms);
+  if (!safeMs) return '0s';
+  const sec = Math.floor(safeMs / 1000);
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = sec % 60;
@@ -194,28 +200,36 @@ const formatDuration = (ms) => {
 };
 
 const formatDistance = (m) => {
-  if (!m) return '0 KM';
-  return (m / 1000).toFixed(2) + ' KM';
+  const safeM = toNumber(m);
+  if (!safeM) return '0 KM';
+  return (safeM / 1000).toFixed(2) + ' KM';
 };
 
 // Total Time for Progress Bar
-const totalTimeMs = computed(() => (props.summary?.totalDuration || 0) + (props.summary?.totalIdle || 0));
+const totalTimeMs = computed(() => toNumber(props.summary?.totalDuration) + toNumber(props.summary?.totalIdle));
 
 const tripPct = computed(() => {
   if (!totalTimeMs.value) return 0;
-  return (props.summary?.totalDuration / totalTimeMs.value) * 100;
+  return (toNumber(props.summary?.totalDuration) / totalTimeMs.value) * 100;
 });
 
 const idlePct = computed(() => {
   if (!totalTimeMs.value) return 0;
-  return (props.summary?.totalIdle / totalTimeMs.value) * 100;
+  return (toNumber(props.summary?.totalIdle) / totalTimeMs.value) * 100;
 });
 
 // Chart Data Processing
 const chartData = computed(() => {
     // If precomputed data is provided (e.g. from Daily Summary), use it
     if (props.precomputedChartData && props.precomputedChartData.length > 0) {
-        return props.precomputedChartData.sort((a, b) => a.date.localeCompare(b.date));
+        return props.precomputedChartData
+          .map((d) => ({
+            ...d,
+            distance: toNumber(d.distance),
+            tripDuration: toNumber(d.tripDuration),
+            idleDuration: toNumber(d.idleDuration),
+          }))
+          .sort((a, b) => String(a.date).localeCompare(String(b.date)));
     }
 
     const dataMap = {};
@@ -225,8 +239,8 @@ const chartData = computed(() => {
         const d = (t.startTimeIso || '').split('T')[0];
         if (!d) return;
         if (!dataMap[d]) dataMap[d] = { date: d, distance: 0, tripDuration: 0, idleDuration: 0 };
-        dataMap[d].distance += (t.distance_m || 0);
-        dataMap[d].tripDuration += (t.duration_ms || 0);
+        dataMap[d].distance += toNumber(t.distance_m);
+        dataMap[d].tripDuration += toNumber(t.duration_ms);
     });
 
     // Process Stops (Idle)
@@ -234,7 +248,7 @@ const chartData = computed(() => {
         const d = (s.startTimeIso || '').split('T')[0];
         if (!d) return;
         if (!dataMap[d]) dataMap[d] = { date: d, distance: 0, tripDuration: 0, idleDuration: 0 };
-        dataMap[d].idleDuration += (s.duration_ms || 0);
+        dataMap[d].idleDuration += toNumber(s.duration_ms);
     });
 
     return Object.values(dataMap).sort((a, b) => a.date.localeCompare(b.date));
@@ -264,13 +278,13 @@ const getX = (index) => {
 
 const getYDistance = (val) => {
     const height = 40; // 50 - 10
-    const ratio = val / maxDistance.value;
+    const ratio = toNumber(val) / maxDistance.value;
     return 50 - (ratio * height);
 };
 
 const getYDuration = (val) => {
     const height = 40;
-    const ratio = val / maxDuration.value;
+    const ratio = toNumber(val) / maxDuration.value;
     return 50 - (ratio * height);
 };
 
