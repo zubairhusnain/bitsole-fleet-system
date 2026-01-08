@@ -144,8 +144,34 @@ class ReportService
             ];
         });
 
-        // Sort by Points Descending and Add Rank
-        return $rows->sortByDesc('points')->values()->map(function ($row, $index) {
+        // Sorting Logic based on request 'type'
+        $sortBy = 'points';
+        $sortDesc = true;
+
+        if ($request->has('type')) {
+            switch ($request->type) {
+                case 'percentage':
+                    $sortBy = 'percentage';
+                    $sortDesc = true;
+                    break;
+                case 'points':
+                    $sortBy = 'points';
+                    $sortDesc = true;
+                    break;
+                case 'behaviour':
+                    // For behaviour, we might want to see who has the most penalties?
+                    // Let's stick to points DESC (Best -> Worst) as default,
+                    // or if user wants "Problematic" first, we'd use ASC.
+                    // Assuming standard ranking (Best First):
+                    $sortBy = 'points';
+                    $sortDesc = true;
+                    break;
+            }
+        }
+
+        $sortedRows = $sortDesc ? $rows->sortByDesc($sortBy) : $rows->sortBy($sortBy);
+
+        return $sortedRows->values()->map(function ($row, $index) {
             $row['rank'] = $index + 1;
             return $row;
         });
