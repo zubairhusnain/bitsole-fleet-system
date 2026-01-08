@@ -102,6 +102,9 @@
 import { ref, onMounted, computed } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
+import { hasPermission } from '../../auth';
+
+const hasPerm = (m, a) => hasPermission(m, a);
 
 const fromDate = ref('');
 const toDate = ref('');

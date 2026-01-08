@@ -181,7 +181,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" :class="{ 'd-testingmode': !isLocalMode, 'menu-open': route.path.startsWith('/reports') }" v-if="!isAdminOrDistributor && hasPerm('reports','read')">
+                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/reports') }" v-if="hasPerm('reports','read')">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/reports') }">
                                 <i class="nav-icon bi bi-bar-chart"></i>
                                 <p>
@@ -351,7 +351,7 @@ const checkTestingMode = () => {
     const rawQ = route.query.testingmode ?? route.query.testingMode;
     const q = rawQ !== null && rawQ !== undefined ? String(rawQ) : null;
 
-    if (envTestingMode === 'true') { 
+    if (envTestingMode === 'true') {
         isTestingMode.value = true;
         isLocalMode.value = true;
     } else if (q === '1') {
