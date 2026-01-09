@@ -11,6 +11,8 @@
       </ol>
     </div>
 
+    <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="error = ''" />
+
     <!-- Page Title -->
     <div class="row mb-3">
       <div class="col-sm-12 col-md-12 col-xl-8">
@@ -18,256 +20,258 @@
       </div>
     </div>
 
-    <!-- Controls -->
-    <div class="card border-0 shadow-sm rounded-4 mb-4 bg-white">
-      <div class="card-body p-4">
-        <div class="row g-4">
-          <!-- Asset Search -->
-          <div class="col-md-5">
-            <label class="form-label fw-semibold small text-dark mb-2">Asset Search</label>
-            <div class="input-group">
-              <input type="text" class="form-control border-end-0 bg-white" placeholder="Search Asset Reg. No." v-model="searchQuery" @keyup.enter="fetchZones">
-              <span class="input-group-text bg-white border-start-0 text-primary cursor-pointer" @click="fetchZones">
-                <i class="bi bi-arrow-clockwise"></i>
-              </span>
-            </div>
-          </div>
-          <!-- Auto Refresh -->
-          <div class="col-md-7">
-            <label class="form-label fw-semibold small text-dark mb-2">Auto Refresh Sec/Min</label>
-            <div class="d-flex gap-0 bg-light rounded overflow-hidden">
-              <button
-                v-for="(label, index) in refreshOptions"
-                :key="index"
-                class="btn btn-sm px-3 py-2 fw-medium flex-fill border-0 rounded-0"
-                :class="selectedRefresh === index ? 'btn-primary text-white' : 'btn-light text-muted'"
-                :style="selectedRefresh !== index ? 'background-color: #f8f9fa;' : 'background-color: #00A3FF;'"
-                @click="selectedRefresh = index"
-              >
-                {{ label }}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Zone Summary Cards -->
-        <div class="row g-3 mt-4">
-          <div v-for="zone in visibleSummaryZones" :key="zone.id" class="col-12 col-md-4 col-lg-2">
-            <div class="card border-0 rounded-4 h-100 cursor-pointer transition-transform"
-                 :style="{ backgroundColor: zone.bgColor, transform: selectedZoneId === zone.id ? 'scale(1.05)' : 'scale(1)', border: selectedZoneId === zone.id ? `2px solid ${zone.barColor}` : 'none' }"
-                 @click="toggleZoneSelection(zone.id)">
-              <div class="card-body p-3 d-flex flex-column justify-content-between" style="min-height: 120px;">
-                <div class="mb-2">
-                  <div class="rounded-circle d-flex align-items-center justify-content-center"
-                       :style="{ width: '32px', height: '32px', backgroundColor: 'rgba(255,255,255,0.4)' }">
-                    <i class="bi bi-diagram-3" :style="{ color: zone.textColor }"></i>
-                  </div>
-                </div>
-                <div>
-                  <div class="fw-semibold mb-1 text-truncate" :title="zone.name" :style="{ color: '#333' }">{{ zone.name }}</div>
-                  <div class="d-flex align-items-end justify-content-between">
-                    <h3 class="fw-bold mb-0" :style="{ color: '#333' }">{{ zone.count }}</h3>
-                    <div class="d-flex align-items-center gap-2 w-50 mb-1">
-                      <div class="progress flex-grow-1" style="height: 6px; background-color: rgba(0,0,0,0.1);">
-                        <div class="progress-bar" role="progressbar"
-                             :style="{ width: zone.percent + '%', backgroundColor: zone.barColor }"></div>
-                      </div>
-                      <span class="small fw-medium" :style="{ color: '#666', fontSize: '0.75rem' }">{{ zone.percent }}%</span>
+    <!-- Widgets -->
+    <div class="row g-3 mb-3">
+        <div class="col-sm-12 col-md-6 col-lg-3">
+            <div class="card border rounded-4 shadow-0 h-100 bg-white">
+                <div class="card-body d-flex align-items-center gap-3 py-3">
+                    <div class="rounded-3 p-2 bg-light text-primary d-inline-flex align-items-center justify-content-center">
+                        <i class="bi bi-diagram-3 fs-5"></i>
                     </div>
+                    <div>
+                        <div class="small text-muted">Total Zone</div>
+                        <div class="fw-semibold">{{ totalZones }} Zones</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-12 col-md-6 col-lg-3">
+            <div class="card border rounded-4 shadow-0 h-100 bg-white">
+                <div class="card-body d-flex align-items-center gap-3 py-3">
+                    <div class="rounded-3 p-2 bg-light text-success d-inline-flex align-items-center justify-content-center">
+                        <i class="bi bi-diagram-3 fs-5"></i>
+                    </div>
+                    <div>
+                        <div class="small text-muted">Active Zone</div>
+                        <div class="fw-semibold">{{ activeZones }} Zones</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-12 col-md-6 col-lg-3">
+            <div class="card border rounded-4 shadow-0 h-100 bg-white">
+                <div class="card-body d-flex align-items-center gap-3 py-3">
+                    <div class="rounded-3 p-2 bg-light text-danger d-inline-flex align-items-center justify-content-center">
+                        <i class="bi bi-diagram-3 fs-5"></i>
+                    </div>
+                    <div>
+                        <div class="small text-muted">Inactive Zone</div>
+                        <div class="fw-semibold">{{ inactiveZones }} Zones</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-12 col-md-6 col-lg-3">
+            <div class="card border rounded-4 shadow-0 h-100 bg-white">
+                <div class="card-body d-flex align-items-center gap-3 py-3">
+                    <div class="rounded-3 p-2 bg-light text-info d-inline-flex align-items-center justify-content-center">
+                        <i class="bi bi-car-front fs-5"></i>
+                    </div>
+                    <div>
+                        <div class="small text-muted">Vehicles in Zone</div>
+                        <div class="fw-semibold">{{ vehiclesInZone }} Vehicles</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Option -->
+    <div class="card border rounded-3 shadow-0 mb-3 bg-white">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Search Option</div>
+        <div class="row g-2 align-items-end">
+          <div class="col-sm-12 col-md-3">
+            <label class="form-label small">Zone Name</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-search"></i></span>
+              <input type="text" class="form-control" placeholder="Enter Zone Name" v-model="filterName">
+            </div>
+          </div>
+          <div class="col-sm-12 col-md-2">
+            <label class="form-label small">Status</label>
+            <select class="form-select" v-model="filterStatus">
+                <option value="">-- Select --</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+            </select>
+          </div>
+          <div class="col-sm-12 col-md-5">
+            <label class="form-label small">Auto Refresh (sec / min)</label>
+            <div class="d-flex gap-0 bg-light rounded overflow-hidden">
+                <button
+                    v-for="(label, index) in refreshOptions"
+                    :key="index"
+                    class="btn btn-sm px-3 py-2 fw-medium flex-fill border-0 rounded-0"
+                    :class="selectedRefresh === index ? 'btn-primary text-white' : 'btn-light text-muted'"
+                    :style="selectedRefresh !== index ? 'background-color: #f8f9fa;' : 'background-color: #00A3FF;'"
+                    @click="selectedRefresh = index"
+                >
+                    {{ label }}
+                </button>
+            </div>
+          </div>
+          <div class="col-sm-12 col-md-2">
+            <button class="btn btn-primary w-100" @click="applyFilters">Submit</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zone Table -->
+    <div class="card border rounded-3 shadow-0 bg-white">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover table-sm align-middle mb-0 table-grid-lines table-nowrap">
+            <thead class="thead-app-dark">
+              <tr>
+                <th class="fw-semibold py-2">Zone Name</th>
+                <th class="fw-semibold py-2">Description</th>
+                <th class="fw-semibold py-2">Created</th>
+                <th class="fw-semibold py-2">Last Update</th>
+                <th class="fw-semibold py-2">Status</th>
+                <th class="fw-semibold py-2 text-center">Assign Vehicles</th>
+                <th class="fw-semibold py-2 text-center">Vehicles Inside</th>
+                <th class="fw-semibold py-2 text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="loading">
+                <td colspan="9" class="text-center py-5">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Loader on scroll -->
-          <div v-if="isLoadingMore" class="col-12 text-center py-3">
-              <div class="spinner-border text-primary spinner-border-sm" role="status">
-                  <span class="visually-hidden">Loading...</span>
-              </div>
-          </div>
+                </td>
+              </tr>
+              <tr v-else-if="paginatedZones.length === 0">
+                <td colspan="9" class="text-center py-5 text-muted">
+                  No zones found matching your criteria.
+                </td>
+              </tr>
+              <tr v-else v-for="zone in paginatedZones" :key="zone.id">
+                <td class="text-muted text-nowrap">{{ zone.name }}</td>
+                <td class="text-muted text-nowrap">{{ zone.description || '—' }}</td>
+                <td class="text-muted text-nowrap">{{ formatDate(zone.created_at) }}</td>
+                <td class="text-muted text-nowrap">{{ formatDate(zone.updated_at) }}</td>
+                <td class="text-nowrap">
+                    <span :class="['status-badge', isActive(zone.status) ? 'is-on' : 'is-off']">
+                        <span class="dot"></span>
+                        {{ isActive(zone.status) ? 'Active' : 'Inactive' }}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="badge rounded-pill px-3 py-2" style="background-color: #8B4513; color: white;">
+                        {{ zone.assigned_count || 0 }} Vehicles
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="badge bg-success-subtle text-success rounded-pill px-3 py-2">
+                        {{ zone.inside_count || 0 }} Vehicles
+                    </span>
+                </td>
+                <td class="text-end">
+                    <div class="btn-group btn-group-sm">
+                        <RouterLink :to="{ name: 'monitoring-zone-details', params: { zoneId: zone.id } }" class="btn btn-outline-primary" title="View">
+                            <i class="bi bi-eye"></i>
+                        </RouterLink>
+                        <!-- Delete button removed as per monitoring view usually read-only or specific actions, keeping view only for now unless requested -->
+                    </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
-    </div>
-
-    <!-- Zone Details -->
-    <div class="d-flex flex-column gap-3">
-      <div v-if="loading" class="text-center py-5">
-          <div class="spinner-border text-primary" role="status">
-              <span class="visually-hidden">Loading...</span>
-          </div>
-      </div>
-      <div v-else-if="detailZones.length === 0" class="text-center py-5 text-muted">
-          No zones found matching your criteria.
-      </div>
-      <div v-else v-for="zone in detailZones" :key="'detail-' + zone.id" class="card border-0 shadow-sm rounded-4 bg-white">
-        <div class="card-body p-4">
-          <!-- Zone Header -->
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <div class="d-flex align-items-center gap-2">
-              <div class="rounded-circle d-flex align-items-center justify-content-center"
-                   :style="{ width: '32px', height: '32px', backgroundColor: zone.bgColor }">
-                <i class="bi bi-diagram-3" :style="{ color: zone.textColor }"></i>
-              </div>
-              <h5 class="fw-bold mb-0 text-dark">{{ zone.name }}</h5>
-            </div>
-            <div class="text-muted small fw-medium">{{ zone.count }} / Total {{ totalDevices }}</div>
-          </div>
-
-          <!-- Vehicles Grid -->
-          <div class="row g-3">
-            <div v-for="(vehicle, idx) in zone.vehicles" :key="idx" class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
-              <div class="d-flex align-items-center p-3 rounded-3 bg-light-subtle border border-light-subtle h-100 cursor-pointer hover-shadow"
-                   @click="openVehicleModal(vehicle)">
-                <i class="bi bi-power fs-4 me-3" :class="vehicle.active ? 'text-success' : 'text-danger'"></i>
-                <div class="overflow-hidden">
-                  <div class="text-muted small text-truncate" style="font-size: 0.7rem;">{{ vehicle.uniqueid }}</div>
-                  <div class="fw-bold text-dark text-truncate" :title="vehicle.name">{{ vehicle.name }}</div>
-                </div>
-              </div>
-            </div>
-            <div v-if="zone.vehicles.length === 0" class="col-12">
-              <div class="text-muted small fst-italic">No vehicles in this zone</div>
-            </div>
-          </div>
+      <!-- Pagination -->
+      <div class="card-footer d-flex align-items-center py-2">
+        <div class="text-muted small me-auto">
+            Showing {{ startIndex + 1 }} to {{ Math.min(endIndex, detailZones.length) }} of {{ detailZones.length }} results
         </div>
+        <nav aria-label="Page navigation" class="ms-auto">
+            <ul class="pagination pagination-sm mb-0 pagination-app">
+                <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                    <button class="page-link" @click="prevPage">‹</button>
+                </li>
+                <li class="page-item" v-for="page in totalPages" :key="page" :class="{ active: currentPage === page }">
+                    <button class="page-link" @click="goToPage(page)">
+                        {{ page }}
+                    </button>
+                </li>
+                <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                    <button class="page-link" @click="nextPage">›</button>
+                </li>
+            </ul>
+        </nav>
       </div>
     </div>
-
-    <!-- Vehicle Detail Modal -->
-    <VehicleDetailModal
-      v-if="showModal"
-      :vehicle="selectedVehicle"
-      @close="closeModal"
-      @change-status="changeVehicleStatus"
-    />
 
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import axios from 'axios';
-import VehicleDetailModal from '../../components/VehicleDetailModal.vue';
+import { formatDateTime } from '../../utils/datetime';
+import UiAlert from '../../components/UiAlert.vue';
 
 // State
 const loading = ref(false);
-const refreshOptions = ['30s', '1m', '2m', '3m', '4m', '5m', '10m', 'Off'];
-const selectedRefresh = ref(0); // Default 30s
-const searchQuery = ref('');
-const totalDevices = ref(0);
 const zones = ref([]);
-const selectedZoneId = ref(null);
+const vehiclesInZoneCount = ref(0);
+const error = ref('');
+
+// Auto Refresh
+const refreshOptions = ['30s', '1m', '2m', '3m', '4m', '5m', '10m', 'Off'];
+const selectedRefresh = ref(7); // Default Off
 const refreshInterval = ref(null);
-const visibleLimit = ref(12);
-const isLoadingMore = ref(false);
 
-// Modal State
-const showModal = ref(false);
-const selectedVehicle = ref(null);
+// Filters
+const filterName = ref('');
+const filterStatus = ref('');
+const activeFilterName = ref('');
+const activeFilterStatus = ref('');
 
-// Color Palette (Pastels)
-const zoneColors = [
-  { bgColor: '#FFEBEE', textColor: '#EF5350', barColor: '#EF5350' }, // Pink
-  { bgColor: '#FFF8E1', textColor: '#FFCA28', barColor: '#FFCA28' }, // Yellow
-  { bgColor: '#E8F5E9', textColor: '#66BB6A', barColor: '#66BB6A' }, // Green
-  { bgColor: '#F3E5F5', textColor: '#AB47BC', barColor: '#AB47BC' }, // Purple
-  { bgColor: '#E1F5FE', textColor: '#29B6F6', barColor: '#29B6F6' }, // Blue
-  { bgColor: '#F5F5F5', textColor: '#757575', barColor: '#BDBDBD' }, // Grey
-];
+// Pagination
+const currentPage = ref(1);
+const itemsPerPage = 10;
 
-// Computed
-const summaryZones = computed(() => {
-    return zones.value.map((z, index) => {
-        const colors = zoneColors[index % zoneColors.length];
-        return { ...z, ...colors };
-    });
-});
+// Helpers
+const isActive = (status) => {
+    if (!status) return true; // Default to active if status is missing/null
+    return String(status).toLowerCase() === 'active';
+};
 
-const visibleSummaryZones = computed(() => {
-    return summaryZones.value.slice(0, visibleLimit.value);
-});
+// Computed Properties for Widgets
+const totalZones = computed(() => zones.value.length);
+const activeZones = computed(() => zones.value.filter(z => isActive(z.status)).length);
+const inactiveZones = computed(() => zones.value.filter(z => !isActive(z.status)).length);
+const vehiclesInZone = computed(() => vehiclesInZoneCount.value);
 
+// Computed Properties for Table
 const detailZones = computed(() => {
-    let filtered = summaryZones.value;
+    let filtered = zones.value;
 
-    // Filter by selected zone
-    if (selectedZoneId.value) {
-        filtered = filtered.filter(z => z.id === selectedZoneId.value);
+    // Filter by Name
+    if (activeFilterName.value.trim()) {
+        const q = activeFilterName.value.toLowerCase();
+        filtered = filtered.filter(z => z.name.toLowerCase().includes(q));
     }
 
-    // Filter by search query (vehicle name or reg no)
-    if (searchQuery.value.trim()) {
-        const q = searchQuery.value.toLowerCase();
-        // Deep filter vehicles inside zones
-        filtered = filtered.map(z => ({
-            ...z,
-            vehicles: z.vehicles.filter(v =>
-                (v.name && v.name.toLowerCase().includes(q)) ||
-                (v.uniqueid && v.uniqueid.toLowerCase().includes(q))
-            )
-        })).filter(z => z.vehicles.length > 0);
+    // Filter by Status
+    if (activeFilterStatus.value) {
+        const isFilterActive = activeFilterStatus.value === 'active';
+        filtered = filtered.filter(z => isActive(z.status) === isFilterActive);
     }
 
     return filtered;
 });
 
+const totalPages = computed(() => Math.ceil(detailZones.value.length / itemsPerPage));
+const startIndex = computed(() => (currentPage.value - 1) * itemsPerPage);
+const endIndex = computed(() => startIndex.value + itemsPerPage);
+const paginatedZones = computed(() => detailZones.value.slice(startIndex.value, endIndex.value));
+
 // Methods
-const fetchZones = async () => {
-  try {
-    // Only show loading on first load or manual refresh, not auto-refresh
-    if (zones.value.length === 0) loading.value = true;
-
-    const { data } = await axios.get('/web/monitoring/zones', {
-        params: { mine: true } // Or other filters if needed
-    });
-
-    zones.value = data.zones || [];
-    totalDevices.value = data.total_devices || 0;
-
-    // Default to first zone if none selected and zones exist
-    if (!selectedZoneId.value && zones.value.length > 0) {
-        selectedZoneId.value = zones.value[0].id;
-    }
-  } catch (e) {
-    console.error("Failed to fetch zones", e);
-  } finally {
-    loading.value = false;
-  }
-};
-
-const toggleZoneSelection = (id) => {
-    selectedZoneId.value = id;
-};
-
-const openVehicleModal = (vehicle) => {
-    selectedVehicle.value = vehicle;
-    showModal.value = true;
-};
-
-const closeModal = () => {
-    showModal.value = false;
-    selectedVehicle.value = null;
-};
-
-const changeVehicleStatus = (vehicle) => {
-    // Placeholder for status change logic
-    alert(`Change status for ${vehicle.name}`);
-};
-
-const handleScroll = () => {
-    if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 100) {
-        if (!isLoadingMore.value && visibleLimit.value < zones.value.length) {
-            isLoadingMore.value = true;
-            // Simulate loading delay
-            setTimeout(() => {
-                visibleLimit.value += 12;
-                isLoadingMore.value = false;
-            }, 500);
-        }
-    }
-};
-
 const setupAutoRefresh = (val) => {
     if (refreshInterval.value) clearInterval(refreshInterval.value);
 
@@ -294,50 +298,66 @@ watch(selectedRefresh, (val) => {
     setupAutoRefresh(val);
 });
 
+onUnmounted(() => {
+    if (refreshInterval.value) clearInterval(refreshInterval.value);
+});
+
+const fetchZones = async () => {
+  try {
+    if (zones.value.length === 0) loading.value = true;
+    error.value = '';
+    const { data } = await axios.get('/web/monitoring/zones', {
+        params: { mine: true }
+    });
+    zones.value = data.zones || [];
+    vehiclesInZoneCount.value = data.vehicles_in_zone || 0;
+  } catch (e) {
+    console.error("Failed to fetch zones", e);
+    error.value = 'Failed to load zones.';
+  } finally {
+    loading.value = false;
+  }
+};
+
+const applyFilters = () => {
+    activeFilterName.value = filterName.value;
+    activeFilterStatus.value = filterStatus.value;
+    currentPage.value = 1;
+};
+
+const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    return formatDateTime(dateStr);
+};
+
+// Pagination Methods
+const nextPage = () => {
+    if (currentPage.value < totalPages.value) currentPage.value++;
+};
+
+const prevPage = () => {
+    if (currentPage.value > 1) currentPage.value--;
+};
+
+const goToPage = (page) => {
+    currentPage.value = page;
+};
+
 onMounted(() => {
     fetchZones();
-    window.addEventListener('scroll', handleScroll);
-
-    // Restore refresh preference
+    // Load preference
     try {
         const saved = localStorage.getItem('zoneMonitoringRefresh');
         if (saved !== null) {
-            const idx = parseInt(saved);
+            const idx = parseInt(saved, 10);
             if (!isNaN(idx) && idx >= 0 && idx < refreshOptions.length) {
                 selectedRefresh.value = idx;
-                setupAutoRefresh(idx);
             }
-        } else {
-             // Default 30s (Index 0)
-            setupAutoRefresh(0);
         }
-    } catch {
-        setupAutoRefresh(0);
-    }
-});
-
-onUnmounted(() => {
-    if (refreshInterval.value) clearInterval(refreshInterval.value);
-    window.removeEventListener('scroll', handleScroll);
+    } catch {}
 });
 </script>
 
 <style scoped>
-.cursor-pointer {
-  cursor: pointer;
-}
-.btn-light {
-  background-color: #f8f9fa;
-  border-color: #f8f9fa;
-}
-.bg-light-subtle {
-    background-color: #f8f9fa !important;
-}
-.hover-shadow:hover {
-    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
-    transition: box-shadow 0.2s;
-}
-.transition-transform {
-    transition: transform 0.2s, border 0.2s;
-}
+/* Reuse global app.css styles for tables, badges, and pagination */
 </style>

@@ -30,9 +30,6 @@
                     {{ labelForDriver(id) }}
                     <button type="button" class="chip-remove" @click.stop="removeDriver(id)" aria-label="Remove">×</button>
                   </span>
-                  <button v-if="selectedDriverIds.length" type="button" class="clear-btn" @click.stop="clearDrivers" aria-label="Clear">
-                    <i class="bi bi-x"></i>
-                  </button>
                   <i class="bi bi-caret-down-fill ms-auto small"></i>
                 </div>
                 <div class="dropdown-list" v-show="driversOpen">
@@ -64,9 +61,6 @@
                     {{ labelForZone(id) }}
                     <button type="button" class="chip-remove" @click.stop="removeZone(id)" aria-label="Remove">×</button>
                   </span>
-                  <button v-if="selectedZoneIds.length" type="button" class="clear-btn" @click.stop="clearZones" aria-label="Clear">
-                    <i class="bi bi-x"></i>
-                  </button>
                   <i class="bi bi-caret-down-fill ms-auto small"></i>
                 </div>
                 <div class="dropdown-list" v-show="zonesOpen">
@@ -177,7 +171,7 @@ const loadingDrivers = ref(false);
 const loadingZones = ref(false);
 const loadingNotifications = ref(false);
 const savingNotifications = ref(false);
-const notificationChannel = ref({ web: true, mail: true, mobile: true });
+const notificationChannel = ref({ web: true, mail: false, mobile: false });
 
 const driverOptions = ref([]);
 const zoneOptions = ref([]);
@@ -301,7 +295,6 @@ function removeDriver(id) {
   const n = Number(id);
   selectedDriverIds.value = selectedDriverIds.value.filter(v => Number(v) !== n);
 }
-function clearDrivers() { selectedDriverIds.value = []; }
 
 function toggleZone(id) {
   const n = Number(id);
@@ -313,7 +306,6 @@ function removeZone(id) {
   const n = Number(id);
   selectedZoneIds.value = selectedZoneIds.value.filter(v => Number(v) !== n);
 }
-function clearZones() { selectedZoneIds.value = []; }
 
 async function saveDrivers() {
   dismissAlerts();

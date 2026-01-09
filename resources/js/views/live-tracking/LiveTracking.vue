@@ -8,7 +8,7 @@
               </button>
               <button class="mobile-btn btn btn-dark btn-sm logout" @click="logout" aria-label="Logout">
                 <i class="bi bi-box-arrow-right"></i>
-              </button>
+              </button> 
             </div>
             <button v-if="isMobile || !panelVisible" class="panel-toggle btn btn-light btn-sm" @click="panelVisible = !panelVisible" :aria-expanded="panelVisible.toString()" aria-controls="device-panel">
                  <i class="bi me-1" :class="panelVisible ? 'bi-x-lg' : 'bi-list'"></i>
@@ -464,20 +464,63 @@ watch(
 );
 
 function getImage(v) {
-    const attrs = parseAttrs(v.attributes);
-    const photos = attrs?.photos;
-    let candidate = '';
+    // Merge attributes: Traccar Device attributes < Vehicle attributes
+    const tcDeviceAttrs = parseAttrs(v.tc_device?.attributes || v.tcDevice?.attributes);
+    const vehicleAttrs = parseAttrs(v.attributes);
+    const mergedAttrs = { ...tcDeviceAttrs, ...vehicleAttrs };
 
-    if (Array.isArray(photos) && photos.length > 0) {
-        candidate = photos.find(p => typeof p === 'string' && p.trim()) || '';
-    } else {
-        const alt = attrs?.photo || attrs?.image || (Array.isArray(attrs?.images) ? attrs.images[0] : '');
-        candidate = typeof alt === 'string' ? alt : '';
-    }
+    const toPath = (it) => {
+        if (!it && it !== 0) return '';
+        if (Array.isArray(it)) return it.map(toPath).filter(Boolean);
+        if (typeof it === 'string') {
+            const s = it.trim();
+            if (!s) return '';
+            if ((s.startsWith('[') && s.endsWith(']')) || (s.startsWith('{') && s.endsWith('}'))) {
+                try {
+                    const parsed = JSON.parse(s);
+                    return toPath(parsed);
+                } catch { /* fall through */ }
+            }
+            return s;
+        }
+        if (typeof it === 'number') return String(it);
+        if (typeof it === 'object') {
+            const cand = it.url ?? it.path ?? it.src ?? it.image ?? it.photo;
+            return typeof cand === 'string' ? cand.trim() : '';
+        }
+        return '';
+    };
 
-    if (!candidate) return '';
-    const urlish = candidate.trim();
-    return urlish.startsWith('http') ? urlish : `/storage/${urlish.replace(/^\/*/, '')}`;
+    const pickAttr = (keys) => {
+        for (const k of keys) {
+            if (mergedAttrs[k] != null && mergedAttrs[k] !== '') return mergedAttrs[k];
+        }
+        return null;
+    };
+
+    const photoUrl = (p) => {
+        if (!p && p !== 0) return '';
+        const raw = String(p).trim();
+        if (!raw) return '';
+        if (raw.startsWith('http') || raw.startsWith('data:')) return raw;
+        if (raw.startsWith('/')) return raw;
+        if (raw.startsWith('storage/')) return `/${raw}`;
+        if (raw.startsWith('public/')) return `/${raw.replace(/^public\//, 'storage/')}`;
+        return `/storage/${raw.replace(/^\/*/, '')}`;
+    };
+
+    const out = [];
+    const arrLike = pickAttr(['photos', 'images']);
+    const arrResolved = toPath(arrLike);
+    if (Array.isArray(arrResolved)) out.push(...arrResolved);
+    else if (typeof arrResolved === 'string' && arrResolved) out.push(arrResolved);
+
+    const single = toPath(pickAttr(['photo', 'image', 'vehiclePhoto', 'vehicleImage']));
+    if (Array.isArray(single)) out.push(...single);
+    else if (typeof single === 'string' && single) out.push(single);
+
+    const uniq = Array.from(new Set(out.filter(v => typeof v === 'string' && v.trim() !== '')));
+    return uniq.length > 0 ? photoUrl(uniq[0]) : '';
 }
 
 function statusText(v) {
@@ -542,14 +585,14 @@ function fuelDisplay(v) {
 function odometerDisplay(v) {
     const pos = getPosition(v).raw || {};
     const model = v.model || (v.tc_device?.model ?? v.tcDevice?.model) || null;
-    
+
     // Merge attributes: Tracker < Vehicle < Position
     const trackerAttrs = parseAttrs(v.tc_device?.attributes ?? v.tcDevice?.attributes);
     const vehicleAttrs = parseAttrs(v.attributes);
     const posAttrs = parseAttrs(pos.attributes);
     // User feedback: odometer value is in position attribute. Prioritize position attributes.
     const mergedAttrs = { ...trackerAttrs, ...vehicleAttrs, ...posAttrs };
-    
+
     // Pass protocol as null to prevent formatTelemetry from assuming 'odometer' key is in meters for Teltonika.
     // This aligns with Detail page behavior where the value (e.g. 118,213) is treated as km.
     const tel = formatTelemetry(mergedAttrs, { protocol: null, model, preferNamedOdometer: true });
@@ -572,8 +615,9 @@ function lastUpdate(v) {
 }
 
 function uniqueId(v) {
-    const attrs = parseAttrs(v.attributes);
-    return v.uniqueId || v.uniqueid || attrs.uniqueId || attrs.uniqueid || null;
+    const rawAttrs = v.attributes || v.tc_device?.attributes || v.tcDevice?.attributes;
+    const attrs = parseAttrs(rawAttrs);
+    return v.uniqueId || v.uniqueid || v.tc_device?.uniqueId || v.tc_device?.uniqueid || v.tcDevice?.uniqueId || v.tcDevice?.uniqueid || attrs.uniqueId || attrs.uniqueid || null;
 }
 
 function speedKmh(speed) {

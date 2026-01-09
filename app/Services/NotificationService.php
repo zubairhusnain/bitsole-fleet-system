@@ -123,10 +123,10 @@ class NotificationService
                         $data = array(
                             "id"=> $id,
                             "type"=> $value['type'],
-                            "always"=> true,
+                            "always"=> false,
                             "web"=> true,
-                            "mail"=> true,
-                            "sms"=> true,
+                            "mail"=> false,
+                            "sms"=> false,
                             "calendarId"=> 0,
                             "attributes"=> [],
                             "already_xist"=>$exist,
@@ -147,10 +147,10 @@ class NotificationService
                         $data2 = array(
                             "id"=> $id,
                             "type"=> 'alarm',
-                            "always"=> true,
+                            "always"=> false,
                             "web"=> true,
-                            "mail"=> true,
-                            "sms"=> true,
+                            "mail"=> false,
+                            "sms"=> false,
                             "calendarId"=> 0,
                             "attributes"=> array('alarms'=>$value),
                             "already_xist"=>$exist,
@@ -224,6 +224,8 @@ class NotificationService
             foreach($data as $key=>$value){
                 $type = 'POST';
                 $id = '';
+                $value['mail']=false;
+                $value['sms']=false;
                 $already_xist = $value['already_xist'] ? true : false;
                 $notificators = $value['web'] ? "web,":"";
                 $notificators.= $value['mail'] ? "mail,":"";

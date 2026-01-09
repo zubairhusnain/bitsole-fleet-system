@@ -58,16 +58,37 @@ import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 
 // Bind Pusher global for Echo
-window.Pusher = Pusher;
+window.Pusher = Pusher; 
 
 // Configure Echo to connect to Reverb (Pusher protocol)
 const reverbKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REVERB_APP_KEY) || 'local';
-const envHost = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REVERB_HOST) || (typeof window !== 'undefined' ? window.location.hostname : 'localhost');
+
+// Dynamic Host and Scheme Detection for VPS/Production compatibility
+const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+const currentHostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+
+let envHost = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REVERB_HOST);
+// If host is not set or is localhost, use current hostname (fixes VPS domain issues)
+if (!envHost || envHost === 'localhost') {
+    envHost = currentHostname;
+}
 const reverbHost = String(envHost).replace(/^"|"$/g, '');
-// Derive sane default port from scheme when env not provided
-const reverbScheme = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REVERB_SCHEME) || 'http';
+
+let envPort = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REVERB_PORT);
+let envScheme = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REVERB_SCHEME);
+
+// If on HTTPS, force secure scheme
+if (isSecure) {
+    envScheme = 'https';
+    // If port is default 8080, assume standard 443 for WSS via proxy
+    if (!envPort || envPort == '8080') {
+        envPort = '443';
+    }
+}
+
+const reverbScheme = envScheme || 'http';
 const defaultWsPort = reverbScheme === 'https' ? 443 : 80;
-const reverbPort = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REVERB_PORT) ? Number(import.meta.env.VITE_REVERB_PORT) : defaultWsPort;
+const reverbPort = envPort ? Number(envPort) : defaultWsPort;
 
 window.echo = new Echo({
   broadcaster: 'pusher',

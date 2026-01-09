@@ -7,6 +7,9 @@ return new class extends Migration {
     public function up(): void
     {
         $driver = DB::getDriverName();
+        if ($driver === 'sqlite') {
+            return;
+        }
         if ($driver === 'pgsql') {
             DB::statement('ALTER TABLE vehicle_models ALTER COLUMN odmeter_ioid DROP NOT NULL');
             DB::statement('ALTER TABLE vehicle_models ALTER COLUMN fuel_ioid DROP NOT NULL');
@@ -19,6 +22,9 @@ return new class extends Migration {
     public function down(): void
     {
         $driver = DB::getDriverName();
+        if ($driver === 'sqlite') {
+            return;
+        }
         if ($driver === 'pgsql') {
             DB::statement('ALTER TABLE vehicle_models ALTER COLUMN odmeter_ioid SET NOT NULL');
             DB::statement('ALTER TABLE vehicle_models ALTER COLUMN fuel_ioid SET NOT NULL');

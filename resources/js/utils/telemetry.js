@@ -24,21 +24,31 @@ function formatNumberKm(km) {
     return `${rounded} km`;
   }
 }
-
+ 
 export function formatOdometer(rawAttrs, ctx = {}) {
+    console.log('odometer key value ',rawAttrs);
   const attrs = parseAttrs(rawAttrs);
   const protocol = String(ctx?.protocol || '').toLowerCase();
   const preferNamed = !!ctx?.preferNamedOdometer;
+  const userPriorityKeys = ['CAN_Total_Mileage_87', 'OBD_Total_Mileage_389', 'GNSS_Total_Odometer_16'];
   const distanceKeys = ['totalDistance', 'distance', 'tripDistance'];
   const primary = ['odometer', 'mileage', 'odometerKm', 'odometer_km'];
-  // Teltonika: prefer io389, then named odometer/mileage, then distance fallbacks
-  const teltonikaOrderIoFirst = ['16', '87', '50', '389', ...primary, ...distanceKeys];
-  const teltonikaOrderNamedFirst = [...primary, ...distanceKeys, '16', '87', '50', '389'];
-  const genericOrderIoFirst = ['16', '87', '50', ...primary, ...distanceKeys];
-  const genericOrderNamedFirst = [...primary, ...distanceKeys, '16', '87', '50'];
-  const orderedKeys = protocol === 'teltonika'
-    ? (preferNamed ? teltonikaOrderNamedFirst : teltonikaOrderIoFirst)
-    : (preferNamed ? genericOrderNamedFirst : genericOrderIoFirst);
+  // Unified order: check ALL userPriorityKeys first, then specific IO IDs, then generic keys
+  const orderIoFirst = [
+    ...userPriorityKeys,
+    '87', '389', '16', '50',
+    ...primary,
+    ...distanceKeys
+  ];
+  // Unified order for Named First: Priority keys and their IOs should still precede generic 'odometer'
+  const orderNamedFirst = [
+    ...userPriorityKeys,
+    '87', '389', '16', '50',
+    ...primary,
+    ...distanceKeys
+  ];
+
+  const orderedKeys = preferNamed ? orderNamedFirst : orderIoFirst;
   const getIoVal = (n) => {
     const forms = [String(n), 'io' + String(n), 'io_' + String(n), 'io-' + String(n)];
     for (const f of forms) {
@@ -46,20 +56,63 @@ export function formatOdometer(rawAttrs, ctx = {}) {
     }
     return undefined;
   };
-  let keyFound = null;
-  const pre16 = getIoVal(16);
-  if (pre16 != null && pre16 !== '') { keyFound = '16'; }
-  for (const k of orderedKeys) {
-    // For numeric IO keys, check both raw and io-prefixed variants
-    const val = (k === '389' || k === '87' || k === '50' || k === '16') ? getIoVal(k) : attrs[k];
-    const exists = val != null && val !== '';
-    if (keyFound == null && exists) { keyFound = k; break; }
+
+  // Create case-insensitive map for named keys
+  const attrsLower = {};
+  for (const key of Object.keys(attrs)) {
+    attrsLower[key.toLowerCase()] = attrs[key];
   }
+
   const parseNum = (val) => {
     const n = typeof val === 'string' ? parseFloat(val) : (typeof val === 'number' ? val : null);
     return Number.isFinite(n) ? n : null;
   };
-  const getAttrVal = (k) => ((k === '389' || k === '87' || k === '50' || k === '16') ? getIoVal(k) : attrs[k]);
+
+  let keyFound = null;
+  // REMOVED pre-check for 16 to respect orderedKeys priority
+  for (const k of orderedKeys) {
+    // For numeric IO keys, check both raw and io-prefixed variants
+    let val;
+    if (k === '389' || k === '87' || k === '50' || k === '16') {
+      val = getIoVal(k);
+    } else {
+      // Check exact match first, then case-insensitive
+      val = attrs[k] ?? attrsLower[k.toLowerCase()];
+    }
+
+    const exists = val != null && val !== '';
+
+    if (exists) {
+        // Condition: Check for > -1 for ALL keys (especially IO IDs and priority keys)
+        const n = parseNum(val);
+        // if (n !== null && n <= -1) continue;
+        // Logic Update:
+        // 1. Priority Keys: skip if <= -1
+        // 2. IO Keys: skip if 0 (allow -1)
+        // 3. Others: skip if <= -1
+
+        if (n === null) continue;
+
+        const isIoKey = ['87', '389', '16', '50'].includes(k);
+        const isPriorityKey = userPriorityKeys.includes(k);
+
+        if (isIoKey) {
+          if (n === 0) continue;
+        } else if (isPriorityKey) {
+          if (n <= -1) continue;
+        } else {
+          // Default for others
+          if (n <= -1) continue;
+        }
+
+        if (keyFound == null) { keyFound = k; break; }
+    }
+  }
+
+  const getAttrVal = (k) => {
+    if (k === '389' || k === '87' || k === '50' || k === '16') return getIoVal(k);
+    return attrs[k] ?? attrsLower[k.toLowerCase()];
+  };
   // Fallback scan
   if (!keyFound) {
     let specialKey = null;
@@ -80,17 +133,11 @@ export function formatOdometer(rawAttrs, ctx = {}) {
   if (!Number.isFinite(num)) return null;
   const keyLower = String(keyFound).toLowerCase();
   let km = num;
-  const looksMeters = (
-    distanceKeys.map(k => k.toLowerCase()).includes(keyLower)
-    || keyLower.endsWith('_m')
-    || keyLower.includes('meter')
-    || ((keyLower === 'odometer' || keyLower === 'mileage') && protocol === 'teltonika')
-  );
-  if (looksMeters) km = num / 1000;
-  // Heuristic for numeric IO keys (io87/io50): values typically in meters if very large
-  if ((keyFound === '87' || keyFound === '50' || keyFound === '389' || keyFound === '16') && !looksMeters) {
-    km = num >= 100000 ? (num / 1000) : num; // >=100,000 assumed meters → km
-  }
+    // console.log('odometer km value ',km,rawVal,keyFound,keyLower);
+
+  const skipConversion = (keyFound === '389') || (keyLower === 'obd_total_mileage_389');
+
+  if (!skipConversion) km = num / 1000;
   return {
     key: keyFound,
     raw: rawVal,
@@ -130,6 +177,11 @@ export function formatFuel(rawAttrs, ctx = {}) {
   const io242 = attrs['io242'] ?? attrs['242'];
   const io243 = attrs['io243'] ?? attrs['243'];
 
+  // Specific CAN/OBD keys
+  const canFuelPercentage89 = lower['can_fuelpercentage_89'] ?? attrs['CAN_FuelPercentage_89'];
+  const canFuelLeter84 = lower['can_fuelleter_84'] ?? attrs['CAN_FuelLeter_84'];
+  const obdFuelLeter48 = lower['obd_fuelleter_48'] ?? attrs['OBD_FuelLeter_48'];
+
   const percentKeyName = null;
   const litersKeyName = null;
   const analogKeyName = null;
@@ -139,6 +191,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
   let percentKeyUsed = null;
   {
     const candidates = [
+      { key: 'CAN_FuelPercentage_89', val: canFuelPercentage89 },
       { key: 'fuelPercent', val: percentFuelPercent },
       { key: 'fuelLevel', val: percentFuelLevel },
       { key: 'fuel_percent', val: percentFuelPercentage },
@@ -147,6 +200,9 @@ export function formatFuel(rawAttrs, ctx = {}) {
     ];
     for (const c of candidates) {
       const n = num(c.val);
+      // Check for > -1 for ALL candidates
+      if (n !== null && n <= -1) continue;
+
       if (n != null) { percent = Math.max(0, Math.min(100, Math.round(n))); percentKeyUsed = c.key; break; }
     }
   }
@@ -160,6 +216,8 @@ export function formatFuel(rawAttrs, ctx = {}) {
   let litersWasMinusOne = false;
   {
     const candidates = [
+      { key: 'CAN_FuelLeter_84', val: canFuelLeter84 },
+      { key: 'OBD_FuelLeter_48', val: obdFuelLeter48 },
       { key: 'fuelLiter', val: litersFuelLiter },
       { key: 'fuelLiters', val: litersFuelLiters },
       { key: 'fuel', val: litersFuel },
@@ -167,6 +225,9 @@ export function formatFuel(rawAttrs, ctx = {}) {
     ];
     for (const c of candidates) {
       const n = num(c.val);
+      // Check for > -1 for ALL candidates
+      if (n !== null && n <= -1) continue;
+
       if (n != null) { liters = Math.round(n * 10) / 10; litersKeyUsed = c.key; break; }
     }
   }
@@ -199,6 +260,10 @@ export function formatFuel(rawAttrs, ctx = {}) {
     ];
     for (const c of rawCandidates) {
       const n = typeof c.val === 'string' ? parseFloat(c.val) : (typeof c.val === 'number' ? c.val : null);
+
+      // Check for > -1 for ALL candidates
+      if (Number.isFinite(n) && n <= -1) continue;
+
       if (Number.isFinite(n)) { raw = n; rawKeyUsed = c.key; break; }
     }
   }
@@ -226,7 +291,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
     for (const [k, v] of Object.entries(lower)) {
       if (!k.includes('fuel')) continue;
       const n = typeof v === 'string' ? parseFloat(v) : (typeof v === 'number' ? v : null);
-      if (Number.isFinite(n)) { raw = n; rawKeyUsed = k; break; }
+      if (Number.isFinite(n) && n > -1) { raw = n; rawKeyUsed = k; break; }
     }
   }
 

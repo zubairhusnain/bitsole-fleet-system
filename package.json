@@ -4,8 +4,11 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "watch": "vite build --watch",
+        "dev": "vite",
+        "release": "npm version patch --no-git-tag-version && vite build"
     },
+    "version": "1.0.1",
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
         "@vitejs/plugin-vue": "^5.2.4",

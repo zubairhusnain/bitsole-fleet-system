@@ -96,6 +96,7 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::post('/vehicles/events/{eventId}/acknowledge', [\App\Http\Controllers\MonitoringController::class, 'acknowledgeEvent']);
     Route::post('/vehicles/{id}/alert-status', [\App\Http\Controllers\MonitoringController::class, 'updateAlertStatus']);
     Route::get('/zones', [\App\Http\Controllers\MonitoringController::class, 'zoneSummary']);
+    Route::get('/zones/{id}', [\App\Http\Controllers\MonitoringController::class, 'zoneDetail']);
 });
 
 // Auth-protected Vehicles CRUD
@@ -241,3 +242,28 @@ Route::middleware(['auth'])->prefix('/web/notifications')->group(function () {
     Route::post('/', [\App\Http\Controllers\NotificationController::class, 'store']);
     Route::post('/assign', [\App\Http\Controllers\NotificationController::class, 'assign']);
 });
+
+// Reports
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/reports')->group(function () {
+    Route::get('/trip-summary', [\App\Http\Controllers\ReportController::class, 'tripSummary']);
+    Route::get('/daily-trips', [\App\Http\Controllers\ReportController::class, 'dailyTrips']);
+    Route::get('/daily-summary', [\App\Http\Controllers\ReportController::class, 'dailySummary']);
+    Route::get('/monthly-summary', [\App\Http\Controllers\ReportController::class, 'monthlySummary']);
+    Route::get('/asset-activity', [\App\Http\Controllers\ReportController::class, 'assetActivity']);
+    Route::get('/vehicle-activity', [\App\Http\Controllers\ReportController::class, 'vehicleActivity']);
+    Route::get('/idling', [\App\Http\Controllers\ReportController::class, 'idling']);
+    Route::get('/utilisation', [\App\Http\Controllers\ReportController::class, 'utilisation']);
+    Route::get('/utilisation-db', [\App\Http\Controllers\ReportController::class, 'utilisationDb']);
+    Route::get('/daily-breakdown-map', [\App\Http\Controllers\ReportController::class, 'dailyBreakdownMap']);
+    Route::get('/vehicle-status', [\App\Http\Controllers\ReportController::class, 'vehicleStatus']);
+    Route::get('/vehicle-status/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportVehicleStatusPdf']);
+    Route::get('/device-options', [\App\Http\Controllers\ReportController::class, 'deviceOptions']);
+    Route::get('/group-options', [\App\Http\Controllers\ReportController::class, 'groupOptions']);
+    // Incident Analysis
+    Route::get('/incidents', [\App\Http\Controllers\ReportController::class, 'incidents']);
+    Route::post('/incidents', [\App\Http\Controllers\ReportController::class, 'storeIncident']);
+    Route::get('/incidents/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportIncidentsPdf']);
+    Route::get('/incidents/export-excel', [\App\Http\Controllers\ReportController::class, 'exportIncidentsExcel']);
+    Route::get('/vehicle-ranking', [\App\Http\Controllers\ReportController::class, 'vehicleRanking']);
+});
+ 

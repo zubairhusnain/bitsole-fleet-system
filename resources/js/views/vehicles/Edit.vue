@@ -28,7 +28,7 @@
           <div class="row g-3 align-items-start">
             <input :value="deviceId" type="hidden" />
             <div class="col-12 col-md-4">
-              <label class="form-label small">Device Name</label>
+              <label class="form-label small">Vehicle Name</label>
               <input v-model="form.name" type="text" class="form-control" placeholder="e.g. Toyota Camry" />
             </div>
             <div class="col-12 col-md-4">
@@ -81,15 +81,18 @@
               <input v-model="form.attributes.plate" type="text" class="form-control" placeholder="e.g. ABC-123" />
             </div>
 
-
             <div class="col-12 col-md-4">
               <label class="form-label small">Fuel Average</label>
-              <select v-model="form.attributes.fuelAverage" class="form-select">
-                <option value="">--Select Information--</option>
-                <option>5 km/l</option>
-                <option>10 km/l</option>
-                <option>15 km/l</option>
-              </select>
+              <input
+                v-model.number="form.attributes.fuelAverage"
+                type="number"
+                min="0"
+                step="1"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                class="form-control"
+                placeholder="e.g. 10"
+              />
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Fuel Type</label>
@@ -97,11 +100,12 @@
                 <option value="">-- Select Fuel Type --</option>
                 <option>Diesel</option>
                 <option>Petrol</option>
+                <option>Electric Vehicle (EV)</option>
               </select>
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Max Speed</label>
-              <input v-model="form.attributes.maxSpeed" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="e.g. 120" />
+              <input v-model="form.speedLimit" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="e.g. 120" />
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Fuel Tank Capacity (Liters)</label>
@@ -160,6 +164,7 @@ const form = reactive({
   name: '',
   uniqueId: '',
   model: '',
+  speedLimit: '',
   attributes: {
     vehicleNo: '',
     type: '',
@@ -170,7 +175,6 @@ const form = reactive({
 
     fuelAverage: '',
     fuelType: '',
-    maxSpeed: '',
     trackerModel: ''
   }
 });
@@ -192,7 +196,7 @@ const message = ref('');
 const error = ref('');
 const submitting = ref(false);
 const loading = ref(true);
-const trackerModels = ref(['Teltonika-FMC-003','Teltonika-FMC-150','Teltonika-FMC-130']);
+const trackerModels = ref(['Teltonika-FMC-003','Teltonika-FMC-150','Teltonika-FMC-130','Teltonika-FMC-920']);
 
 function dismissError() { error.value = ''; }
 function dismissMessage() { message.value = ''; }
@@ -259,11 +263,21 @@ function hydrateFormFromTc(tc) {
   form.attributes.registration = attrs.registration || '';
   form.attributes.plate = attrs.plate || attrs.licensePlate || attrs.plateNumber || '';
 
-  form.attributes.fuelAverage = attrs.fuelAverage || '';
+  {
+    const fa = attrs.fuelAverage;
+    if (fa === null || fa === undefined || fa === '') {
+      form.attributes.fuelAverage = '';
+    } else if (typeof fa === 'number') {
+      form.attributes.fuelAverage = fa;
+    } else {
+      const m = String(fa).match(/\d+/);
+      form.attributes.fuelAverage = m ? parseInt(m[0], 10) : '';
+    }
+  }
   form.attributes.fuelType = (
     attrs.fuelType || attrs.fuel_type || attrs.FuelType || attrs.fueltype || ''
   );
-  form.attributes.maxSpeed = attrs.maxSpeed || attrs.speedLimit || '';
+  form.speedLimit = attrs.speedLimit || '';
   form.attributes.trackerModel = attrs.trackerModel || attrs.deviceModel || attrs.gpsModel || attrs.teltonikaModel || tc.model || '';
   form.attributes.fuelTankCapacity = attrs.fuelTankCapacity || attrs.FuelTankCapacity || attrs.fueltankcapacity || '';
 
@@ -300,9 +314,9 @@ async function submit() {
   message.value = '';
   error.value = '';
 
-  // Validate numeric fields: maxSpeed
-  if (form.attributes.maxSpeed !== '' && form.attributes.maxSpeed !== null) {
-    const msStr = String(form.attributes.maxSpeed);
+  // Validate numeric fields: max speed
+  if (form.speedLimit !== '' && form.speedLimit !== null) {
+    const msStr = String(form.speedLimit);
     if (!/^\d+$/.test(msStr)) {
       error.value = 'Max Speed must be numeric and >= 0';
       return;
@@ -318,6 +332,15 @@ async function submit() {
     }
   }
 
+  // Validate numeric fields: fuelAverage (integer)
+  if (form.attributes.fuelAverage !== '' && form.attributes.fuelAverage !== null) {
+    const fa = form.attributes.fuelAverage;
+    if (!Number.isInteger(fa) || fa < 0) {
+      error.value = 'Fuel Average must be an integer and >= 0';
+      return;
+    }
+  }
+
   submitting.value = true;
   try {
     const fd = new FormData();
@@ -328,6 +351,7 @@ async function submit() {
     if (attrsOut.fuelType && !attrsOut.fuel_type) attrsOut.fuel_type = attrsOut.fuelType;
     const keptPhotos = existingPhotos.value.filter(Boolean);
     attrsOut.photos = keptPhotos;
+    attrsOut.speedLimit = form.speedLimit ?? '';
     fd.append('attributes', JSON.stringify(attrsOut));
     blobs.value.forEach((file, i) => { if (file) fd.append(`images[${i}]`, file); });
     // Use POST with method override to ensure Laravel parses multipart fields/files

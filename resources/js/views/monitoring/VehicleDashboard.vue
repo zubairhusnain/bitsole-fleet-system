@@ -165,7 +165,7 @@
                     </div>
                     <div class="row g-3 align-items-center">
                         <div class="col-5">
-                            <img :src="vehicle.image_verified_url || vehicle.image_url || '/assets/images/vehicle-placeholder.jpg'"
+                            <img :src="vehicle.image_verified_url || vehicle.image_url || 'https://placehold.co/360x240/e9ecef/6c757d?text=Vehicle'"
                                  class="img-fluid img-thumbnail rounded w-120"
                                  alt="Vehicle Image"
                                  onerror="this.src='https://placehold.co/360x240/e9ecef/6c757d?text=Vehicle'">

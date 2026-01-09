@@ -3,6 +3,7 @@
 namespace App\Services;
 use App\Helpers\Curl;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 
 
@@ -31,8 +32,10 @@ class PermissionService
 
         public function assignGeofence($request,$device_id,$geo_id,$type){
             $sessionId = $request->user()->traccarSession ?? session('cookie');
-            $data='{"deviceId":"'.$device_id.'","geofenceId":'.$geo_id.'}';
+            $data = json_encode(['deviceId' => (int)$device_id, 'geofenceId' => (int)$geo_id]);
+            Log::info("AssignGeofence: Type=$type, Data=$data");
             $devices = static::curl('/api/permissions', $type, $sessionId, $data,array('Content-Type: application/json', 'Accept: application/json'));
+            Log::info("AssignGeofence Response: " . json_encode($devices));
             return $devices;
         }
 

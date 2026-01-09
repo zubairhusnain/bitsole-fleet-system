@@ -3,7 +3,6 @@
     <template v-if="isGuestPage">
         <RouterView />
     </template>
-
     <!-- Admin layout mirrors layout-sample.blade.php -->
     <div v-else class="app-wrapper" :class="{ 'live-tracking-route': route.name === 'live-tracking' }">
         <!--begin::Header-->
@@ -14,7 +13,7 @@
                 <ul class="navbar-nav">
                     <li class="nav-item">
                         <a class="nav-link toggle-btn" href="#" role="button" @click.stop.prevent="toggleSidebar($event)" @touchend.stop.prevent="toggleSidebar($event)" aria-label="Toggle sidebar">
-                            <i class="bi caret-toggle" :class="sidebarOpen ? 'bi-caret-left-fill' : 'bi-caret-right-fill'"></i>
+                            <i class="bi caret-toggle sidebar-toggle" :class="sidebarOpen ? 'bi-caret-right-fill' : 'bi-caret-left-fill'"></i>
                         </a>
                     </li>
                 </ul>
@@ -106,7 +105,7 @@
                                 <i class="nav-icon bi bi-car-front"></i>
                                 <p>
                                     Vehicle Management
-                                    <i class="nav-arrow bi bi-chevron-right"></i>
+                                    <i class="bi bi-chevron-right right"></i>
                                 </p>
                             </a>
                             <ul class="nav nav-treeview">
@@ -181,14 +180,75 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item  d-none">
-                            <RouterLink to="/reports" class="nav-link" :class="{ active: route.name === 'reports' }">
+                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode,'menu-open': route.path.startsWith('/reports') }" v-if="hasPerm('reports','read')">
+                            <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/reports') }">
                                 <i class="nav-icon bi bi-bar-chart"></i>
-                                <p>Reports & Analytics</p>
-                            </RouterLink>
+                                <p>
+                                    Reports & Analytics
+                                    <i class="bi bi-chevron-right right"></i>
+                                </p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/trip-analysis" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/trip-analysis') }">
+                                        <i class="nav-icon bi bi-table"></i>
+                                        <p>Trip Analysis Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/asset-activity" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/asset-activity') }">
+                                        <i class="nav-icon bi bi-graph-up"></i>
+                                        <p>Asset Activity Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/vehicle-activity" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/vehicle-activity') }">
+                                        <i class="nav-icon bi bi-list-check"></i>
+                                        <p>Vehicle Activity Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/vehicle-status" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/vehicle-status') }">
+                                        <i class="nav-icon bi bi-info-square"></i>
+                                        <p>Vehicle Status Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/idling" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/idling') }">
+                                        <i class="nav-icon bi bi-pause-circle"></i>
+                                        <p>Idling Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/utilisation" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/utilisation') }">
+                                        <i class="nav-icon bi bi-bar-chart-line"></i>
+                                        <p>Utilisation Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/incident-analysis" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/incident-analysis') }">
+                                        <i class="nav-icon bi bi-exclamation-circle"></i>
+                                        <p>Incident Analysis Report</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/vehicle-ranking" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/vehicle-ranking') }">
+                                        <i class="nav-icon bi bi-trophy"></i>
+                                        <p>Vehicle Ranking Report</p>
+                                    </RouterLink>
+                                </li>
+                            </ul>
                         </li>
 
-                        <li class="nav-item" v-if="isAuthed">
+                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode }" v-if="isAuthed">
                             <RouterLink to="/alerts" class="nav-link" :class="{ active: route.name === 'alerts' }">
                                 <i class="nav-icon bi bi-bell"></i>
                                 <p>Alerts & Notifications</p>
@@ -202,7 +262,7 @@
                                 <i class="nav-icon bi bi-people-fill"></i>
                                 <p>
                                     User Management
-                                    <i class="nav-arrow bi bi-chevron-right"></i>
+                                    <i class="bi bi-chevron-right right"></i>
                                 </p>
                             </a>
                             <ul class="nav nav-treeview">
@@ -246,7 +306,7 @@
 
         <!--begin::Footer-->
         <footer class="app-footer">
-            <div class="float-end d-none d-sm-inline">Anything you want</div>
+            <div class="float-end d-none d-sm-inline">Version {{ version }}</div>
             <strong>
                 Copyright &copy; {{ year }} {{ appName }}.
             </strong>
@@ -272,6 +332,7 @@ const sidebarOpen = ref(false);
 const isProd = import.meta.env.PROD;
 const appName = document.title || 'Omayer Fleet System';
 const year = new Date().getFullYear();
+const version = import.meta.env.VITE_APP_VERSION || '1.0.0';
 const unreadCount = ref(0);
 const myDeviceIds = ref([]);
 let echoChannel = null;
@@ -279,12 +340,18 @@ let echoChannel = null;
 const isTestingMode = ref(false);
 provide('isTestingMode', isTestingMode);
 
+
 const checkTestingMode = () => {
-    // Support both lowercase and camelCase
+    // Check for environment variable configuration
+    const envTestingMode = import.meta.env.VITE_TESTING_MODE;
+
+    // Support both lowercase and camelCase query params
     const rawQ = route.query.testingmode ?? route.query.testingMode;
     const q = rawQ !== null && rawQ !== undefined ? String(rawQ) : null;
 
-    if (q === '1') {
+    if (envTestingMode === 'true') {
+        isTestingMode.value = true;
+    } else if (q === '1') {
         console.log('testingMode on hai');
         localStorage.setItem('testingMode', '1');
         isTestingMode.value = true;
@@ -377,8 +444,10 @@ const listenForAlerts = () => {
     }
 };
 
+
 // Dev-only broadcast ping to ensure updates flow (mirrors LiveTracking)
 let broadcastPing = null;
+
 
 watch(isAuthed, (val) => {
     if (val) {
@@ -553,6 +622,7 @@ function toggleSidebar(ev) {
     lastToggleTs = now;
     try {
         const body = document.body;
+        // Icon toggling is handled by Vue reactivity on sidebarOpen
         const isOpen = body.classList.contains('sidebar-open');
         if (isOpen) {
             body.classList.remove('sidebar-open');
@@ -567,6 +637,11 @@ function toggleSidebar(ev) {
         sidebarOpen.value = !sidebarOpen.value;
     }
 }
+
+onMounted(async () => {
+    // Sync initial state with body class
+    sidebarOpen.value = document.body.classList.contains('sidebar-open');
+});
 </script>
 
 <style scoped>
@@ -659,4 +734,11 @@ nav a.router-link-exact-active {
 .name-text { color: #0b0f28; }
 .chevron { color: #0b0f28; font-size: 18px; }
 .role-badge { font-size: 10px; line-height: 1; color: #6b7280; border: 1px solid #e5e7eb; border-radius: 999px; padding: 1px 6px; text-transform: capitalize; }
+:global(body:not(.sidebar-collapse) .app-sidebar .nav-link .nav-icon) { margin-right: 0.5rem; }
+:global(body:not(.sidebar-collapse) .app-sidebar .nav-link p) { display: flex; align-items: center; justify-content: space-between; }
+
+@media (min-width: 992px) {
+    :global(body.sidebar-mini.sidebar-collapse .app-sidebar:not(:hover) .nav-link) { justify-content: center; }
+    :global(body.sidebar-mini.sidebar-collapse .app-sidebar:not(:hover) .nav-link .nav-icon) { margin-right: 0 !important; }
+}
 </style>

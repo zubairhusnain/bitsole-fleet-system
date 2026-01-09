@@ -22,7 +22,9 @@ function setBodyClasses(to) {
     const guestClass = to.name === 'register' ? 'register-page' : 'login-page';
     body.className = `${guestClass} bg-body-secondary`;
   } else {
-    body.className = `layout-fixed sidebar-expand-lg ${isMobile ? 'sidebar-collapse' : 'sidebar-open'} bg-body-tertiary`;
+    const keepOpen = !isMobile && body.classList.contains('sidebar-open');
+    const sidebarStateClass = isMobile ? 'sidebar-collapse' : (keepOpen ? 'sidebar-open' : 'sidebar-collapse');
+    body.className = `layout-fixed sidebar-expand-lg sidebar-mini ${sidebarStateClass} bg-body-tertiary`;
   }
 }
 

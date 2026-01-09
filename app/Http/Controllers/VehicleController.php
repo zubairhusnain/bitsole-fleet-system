@@ -114,24 +114,19 @@ class VehicleController extends Controller
         }
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
-            'type','manufacturer','color','registration','plate','odometer','fuelAverage','maxSpeed','speedLimit','photos','fuelTankCapacity','trackerModel',
-            'fuelType','fuel_type','vehicleNo'
+            'type','manufacturer','color','registration','plate','odometer','fuelAverage','photos','fuelTankCapacity','trackerModel',
+            'fuelType','fuel_type','vehicleNo','speedLimit'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
         // Validate numeric attributes
-        if (array_key_exists('maxSpeed', $attributes) && $attributes['maxSpeed'] !== null && $attributes['maxSpeed'] !== '') {
-            $msStr = (string) $attributes['maxSpeed'];
-            if (!preg_match('/^\d+$/', $msStr)) {
-                return response()->json(['message' => 'Max Speed must be numeric and >= 0'], 422);
-            }
-        }
         if (array_key_exists('speedLimit', $attributes) && $attributes['speedLimit'] !== null && $attributes['speedLimit'] !== '') {
             $slStr = (string) $attributes['speedLimit'];
             if (!preg_match('/^\d+$/', $slStr)) {
                 return response()->json(['message' => 'Speed Limit must be numeric and >= 0'], 422);
             }
         }
+
         if (array_key_exists('fuelTankCapacity', $attributes) && $attributes['fuelTankCapacity'] !== null && $attributes['fuelTankCapacity'] !== '') {
             $capStr = (string) $attributes['fuelTankCapacity'];
             if (!preg_match('/^\d+(?:\.\d+)?$/', $capStr)) {
@@ -277,24 +272,19 @@ class VehicleController extends Controller
         }
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
-            'type','manufacturer','color','registration','plate','odometer','fuelAverage','maxSpeed','speedLimit','photos','fuelTankCapacity','trackerModel',
-            'fuelType','fuel_type','vehicleNo'
+            'type','manufacturer','color','registration','plate','odometer','fuelAverage','photos','fuelTankCapacity','trackerModel',
+            'fuelType','fuel_type','vehicleNo','speedLimit'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
         // Validate numeric attributes
-        if (array_key_exists('maxSpeed', $attributes) && $attributes['maxSpeed'] !== null && $attributes['maxSpeed'] !== '') {
-            $msStr = (string) $attributes['maxSpeed'];
-            if (!preg_match('/^\d+$/', $msStr)) {
-                return response()->json(['message' => 'Max Speed must be numeric and >= 0'], 422);
-            }
-        }
         if (array_key_exists('speedLimit', $attributes) && $attributes['speedLimit'] !== null && $attributes['speedLimit'] !== '') {
             $slStr = (string) $attributes['speedLimit'];
             if (!preg_match('/^\d+$/', $slStr)) {
                 return response()->json(['message' => 'Speed Limit must be numeric and >= 0'], 422);
             }
         }
+
         if (array_key_exists('fuelTankCapacity', $attributes) && $attributes['fuelTankCapacity'] !== null && $attributes['fuelTankCapacity'] !== '') {
             $capStr = (string) $attributes['fuelTankCapacity'];
             if (!preg_match('/^\d+(?:\.\d+)?$/', $capStr)) {
@@ -366,6 +356,7 @@ class VehicleController extends Controller
         ]);
 
         $tracking = app(\App\Services\DeviceService::class)->deviceUpdate($request);
+
         if (!isset($tracking->responseCode) || $tracking->responseCode < 200 || $tracking->responseCode >= 300) {
             return response()->json([
                 'message' => 'Failed to update device on tracking server',
@@ -687,13 +678,32 @@ class VehicleController extends Controller
         $ids = is_array($ids) ? $ids : [$ids];
         $ids = array_values(array_filter(array_map('intval', $ids), fn($v) => $v > 0));
         $results = [];
+
         foreach ($ids as $geoId) {
             try {
                 $resp = $this->permissionService->assignGeofence($request, $deviceId, $geoId, 'POST');
-                $results[] = ['geofenceId' => $geoId, 'ok' => true, 'response' => $resp->response ?? null];
+                $code = (int) ($resp->responseCode ?? 0);
+                if ($code >= 200 && $code < 300) {
+                    $results[] = ['geofenceId' => $geoId, 'ok' => true, 'response' => $resp->response ?? null];
+                } else {
+                    $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $resp->response ?? 'Traccar error', 'code' => $code];
+                }
             } catch (\Throwable $e) {
                 $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $e->getMessage()];
             }
+        }
+
+        $hasError = false;
+        $firstError = '';
+        foreach ($results as $res) {
+            if (!$res['ok']) {
+                $hasError = true;
+                $firstError = $res['error'] ?? 'Unknown error';
+                break;
+            }
+        }
+        if ($hasError) {
+             return response()->json(['message' => 'Failed to assign zones: ' . $firstError, 'assigned' => $results], 400);
         }
         return response()->json(['assigned' => $results]);
     }
@@ -710,10 +720,28 @@ class VehicleController extends Controller
         foreach ($ids as $geoId) {
             try {
                 $resp = $this->permissionService->assignGeofence($request, $deviceId, $geoId, 'DELETE');
-                $results[] = ['geofenceId' => $geoId, 'ok' => true, 'response' => $resp->response ?? null];
+                $code = (int) ($resp->responseCode ?? 0);
+                if ($code >= 200 && $code < 300) {
+                    $results[] = ['geofenceId' => $geoId, 'ok' => true, 'response' => $resp->response ?? null];
+                } else {
+                    $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $resp->response ?? 'Traccar error', 'code' => $code];
+                }
             } catch (\Throwable $e) {
                 $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $e->getMessage()];
             }
+        }
+
+        $hasError = false;
+        $firstError = '';
+        foreach ($results as $res) {
+            if (!$res['ok']) {
+                $hasError = true;
+                $firstError = $res['error'] ?? 'Unknown error';
+                break;
+            }
+        }
+        if ($hasError) {
+             return response()->json(['message' => 'Failed to unassign zones: ' . $firstError, 'unassigned' => $results], 400);
         }
         return response()->json(['unassigned' => $results]);
     }
@@ -824,6 +852,7 @@ class VehicleController extends Controller
         // Handle bulk assignment
         if ($request->has('items') && is_array($request->input('items'))) {
             $items = $request->input('items');
+            Log::info('Bulk assigning notifications', ['count' => count($items), 'deviceId' => $deviceId]);
             $results = [];
             foreach ($items as $item) {
                 $notificationId = (int) ($item['notificationId'] ?? 0);
@@ -831,17 +860,26 @@ class VehicleController extends Controller
 
                 // Create a new request instance with merged data for this item
                 $mergedData = array_merge($request->all(), $item);
-                // Pass merged data as 2nd argument (request/POST params) to ensure it overrides body
-                // First argument (query) is null, so it inherits from original (likely empty)
-                $itemReq = $request->duplicate(null, $mergedData);
+
+                // Override CONTENT_TYPE to ensure input() reads from request parameters
+                // instead of JSON payload (which duplicate() doesn't update)
+                $server = array_merge($request->server->all(), [
+                    'CONTENT_TYPE' => 'application/x-www-form-urlencoded',
+                    'REQUEST_METHOD' => 'POST'
+                ]);
+
+                // Pass merged data as 2nd argument (request/POST params)
+                $itemReq = $request->duplicate(null, $mergedData, null, null, null, $server);
 
                 // assignNotification relies on $request->user()
                 $itemReq->setUserResolver(fn () => $request->user());
 
                 try {
+                    // Log::info('Assigning notification item', ['nid' => $notificationId, 'already_xist' => $itemReq->input('already_xist')]);
                     $resp = $this->permissionService->assignNotification($itemReq, $deviceId, $notificationId);
                     $results[] = ['notificationId' => $notificationId, 'ok' => true, 'response' => $resp];
                 } catch (\Throwable $e) {
+                    Log::error('Assign notification error', ['nid' => $notificationId, 'error' => $e->getMessage()]);
                     $results[] = ['notificationId' => $notificationId, 'ok' => false, 'error' => $e->getMessage()];
                 }
             }
