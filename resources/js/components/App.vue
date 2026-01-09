@@ -3,7 +3,6 @@
     <template v-if="isGuestPage">
         <RouterView />
     </template>
-
     <!-- Admin layout mirrors layout-sample.blade.php -->
     <div v-else class="app-wrapper" :class="{ 'live-tracking-route': route.name === 'live-tracking' }">
         <!--begin::Header-->
@@ -14,7 +13,7 @@
                 <ul class="navbar-nav">
                     <li class="nav-item">
                         <a class="nav-link toggle-btn" href="#" role="button" @click.stop.prevent="toggleSidebar($event)" @touchend.stop.prevent="toggleSidebar($event)" aria-label="Toggle sidebar">
-                            <i class="bi caret-toggle" :class="sidebarOpen ? 'bi-caret-left-fill' : 'bi-caret-right-fill'"></i>
+                            <i class="bi caret-toggle sidebar-toggle" :class="sidebarOpen ? 'bi-caret-right-fill' : 'bi-caret-left-fill'"></i>
                         </a>
                     </li>
                 </ul>
@@ -623,6 +622,7 @@ function toggleSidebar(ev) {
     lastToggleTs = now;
     try {
         const body = document.body;
+        // Icon toggling is handled by Vue reactivity on sidebarOpen
         const isOpen = body.classList.contains('sidebar-open');
         if (isOpen) {
             body.classList.remove('sidebar-open');
@@ -637,6 +637,11 @@ function toggleSidebar(ev) {
         sidebarOpen.value = !sidebarOpen.value;
     }
 }
+
+onMounted(async () => {
+    // Sync initial state with body class
+    sidebarOpen.value = document.body.classList.contains('sidebar-open');
+});
 </script>
 
 <style scoped>
@@ -729,6 +734,11 @@ nav a.router-link-exact-active {
 .name-text { color: #0b0f28; }
 .chevron { color: #0b0f28; font-size: 18px; }
 .role-badge { font-size: 10px; line-height: 1; color: #6b7280; border: 1px solid #e5e7eb; border-radius: 999px; padding: 1px 6px; text-transform: capitalize; }
-.app-sidebar .nav-link .nav-icon { margin-right: 0.5rem; }
-.app-sidebar .nav-link p { display: flex; align-items: center; justify-content: space-between; }
+:global(body:not(.sidebar-collapse) .app-sidebar .nav-link .nav-icon) { margin-right: 0.5rem; }
+:global(body:not(.sidebar-collapse) .app-sidebar .nav-link p) { display: flex; align-items: center; justify-content: space-between; }
+
+@media (min-width: 992px) {
+    :global(body.sidebar-mini.sidebar-collapse .app-sidebar:not(:hover) .nav-link) { justify-content: center; }
+    :global(body.sidebar-mini.sidebar-collapse .app-sidebar:not(:hover) .nav-link .nav-icon) { margin-right: 0 !important; }
+}
 </style>
