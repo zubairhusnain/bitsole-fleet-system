@@ -27,10 +27,10 @@
       @vite([
         'resources/css/app.css',
         'resources/js/app.js',
-      ])
+      ]) 
     @endif
   </head>
-  <body class="layout-fixed sidebar-expand-lg sidebar-mini sidebar-collapse bg-body-tertiary">
+  <body class="layout-fixed sidebar-expand-lg sidebar-mini sidebar-open bg-body-tertiary">
     <div id="app"></div>
 
     <!-- Footer scripts aligned with AdminLTE samples -->
