@@ -591,6 +591,20 @@
                                 <dd class="col-7 small mb-2">{{ fuelType || '-' }}</dd>
                                 <dt class="col-5 text-muted small">Speed Limit</dt>
                                 <dd class="col-7 small mb-2">{{ speedLimit ? speedLimit + ' km/h' : '-' }}</dd>
+                                <dt class="col-5 text-muted small">Speed</dt>
+                                <dd class="col-7 small mb-2">{{ speedDisplay }}</dd>
+                                <dt class="col-5 text-muted small">Device Battery</dt>
+                                <dd class="col-7 small mb-2">{{ batteryDisplay }}</dd>
+                                <dt class="col-5 text-muted small">Odometer</dt>
+                                <dd class="col-7 small mb-2">{{ odometerDisplay }}</dd>
+
+
+                                <dt class="col-5 text-muted small">Max Speed</dt>
+                                <dd class="col-7 small mb-2">{{ maxSpeed ? maxSpeed + ' km/h' : '-' }}</dd>
+                                <dt class="col-5 text-muted small">Fuel Type</dt>
+                                <dd class="col-7 small mb-2">{{ fuelType || '-' }}</dd>
+                                <dt class="col-5 text-muted small">Speed Limit</dt>
+                                <dd class="col-7 small mb-2">{{ speedLimit ? speedLimit + ' km/h' : '-' }}</dd>
                                 <dt class="col-5 text-muted small">Device Source</dt>
                                 <dd class="col-7 small mb-2">{{ deviceSourceLabel }}</dd>
                                 <dt class="col-5 text-muted small">Location</dt>
@@ -639,53 +653,11 @@
                                 </dl>
                             </div>
                         </div>
-                        <div class="card rounded-3">
+                        <div class="card rounded-3 d-none">
                             <div class="card-header">
                                 <h6 class="mb-0">Vehicle Rating</h6>
                             </div>
                             <div class="card-body">
-                                <div class="small text-muted mb-2">This rating reflects your vehicle during driving.
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <div>Fuel Average</div>
-                                    <div class="fw-semibold">{{ formatNumber(rating?.avgFuel_l_per_100km, 1) }} L/100km</div>
-                                </div>
-                                <div class="progress mb-3" style="height: 6px;">
-                                    <div class="progress-bar bg-info" role="progressbar"
-                                        :style="{ width: fuelPercent + '%' }"></div>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <div>Avg Speed</div>
-                                    <div class="fw-semibold">{{ formatNumber(rating?.avgSpeed_kph, 1) }} km/h</div>
-                                </div>
-                                <div class="progress mb-3" style="height: 6px;">
-                                    <div class="progress-bar bg-primary" role="progressbar"
-                                        :style="{ width: speedPercent + '%' }"></div>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <div>Brake events</div>
-                                    <div class="fw-semibold">{{ (rating?.harshBraking ?? 0) }}</div>
-                                </div>
-                                <div class="progress mb-3" style="height: 6px;">
-                                    <div class="progress-bar bg-warning" role="progressbar"
-                                        :style="{ width: brakePercent + '%' }"></div>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <div>Overspeed events</div>
-                                    <div class="fw-semibold">{{ (rating?.overspeedEvents ?? 0) }}</div>
-                                </div>
-                                <div class="progress mb-3" style="height: 6px;">
-                                    <div class="progress-bar bg-danger" role="progressbar"
-                                        :style="{ width: overspeedPercent + '%' }"></div>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>Overall Rating</div>
-                                    <div class="fw-semibold">{{ overallScoreDisplay }}</div>
-                                </div>
-                                <div class="progress" style="height: 8px;">
-                                    <div class="progress-bar" role="progressbar"
-                                        :style="{ width: (rating?.overallScore ?? 0) + '%' }"></div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -1798,49 +1770,9 @@ const batteryMobileRaw = computed(() => positionPickAttr(['battery', 'Battery', 
 const batteryTrackerRaw = computed(() => positionPickAttr(['batterylevel', 'batteryLevel', 'battery_level', 'voltage', 'batteryVoltage', 'power', 'battery', 'Battery']));
 const batteryDisplay = computed(() => {
     const a = positionAttrs.value || {};
-
-    // Priority 1: Battery_io_67
-    const bio67 = a.Battery_io_67;
-    if (bio67 !== undefined && bio67 !== null && bio67 !== '') {
-        const s = String(bio67).trim();
-        const n = extractNumber(s);
-        if (Number.isFinite(n)) {
-            if (n !== -1) {
-                const fixed = Math.abs(n) >= 10 ? n.toFixed(1) : n.toFixed(2);
-                return `${fixed} V`;
-            }
-        } else {
-            return hasVoltageUnit(s) ? s : `${s} V`;
-        }
-    }
-
-    // Priority 2: CAN_Battery_io_168
-    const canBio168 = a.CAN_Battery_io_168;
-    if (canBio168 !== undefined && canBio168 !== null && canBio168 !== '') {
-        const s = String(canBio168).trim();
-        const n = extractNumber(s);
-        if (Number.isFinite(n)) {
-            if (n !== -1) {
-                const fixed = Math.abs(n) >= 10 ? n.toFixed(1) : n.toFixed(2);
-                return `${fixed} V`;
-            }
-        } else {
-            return hasVoltageUnit(s) ? s : `${s} V`;
-        }
-    }
-
-    const bl = a.batteryLevel;
-    if (bl !== undefined && bl !== null && bl !== '') {
-        const s = String(bl).trim();
-        const n = extractNumber(s);
-        if (Number.isFinite(n)) {
-            return `${Math.round(n)} %`;
-        }
-        return hasPercentUnit(s) ? s : `${s} %`;
-    }
-    const bv = a.battery;
-    if (bv !== undefined && bv !== null && bv !== '') {
-        const s = String(bv).trim();
+    const val = a.power;
+    if (val !== undefined && val !== null && val !== '') {
+        const s = String(val).trim();
         const n = extractNumber(s);
         if (Number.isFinite(n)) {
             const fixed = Math.abs(n) >= 10 ? n.toFixed(1) : n.toFixed(2);
@@ -1851,74 +1783,26 @@ const batteryDisplay = computed(() => {
     return '-';
 });
 
-// Calibrated voltage→percent mapping (piecewise linear), tuned for 1S Li-ion
-function voltageToPercent(v) {
-    const points = [
-        [3.40, 0],
-        [3.70, 10],
-        [3.80, 25],
-        [3.90, 60],
-        [3.96, 90],
-        [4.00, 95],
-        [4.20, 100],
-    ];
-    if (!Number.isFinite(v)) return null;
-    if (v <= points[0][0]) return 0;
-    if (v >= points[points.length - 1][0]) return 100;
-    for (let i = 1; i < points.length; i++) {
-        const [vx, px] = points[i];
-        const [vPrev, pPrev] = points[i - 1];
-        if (v <= vx) {
-            const t = (v - vPrev) / (vx - vPrev);
-            const p = pPrev + t * (px - pPrev);
-            return Math.max(0, Math.min(100, Math.round(p)));
-        }
-    }
-    return null;
-}
-
-// Battery percent for icon fill (percent for mobile, voltage→percent for trackers)
+// Battery percent for icon fill (tuned for vehicle voltage)
 const batteryLevelPercent = computed(() => {
     const a = positionAttrs.value || {};
-
-    // Priority 1: Battery_io_67
-    const bio67 = a.Battery_io_67;
-    if (bio67 !== undefined && bio67 !== null && bio67 !== '') {
-        const s = String(bio67).trim();
-        const n = extractNumber(s);
+    const val = a.power;
+    if (val !== undefined && val !== null && val !== '') {
+        const n = extractNumber(val);
         if (Number.isFinite(n)) {
-            if (n !== -1) {
-                if (hasPercentUnit(s)) return Math.max(0, Math.min(100, Math.round(n)));
-                return voltageToPercent(n);
-            }
+            // Assume 12V/24V system: if > 11V, treat as "good" (green)
+            // if < 11V but > 10V, "warning" (yellow)
+            // if < 10V, "critical" (red)
+            // We map this to a "percent" for color logic:
+            // >11.5 -> 100% (Green)
+            // 10-11.5 -> 40% (Amber)
+            // <10 -> 10% (Red)
+            if (n >= 11.5) return 100;
+            if (n >= 10) return 40;
+            return 10;
         }
     }
-
-    // Priority 2: CAN_Battery_io_168
-    const canBio168 = a.CAN_Battery_io_168;
-    if (canBio168 !== undefined && canBio168 !== null && canBio168 !== '') {
-        const s = String(canBio168).trim();
-        const n = extractNumber(s);
-        if (Number.isFinite(n)) {
-            if (n !== -1) {
-                if (hasPercentUnit(s)) return Math.max(0, Math.min(100, Math.round(n)));
-                return voltageToPercent(n);
-            }
-        }
-    }
-
-    const bl = a.batteryLevel;
-    if (bl !== undefined && bl !== null && bl !== '') {
-        const n = extractNumber(bl);
-        if (!Number.isFinite(n)) return null;
-        return Math.max(0, Math.min(100, Math.round(n)));
-    }
-    const bv = a.battery;
-    if (bv !== undefined && bv !== null && bv !== '') {
-        const v = extractNumber(bv);
-        return voltageToPercent(v);
-    }
-    return null;
+    return 0; // Gray
 });
 const batteryIconFill = computed(() => {
     const p = batteryLevelPercent.value;
