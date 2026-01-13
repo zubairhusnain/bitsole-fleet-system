@@ -722,19 +722,19 @@
                         </div>
                         <!-- Pagination Controls -->
                         <div class="d-flex justify-content-between align-items-center mt-3" v-if="totalTrips > 0">
-                            <div class="small text-muted">
+                            <div class="text-muted small">
                                 Showing {{ (currentPage - 1) * perPage + 1 }} to {{ Math.min(currentPage * perPage, totalTrips) }} of {{ totalTrips }} trips
                             </div>
                             <nav aria-label="Trip pagination">
-                                <ul class="pagination pagination-sm mb-0">
+                                <ul class="pagination pagination-sm mb-0 pagination-app">
                                     <li class="page-item" :class="{ disabled: currentPage === 1 }">
-                                        <button class="page-link" @click="changePage(currentPage - 1)" :disabled="currentPage === 1">Previous</button>
+                                        <button class="page-link" @click="changePage(currentPage - 1)" :disabled="currentPage === 1">‹</button>
                                     </li>
                                     <li class="page-item" :class="{ active: currentPage === p, disabled: p === '...' }" v-for="(p, idx) in visiblePages" :key="idx">
                                         <button class="page-link" @click="changePage(p)">{{ p }}</button>
                                     </li>
                                     <li class="page-item" :class="{ disabled: currentPage === lastPage }">
-                                        <button class="page-link" @click="changePage(currentPage + 1)" :disabled="currentPage === lastPage">Next</button>
+                                        <button class="page-link" @click="changePage(currentPage + 1)" :disabled="currentPage === lastPage">›</button>
                                     </li>
                                 </ul>
                             </nav>
@@ -1351,7 +1351,7 @@ async function fetchTripsByFilter() {
         loadingTrips.value = false;
     }
 }
- 
+
 function changePage(p) {
     if (p === '...' || p < 1 || p > lastPage.value || p === currentPage.value) return;
     currentPage.value = p;
