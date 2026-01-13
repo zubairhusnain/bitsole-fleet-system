@@ -1029,6 +1029,4 @@ class DeviceService
         return $resp;
     }
 
-    use \App\Traits\GeocodingTrait;
-
 }
