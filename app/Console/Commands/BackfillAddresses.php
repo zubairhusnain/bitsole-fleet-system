@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Traits\GeocodingTrait;
 
 class BackfillAddresses extends Command
@@ -51,6 +52,7 @@ class BackfillAddresses extends Command
                 $msg .= " for Device ID: $deviceId";
             }
             $this->info($msg . "...");
+            Log::info("[BackfillAddresses] " . $msg);
 
             // Fetch positions with missing address
             // Order by ID descending to fix newest entries first
@@ -70,13 +72,18 @@ class BackfillAddresses extends Command
 
             if ($positions->isEmpty()) {
                 $this->info("No positions found with missing addresses.");
+                Log::info("[BackfillAddresses] No positions found with missing addresses.");
                 break;
             }
 
             $this->info("Found " . $positions->count() . " positions. Processing...");
+            Log::info("[BackfillAddresses] Found " . $positions->count() . " positions. Processing...");
 
             $bar = $this->output->createProgressBar($positions->count());
             $bar->start();
+
+            $updatedCount = 0;
+            $failedCount = 0;
 
             foreach ($positions as $pos) {
                 $address = $this->getAddress($pos->latitude, $pos->longitude);
@@ -85,6 +92,10 @@ class BackfillAddresses extends Command
                     DB::connection('pgsql')->table('tc_positions')
                         ->where('id', $pos->id)
                         ->update(['address' => $address]);
+
+                    $updatedCount++;
+                } else {
+                    $failedCount++;
                 }
 
                 // Respect Nominatim Rate Limit (1 req/sec)
@@ -96,6 +107,8 @@ class BackfillAddresses extends Command
 
             $bar->finish();
             $this->newLine();
+
+            Log::info("[BackfillAddresses] Batch Result: Updated: $updatedCount, Failed: $failedCount");
 
             if ($continuous) {
                 $this->info("Batch completed. Continuing to next batch...");
