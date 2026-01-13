@@ -714,10 +714,10 @@
                                         <td class="small">{{ formatDistanceKm(t.distance) }}</td>
                                         <td class="small">{{ formatDuration(t.duration) }}</td>
                                         <td class="small">{{ formatSpeedKmh(t.averageSpeed ?? t.average_speed) }}</td>
-                                        <td class="small text-truncate" style="max-width: 200px;" :title="t.startAddress || t.start_address">{{ t.startAddress || t.start_address || '-' }}</td>
-                                        <td class="small text-truncate" style="max-width: 200px;" :title="t.endAddress || t.end_address">{{ t.endAddress || t.end_address || '-' }}</td>
+                                        <td class="small" style="max-width: 200px; white-space: normal;">{{ t.startAddress || t.start_address || '-' }}</td>
+                                        <td class="small" style="max-width: 200px; white-space: normal;">{{ t.endAddress || t.end_address || '-' }}</td>
                                     </tr>
-                                </tbody>
+                                </tbody> 
                             </table>
                         </div>
                         <!-- Pagination Controls -->
