@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use App\Traits\GeocodingTrait;
 
 class BackfillAddresses extends Command
@@ -16,7 +17,7 @@ class BackfillAddresses extends Command
      *
      * @var string
      */
-    protected $signature = 'traccar:backfill-addresses {--limit=30} {--device_id=} {--continuous}';
+    protected $signature = 'traccar:backfill-addresses {--limit=100} {--device_id=} {--continuous}';
 
     /**
      * The console command description.
@@ -89,6 +90,12 @@ class BackfillAddresses extends Command
                 $failedCount = 0;
 
                 foreach ($positions as $pos) {
+                    // Check cache first to avoid sleep if possible
+                    $lat = round((float)$pos->latitude, 4);
+                    $lon = round((float)$pos->longitude, 4);
+                    $cacheKey = "geo_addr_{$lat}_{$lon}";
+                    $isCached = Cache::has($cacheKey);
+
                     $address = $this->getAddress($pos->latitude, $pos->longitude);
 
                     if (!empty($address)) {
@@ -102,8 +109,10 @@ class BackfillAddresses extends Command
                     }
 
                     // Respect Nominatim Rate Limit (1 req/sec)
-                    // Sleep 1.5s to be safe
-                    usleep(1500000);
+                    // Only sleep if we actually made an API request (not cached)
+                    if (!$isCached) {
+                        usleep(1000000); // 1.0s is enough for Nominatim (limit is 1s)
+                    }
 
                     $bar->advance();
                 }
