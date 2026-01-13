@@ -16,7 +16,7 @@ class BackfillAddresses extends Command
      *
      * @var string
      */
-    protected $signature = 'traccar:backfill-addresses {--limit=10} {--device_id=} {--continuous}';
+    protected $signature = 'traccar:backfill-addresses {--limit=30} {--device_id=} {--continuous}';
 
     /**
      * The console command description.
