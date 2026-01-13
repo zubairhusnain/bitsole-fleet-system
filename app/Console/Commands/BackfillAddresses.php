@@ -72,46 +72,50 @@ class BackfillAddresses extends Command
 
             if ($positions->isEmpty()) {
                 $this->info("No positions found with missing addresses.");
-                Log::info("[BackfillAddresses] No positions found with missing addresses.");
-                break;
-            }
-
-            $this->info("Found " . $positions->count() . " positions. Processing...");
-            Log::info("[BackfillAddresses] Found " . $positions->count() . " positions. Processing...");
-
-            $bar = $this->output->createProgressBar($positions->count());
-            $bar->start();
-
-            $updatedCount = 0;
-            $failedCount = 0;
-
-            foreach ($positions as $pos) {
-                $address = $this->getAddress($pos->latitude, $pos->longitude);
-
-                if (!empty($address)) {
-                    DB::connection('pgsql')->table('tc_positions')
-                        ->where('id', $pos->id)
-                        ->update(['address' => $address]);
-
-                    $updatedCount++;
+                if ($continuous) {
+                    sleep(10); // Wait before retrying in continuous mode
                 } else {
-                    $failedCount++;
+                    Log::info("[BackfillAddresses] No positions found with missing addresses.");
+                    break;
+                }
+            } else {
+                $this->info("Found " . $positions->count() . " positions. Processing...");
+                Log::info("[BackfillAddresses] Found " . $positions->count() . " positions. Processing...");
+
+                $bar = $this->output->createProgressBar($positions->count());
+                $bar->start();
+
+                $updatedCount = 0;
+                $failedCount = 0;
+
+                foreach ($positions as $pos) {
+                    $address = $this->getAddress($pos->latitude, $pos->longitude);
+
+                    if (!empty($address)) {
+                        DB::connection('pgsql')->table('tc_positions')
+                            ->where('id', $pos->id)
+                            ->update(['address' => $address]);
+
+                        $updatedCount++;
+                    } else {
+                        $failedCount++;
+                    }
+
+                    // Respect Nominatim Rate Limit (1 req/sec)
+                    // Sleep 1.5s to be safe
+                    usleep(1500000);
+
+                    $bar->advance();
                 }
 
-                // Respect Nominatim Rate Limit (1 req/sec)
-                // Sleep 1.5s to be safe
-                usleep(1500000);
+                $bar->finish();
+                $this->newLine();
 
-                $bar->advance();
-            }
+                Log::info("[BackfillAddresses] Batch Result: Updated: $updatedCount, Failed: $failedCount");
 
-            $bar->finish();
-            $this->newLine();
-
-            Log::info("[BackfillAddresses] Batch Result: Updated: $updatedCount, Failed: $failedCount");
-
-            if ($continuous) {
-                $this->info("Batch completed. Continuing to next batch...");
+                if ($continuous) {
+                    $this->info("Batch completed. Continuing to next batch...");
+                }
             }
 
         } while ($continuous);
