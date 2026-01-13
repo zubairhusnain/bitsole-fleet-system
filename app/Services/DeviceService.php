@@ -393,7 +393,7 @@ class DeviceService
      * Return trips for a device over a time window.
      * Options: from, to (string|int)
      */
-    public function getTrips(User $user, int $deviceId, array $options = []): array
+    public function getTrips(User $user, int $deviceId, array $options = [])
     {
         $toIso = isset($options['to'])
             ? gmdate('Y-m-d H:i:s', is_numeric($options['to']) ? (int)$options['to'] : strtotime((string)$options['to']))
@@ -402,10 +402,10 @@ class DeviceService
             ? gmdate('Y-m-d H:i:s', is_numeric($options['from']) ? (int)$options['from'] : strtotime((string)$options['from']))
             : gmdate('Y-m-d H:i:s', strtotime('-1 day'));
 
-        return $this->fetchTripsDb($deviceId, $fromIso, $toIso);
+        return $this->fetchTripsDb($deviceId, $fromIso, $toIso, $options);
     }
 
-    public function fetchTripsDb($deviceId, $from, $to)
+    public function fetchTripsDb($deviceId, $from, $to, $options = [])
     {
         try {
             // Fetch Device Name
@@ -440,7 +440,7 @@ class DeviceService
 
             $currentStart = null;
 
-            return collect($events)->map(function ($event) use (&$currentStart, $deviceId, $deviceName, $drivers) {
+            $trips = collect($events)->map(function ($event) use (&$currentStart, $deviceId, $deviceName, $drivers) {
                 if ($event->type === 'ignitionOn') {
                     $currentStart = $event;
                     return null;
@@ -510,7 +510,27 @@ class DeviceService
             })
             ->filter()
             ->values()
-            ->all();
+            ->sortByDesc('startTime')
+            ->values();
+
+            if (isset($options['paginate']) && $options['paginate']) {
+                $page = $options['page'] ?? 1;
+                $perPage = $options['perPage'] ?? 15;
+
+                $total = $trips->count();
+                $items = $trips->forPage($page, $perPage)->values()->all();
+
+                return new \Illuminate\Pagination\LengthAwarePaginator(
+                    $items,
+                    $total,
+                    $perPage,
+                    $page,
+                    ['path' => \Illuminate\Support\Facades\Request::url(), 'query' => \Illuminate\Support\Facades\Request::query()]
+                );
+            }
+
+            return $trips->all();
+
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('fetchTripsDb Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             throw $e;

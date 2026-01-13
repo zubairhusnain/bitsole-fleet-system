@@ -604,10 +604,25 @@ class VehicleController extends Controller
         $to = $request->query('to');
         if ($from) { $options['from'] = $from; }
         if ($to) { $options['to'] = $to; }
-        $trips = app(\App\Services\DeviceService::class)->getTrips($user, $deviceId, $options);
+
+        // Pagination
+        $options['paginate'] = true;
+        $options['page'] = $request->input('page', 1);
+        $options['perPage'] = $request->input('per_page', 15);
+
+        $result = app(\App\Services\DeviceService::class)->getTrips($user, $deviceId, $options);
+
         $elapsedMs = (int) round((microtime(true) - $start) * 1000);
         Log::info('Vehicle trips latency', ['deviceId' => $deviceId, 'ms' => $elapsedMs]);
-        return response()->json(['trips' => $trips, 'latencyMs' => $elapsedMs]);
+
+        return response()->json([
+            'trips' => $result->items(),
+            'total' => $result->total(),
+            'per_page' => $result->perPage(),
+            'current_page' => $result->currentPage(),
+            'last_page' => $result->lastPage(),
+            'latencyMs' => $elapsedMs
+        ]);
     }
 
     /**
