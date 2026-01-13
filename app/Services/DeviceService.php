@@ -407,109 +407,114 @@ class DeviceService
 
     public function fetchTripsDb($deviceId, $from, $to)
     {
-        // Fetch Device Name
-        $deviceName = \Illuminate\Support\Facades\DB::connection('pgsql')->table('tc_devices')->where('id', $deviceId)->value('name') ?? '';
+        try {
+            // Fetch Device Name
+            $deviceName = \Illuminate\Support\Facades\DB::connection('pgsql')->table('tc_devices')->where('id', $deviceId)->value('name') ?? '';
 
-        // 1. Fetch Ignition Events with Position Data
-        $events = \Illuminate\Support\Facades\DB::connection('pgsql')->select("
-            SELECT
-                e.id, e.type, e.eventtime, e.positionid,
-                p.latitude, p.longitude, p.address,
-                CAST(COALESCE(NULLIF(CAST(p.attributes AS json)->>'totalDistance', ''), '0') AS FLOAT) as total_distance,
-                CAST(COALESCE(NULLIF(CAST(p.attributes AS json)->>'odometer', ''), '0') AS FLOAT) as odometer,
-                CAST(p.attributes AS json)->>'driverUniqueId' as driver_unique_id
-            FROM tc_events e
-            LEFT JOIN tc_positions p ON e.positionid = p.id
-            WHERE e.deviceid = ?
-              AND e.eventtime BETWEEN ? AND ?
-              AND e.type IN ('ignitionOn', 'ignitionOff')
-            ORDER BY e.eventtime ASC
-        ", [$deviceId, $from, $to]);
+            // 1. Fetch Ignition Events with Position Data
+            $events = \Illuminate\Support\Facades\DB::connection('pgsql')->select("
+                SELECT
+                    e.id, e.type, e.eventtime, e.positionid,
+                    p.latitude, p.longitude, p.address,
+                    CAST(COALESCE(NULLIF(CAST(p.attributes AS json)->>'totalDistance', ''), '0') AS FLOAT) as total_distance,
+                    CAST(COALESCE(NULLIF(CAST(p.attributes AS json)->>'odometer', ''), '0') AS FLOAT) as odometer,
+                    CAST(p.attributes AS json)->>'driverUniqueId' as driver_unique_id
+                FROM tc_events e
+                LEFT JOIN tc_positions p ON e.positionid = p.id
+                WHERE e.deviceid = ?
+                  AND e.eventtime BETWEEN ? AND ?
+                  AND e.type IN ('ignitionOn', 'ignitionOff')
+                ORDER BY e.eventtime ASC
+            ", [$deviceId, $from, $to]);
 
-        // Pre-fetch drivers if any driverUniqueId exists
-        $driverIds = collect($events)->pluck('driver_unique_id')->filter()->unique()->toArray();
-        $drivers = [];
-        if (!empty($driverIds)) {
-            $drivers = \Illuminate\Support\Facades\DB::connection('pgsql')
-                ->table('tc_drivers')
-                ->whereIn('uniqueid', $driverIds)
-                ->pluck('name', 'uniqueid')
-                ->toArray();
-        }
-
-        $currentStart = null;
-
-        return collect($events)->map(function ($event) use (&$currentStart, $deviceId, $deviceName, $drivers) {
-            if ($event->type === 'ignitionOn') {
-                $currentStart = $event;
-                return null;
+            // Pre-fetch drivers if any driverUniqueId exists
+            $driverIds = collect($events)->pluck('driver_unique_id')->filter()->unique()->toArray();
+            $drivers = [];
+            if (!empty($driverIds)) {
+                $drivers = \Illuminate\Support\Facades\DB::connection('pgsql')
+                    ->table('tc_drivers')
+                    ->whereIn('uniqueid', $driverIds)
+                    ->pluck('name', 'uniqueid')
+                    ->toArray();
             }
 
-            if ($event->type === 'ignitionOff' && $currentStart !== null) {
-                $start = $currentStart;
-                $currentStart = null;
+            $currentStart = null;
 
-                // Close trip
-                $dist = $event->total_distance - $start->total_distance;
-                if ($dist < 0) $dist = 0;
-
-                // Duration
-                $startTime = strtotime($start->eventtime);
-                $endTime = strtotime($event->eventtime);
-                $duration = $endTime - $startTime;
-
-                // Filter noise (e.g. < 100m or < 2 min)
-                if ($duration > 120 || $dist > 100) {
-                    // Fetch Max Speed
-                    $maxSpeed = 0;
-                    try {
-                        $ms = \Illuminate\Support\Facades\DB::connection('pgsql')->selectOne("
-                            SELECT MAX(speed) as max_speed
-                            FROM tc_positions
-                            WHERE deviceid = ?
-                              AND fixtime BETWEEN ? AND ?
-                        ", [$deviceId, $start->eventtime, $event->eventtime]);
-                        $maxSpeed = $ms ? $ms->max_speed : 0;
-                    } catch (\Throwable $t) {}
-
-                    $avgSpeed = ($duration > 0) ? ($dist / $duration) * 1.94384 : 0; // m/s to knots
-
-                    $driverUniqueId = $start->driver_unique_id ?? '';
-                    $driverName = $drivers[$driverUniqueId] ?? '';
-
-                    $startAddress = $start->address;
-                    $endAddress = $event->address;
- 
-                    return [
-                        'deviceId' => $deviceId,
-                        'deviceName' => $deviceName,
-                        'distance' => $dist, // meters
-                        'averageSpeed' => $avgSpeed, // knots
-                        'maxSpeed' => $maxSpeed, // knots
-                        'spentFuel' => 0,
-                        'startOdometer' => $start->odometer,
-                        'endOdometer' => $event->odometer,
-                        'startTime' => date('Y-m-d\TH:i:s.v\Z', $startTime),
-                        'endTime' => date('Y-m-d\TH:i:s.v\Z', $endTime),
-                        'startPositionId' => $start->positionid,
-                        'endPositionId' => $event->positionid,
-                        'startLat' => $start->latitude,
-                        'startLon' => $start->longitude,
-                        'endLat' => $event->latitude,
-                        'endLon' => $event->longitude,
-                        'startAddress' => $startAddress,
-                        'endAddress' => $endAddress,
-                        'duration' => $duration * 1000, // ms
-                        'driverUniqueId' => $driverUniqueId,
-                        'driverName' => $driverName
-                    ];
+            return collect($events)->map(function ($event) use (&$currentStart, $deviceId, $deviceName, $drivers) {
+                if ($event->type === 'ignitionOn') {
+                    $currentStart = $event;
+                    return null;
                 }
-            }
-            return null;
-        })
-        ->filter()
-        ->values()
-        ->all();
+
+                if ($event->type === 'ignitionOff' && $currentStart !== null) {
+                    $start = $currentStart;
+                    $currentStart = null;
+
+                    // Close trip
+                    $dist = $event->total_distance - $start->total_distance;
+                    if ($dist < 0) $dist = 0;
+
+                    // Duration
+                    $startTime = strtotime($start->eventtime);
+                    $endTime = strtotime($event->eventtime);
+                    $duration = $endTime - $startTime;
+
+                    // Filter noise (e.g. < 100m or < 2 min)
+                    if ($duration > 120 || $dist > 100) {
+                        // Fetch Max Speed
+                        $maxSpeed = 0;
+                        try {
+                            $ms = \Illuminate\Support\Facades\DB::connection('pgsql')->selectOne("
+                                SELECT MAX(speed) as max_speed
+                                FROM tc_positions
+                                WHERE deviceid = ?
+                                  AND fixtime BETWEEN ? AND ?
+                            ", [$deviceId, $start->eventtime, $event->eventtime]);
+                            $maxSpeed = $ms ? $ms->max_speed : 0;
+                        } catch (\Throwable $t) {}
+
+                        $avgSpeed = ($duration > 0) ? ($dist / $duration) * 1.94384 : 0; // m/s to knots
+
+                        $driverUniqueId = $start->driver_unique_id ?? '';
+                        $driverName = $drivers[$driverUniqueId] ?? '';
+
+                        $startAddress = $start->address;
+                        $endAddress = $event->address;
+
+                        return [
+                            'deviceId' => $deviceId,
+                            'deviceName' => $deviceName,
+                            'distance' => $dist, // meters
+                            'averageSpeed' => $avgSpeed, // knots
+                            'maxSpeed' => $maxSpeed, // knots
+                            'spentFuel' => 0,
+                            'startOdometer' => $start->odometer,
+                            'endOdometer' => $event->odometer,
+                            'startTime' => date('Y-m-d\TH:i:s.v\Z', $startTime),
+                            'endTime' => date('Y-m-d\TH:i:s.v\Z', $endTime),
+                            'startPositionId' => $start->positionid,
+                            'endPositionId' => $event->positionid,
+                            'startLat' => $start->latitude,
+                            'startLon' => $start->longitude,
+                            'endLat' => $event->latitude,
+                            'endLon' => $event->longitude,
+                            'startAddress' => $startAddress,
+                            'endAddress' => $endAddress,
+                            'duration' => $duration * 1000, // ms
+                            'driverUniqueId' => $driverUniqueId,
+                            'driverName' => $driverName
+                        ];
+                    }
+                }
+                return null;
+            })
+            ->filter()
+            ->values()
+            ->all();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('fetchTripsDb Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            throw $e;
+        }
     }
     /**
      * Return all drivers assigned to the device from tracking server.
