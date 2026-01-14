@@ -148,7 +148,7 @@ class MonitoringController extends Controller
                 'speed' => $pos ? round($pos->speed * 1.852, 1) : 0,
                 'lat' => $pos ? $pos->latitude : 0,
                 'lng' => $pos ? $pos->longitude : 0,
-                'last_update' => $this->formatDate($pos ? $pos->servertime : $row->lastupdate),
+                'last_update' => $pos ? $pos->servertime : $row->lastupdate,
                 'address' => $pos ? $pos->address : '',
                 'type' => $attrs['type'] ?? 'Unknown',
                 'model' => $row->model ?? 'Unknown',

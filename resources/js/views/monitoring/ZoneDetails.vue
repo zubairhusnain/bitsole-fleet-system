@@ -107,7 +107,7 @@
                 <td class="text-muted small" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
                     {{ vehicle.address || '—' }}
                 </td>
-                <td>{{ vehicle.last_update || '—' }}</td>
+                <td>{{ vehicle.last_update || '—' }} </td>
                 <td class="text-center">
                     <span class="badge rounded-pill px-3 py-2" :class="isIgnitionOn(vehicle) ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'">
                         {{ isIgnitionOn(vehicle) ? 'Ignition On' : 'Ignition Off' }}
@@ -805,8 +805,11 @@ onMounted(async () => {
 
     const vlist = Array.isArray(md?.vehicles) ? md.vehicles : [];
     vehicles.value = vlist.map(v => {
-      const lat = Number(v.lat ?? v.latitude);
-      const lon = Number(v.lng ?? v.longitude);
+      const tc = v.tc_device || v.tcDevice || {};
+      const pos = tc.position || {};
+
+      const lat = Number(v.lat ?? v.latitude ?? pos.latitude);
+      const lon = Number(v.lng ?? v.longitude ?? pos.longitude);
       const valid =
         Number.isFinite(lat) &&
         Number.isFinite(lon) &&
@@ -815,17 +818,15 @@ onMounted(async () => {
         !(lat === 0 && lon === 0);
 
       const rawLastUpdate =
+        pos.servertime ||
+        pos.fixtime ||
         v.last_update ||
         v.lastReport ||
-        v.last_report ||
-        v.servertime ||
-        v.serverTime ||
-        v.fixtime ||
-        v.fixTime;
+        v.last_report;
 
       const formattedLastUpdate =
-        !rawLastUpdate || rawLastUpdate === 'Invalid Date'
-          ? '—'
+        !rawLastUpdate
+          ? '-'
           : formatDate(rawLastUpdate);
 
       return {
