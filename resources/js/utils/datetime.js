@@ -59,6 +59,10 @@ export function formatDateTime(date) {
             if (Number.isFinite(n)) d = new Date(n);
         }
 
+        if (isNaN(d.getTime())) {
+            return '-';
+        }
+
         const timeZone = getActiveTimezone();
 
         // Format: DD/MM/YYYY HH:MM:SS
@@ -73,7 +77,7 @@ export function formatDateTime(date) {
             hour12: false
         }).replace(',', '');
     } catch (e) {
-        return String(date);
+        return '-';
     }
 }
 
@@ -92,6 +96,10 @@ export function formatDate(date) {
             if (Number.isFinite(n)) d = new Date(n);
         }
 
+        if (isNaN(d.getTime())) {
+            return '-';
+        }
+
         const timeZone = getActiveTimezone();
 
         // Format: DD/MM/YYYY
@@ -102,7 +110,7 @@ export function formatDate(date) {
             day: '2-digit'
         });
     } catch (e) {
-        return String(date);
+        return '-';
     }
 }
 
@@ -121,6 +129,10 @@ export function formatTime(date) {
             if (Number.isFinite(n)) d = new Date(n);
         }
 
+        if (isNaN(d.getTime())) {
+            return '-';
+        }
+
         const timeZone = getActiveTimezone();
 
         // Format: HH:MM:SS
@@ -132,6 +144,6 @@ export function formatTime(date) {
             hour12: false
         });
     } catch (e) {
-        return String(date);
+        return '-';
     }
 }

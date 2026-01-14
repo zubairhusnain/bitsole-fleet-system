@@ -538,7 +538,7 @@ const totalPages = computed(() => Math.ceil(vehicles.value.length / pageSize));
 const startIndex = computed(() => (currentPage.value - 1) * pageSize);
 const endIndex = computed(() => startIndex.value + pageSize);
 const paginatedVehicles = computed(() => vehicles.value.slice(startIndex.value, endIndex.value));
-
+console.log('Last Report ',paginatedVehicles);
 const goToPage = (p) => currentPage.value = p;
 const prevPage = () => { if (currentPage.value > 1) currentPage.value--; };
 const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++; };
@@ -813,9 +813,24 @@ onMounted(async () => {
         Math.abs(lat) <= 90 &&
         Math.abs(lon) <= 180 &&
         !(lat === 0 && lon === 0);
+
+      const rawLastUpdate =
+        v.last_update ||
+        v.lastReport ||
+        v.last_report ||
+        v.servertime ||
+        v.serverTime ||
+        v.fixtime ||
+        v.fixTime;
+
+      const formattedLastUpdate =
+        !rawLastUpdate || rawLastUpdate === 'Invalid Date'
+          ? '—'
+          : formatDate(rawLastUpdate);
+
       return {
         ...v,
-        last_update: formatDate(v.last_update),
+        last_update: formattedLastUpdate,
         latitude: valid ? lat : undefined,
         longitude: valid ? lon : undefined,
       };
