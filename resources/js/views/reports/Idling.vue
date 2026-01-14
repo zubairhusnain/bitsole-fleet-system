@@ -166,7 +166,7 @@
 import { ref, computed, onMounted } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
-import { formatDateTime, formatTime } from '../../utils/datetime';
+import { formatDate, formatTime } from '../../utils/datetime';
 
 // State
 const devices = ref([]);
@@ -177,10 +177,10 @@ const timeFilter = ref('>120'); // Default > 2 mins
 const loading = ref(false);
 const errorMessage = ref(null);
 const reportData = ref([]);
- 
+
 // Pagination
 const currentPage = ref(1);
-const itemsPerPage = ref(20); 
+const itemsPerPage = ref(20);
 
 // Computed
 const filteredRows = computed(() => {
@@ -279,7 +279,17 @@ async function fetchReport() {
                 device_ids: [selectedDevice.value]
             }
         });
-        reportData.value = res.data;
+        const raw = Array.isArray(res.data) ? res.data : [];
+        reportData.value = raw.map((r) => {
+            const startMs = typeof r.startEpoch === 'number' ? r.startEpoch * 1000 : null;
+            const endMs = typeof r.endEpoch === 'number' ? r.endEpoch * 1000 : null;
+            return {
+                ...r,
+                date: startMs ? formatDate(startMs) : r.date,
+                startTime: startMs ? formatTime(startMs) : r.startTime,
+                endTime: endMs ? formatTime(endMs) : r.endTime
+            };
+        });
     } catch (e) {
         console.error('Failed to fetch idling report', e);
         errorMessage.value = e.response?.data?.message || 'Failed to fetch report data';

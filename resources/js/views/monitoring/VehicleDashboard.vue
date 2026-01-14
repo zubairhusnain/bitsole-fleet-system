@@ -235,6 +235,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import axios from 'axios';
 import { hasPermission } from '../../auth';
 import VehicleDetailModal from '../../components/VehicleDetailModal.vue';
+import { formatDateTime } from '../../utils/datetime';
 
 // State
 const vehicles = ref([]);
@@ -434,14 +435,7 @@ const parseAttrs = (a) => {
 };
 const formatDate = (dateStr) => {
     if (!dateStr || dateStr === 'N/A') return 'N/A';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return 'N/A';
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = String(d.getFullYear()).slice(-2);
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    return `${day}/${month}/${year}-${hours}:${minutes}`;
+    return formatDateTime(dateStr);
 };
 const placeholderImg = 'https://placehold.co/360x240/e9ecef/6c757d?text=Vehicle';
 const resolveImage = (p) => {

@@ -141,7 +141,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { formatTelemetry } from '../../utils/telemetry';
-
+import { formatDateTime } from '../../utils/datetime';
 const vehicles = ref([]);
 const vehicleOptions = ref([]);
 const groupOptions = ref([]);
@@ -170,18 +170,7 @@ const pickAttr = (attrs, keys) => {
 
 const formatDate = (dateStr) => {
     if (!dateStr || dateStr === 'N/A') return 'N/A';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return 'N/A';
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    let hours = d.getHours();
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    hours = hours ? hours : 12; // the hour '0' should be '12'
-    const strHours = String(hours).padStart(2, '0');
-    return `${day}/${month}/${year} - ${strHours}:${minutes} ${ampm}`;
+    return formatDateTime(dateStr);
 };
 
 const getSignalStatus = (sat) => {

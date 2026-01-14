@@ -300,6 +300,7 @@ import "leaflet/dist/leaflet.css";
 import { LMap, LTileLayer, LPolygon, LMarker, LPopup, LControlZoom, LCircle } from "@vue-leaflet/vue-leaflet";
 import * as L from 'leaflet';
 import UiAlert from '../../components/UiAlert.vue';
+import { formatDateTime } from '../../utils/datetime';
 
 const route = useRoute();
 const zoneId = route.params.zoneId;
@@ -328,18 +329,10 @@ const selectedMaintenanceStatus = ref('');
 const alertStatusTargetId = ref(null);
 const submittingStatus = ref(false);
 
-// Helper for date formatting
+// Helper for date formatting (timezone-aware)
 const formatDate = (dateStr) => {
     if (!dateStr || dateStr === 'N/A') return 'N/A';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return 'N/A';
-    // Format: DD/MM/YYYY - HH:mm
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    return `${day}/${month}/${year}-${hours}:${minutes}`;
+    return formatDateTime(dateStr);
 };
 
 const parseAttrs = (a) => {

@@ -70,7 +70,7 @@ Date.prototype.toLocaleString = function (locale, options) {
       if (tz) {
         return originalDateToLocaleString.call(this, locale || undefined, { ...opts, timeZone: tz });
       }
-    } 
+    }
     return originalDateToLocaleString.call(this, locale || undefined, opts);
   } catch {
     return originalDateToLocaleString.call(this, locale, options);
@@ -107,7 +107,7 @@ Date.prototype.toLocaleTimeString = function (locale, options) {
   }
 };
 
-window.Pusher = Pusher; 
+window.Pusher = Pusher;
 
 const reverbKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REVERB_APP_KEY) || 'local';
 

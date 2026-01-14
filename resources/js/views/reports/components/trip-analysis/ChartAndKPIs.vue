@@ -299,7 +299,10 @@ const idleLinePoints = computed(() => {
 const formatDateLabel = (isoDate) => {
     if (!isoDate) return '';
     const d = new Date(isoDate);
-    return `${d.getDate()}/${d.getMonth()+1}`;
+    const s = d.toLocaleDateString('en-GB');
+    const parts = s.split('/');
+    if (parts.length < 2) return s;
+    return `${parts[0]}/${parts[1]}`;
 };
 
 </script>

@@ -10,7 +10,7 @@ function getStoredTimezone() {
         return null;
     }
 }
- 
+
 export function setTimezonePreference(tz) {
     if (typeof window === 'undefined') return;
     try {
@@ -105,7 +105,7 @@ export function formatDate(date) {
         return String(date);
     }
 }
- 
+
 export function formatTime(date) {
     if (!date) return '-';
     try {
@@ -135,4 +135,3 @@ export function formatTime(date) {
         return String(date);
     }
 }
- 
