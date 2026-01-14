@@ -110,7 +110,6 @@
                 </td>
                 <td class="text-end">
                   <div class="btn-group btn-group-sm">
-                    <button v-if="hasPerm('zones','read')" class="btn btn-outline-primary" title="View" @click="goView(row.id, row.geofenceId)"><i class="bi bi-eye"></i></button>
                     <button v-if="hasPerm('zones','update')" class="btn btn-outline-secondary" title="Edit" @click="goEdit(row.id, row.geofenceId)" :disabled="row.deletedAt"><i class="bi bi-pencil"></i></button>
                     <button v-if="!row.deletedAt && hasPerm('zones','delete')" class="btn btn-outline-warning" title="Block" @click="confirmBlock(row.id, row.geofenceId)"><i class="bi bi-slash-circle"></i></button>
                     <button v-if="row.deletedAt && hasPerm('zones','update')" class="btn btn-outline-success" title="Restore" @click="restoreZone(row.id, row.geofenceId)"><i class="bi bi-arrow-counterclockwise"></i></button>
@@ -120,8 +119,8 @@
               </tr>
             </tbody>
           </table>
-        </div>
-      </div>
+        </div> 
+      </div> 
       <div class="card-footer d-flex align-items-center py-2">
         <div class="text-muted small me-auto">Showing {{ totalCount === 0 ? 0 : (startIndex + 1) }} to {{ totalCount === 0 ? 0 : Math.min(startIndex + pageSize, totalCount) }} of {{ totalCount }} results</div>
         <nav aria-label="Pagination" class="ms-auto">
@@ -252,7 +251,6 @@ async function fetchZones() {
 }
 
 function goEdit(id, geofenceId) { router.push(`/zones/${geofenceId ?? id}/edit`); }
-function goView(id, geofenceId) { router.push(`/zones/${geofenceId ?? id}/edit`); }
 async function confirmDelete(id, geofenceId) {
   if (!confirm('Permanently delete this zone? This removes the remote geofence.')) return;
   error.value = '';
