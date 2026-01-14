@@ -551,7 +551,7 @@ function getVehicleMeta(v) {
     const vehicleAttrs = parseAttrs(v.attributes);
     const attrs = { ...tcAttrs, ...vehicleAttrs };
     const brand = v.brand ?? attrs.brand ?? attrs.make ?? attrs.brandName ?? '';
-    const model = v.trackerModel ?? tc.trackerModel ?? attrs.trackerModel ?? '';
+    const model = v.model ?? tc.model ?? attrs.model ?? '';
     const plate =
         attrs.plate
         || attrs.plateNumber
