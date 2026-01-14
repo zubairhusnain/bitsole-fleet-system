@@ -714,11 +714,30 @@
                                         <td class="small">{{ formatDistanceKm(t.distance) }}</td>
                                         <td class="small">{{ formatDuration(t.duration) }}</td>
                                         <td class="small">{{ formatSpeedKmh(t.averageSpeed ?? t.average_speed) }}</td>
-                                        <td class="small">{{ t.startAddress || t.start_address || '-' }}</td>
-                                        <td class="small">{{ t.endAddress || t.end_address || '-' }}</td>
+                                        <td class="small" style="max-width: 200px; white-space: normal;">{{ t.startAddress || t.start_address || '-' }}</td>
+                                        <td class="small" style="max-width: 200px; white-space: normal;">{{ t.endAddress || t.end_address || '-' }}</td>
                                     </tr>
-                                </tbody>
+                                </tbody> 
                             </table>
+                        </div>
+                        <!-- Pagination Controls -->
+                        <div class="d-flex justify-content-between align-items-center mt-3" v-if="totalTrips > 0">
+                            <div class="text-muted small">
+                                Showing {{ (currentPage - 1) * perPage + 1 }} to {{ Math.min(currentPage * perPage, totalTrips) }} of {{ totalTrips }} trips
+                            </div>
+                            <nav aria-label="Trip pagination">
+                                <ul class="pagination pagination-sm mb-0 pagination-app">
+                                    <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                                        <button class="page-link" @click="changePage(currentPage - 1)" :disabled="currentPage === 1">‹</button>
+                                    </li>
+                                    <li class="page-item" :class="{ active: currentPage === p, disabled: p === '...' }" v-for="(p, idx) in visiblePages" :key="idx">
+                                        <button class="page-link" @click="changePage(p)">{{ p }}</button>
+                                    </li>
+                                    <li class="page-item" :class="{ disabled: currentPage === lastPage }">
+                                        <button class="page-link" @click="changePage(currentPage + 1)" :disabled="currentPage === lastPage">›</button>
+                                    </li>
+                                </ul>
+                            </nav>
                         </div>
                     </div>
                 </div>
@@ -766,6 +785,10 @@ const error = ref('');
 const driver = ref(null);
 const rating = ref(null);
 const weeklyTrips = ref([]);
+const currentPage = ref(1);
+const lastPage = ref(1);
+const perPage = ref(15);
+const totalTrips = ref(0);
 // Trip history filter state
 const tripRangePreset = ref('prev_week'); // today | prev_week | prev_month | prev_year | custom
 const customFromDate = ref('');
@@ -1267,22 +1290,77 @@ function computeTripRange() {
     return { from: from.toISOString(), to: to.toISOString() };
 }
 
+const visiblePages = computed(() => {
+    const total = lastPage.value;
+    const current = currentPage.value;
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
+    let l;
+
+    for (let i = 1; i <= total; i++) {
+        if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+            range.push(i);
+        }
+    }
+
+    for (let i of range) {
+        if (l) {
+            if (i - l === 2) {
+                rangeWithDots.push(l + 1);
+            } else if (i - l !== 1) {
+                rangeWithDots.push('...');
+            }
+        }
+        rangeWithDots.push(i);
+        l = i;
+    }
+    return rangeWithDots;
+});
+
 async function fetchTripsByFilter() {
     loadingTrips.value = true;
     try {
         const { from, to } = computeTripRange();
-        const res = await axios.get(`/web/vehicles/${deviceId.value}/trips`, { params: { from, to } });
-        const list = Array.isArray(res.data?.trips) ? res.data.trips : (Array.isArray(res.data) ? res.data : []);
-        weeklyTrips.value = list;
+        const params = {
+            from,
+            to,
+            page: currentPage.value,
+            per_page: perPage.value
+        };
+        const res = await axios.get(`/web/vehicles/${deviceId.value}/trips`, { params });
+
+        if (res.data && Array.isArray(res.data.trips)) {
+            // Paginated response
+            weeklyTrips.value = res.data.trips;
+            currentPage.value = res.data.current_page || 1;
+            lastPage.value = res.data.last_page || 1;
+            totalTrips.value = res.data.total || 0;
+        } else {
+            // Backward compatibility / Fallback
+            const list = Array.isArray(res.data?.trips) ? res.data.trips : (Array.isArray(res.data) ? res.data : []);
+            weeklyTrips.value = list;
+            totalTrips.value = list.length;
+            lastPage.value = 1;
+            currentPage.value = 1;
+        }
     } catch (e) {
         weeklyTrips.value = [];
+        totalTrips.value = 0;
     } finally {
         loadingTrips.value = false;
     }
 }
 
+function changePage(p) {
+    if (p === '...' || p < 1 || p > lastPage.value || p === currentPage.value) return;
+    currentPage.value = p;
+    fetchTripsByFilter();
+}
+
 function applyCustomRange() {
     if (!customFromDate.value || !customToDate.value) return;
+    currentPage.value = 1;
     fetchTripsByFilter();
 }
 
@@ -1477,6 +1555,7 @@ watch(currentLatLng, (ll) => {
 
 // React to preset changes (non-custom) by reloading trips
 watch(tripRangePreset, (val) => {
+    currentPage.value = 1;
     if (val !== 'custom') fetchTripsByFilter();
 });
 

@@ -136,7 +136,7 @@ class ReportService
         $to = date('Y-m-d\TH:i:00\Z', strtotime($request->to_date ?? date('Y-01-01 00:00:00')));
 
         $data = 'deviceId=' . $id . '&from=' . $from . '&to=' . $to;
-        $tripsRaw = static::curl('/api/reports/trips?' . $data, 'GET', $sessionId, '', array('Content-Type: application/json', 'Accept: application/json'));
+        $tripsRaw = static::curl('/api/reports/trips?' . $data, 'GET', $sessionId, '', array('Content-Type: application/json', 'Accept: application/json'), 120);
         // dd($tripsRaw);
         $trips = [];
         if ($tripsRaw->responseCode ==200 && isset($tripsRaw->responseCode)) {
@@ -1160,7 +1160,7 @@ class ReportService
 
         // Fuel - Placeholder
         $totalFuel = 0;
- 
+
         return [
             'rows' => $rows,
             'stops' => $stopsFormatted,
@@ -1208,9 +1208,9 @@ class ReportService
 
         try {
             $responses = Http::pool(fn (Pool $pool) => [
-                $pool->as('trips')->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
-                $pool->as('stops')->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
-                $pool->as('events')->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$fullQuery}"),
+                $pool->as('trips')->withHeaders($headers)->timeout(120)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
+                $pool->as('stops')->withHeaders($headers)->timeout(120)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
+                $pool->as('events')->withHeaders($headers)->timeout(120)->get("{$baseUrl}/api/reports/events?{$fullQuery}"),
             ]);
         } catch (\Exception $e) {
              Log::error('fetchDailyTrips exception', ['error' => $e->getMessage()]);
@@ -1966,9 +1966,9 @@ class ReportService
 
         try {
             $responses = Http::pool(fn (Pool $pool) => [
-                $pool->as('trips')->withHeaders($headers)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
-                $pool->as('events')->withHeaders($headers)->get("{$baseUrl}/api/reports/events?{$fullQuery}"),
-                $pool->as('stops')->withHeaders($headers)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
+                $pool->as('trips')->withHeaders($headers)->timeout(120)->get("{$baseUrl}/api/reports/trips?{$fullQuery}"),
+                $pool->as('events')->withHeaders($headers)->timeout(120)->get("{$baseUrl}/api/reports/events?{$fullQuery}"),
+                $pool->as('stops')->withHeaders($headers)->timeout(120)->get("{$baseUrl}/api/reports/stops?{$fullQuery}"),
             ]);
 
             $trips = collect(($responses['trips']->ok()) ? $responses['trips']->json() : []);
@@ -3749,5 +3749,7 @@ class ReportService
 
         return $rows->values();
     }
+
+    use \App\Traits\GeocodingTrait;
 
 }

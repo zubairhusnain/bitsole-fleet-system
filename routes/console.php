@@ -32,3 +32,10 @@ Schedule::command('events:check-columns')
 // Custom cleanup to keep only last 10 days
 Schedule::command('backup:cleanup-old')->daily()->at('01:00');
 Schedule::command('backup:run')->daily()->at('01:30');
+
+// Backfill missing addresses in tc_positions
+// Runs continuously (restarts if stopped) to fix blank addresses
+Schedule::command('traccar:backfill-addresses --continuous')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();
