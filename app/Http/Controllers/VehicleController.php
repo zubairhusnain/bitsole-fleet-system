@@ -582,9 +582,10 @@ class VehicleController extends Controller
     /**
      * Return the latest position for this vehicle using its current positionId.
      */
-    public function positionCurrent(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    public function positionCurrent(Request $request, $deviceId): \Illuminate\Http\JsonResponse
     {
         $user = $request->user();
+        $deviceId = (int) $deviceId;
         $pos = app(\App\Services\DeviceService::class)->getCurrentPosition($user, $deviceId);
         return response()->json(['position' => $pos]);
     }

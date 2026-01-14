@@ -53,7 +53,7 @@ class BackfillAddresses extends Command
                 $msg .= " for Device ID: $deviceId";
             }
             $this->info($msg . "...");
-            Log::info("[BackfillAddresses] " . $msg);
+            $this->safeLog("[BackfillAddresses] " . $msg);
 
             // Fetch positions with missing address
             // Order by ID descending to fix newest entries first
@@ -85,12 +85,12 @@ class BackfillAddresses extends Command
                 if ($continuous) {
                     sleep(10); // Wait before retrying in continuous mode
                 } else {
-                    Log::info("[BackfillAddresses] No positions found with missing addresses.");
+                    $this->safeLog("[BackfillAddresses] No positions found with missing addresses.");
                     break;
                 }
             } else {
                 $this->info("Found " . $positions->count() . " positions. Processing...");
-                Log::info("[BackfillAddresses] Found " . $positions->count() . " positions. Processing...");
+                $this->safeLog("[BackfillAddresses] Found " . $positions->count() . " positions. Processing...");
 
                 $bar = $this->output->createProgressBar($positions->count());
                 $bar->start();
@@ -129,7 +129,7 @@ class BackfillAddresses extends Command
                 $bar->finish();
                 $this->newLine();
 
-                Log::info("[BackfillAddresses] Batch Result: Updated: $updatedCount, Failed: $failedCount");
+                $this->safeLog("[BackfillAddresses] Batch Result: Updated: $updatedCount, Failed: $failedCount");
 
                 if ($continuous) {
                     $this->info("Batch completed. Continuing to next batch...");
@@ -141,5 +141,21 @@ class BackfillAddresses extends Command
         $this->info("Done.");
 
         return 0;
+    }
+
+    /**
+     * Safely log a message without crashing if permissions are denied.
+     *
+     * @param string $message
+     * @param string $level
+     */
+    private function safeLog($message, $level = 'info')
+    {
+        try {
+            Log::log($level, $message);
+        } catch (\Throwable $e) {
+            // Suppress logging error to prevent command crash.
+            // Optionally output to console if needed.
+        }
     }
 }
