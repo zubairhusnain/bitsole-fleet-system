@@ -102,7 +102,7 @@ class BackfillAddresses extends Command
                     // Check cache first to avoid sleep if possible
                     $lat = round((float)$pos->latitude, 4);
                     $lon = round((float)$pos->longitude, 4);
-                    $cacheKey = "geo_addr_{$lat}_{$lon}";
+                    $cacheKey = "geo_addr_en_{$lat}_{$lon}";
                     $isCached = Cache::has($cacheKey);
 
                     $address = $this->getAddress($pos->latitude, $pos->longitude);

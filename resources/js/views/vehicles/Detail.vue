@@ -717,7 +717,7 @@
                                         <td class="small" style="max-width: 200px; white-space: normal;">{{ t.startAddress || t.start_address || '-' }}</td>
                                         <td class="small" style="max-width: 200px; white-space: normal;">{{ t.endAddress || t.end_address || '-' }}</td>
                                     </tr>
-                                </tbody> 
+                                </tbody>
                             </table>
                         </div>
                         <!-- Pagination Controls -->
@@ -829,6 +829,16 @@ async function fetchGeofences() {
 
 watch(showZones, (val) => {
     if (val) fetchGeofences();
+});
+
+// When device changes, reset trip pagination and refetch trips
+watch(deviceId, (val) => {
+    try { selectedDeviceId.value = val; } catch {}
+    currentPage.value = 1;
+    lastPage.value = 1;
+    totalTrips.value = 0;
+    weeklyTrips.value = [];
+    fetchTripsByFilter();
 });
 
 const visibleZones = computed(() => {
@@ -1039,6 +1049,10 @@ async function fetchDeviceOptions() {
 function switchToSelectedDevice() {
     const id = Number(selectedDeviceId.value);
     if (!id || Number(route.params.deviceId) === id) return;
+    currentPage.value = 1;
+    lastPage.value = 1;
+    totalTrips.value = 0;
+    weeklyTrips.value = [];
     router.push(`/vehicles/${id}`);
 }
 
