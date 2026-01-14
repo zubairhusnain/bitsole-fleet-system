@@ -24,12 +24,15 @@
                <div class="panel-body" @wheel.stop>
                  <div v-if="loading" class="text-muted small">Loading…</div>
                  <div v-else>
-                  <div v-for="v in filtered" :key="deviceKey(v)" :class="['vehicle-card', { 'is-selected': selectedId === deviceKey(v) }]" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
+                 <div v-for="v in filtered" :key="deviceKey(v)" :class="['vehicle-card', { 'is-selected': selectedId === deviceKey(v) }]" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
                     <div class="vehicle-avatar">
                       <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
                     </div>
                     <div class="vehicle-info">
-                      <div class="vehicle-name">{{ deviceName(v) }}</div>
+                      <div class="vehicle-name-row">
+                        <div class="vehicle-name">{{ deviceName(v) }}</div>
+                        <img :src="getIcon(v)" class="status-icon" alt="" />
+                      </div> 
                       <div class="vehicle-meta-lines">
                         <div class="meta-line">
                           <span class="meta-label">Device:</span>
@@ -41,9 +44,6 @@
                           <span class="meta-value">{{ getVehicleMeta(v).plate || '—' }}</span>
                         </div>
                       </div>
-                    </div>
-                    <div class="vehicle-right">
-                      <img :src="getIcon(v)" class="status-icon" alt="" />
                     </div>
                   </div>
                    <div v-if="!filtered.length" class="text-muted small">No vehicles found.</div>
@@ -69,12 +69,15 @@
               <div class="panel-body" @wheel.stop>
                 <div v-if="loading" class="text-muted small">Loading…</div>
                 <div v-else>
-                  <div v-for="v in filtered" :key="deviceKey(v)" :class="['vehicle-card', { 'is-selected': selectedId === deviceKey(v) }]" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
+                <div v-for="v in filtered" :key="deviceKey(v)" :class="['vehicle-card', { 'is-selected': selectedId === deviceKey(v) }]" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
                     <div class="vehicle-avatar">
                       <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
                     </div>
                     <div class="vehicle-info">
-                      <div class="vehicle-name">{{ deviceName(v) }}</div>
+                      <div class="vehicle-name-row">
+                        <div class="vehicle-name">{{ deviceName(v) }}</div>
+                        <img :src="getIcon(v)" class="status-icon" alt="" />
+                      </div>
                       <div class="vehicle-meta-lines">
                         <div class="meta-line">
                           <span class="meta-label">Device:</span>
@@ -87,9 +90,6 @@
                         </div>
                       </div>
                     </div>
-                    <div class="vehicle-right">
-                      <img :src="getIcon(v)" class="status-icon" alt="" />
-                    </div>
                   </div>
                   <div v-if="!filtered.length" class="text-muted small">No vehicles found.</div>
                 </div>
@@ -100,7 +100,7 @@
         </div>
     </div>
 </template>
-  
+
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue';
@@ -951,7 +951,7 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 12px;
+    padding: 10px 42px 10px 12px;
     border-radius: 10px;
     cursor: pointer;
     position: relative; /* create stacking context for z-index */
@@ -1141,9 +1141,12 @@ onBeforeUnmount(() => {
 }
 
 .status-icon {
-    width: 28px;
+    width: 36px;
     height: auto;
     object-fit: contain;
+    position: absolute;
+    top: 18px;
+    right: 12px;
 }
 
 /* Mobile-friendly adjustments for panel and map */
