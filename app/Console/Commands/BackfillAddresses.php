@@ -61,7 +61,16 @@ class BackfillAddresses extends Command
                 ->select('id', 'latitude', 'longitude')
                 ->whereNull('address')
                 ->where('latitude', '!=', 0)
-                ->where('longitude', '!=', 0);
+                ->where('longitude', '!=', 0)
+                ->whereExists(function ($q) use ($deviceId) {
+                    $q->select(DB::raw(1))
+                      ->from('tc_events')
+                      ->whereColumn('tc_events.positionid', 'tc_positions.id')
+                      ->whereIn('tc_events.type', ['ignitionOn', 'ignitionOff']);
+                    if ($deviceId) {
+                        $q->where('tc_events.deviceid', $deviceId);
+                    }
+                });
 
             if ($deviceId) {
                 $query->where('deviceid', $deviceId);
