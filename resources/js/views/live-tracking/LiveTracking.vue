@@ -32,7 +32,7 @@
                       <div class="vehicle-name-row">
                         <div class="vehicle-name">{{ deviceName(v) }}</div>
                         <img :src="getIcon(v)" class="status-icon" alt="" />
-                      </div> 
+                      </div>
                       <div class="vehicle-meta-lines">
                         <div class="meta-line">
                           <span class="meta-label">Device:</span>
@@ -1017,6 +1017,7 @@ onBeforeUnmount(() => {
 
 .vehicle-name {
     font-weight: 600;
+    padding-right:10px;
 }
 
 .vehicle-meta {
