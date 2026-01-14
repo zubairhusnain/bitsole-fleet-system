@@ -8,7 +8,7 @@
               </button>
               <button class="mobile-btn btn btn-dark btn-sm logout" @click="logout" aria-label="Logout">
                 <i class="bi bi-box-arrow-right"></i>
-              </button> 
+              </button>
             </div>
             <button v-if="isMobile || !panelVisible" class="panel-toggle btn btn-light btn-sm" @click="panelVisible = !panelVisible" :aria-expanded="panelVisible.toString()" aria-controls="device-panel">
                  <i class="bi me-1" :class="panelVisible ? 'bi-x-lg' : 'bi-list'"></i>
@@ -29,16 +29,22 @@
                        <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
                      </div>
                      <div class="vehicle-info">
-                       <div class="vehicle-name-row">
-                         <div class="vehicle-name">{{ deviceName(v) }}</div>
-                         <div class="vehicle-status" :class="statusClass(v)">
-                           <span v-if="statusIs(v, 'online')" class="icon-buffering"></span>
-                           <span v-else class="icon-dot"></span>
-                           <span class="status-text">{{ statusLabel(v) }}</span>
+                       <div class="vehicle-name">{{ deviceName(v) }}</div>
+                       <div class="vehicle-meta-lines">
+                         <div class="meta-line">
+                           <span class="meta-label">Device:</span>
+                           <span class="meta-value">{{ getVehicleMeta(v).model || '—' }}</span>
+                           <span class="icon-dot" :class="getActivity(v).class"></span>
+                         </div>
+                         <div class="meta-line">
+                           <span class="meta-label">Number Plate:</span>
+                           <span class="meta-value">{{ getVehicleMeta(v).plate || '—' }}</span>
                          </div>
                        </div>
-                       <div class="vehicle-meta">Vehicle ID {{ uniqueId(v) || '—' }}</div>
                      </div>
+                     <div class="vehicle-right">
+                      <img :src="getIcon(v)" class="status-icon" alt="" />
+                    </div>
                    </div>
                    <div v-if="!filtered.length" class="text-muted small">No vehicles found.</div>
                  </div>
@@ -68,15 +74,21 @@
                       <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
                     </div>
                     <div class="vehicle-info">
-                      <div class="vehicle-name-row">
-                        <div class="vehicle-name">{{ deviceName(v) }}</div>
-                        <div class="vehicle-status" :class="statusClass(v)">
-                          <span v-if="statusIs(v, 'online')" class="icon-buffering"></span>
-                          <span v-else class="icon-dot"></span>
-                          <span class="status-text">{{ statusLabel(v) }}</span>
+                      <div class="vehicle-name">{{ deviceName(v) }}</div>
+                      <div class="vehicle-meta-lines">
+                        <div class="meta-line">
+                          <span class="meta-label">Device:</span>
+                          <span class="meta-value">{{ getVehicleMeta(v).model || '—' }}</span>
+                          <span class="icon-dot" :class="getActivity(v).class"></span>
+                        </div>
+                        <div class="meta-line">
+                          <span class="meta-label">Number Plate:</span>
+                          <span class="meta-value">{{ getVehicleMeta(v).plate || '—' }}</span>
                         </div>
                       </div>
-                      <div class="vehicle-meta">Vehicle ID {{ uniqueId(v) || '—' }}</div>
+                    </div>
+                    <div class="vehicle-right">
+                      <img :src="getIcon(v)" class="status-icon" alt="" />
                     </div>
                   </div>
                   <div v-if="!filtered.length" class="text-muted small">No vehicles found.</div>
@@ -532,6 +544,47 @@ function statusText(v) {
     return status || 'Unknown';
 }
 
+function getVehicleMeta(v) {
+    const tc = v.tc_device ?? v.tcDevice ?? {};
+    const rawAttrs = v.attributes || tc.attributes;
+    const attrs = parseAttrs(rawAttrs);
+    const brand = v.brand ?? attrs.brand ?? attrs.make ?? attrs.brandName ?? '';
+    const model = v.model ?? tc.model ?? attrs.model ?? '';
+    const plate =
+        v.plate
+        || tc.plate
+        || attrs.plate
+        || attrs.plateNumber
+        || attrs.plate_number
+        || attrs.numberPlate
+        || attrs.number_plate
+        || attrs.licensePlate
+        || attrs.registration
+        || attrs.regNumber
+        || attrs.vehicleNumber
+        || attrs.vehicleNo
+        || attrs.plateNo
+        || '';
+    return { brand, model, plate };
+}
+
+function getActivity(v) {
+    const { ignition, speed } = getPosition(v);
+    const speedVal = speedKmh(speed) || 0;
+    const isIgnOn = ignition === true;
+
+    if (!isIgnOn) return { label: 'Stopped', class: 'text-danger' };
+    if (speedVal > 0) return { label: 'Moving', class: 'text-success' };
+    return { label: 'Idle', class: 'text-warning' };
+}
+
+function getIcon(v) {
+    const { label } = getActivity(v);
+    if (label === 'Moving') return '/images/moving_car.png';
+    if (label === 'Stopped') return '/images/stop_car.png';
+    return '/images/idle_car.png';
+}
+
 function statusClass(v) {
     const s = statusValue(v);
     if (s === 'online') return 'status-on';
@@ -898,6 +951,16 @@ onBeforeUnmount(() => {
     z-index: 4001; /* ensure whole card overlays within the panel */
 }
 
+.vehicle-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.vehicle-right .bi {
+    font-size: 28px;
+}
+
 .vehicle-card:hover {
     background: rgba(0, 0, 0, .04);
 }
@@ -927,6 +990,25 @@ onBeforeUnmount(() => {
 .vehicle-info {
     display: flex;
     flex-direction: column;
+}
+
+.vehicle-meta-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.meta-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+}
+.meta-label {
+    color: #6c757d;
+}
+.meta-value {
+    color: #111;
+    font-weight: 500;
 }
 
 .vehicle-name {
@@ -1044,6 +1126,12 @@ onBeforeUnmount(() => {
 }
 .status-text {
     line-height: 1;
+}
+
+.status-icon {
+    width: 28px;
+    height: auto;
+    object-fit: contain;
 }
 
 /* Mobile-friendly adjustments for panel and map */
