@@ -34,7 +34,7 @@
                                 <span class="visually-hidden">unread messages</span>
                             </span>
                         </RouterLink>
-                    </li>
+                    </li> 
                     <li class="nav-item user-menu" v-if="isAuthed">
                         <div class="nav-link d-flex align-items-center user-toggle">
                             <img v-if="avatarSrc" :src="avatarSrc" alt="Avatar" class="avatar-img" />
@@ -357,10 +357,26 @@ function timezoneFlag(tz) {
         'Europe/Amsterdam': '🇳🇱',
         'Europe/Brussels': '🇧🇪',
         'Europe/Zurich': '🇨🇭',
+        'Europe/Vienna': '🇦🇹',
         'Europe/Prague': '🇨🇿',
         'Europe/Warsaw': '🇵🇱',
+        'Europe/Stockholm': '🇸🇪',
+        'Europe/Copenhagen': '🇩🇰',
+        'Europe/Helsinki': '🇫🇮',
+        'Europe/Dublin': '🇮🇪',
+        'Europe/Oslo': '🇳🇴',
+        'Europe/Athens': '🇬🇷',
+        'Europe/Bucharest': '🇷🇴',
+        'Europe/Sofia': '🇧🇬',
+        'Europe/Budapest': '🇭🇺',
+        'Europe/Lisbon': '🇵🇹',
+        'Europe/Moscow': '🇷🇺',
+        'Europe/Istanbul': '🇹🇷',
         'Asia/Dubai': '🇦🇪',
         'Asia/Riyadh': '🇸🇦',
+        'Asia/Doha': '🇶🇦',
+        'Asia/Kuwait': '🇰🇼',
+        'Asia/Manama': '🇧🇭',
         'Asia/Kolkata': '🇮🇳',
         'Asia/Karachi': '🇵🇰',
         'Asia/Dhaka': '🇧🇩',
@@ -370,22 +386,70 @@ function timezoneFlag(tz) {
         'Asia/Kuala_Lumpur': '🇲🇾',
         'Asia/Hong_Kong': '🇭🇰',
         'Asia/Shanghai': '🇨🇳',
+        'Asia/Chongqing': '🇨🇳',
+        'Asia/Urumqi': '🇨🇳',
         'Asia/Tokyo': '🇯🇵',
         'Asia/Seoul': '🇰🇷',
+        'Asia/Taipei': '🇹🇼',
+        'Asia/Yangon': '🇲🇲',
+        'Asia/Colombo': '🇱🇰',
+        'Asia/Kathmandu': '🇳🇵',
+        'Asia/Almaty': '🇰🇿',
+        'Asia/Tashkent': '🇺🇿',
+        'Asia/Bishkek': '🇰🇬',
+        'Asia/Tehran': '🇮🇷',
+        'Asia/Baghdad': '🇮🇶',
+        'Asia/Beirut': '🇱🇧',
+        'Asia/Amman': '🇯🇴',
+        'Asia/Jerusalem': '🇮🇱',
+        'Asia/Muscat': '🇴🇲',
         'Australia/Sydney': '🇦🇺',
         'Australia/Melbourne': '🇦🇺',
+        'Australia/Brisbane': '🇦🇺',
+        'Australia/Perth': '🇦🇺',
         'Pacific/Auckland': '🇳🇿',
+        'Pacific/Fiji': '🇫🇯',
+        'America/St_Johns': '🇨🇦',
+        'America/Halifax': '🇨🇦',
+        'America/Toronto': '🇨🇦',
+        'America/Montreal': '🇨🇦',
+        'America/Vancouver': '🇨🇦',
+        'America/Edmonton': '🇨🇦',
+        'America/Winnipeg': '🇨🇦',
         'America/New_York': '🇺🇸',
+        'America/Detroit': '🇺🇸',
         'America/Chicago': '🇺🇸',
         'America/Denver': '🇺🇸',
+        'America/Phoenix': '🇺🇸',
         'America/Los_Angeles': '🇺🇸',
-        'America/Toronto': '🇨🇦',
-        'America/Vancouver': '🇨🇦',
+        'America/Anchorage': '🇺🇸',
+        'America/Juneau': '🇺🇸',
+        'America/Honolulu': '🇺🇸',
         'America/Sao_Paulo': '🇧🇷',
+        'America/Rio_Branco': '🇧🇷',
+        'America/Argentina/Buenos_Aires': '🇦🇷',
+        'America/Lima': '🇵🇪',
+        'America/Bogota': '🇨🇴',
+        'America/Caracas': '🇻🇪',
         'America/Mexico_City': '🇲🇽',
+        'America/Monterrey': '🇲🇽',
+        'America/Guatemala': '🇬🇹',
+        'America/Panama': '🇵🇦',
+        'America/Santiago': '🇨🇱',
+        'America/La_Paz': '🇧🇴',
+        'America/Asuncion': '🇵🇾',
+        'America/Montevideo': '🇺🇾',
         'Africa/Cairo': '🇪🇬',
+        'Africa/Casablanca': '🇲🇦',
+        'Africa/Algiers': '🇩🇿',
+        'Africa/Tunis': '🇹🇳',
         'Africa/Johannesburg': '🇿🇦',
-        'Africa/Nairobi': '🇰🇪'
+        'Africa/Lagos': '🇳🇬',
+        'Africa/Nairobi': '🇰🇪',
+        'Africa/Khartoum': '🇸🇩',
+        'Africa/Addis_Ababa': '🇪🇹',
+        'Africa/Accra': '🇬🇭',
+        'Africa/Dakar': '🇸🇳'
     };
     if (map[tz]) return map[tz];
     const region = tz.split('/')[0];
@@ -412,7 +476,16 @@ const rawTimezones = typeof Intl !== 'undefined' && typeof Intl.supportedValuesO
         'America/Los_Angeles'
     ];
 
-const timezoneOptions = rawTimezones.map(v => ({
+const filteredTimezones = rawTimezones.filter((tz) => {
+    if (tz === 'UTC' || tz === 'Etc/UTC') return true;
+    if (tz.startsWith('Etc/')) return false;
+    if (tz === 'GMT' || tz === 'GMT0' || tz === 'Greenwich' || tz === 'Universal' || tz === 'Zulu' || tz === 'UCT') {
+        return false;
+    }
+    return true;
+});
+
+const timezoneOptions = filteredTimezones.map(v => ({
     value: v,
     label: `${timezoneFlag(v)} ${v}`
 }));
