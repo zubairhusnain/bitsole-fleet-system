@@ -815,6 +815,7 @@ onMounted(async () => {
         !(lat === 0 && lon === 0);
       return {
         ...v,
+        last_update: formatDate(v.last_update),
         latitude: valid ? lat : undefined,
         longitude: valid ? lon : undefined,
       };

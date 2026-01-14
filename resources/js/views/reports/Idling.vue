@@ -166,7 +166,7 @@
 import { ref, computed, onMounted } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
-import { formatDate, formatTime } from '../../utils/datetime';
+import { formatDate, formatTime, getActiveTimezone } from '../../utils/datetime';
 
 // State
 const devices = ref([]);
@@ -210,11 +210,12 @@ const paginatedRows = computed(() => {
 
 const groupedRows = computed(() => {
     const groups = {};
+    const timeZone = getActiveTimezone();
     paginatedRows.value.forEach(row => {
         const dt = new Date(row.startEpoch * 1000);
         const dayName = dt.toLocaleDateString('en-US', {
             weekday: 'long',
-            timeZone: undefined,
+            timeZone,
         });
         const key = `${row.date} ${dayName}`;
 

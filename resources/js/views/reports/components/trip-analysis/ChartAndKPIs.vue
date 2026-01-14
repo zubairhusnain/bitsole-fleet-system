@@ -158,6 +158,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { formatDateTime } from '../../../../utils/datetime';
 
 const props = defineProps({
   summary: {
@@ -298,10 +299,11 @@ const idleLinePoints = computed(() => {
 
 const formatDateLabel = (isoDate) => {
     if (!isoDate) return '';
-    const d = new Date(isoDate);
-    const s = d.toLocaleDateString('en-GB');
-    const parts = s.split('/');
-    if (parts.length < 2) return s;
+    const formatted = formatDateTime(isoDate);
+    if (!formatted || formatted === '-') return '';
+    const [datePart] = formatted.split(' ');
+    const parts = datePart.split('/');
+    if (parts.length < 2) return datePart;
     return `${parts[0]}/${parts[1]}`;
 };
 
