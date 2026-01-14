@@ -34,7 +34,7 @@
                                 <span class="visually-hidden">unread messages</span>
                             </span>
                         </RouterLink>
-                    </li> 
+                    </li>
                     <li class="nav-item user-menu" v-if="isAuthed">
                         <div class="nav-link d-flex align-items-center user-toggle">
                             <img v-if="avatarSrc" :src="avatarSrc" alt="Avatar" class="avatar-img" />
@@ -561,6 +561,7 @@ const initTimezone = () => {
 
 const handleTimezoneChange = () => {
     setTimezonePreference(timezone.value);
+    window.location.reload();
 };
 
 watch(() => route.path, (newPath) => {
