@@ -22,13 +22,16 @@ trait GeocodingTrait
         // Round to 4 decimal places (~11m precision) to improve cache hit rate
         $lat = round((float)$lat, 4);
         $lon = round((float)$lon, 4);
-        $key = "geo_addr_{$lat}_{$lon}";
+        $lang = 'en';
+        $key = "geo_addr_{$lang}_{$lat}_{$lon}";
 
-        return Cache::remember($key, 86400 * 30, function () use ($lat, $lon) {
+        return Cache::remember($key, 86400 * 30, function () use ($lat, $lon, $lang) {
             try {
-                // Use OpenStreetMap Nominatim with caching
-                $url = "https://nominatim.openstreetmap.org/reverse?format=json&lat={$lat}&lon={$lon}&zoom=18&addressdetails=1";
-                $response = Http::withHeaders(['User-Agent' => 'OmayerFleetSystem/1.0'])->get($url);
+                $url = "https://nominatim.openstreetmap.org/reverse?format=json&lat={$lat}&lon={$lon}&zoom=18&addressdetails=1&accept-language={$lang}";
+                $response = Http::withHeaders([
+                    'User-Agent' => 'OmayerFleetSystem/1.0',
+                    'Accept-Language' => $lang
+                ])->get($url);
                 if ($response->successful()) {
                     return $response->json()['display_name'] ?? '';
                 }
