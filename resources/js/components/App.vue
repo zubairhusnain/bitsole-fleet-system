@@ -19,6 +19,13 @@
                 </ul>
                 <!--end::Start Navbar Links-->
                 <ul class="navbar-nav ms-auto">
+                    <li class="nav-item d-flex align-items-center" v-if="isAuthed">
+                        <select v-model="timezone" @change="handleTimezoneChange" class="form-select form-select-sm timezone-select">
+                            <option v-for="opt in timezoneOptions" :key="opt.value" :value="opt.value">
+                                {{ opt.label }}
+                            </option>
+                        </select>
+                    </li>
                     <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode }" v-if="isAuthed">
                         <RouterLink to="/alerts" class="nav-link position-relative" style="padding-top: 0.5rem;">
                             <i class="bi bi-bell" style="font-size: 1.2rem;"></i>
@@ -321,6 +328,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick, provide } from 
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
 import { authState, clearAuthCache, hasPermission, roleToNumber } from '../auth';
+import { getActiveTimezone, setTimezonePreference } from '../utils/datetime';
 
 // Resolve assets from Laravel backend in dev; use current origin in prod
 const assetBase = import.meta.env.DEV ? (import.meta.env.VITE_BACKEND_PROXY_TARGET || 'http://127.0.0.1:8001') : window.location.origin;
@@ -336,6 +344,80 @@ const version = import.meta.env.VITE_APP_VERSION || '1.0.0';
 const unreadCount = ref(0);
 const myDeviceIds = ref([]);
 let echoChannel = null;
+
+function timezoneFlag(tz) {
+    const map = {
+        'UTC': '🌐',
+        'Etc/UTC': '🌐',
+        'Europe/London': '🇬🇧',
+        'Europe/Berlin': '🇩🇪',
+        'Europe/Paris': '🇫🇷',
+        'Europe/Madrid': '🇪🇸',
+        'Europe/Rome': '🇮🇹',
+        'Europe/Amsterdam': '🇳🇱',
+        'Europe/Brussels': '🇧🇪',
+        'Europe/Zurich': '🇨🇭',
+        'Europe/Prague': '🇨🇿',
+        'Europe/Warsaw': '🇵🇱',
+        'Asia/Dubai': '🇦🇪',
+        'Asia/Riyadh': '🇸🇦',
+        'Asia/Kolkata': '🇮🇳',
+        'Asia/Karachi': '🇵🇰',
+        'Asia/Dhaka': '🇧🇩',
+        'Asia/Bangkok': '🇹🇭',
+        'Asia/Jakarta': '🇮🇩',
+        'Asia/Singapore': '🇸🇬',
+        'Asia/Kuala_Lumpur': '🇲🇾',
+        'Asia/Hong_Kong': '🇭🇰',
+        'Asia/Shanghai': '🇨🇳',
+        'Asia/Tokyo': '🇯🇵',
+        'Asia/Seoul': '🇰🇷',
+        'Australia/Sydney': '🇦🇺',
+        'Australia/Melbourne': '🇦🇺',
+        'Pacific/Auckland': '🇳🇿',
+        'America/New_York': '🇺🇸',
+        'America/Chicago': '🇺🇸',
+        'America/Denver': '🇺🇸',
+        'America/Los_Angeles': '🇺🇸',
+        'America/Toronto': '🇨🇦',
+        'America/Vancouver': '🇨🇦',
+        'America/Sao_Paulo': '🇧🇷',
+        'America/Mexico_City': '🇲🇽',
+        'Africa/Cairo': '🇪🇬',
+        'Africa/Johannesburg': '🇿🇦',
+        'Africa/Nairobi': '🇰🇪'
+    };
+    if (map[tz]) return map[tz];
+    const region = tz.split('/')[0];
+    if (region === 'Europe') return '🇪🇺';
+    if (region === 'Asia') return '🌏';
+    if (region === 'America') return '🌎';
+    if (region === 'Africa') return '🌍';
+    if (region === 'Australia' || region === 'Pacific') return '🌏';
+    return '🌐';
+}
+
+const rawTimezones = typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function'
+    ? Intl.supportedValuesOf('timeZone')
+    : [
+        'UTC',
+        'Europe/London',
+        'Europe/Berlin',
+        'Asia/Dubai',
+        'Asia/Kolkata',
+        'Asia/Karachi',
+        'Asia/Singapore',
+        'America/New_York',
+        'America/Chicago',
+        'America/Los_Angeles'
+    ];
+
+const timezoneOptions = rawTimezones.map(v => ({
+    value: v,
+    label: `${timezoneFlag(v)} ${v}`
+}));
+
+const timezone = ref('');
 
 const isTestingMode = ref(false);
 provide('isTestingMode', isTestingMode);
@@ -398,6 +480,14 @@ const fetchUnreadCount = async () => {
     } catch (e) {
         console.error('Failed to fetch unread count', e);
     }
+};
+
+const initTimezone = () => {
+    timezone.value = getActiveTimezone();
+};
+
+const handleTimezoneChange = () => {
+    setTimezonePreference(timezone.value);
 };
 
 watch(() => route.path, (newPath) => {
@@ -488,6 +578,7 @@ onMounted(() => {
             }, 5000);
         }
     }
+    initTimezone();
 });
 
 onUnmounted(() => {
@@ -736,6 +827,39 @@ nav a.router-link-exact-active {
 .role-badge { font-size: 10px; line-height: 1; color: #6b7280; border: 1px solid #e5e7eb; border-radius: 999px; padding: 1px 6px; text-transform: capitalize; }
 :global(body:not(.sidebar-collapse) .app-sidebar .nav-link .nav-icon) { margin-right: 0.5rem; }
 :global(body:not(.sidebar-collapse) .app-sidebar .nav-link p) { display: flex; align-items: center; justify-content: space-between; }
+
+ .timezone-select {
+    min-width: 220px;
+    font-size: 0.8rem;
+    margin-left: 0.75rem;
+    margin-right: 0.75rem;
+    border-radius: 999px;
+    padding: 0.25rem 1.75rem 0.25rem 0.75rem;
+    border: 1px solid #e5e7eb;
+    background-color: #f9fafb;
+    color: #111827;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    background-image: linear-gradient(45deg, transparent 50%, #6b7280 50%), linear-gradient(135deg, #6b7280 50%, transparent 50%);
+    background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+}
+
+.timezone-select:focus {
+    outline: none;
+    border-color: #0f766e;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+    background-color: #ffffff;
+}
+
+@media (max-width: 576px) {
+    .timezone-select {
+        min-width: 160px;
+        font-size: 0.75rem;
+        margin-left: 0.5rem;
+        margin-right: 0.5rem;
+    }
+}
 
 @media (min-width: 992px) {
     :global(body.sidebar-mini.sidebar-collapse .app-sidebar:not(:hover) .nav-link) { justify-content: center; }

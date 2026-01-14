@@ -149,12 +149,13 @@ import axios from 'axios';
 import Swal from 'sweetalert2';
 import { authState, getCurrentUser } from '../auth';
 import VehicleModelsManager from '../components/VehicleModelsManager.vue';
+import { formatDateTime } from '../utils/datetime';
 
 const activeTab = ref('alerts');
 const isTestingMode = inject('isTestingMode', ref(false));
 
 const loading = ref(false);
-const saving = ref(false);
+const saving = ref(false); 
 const notificationChannel = ref({ web: true, mail: false, mobile: false });
 const requestData = ref([]);
 const notificationType = ref([]);
@@ -165,7 +166,7 @@ const error = ref('');
 const backups = ref([]);
 const backupLoading = ref(false);
 const isAdmin = computed(() => authState.user && authState.user.role === 3);
-
+ 
 function toggleTestingMode() {
   const newVal = !isTestingMode.value;
   isTestingMode.value = newVal;
@@ -180,7 +181,7 @@ function toggleTestingMode() {
 
 function formatDate(ts) {
   if (!ts) return '-';
-  return new Date(ts * 1000).toLocaleString();
+  return formatDateTime(ts * 1000);
 }
 
 async function fetchBackups() {

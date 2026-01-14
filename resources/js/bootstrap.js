@@ -56,11 +56,59 @@ window.axios.interceptors.response.use(
 
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
+import { getActiveTimezone } from './utils/datetime';
 
-// Bind Pusher global for Echo
+const originalDateToLocaleString = Date.prototype.toLocaleString;
+const originalDateToLocaleDateString = Date.prototype.toLocaleDateString;
+const originalDateToLocaleTimeString = Date.prototype.toLocaleTimeString;
+
+Date.prototype.toLocaleString = function (locale, options) {
+  try {
+    const opts = options || {};
+    if (!opts.timeZone) {
+      const tz = getActiveTimezone();
+      if (tz) {
+        return originalDateToLocaleString.call(this, locale || undefined, { ...opts, timeZone: tz });
+      }
+    } 
+    return originalDateToLocaleString.call(this, locale || undefined, opts);
+  } catch {
+    return originalDateToLocaleString.call(this, locale, options);
+  }
+};
+
+Date.prototype.toLocaleDateString = function (locale, options) {
+  try {
+    const opts = options || {};
+    if (!opts.timeZone) {
+      const tz = getActiveTimezone();
+      if (tz) {
+        return originalDateToLocaleDateString.call(this, locale || undefined, { ...opts, timeZone: tz });
+      }
+    }
+    return originalDateToLocaleDateString.call(this, locale || undefined, opts);
+  } catch {
+    return originalDateToLocaleDateString.call(this, locale, options);
+  }
+};
+
+Date.prototype.toLocaleTimeString = function (locale, options) {
+  try {
+    const opts = options || {};
+    if (!opts.timeZone) {
+      const tz = getActiveTimezone();
+      if (tz) {
+        return originalDateToLocaleTimeString.call(this, locale || undefined, { ...opts, timeZone: tz });
+      }
+    }
+    return originalDateToLocaleTimeString.call(this, locale || undefined, opts);
+  } catch {
+    return originalDateToLocaleTimeString.call(this, locale, options);
+  }
+};
+
 window.Pusher = Pusher; 
 
-// Configure Echo to connect to Reverb (Pusher protocol)
 const reverbKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_REVERB_APP_KEY) || 'local';
 
 // Dynamic Host and Scheme Detection for VPS/Production compatibility

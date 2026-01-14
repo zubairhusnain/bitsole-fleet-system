@@ -166,6 +166,7 @@
 import { ref, computed, onMounted } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
+import { formatDateTime, formatTime } from '../../utils/datetime';
 
 // State
 const devices = ref([]);
@@ -176,10 +177,10 @@ const timeFilter = ref('>120'); // Default > 2 mins
 const loading = ref(false);
 const errorMessage = ref(null);
 const reportData = ref([]);
-
+ 
 // Pagination
 const currentPage = ref(1);
-const itemsPerPage = ref(20);
+const itemsPerPage = ref(20); 
 
 // Computed
 const filteredRows = computed(() => {
@@ -210,11 +211,11 @@ const paginatedRows = computed(() => {
 const groupedRows = computed(() => {
     const groups = {};
     paginatedRows.value.forEach(row => {
-        // Create a friendly date key (e.g., "11-03-2024 Monday")
-        const dateObj = new Date(row.startEpoch * 1000);
-        const options = { weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' };
-        // We can just use row.date + day name
-        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+        const dt = new Date(row.startEpoch * 1000);
+        const dayName = dt.toLocaleDateString('en-US', {
+            weekday: 'long',
+            timeZone: undefined,
+        });
         const key = `${row.date} ${dayName}`;
 
         if (!groups[key]) groups[key] = [];
