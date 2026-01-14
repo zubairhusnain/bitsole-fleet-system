@@ -24,28 +24,28 @@
                <div class="panel-body" @wheel.stop>
                  <div v-if="loading" class="text-muted small">Loading…</div>
                  <div v-else>
-                   <div v-for="v in filtered" :key="deviceKey(v)" :class="['vehicle-card', { 'is-selected': selectedId === deviceKey(v) }]" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
-                     <div class="vehicle-avatar">
-                       <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
-                     </div>
-                     <div class="vehicle-info">
-                       <div class="vehicle-name">{{ deviceName(v) }}</div>
-                       <div class="vehicle-meta-lines">
-                         <div class="meta-line">
-                           <span class="meta-label">Device:</span>
-                           <span class="meta-value">{{ getVehicleMeta(v).model || '—' }}</span>
-                           <span class="icon-dot" :class="getActivity(v).class"></span>
-                         </div>
-                         <div class="meta-line">
-                           <span class="meta-label">Number Plate:</span>
-                           <span class="meta-value">{{ getVehicleMeta(v).plate || '—' }}</span>
-                         </div>
-                       </div>
-                     </div>
-                     <div class="vehicle-right">
+                  <div v-for="v in filtered" :key="deviceKey(v)" :class="['vehicle-card', { 'is-selected': selectedId === deviceKey(v) }]" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
+                    <div class="vehicle-avatar">
+                      <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
+                    </div>
+                    <div class="vehicle-info">
+                      <div class="vehicle-name">{{ deviceName(v) }}</div>
+                      <div class="vehicle-meta-lines">
+                        <div class="meta-line">
+                          <span class="meta-label">Device:</span>
+                          <span class="meta-value">{{ getVehicleMeta(v).model || '—' }}</span>
+                          <span class="icon-dot" :class="statusDotClass(v)"></span>
+                        </div>
+                        <div class="meta-line">
+                          <span class="meta-label">Number Plate:</span>
+                          <span class="meta-value">{{ getVehicleMeta(v).plate || '—' }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="vehicle-right">
                       <img :src="getIcon(v)" class="status-icon" alt="" />
                     </div>
-                   </div>
+                  </div>
                    <div v-if="!filtered.length" class="text-muted small">No vehicles found.</div>
                  </div>
                </div>
@@ -79,7 +79,7 @@
                         <div class="meta-line">
                           <span class="meta-label">Device:</span>
                           <span class="meta-value">{{ getVehicleMeta(v).model || '—' }}</span>
-                          <span class="icon-dot" :class="getActivity(v).class"></span>
+                          <span class="icon-dot" :class="statusDotClass(v)"></span>
                         </div>
                         <div class="meta-line">
                           <span class="meta-label">Number Plate:</span>
@@ -100,6 +100,7 @@
         </div>
     </div>
 </template>
+  
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue';
@@ -546,14 +547,13 @@ function statusText(v) {
 
 function getVehicleMeta(v) {
     const tc = v.tc_device ?? v.tcDevice ?? {};
-    const rawAttrs = v.attributes || tc.attributes;
-    const attrs = parseAttrs(rawAttrs);
+    const tcAttrs = parseAttrs(tc.attributes);
+    const vehicleAttrs = parseAttrs(v.attributes);
+    const attrs = { ...tcAttrs, ...vehicleAttrs };
     const brand = v.brand ?? attrs.brand ?? attrs.make ?? attrs.brandName ?? '';
     const model = v.model ?? tc.model ?? attrs.model ?? '';
     const plate =
-        v.plate
-        || tc.plate
-        || attrs.plate
+        attrs.plate
         || attrs.plateNumber
         || attrs.plate_number
         || attrs.numberPlate
@@ -590,6 +590,13 @@ function statusClass(v) {
     if (s === 'online') return 'status-on';
     if (s === 'offline') return 'status-off';
     return 'status-unknown';
+}
+
+function statusDotClass(v) {
+    const s = statusValue(v);
+    if (s === 'online') return 'dot-online';
+    if (s === 'offline') return 'dot-offline';
+    return 'dot-offline';
 }
 
 function statusValue(v) {
@@ -957,9 +964,6 @@ onBeforeUnmount(() => {
     align-items: center;
     justify-content: center;
 }
-.vehicle-right .bi {
-    font-size: 28px;
-}
 
 .vehicle-card:hover {
     background: rgba(0, 0, 0, .04);
@@ -1123,6 +1127,14 @@ onBeforeUnmount(() => {
     height: 8px;
     background: currentColor;
     border-radius: 50%;
+}
+
+.dot-online {
+    color: #16a34a; /* green */
+}
+
+.dot-offline {
+    color: #9ca3af; /* gray */
 }
 .status-text {
     line-height: 1;
