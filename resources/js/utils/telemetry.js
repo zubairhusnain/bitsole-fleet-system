@@ -24,7 +24,7 @@ function formatNumberKm(km) {
     return `${rounded} km`;
   }
 }
- 
+
 export function formatOdometer(rawAttrs, ctx = {}) {
     console.log('odometer key value ',rawAttrs);
   const attrs = parseAttrs(rawAttrs);
@@ -315,12 +315,17 @@ export function formatFuel(rawAttrs, ctx = {}) {
     }
   }
 
-  // If capacity provided and percent available, prefer computed liters
+  const capNum = Number.isFinite(parseFloat(capacity)) ? parseFloat(capacity) : null;
+  const hasCapacity = capNum !== null;
+
+  if (!hasCapacity && liters != null) {
+    percent = null;
+  }
+
   let computedLiters = null;
-  if (Number.isFinite(parseFloat(capacity)) && percent != null) {
-    const cap = parseFloat(capacity);
+  if (hasCapacity && percent != null) {
     if (!litersWasMinusOne || percent > 0) {
-      computedLiters = Math.round((cap * percent / 100) * 10) / 10;
+      computedLiters = Math.round((capNum * percent / 100) * 10) / 10;
     }
   }
 
@@ -348,7 +353,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
     isPercent: percent != null && finalLiters == null,
     percent,
     liters: finalLiters,
-    capacity: Number.isFinite(parseFloat(capacity)) ? parseFloat(capacity) : null,
+    capacity: capNum,
     variant: badgeVariant,
     raw,
     key: keyUsed,
