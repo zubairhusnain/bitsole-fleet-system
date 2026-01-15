@@ -53,8 +53,15 @@
                 <option value="">-- Select Option --</option>
                 <option>Sedan</option>
                 <option>SUV</option>
+                <option>MPV</option>
+                <option>BUS</option>
+                <option>Pick-Up</option>
+                <option>Hatchback</option>
                 <option>Truck</option>
+                <option>Trailer Truck</option>
                 <option>Van</option>
+                <option>Machinery</option>
+                <option>Forklift</option>
               </select>
             </div>
             <div class="col-12 col-md-4">
