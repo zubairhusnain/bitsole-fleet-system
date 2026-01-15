@@ -35,7 +35,7 @@
                             </span>
                         </RouterLink>
                     </li>
-                    <li class="nav-item user-menu" v-if="isAuthed">
+                    <li class="nav-item user-menu" v-if="i sAuthed">
                         <div class="nav-link d-flex align-items-center user-toggle">
                             <img v-if="avatarSrc" :src="avatarSrc" alt="Avatar" class="avatar-img" />
                             <span v-else class="avatar">{{ initials }}</span>
@@ -341,117 +341,14 @@ const isProd = import.meta.env.PROD;
 const appName = document.title || 'Omayer Fleet System';
 const year = new Date().getFullYear();
 const version = import.meta.env.VITE_APP_VERSION || '1.0.0';
+import timezoneFlagMap from '../data/timezone-flags.json';
+
 const unreadCount = ref(0);
 const myDeviceIds = ref([]);
 let echoChannel = null;
 
 function timezoneFlag(tz) {
-    const map = {
-        'UTC': '🌐',
-        'Etc/UTC': '🌐',
-        'Europe/London': '🇬🇧',
-        'Europe/Berlin': '🇩🇪',
-        'Europe/Paris': '🇫🇷',
-        'Europe/Madrid': '🇪🇸',
-        'Europe/Rome': '🇮🇹',
-        'Europe/Amsterdam': '🇳🇱',
-        'Europe/Brussels': '🇧🇪',
-        'Europe/Zurich': '🇨🇭',
-        'Europe/Vienna': '🇦🇹',
-        'Europe/Prague': '🇨🇿',
-        'Europe/Warsaw': '🇵🇱',
-        'Europe/Stockholm': '🇸🇪',
-        'Europe/Copenhagen': '🇩🇰',
-        'Europe/Helsinki': '🇫🇮',
-        'Europe/Dublin': '🇮🇪',
-        'Europe/Oslo': '🇳🇴',
-        'Europe/Athens': '🇬🇷',
-        'Europe/Bucharest': '🇷🇴',
-        'Europe/Sofia': '🇧🇬',
-        'Europe/Budapest': '🇭🇺',
-        'Europe/Lisbon': '🇵🇹',
-        'Europe/Moscow': '🇷🇺',
-        'Europe/Istanbul': '🇹🇷',
-        'Asia/Dubai': '🇦🇪',
-        'Asia/Riyadh': '🇸🇦',
-        'Asia/Doha': '🇶🇦',
-        'Asia/Kuwait': '🇰🇼',
-        'Asia/Manama': '🇧🇭',
-        'Asia/Kolkata': '🇮🇳',
-        'Asia/Karachi': '🇵🇰',
-        'Asia/Dhaka': '🇧🇩',
-        'Asia/Bangkok': '🇹🇭',
-        'Asia/Jakarta': '🇮🇩',
-        'Asia/Singapore': '🇸🇬',
-        'Asia/Kuala_Lumpur': '🇲🇾',
-        'Asia/Hong_Kong': '🇭🇰',
-        'Asia/Shanghai': '🇨🇳',
-        'Asia/Chongqing': '🇨🇳',
-        'Asia/Urumqi': '🇨🇳',
-        'Asia/Tokyo': '🇯🇵',
-        'Asia/Seoul': '🇰🇷',
-        'Asia/Taipei': '🇹🇼',
-        'Asia/Yangon': '🇲🇲',
-        'Asia/Colombo': '🇱🇰',
-        'Asia/Kathmandu': '🇳🇵',
-        'Asia/Almaty': '🇰🇿',
-        'Asia/Tashkent': '🇺🇿',
-        'Asia/Bishkek': '🇰🇬',
-        'Asia/Tehran': '🇮🇷',
-        'Asia/Baghdad': '🇮🇶',
-        'Asia/Beirut': '🇱🇧',
-        'Asia/Amman': '🇯🇴',
-        'Asia/Jerusalem': '🇮🇱',
-        'Asia/Muscat': '🇴🇲',
-        'Australia/Sydney': '🇦🇺',
-        'Australia/Melbourne': '🇦🇺',
-        'Australia/Brisbane': '🇦🇺',
-        'Australia/Perth': '🇦🇺',
-        'Pacific/Auckland': '🇳🇿',
-        'Pacific/Fiji': '🇫🇯',
-        'America/St_Johns': '🇨🇦',
-        'America/Halifax': '🇨🇦',
-        'America/Toronto': '🇨🇦',
-        'America/Montreal': '🇨🇦',
-        'America/Vancouver': '🇨🇦',
-        'America/Edmonton': '🇨🇦',
-        'America/Winnipeg': '🇨🇦',
-        'America/New_York': '🇺🇸',
-        'America/Detroit': '🇺🇸',
-        'America/Chicago': '🇺🇸',
-        'America/Denver': '🇺🇸',
-        'America/Phoenix': '🇺🇸',
-        'America/Los_Angeles': '🇺🇸',
-        'America/Anchorage': '🇺🇸',
-        'America/Juneau': '🇺🇸',
-        'America/Honolulu': '🇺🇸',
-        'America/Sao_Paulo': '🇧🇷',
-        'America/Rio_Branco': '🇧🇷',
-        'America/Argentina/Buenos_Aires': '🇦🇷',
-        'America/Lima': '🇵🇪',
-        'America/Bogota': '🇨🇴',
-        'America/Caracas': '🇻🇪',
-        'America/Mexico_City': '🇲🇽',
-        'America/Monterrey': '🇲🇽',
-        'America/Guatemala': '🇬🇹',
-        'America/Panama': '🇵🇦',
-        'America/Santiago': '🇨🇱',
-        'America/La_Paz': '🇧🇴',
-        'America/Asuncion': '🇵🇾',
-        'America/Montevideo': '🇺🇾',
-        'Africa/Cairo': '🇪🇬',
-        'Africa/Casablanca': '🇲🇦',
-        'Africa/Algiers': '🇩🇿',
-        'Africa/Tunis': '🇹🇳',
-        'Africa/Johannesburg': '🇿🇦',
-        'Africa/Lagos': '🇳🇬',
-        'Africa/Nairobi': '🇰🇪',
-        'Africa/Khartoum': '🇸🇩',
-        'Africa/Addis_Ababa': '🇪🇹',
-        'Africa/Accra': '🇬🇭',
-        'Africa/Dakar': '🇸🇳'
-    };
-    if (map[tz]) return map[tz];
+    if (timezoneFlagMap[tz]) return timezoneFlagMap[tz];
     const region = tz.split('/')[0];
     if (region === 'Europe') return '🇪🇺';
     if (region === 'Asia') return '🌏';
