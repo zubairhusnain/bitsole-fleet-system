@@ -107,7 +107,7 @@
                 <td class="text-muted small" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
                     {{ vehicle.address || '—' }}
                 </td>
-                <td>{{ vehicle.last_update || '—' }} </td>
+                <td>{{ vehicle.last_update || '—' }} {{</td>
                 <td class="text-center">
                     <span class="badge rounded-pill px-3 py-2" :class="isIgnitionOn(vehicle) ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'">
                         {{ isIgnitionOn(vehicle) ? 'Ignition On' : 'Ignition Off' }}
@@ -304,7 +304,7 @@ import { formatDateTime } from '../../utils/datetime';
 
 const route = useRoute();
 const zoneId = route.params.zoneId;
-
+ 
 // State
 const zoneName = ref('');
 const zoneData = ref({});

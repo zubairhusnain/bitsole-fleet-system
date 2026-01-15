@@ -167,7 +167,7 @@ import { ref, computed, onMounted } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { formatDate, formatTime, getActiveTimezone } from '../../utils/datetime';
-
+ 
 // State
 const devices = ref([]);
 const selectedDevice = ref('');
@@ -218,7 +218,7 @@ const groupedRows = computed(() => {
             timeZone,
         });
         const key = `${row.date} ${dayName}`;
-
+ 
         if (!groups[key]) groups[key] = [];
         groups[key].push(row);
     });

@@ -236,7 +236,7 @@ import axios from 'axios';
 import { hasPermission } from '../../auth';
 import VehicleDetailModal from '../../components/VehicleDetailModal.vue';
 import { formatDateTime } from '../../utils/datetime';
-
+ 
 // State
 const vehicles = ref([]);
 const loading = ref(true);
@@ -296,8 +296,8 @@ const fetchVehicles = async () => {
                 model: tc.model || v.model || 'Unknown',
                 speed: speedKmh,
                 ignition: ign,
-                last_ignition_on: v.last_ignition_on || 'N/A',
-                last_ignition_off: v.last_ignition_off || 'N/A',
+                last_ignition_on: v.last_ignition_on ? formatDate(v.last_ignition_on) : 'N/A',
+                last_ignition_off: v.last_ignition_off ? formatDate(v.last_ignition_off) : 'N/A',
                 last_update: formatDate(pos.servertime || pos.fixtime),
                 lat: parseFloat(pos.latitude) || 0,
                 lng: parseFloat(pos.longitude) || 0,
