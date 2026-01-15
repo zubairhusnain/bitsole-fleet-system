@@ -2323,7 +2323,6 @@ class ReportService
 
         $positions = DB::connection('pgsql')
             ->table('tc_positions as p')
-            ->join('tc_devices as d', 'p.deviceid', '=', 'd.id')
             ->leftJoin('tc_events as e', function ($join) use ($from, $to) {
                 $join->on('e.positionid', '=', 'p.id')
                      ->whereBetween('e.eventtime', [$from, $to]);
@@ -2331,7 +2330,6 @@ class ReportService
             ->select(
                 'p.id',
                 'p.deviceid',
-                'd.name as device_name',
                 'p.fixtime',
                 'p.latitude',
                 'p.longitude',
@@ -2345,10 +2343,10 @@ class ReportService
             )
             ->whereIn('p.deviceid', $deviceIds)
             ->whereBetween('p.fixtime', [$from, $to])
-            ->orderBy('p.fixtime', 'asc')
-            ->orderBy('e.eventtime', 'asc')
+            ->orderBy('p.id', 'desc')
+            ->limit($limitParam)
             ->get();
- 
+
         $grouped = [];
         foreach ($positions as $row) {
             $pid = $row->id;
@@ -2366,8 +2364,10 @@ class ReportService
 
         $positionsForRows = collect(array_values($grouped));
 
-        $positionRows = $positionsForRows->map(function ($p) {
-            $deviceName = $p->device_name ?? 'Unknown';
+        $positionRows = $positionsForRows->map(function ($p) use ($tcDevices,$positions) {
+            $deviceId = (int) $p->deviceid;
+            $device = $tcDevices->get($deviceId);
+            $deviceName = $device ? ($device->name ?? 'Unknown') : 'Unknown';
 
             $epoch = strtotime($p->fixtime);
             if ($epoch === false) return null;
@@ -2414,22 +2414,29 @@ class ReportService
                 else $gps = 'Poor';
             }
 
-            $ign = $attrs['ignition'] ?? false;
-            $isIgnitionOn = ($ign === true || $ign === 1 || $ign === '1' || $ign === 'true' || $ign === 'ON');
+            $ignRaw = $attrs['ignition'] ?? null;
+            $isIgnitionOn = false;
+            if ($ignRaw !== null) {
+                if (is_bool($ignRaw)) {
+                    $isIgnitionOn = $ignRaw;
+                } elseif (is_numeric($ignRaw)) {
+                    $isIgnitionOn = ((int) $ignRaw) === 1;
+                } else {
+                    $val = strtolower(trim((string) $ignRaw));
+                    $isIgnitionOn = in_array($val, ['true', 'on', '1', 'yes'], true);
+                }
+            }
             $ignition = $isIgnitionOn ? 'ON' : 'OFF';
 
             $speedKnots = $p->speed ?? 0;
             $speedVal = round(((float)$speedKnots) * 1.852, 0);
             $speed = $speedVal . ' km/h';
 
-            $status = 'Stopped';
-            if ($speedVal > 1) {
-                $status = 'Moving';
-            } elseif ($isIgnitionOn) {
-                $status = 'Idle';
-            }
+            $status = null;
 
-            if ($p->event_type) {
+            if ($p->event_type === 'deviceOffline') {
+                $status = 'Offline';
+            } elseif ($p->event_type) {
                 $eventAttrsRaw = $p->event_attributes;
                 if (is_string($eventAttrsRaw)) {
                     $eventAttrs = json_decode($eventAttrsRaw, true) ?? [];
@@ -2446,6 +2453,27 @@ class ReportService
                 ];
 
                 $status = $this->formatEventDescription($eventPayload);
+            } else {
+                $status = 'Stopped';
+                if ($speedVal > 1) {
+                    $status = 'Moving';
+                } elseif ($isIgnitionOn) {
+                    $status = 'Idle';
+                }
+            }
+
+            if ($status !== null && stripos($status, 'moving') !== false && !$isIgnitionOn) {
+                $isIgnitionOn = true;
+                $ignition = 'ON';
+            }
+
+            $location = $p->address ?? '';
+            if (is_string($location)) {
+                $location = trim($location);
+            }
+            if ($location === '' && ($lat !== 0 || $lon !== 0)) {
+                $coords = $lat . ',' . $lon;
+                $location = 'https://www.google.com/maps?q=' . $coords;
             }
 
             return [
@@ -2457,7 +2485,7 @@ class ReportService
                 'status' => $status,
                 'lat' => $lat,
                 'lon' => $lon,
-                'location' => $p->address ?? '',
+                'location' => $location,
                 'direction' => $p->course ?? 0,
                 'speed' => $speed,
                 'gsm' => $gsm,
@@ -2477,9 +2505,9 @@ class ReportService
             return $a['epoch'] <=> $b['epoch'];
         });
 
-        // if ($limitParam > 0 && count($rows) > $limitParam) {
-        //    $rows = array_slice($rows, 0, $limitParam);
-        // }
+        if ($limitParam > 0 && count($rows) > $limitParam) {
+            $rows = array_slice($rows, 0, $limitParam);
+        }
 
         $lastEpoch = null;
         $lastLocation = '';

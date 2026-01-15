@@ -71,7 +71,20 @@
           </div>
           <div class="col-12">
             <div class="small text-muted">Last Location</div>
-            <div class="fw-semibold text-primary">{{ headerInfo.lastLocation }}</div>
+            <div class="fw-semibold text-primary">
+              <a
+                v-if="headerInfo.lastLocation && headerInfo.lastLocation.startsWith('http')"
+                :href="headerInfo.lastLocation"
+                target="_blank"
+                rel="noopener"
+                class="text-primary text-decoration-underline"
+              >
+                {{ headerInfo.lastLocation }}
+              </a>
+              <span v-else>
+                {{ headerInfo.lastLocation }}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -120,7 +133,24 @@
                     <td>{{ row.lon }}</td>
                     <td>{{ row.lat }}</td>
                     <td>
-                      <div class="text-truncate" style="max-width: 200px;" :title="row.location">{{ row.location }}</div>
+                      <a
+                        v-if="row.location && row.location.startsWith('http')"
+                        :href="row.location"
+                        target="_blank"
+                        rel="noopener"
+                        class="text-truncate d-inline-block"
+                        style="max-width: 200px;"
+                      >
+                        {{ row.lat }}, {{ row.lon }}
+                      </a>
+                      <div
+                        v-else
+                        class="text-truncate"
+                        style="max-width: 200px;"
+                        :title="row.location"
+                      >
+                        {{ row.location }}
+                      </div>
                     </td>
                     <td class="text-center">
                       <i class="bi bi-arrow-up text-primary" :style="{ transform: `rotate(${row.direction}deg)`, display: 'inline-block' }"></i>
@@ -136,7 +166,7 @@
                     </td>
                     <td class="text-info fw-bold">{{ row.power }}</td>
                     <td>
-                      <span v-if="row.ignition" class="badge bg-success bg-opacity-10 text-success border border-success">ON</span>
+                      <span v-if="row.ignition === 'ON'" class="badge bg-success bg-opacity-10 text-success border border-success">ON</span>
                       <span v-else class="badge bg-danger bg-opacity-10 text-danger border border-danger">OFF</span>
                     </td>
                     <td>{{ row.fuel }}</td>
