@@ -19,7 +19,7 @@
                 </ul>
                 <!--end::Start Navbar Links-->
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item d-flex align-items-center" v-if="isAuthed">
+                    <li class="nav-item d-flex align-items-center" :class="{ 'd-testingmode': !isTestingMode }" v-if="isAuthed">
                         <select v-model="timezone" @change="handleTimezoneChange" class="form-select form-select-sm timezone-select">
                             <option v-for="opt in timezoneOptions" :key="opt.value" :value="opt.value">
                                 {{ opt.label }}
@@ -358,31 +358,9 @@ function timezoneFlag(tz) {
     return '🌐';
 }
 
-const rawTimezones = typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function'
-    ? Intl.supportedValuesOf('timeZone')
-    : [
-        'UTC',
-        'Europe/London',
-        'Europe/Berlin',
-        'Asia/Dubai',
-        'Asia/Kolkata',
-        'Asia/Karachi',
-        'Asia/Singapore',
-        'America/New_York',
-        'America/Chicago',
-        'America/Los_Angeles'
-    ];
+const rawTimezones = Object.keys(timezoneFlagMap);
 
-const filteredTimezones = rawTimezones.filter((tz) => {
-    if (tz === 'UTC' || tz === 'Etc/UTC') return true;
-    if (tz.startsWith('Etc/')) return false;
-    if (tz === 'GMT' || tz === 'GMT0' || tz === 'Greenwich' || tz === 'Universal' || tz === 'Zulu' || tz === 'UCT') {
-        return false;
-    }
-    return true;
-});
-
-const timezoneOptions = filteredTimezones.map(v => ({
+const timezoneOptions = rawTimezones.map(v => ({
     value: v,
     label: `${timezoneFlag(v)} ${v}`
 }));
