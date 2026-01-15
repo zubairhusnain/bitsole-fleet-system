@@ -42,45 +42,45 @@
       </div>
     </div>
 
-    <div v-if="reportData" class="card border rounded-3 shadow-0 mb-3">
+    <div v-if="headerInfo" class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header"><h6 class="mb-0">Vehicle Activity Report Result</h6></div>
       <div class="card-body">
         <div class="row g-3">
           <div class="col-12 col-md-3">
             <div class="small text-muted">Vehicle ID</div>
-            <div class="fw-semibold">{{ reportData.header.vehicleId }}</div>
+            <div class="fw-semibold">{{ headerInfo.vehicleId }}</div>
           </div>
           <div class="col-12 col-md-3">
             <div class="small text-muted">Device ID</div>
-            <div class="fw-semibold">#{{ reportData.header.deviceUniqueId || reportData.header.deviceId }}</div>
+            <div class="fw-semibold">#{{ headerInfo.deviceUniqueId || headerInfo.deviceId }}</div>
           </div>
           <div class="col-12 col-md-3">
             <div class="small text-muted">Duration</div>
-            <div class="fw-semibold">{{ reportData.header.duration }}</div>
+            <div class="fw-semibold">{{ headerInfo.duration }}</div>
           </div>
           <div class="col-12 col-md-3">
             <div class="small text-muted">Last Report</div>
-            <div class="fw-semibold">{{ reportData.header.lastReport }}</div>
+            <div class="fw-semibold">{{ headerInfo.lastReport }}</div>
           </div>
           <div class="col-12">
             <div class="small text-muted">Last Location</div>
             <div class="fw-semibold text-primary">
               <a
-                v-if="reportData.header.lastLocation && reportData.header.lastLocation.startsWith('http')"
-                :href="reportData.header.lastLocation"
+                v-if="headerInfo.lastLocation && headerInfo.lastLocation.startsWith('http')"
+                :href="headerInfo.lastLocation"
                 target="_blank"
                 rel="noopener"
                 class="text-primary text-decoration-underline"
               >
-                <span v-if="reportData.header.lastLocationLat != null && reportData.header.lastLocationLon != null">
-                  {{ reportData.header.lastLocationLat }}, {{ reportData.header.lastLocationLon }}
+                <span v-if="headerInfo.lastLocationLat != null && headerInfo.lastLocationLon != null">
+                  {{ headerInfo.lastLocationLat }}, {{ headerInfo.lastLocationLon }}
                 </span>
                 <span v-else>
-                  {{ reportData.header.lastLocation }}
+                  {{ headerInfo.lastLocation }}
                 </span>
               </a>
               <span v-else>
-                {{ reportData.header.lastLocation || 'N/A' }}
+                {{ headerInfo.lastLocation || 'N/A' }}
               </span>
             </div>
           </div>
@@ -207,6 +207,7 @@ import { ref, computed, onMounted } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
+import { formatDateTime, formatDate, formatTime } from '../../utils/datetime';
 
 const router = useRouter();
 
@@ -219,6 +220,22 @@ const searchFilter = ref('');
 const loading = ref(false);
 const errorMessage = ref(null);
 const reportData = ref(null);
+
+const headerInfo = computed(() => {
+  if (!reportData.value || !reportData.value.header) return null;
+  const h = reportData.value.header;
+  const [fromStr, toStr] = typeof h.duration === 'string' && h.duration.includes('-')
+    ? h.duration.split('-').map(s => s.trim())
+    : [null, null];
+  const formattedDuration = fromStr && toStr
+    ? `${formatDateTime(fromStr)} - ${formatDateTime(toStr)}`
+    : h.duration;
+  return {
+    ...h,
+    duration: formattedDuration,
+    lastReport: formatDateTime(h.lastReport),
+  };
+});
 
 // Pagination
 const currentPage = ref(1);
@@ -247,10 +264,16 @@ const paginatedRows = computed(() => {
 const groupedRows = computed(() => {
   const groups = {};
   paginatedRows.value.forEach(row => {
-    if (!groups[row.groupDate]) {
-      groups[row.groupDate] = [];
+    const epochMs = row.epoch ? row.epoch * 1000 : null;
+    const dateKey = epochMs ? formatDate(epochMs) : row.groupDate || row.date;
+    if (!groups[dateKey]) {
+      groups[dateKey] = [];
     }
-    groups[row.groupDate].push(row);
+    groups[dateKey].push({
+      ...row,
+      date: epochMs ? formatDate(epochMs) : row.date,
+      time: epochMs ? formatTime(epochMs) : row.time,
+    });
   });
   return groups;
 });
