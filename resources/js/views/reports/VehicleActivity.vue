@@ -43,37 +43,40 @@
     </div>
 
     <div v-if="reportData" class="card border rounded-3 shadow-0 mb-3">
-      <div class="card-header bg-white border-bottom-0 pt-3 pb-0 ps-3"><h6 class="mb-0 fw-bold">Vehicle Activity Report Result</h6></div>
-      <div class="card-body pt-2">
+      <div class="card-header"><h6 class="mb-0">Vehicle Activity Report Result</h6></div>
+      <div class="card-body">
         <div class="row g-3">
           <div class="col-12 col-md-3">
-            <div class="bg-light p-3 rounded-2 h-100">
-              <div class="small fw-bold text-dark">Vehicle ID</div>
-              <div class="small text-muted">{{ reportData.header.vehicleId }}</div>
-            </div>
+            <div class="small text-muted">Vehicle ID</div>
+            <div class="fw-semibold">{{ reportData.header.vehicleId }}</div>
           </div>
           <div class="col-12 col-md-3">
-            <div class="bg-light p-3 rounded-2 h-100">
-              <div class="small fw-bold text-dark">Device ID</div>
-              <div class="small text-muted">{{ reportData.header.deviceId }}</div>
-            </div>
+            <div class="small text-muted">Device ID</div>
+            <div class="fw-semibold">#{{ reportData.header.deviceUniqueId || reportData.header.deviceId }}</div>
           </div>
           <div class="col-12 col-md-3">
-            <div class="bg-light p-3 rounded-2 h-100">
-              <div class="small fw-bold text-dark">Duration</div>
-              <div class="small text-muted">{{ reportData.header.duration }}</div>
-            </div>
+            <div class="small text-muted">Duration</div>
+            <div class="fw-semibold">{{ reportData.header.duration }}</div>
           </div>
           <div class="col-12 col-md-3">
-            <div class="bg-light p-3 rounded-2 h-100">
-              <div class="small fw-bold text-dark">Last Report</div>
-              <div class="small text-muted">{{ reportData.header.lastReport }}</div>
-            </div>
+            <div class="small text-muted">Last Report</div>
+            <div class="fw-semibold">{{ reportData.header.lastReport }}</div>
           </div>
           <div class="col-12">
-            <div class="bg-light p-3 rounded-2">
-              <div class="small fw-bold text-dark">Last Location</div>
-              <div class="small text-primary">{{ reportData.header.lastLocation || 'N/A' }}</div>
+            <div class="small text-muted">Last Location</div>
+            <div class="fw-semibold text-primary">
+              <a
+                v-if="reportData.header.lastLocation && reportData.header.lastLocation.startsWith('http')"
+                :href="reportData.header.lastLocation"
+                target="_blank"
+                rel="noopener"
+                class="text-primary text-decoration-underline"
+              >
+                {{ reportData.header.lastLocation }}
+              </a>
+              <span v-else>
+                {{ reportData.header.lastLocation || 'N/A' }}
+              </span>
             </div>
           </div>
         </div>
@@ -122,7 +125,21 @@
                   <td>{{ row.status }}</td>
                   <td>{{ row.lon }}</td>
                   <td>{{ row.lat }}</td>
-                  <td>{{ row.location }}</td>
+                  <td>
+                    <a
+                      v-if="row.lat && row.lon"
+                      :href="(row.location && row.location.startsWith('http'))
+                        ? row.location
+                        : `https://www.google.com/maps?q=${row.lat},${row.lon}`"
+                      target="_blank"
+                      rel="noopener"
+                      class="text-truncate d-inline-block"
+                      style="max-width: 220px;"
+                    >
+                      {{ row.location || `${row.lat}, ${row.lon}` }}
+                    </a>
+                    <span v-else>{{ row.location }}</span>
+                  </td>
                   <td class="text-center">
                      <a v-if="!row.isEvent" :href="`https://www.google.com/maps?q=${row.lat},${row.lon}`" target="_blank" rel="noopener">
                       <i class="bi bi-arrow-up text-primary" :style="{ transform: `rotate(${row.direction}deg)`, display: 'inline-block' }"></i>

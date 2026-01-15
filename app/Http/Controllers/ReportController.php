@@ -287,13 +287,13 @@ class ReportController extends Controller
 
             $deviceIds = $this->getDeviceIds($request);
             if (empty($deviceIds)) return response()->json([]);
-            return $this->reportService->fetchVehicleActivity($request, $deviceIds);
+            return $this->reportService->fetchVehicleActivityDb($request, $deviceIds);
         } catch (\Throwable $e) {
             Log::error('vehicleActivity failed', ['error' => $e->getMessage()]);
             return response()->json([]);
         }
     }
-
+ 
     public function idling(Request $request)
     {
         try {

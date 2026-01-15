@@ -2316,7 +2316,7 @@ class ReportService
 
         $tcDevices = DB::connection('pgsql')
             ->table('tc_devices')
-            ->select('id', 'name', 'uniqueid')
+            ->select('id', 'name', 'uniqueid', 'attributes')
             ->whereIn('id', $deviceIds)
             ->get()
             ->keyBy('id');
@@ -2539,9 +2539,24 @@ class ReportService
         $vehicleLabel = count($deviceIds) > 1 ? 'Multiple Vehicles (' . count($deviceIds) . ')' : $singleDeviceName;
         $deviceIdLabel = count($deviceIds) > 1 ? 'Multiple' : ($deviceIds[0] ?? 'N/A');
         $deviceUniqueIdLabel = 'Multiple';
+        $vehicleNoLabel = count($deviceIds) > 1 ? 'Multiple' : 'N/A';
         if (count($deviceIds) === 1) {
             $device = $tcDevices->get($deviceIds[0]);
-            $deviceUniqueIdLabel = $device && $device->uniqueid ? (string) $device->uniqueid : 'N/A';
+            if ($device) {
+                $deviceUniqueIdLabel = $device->uniqueid ? (string) $device->uniqueid : 'N/A';
+                $attrs = $device->attributes ?? [];
+                if (is_string($attrs)) {
+                    $decoded = json_decode($attrs, true);
+                    $attrs = is_array($decoded) ? $decoded : [];
+                } elseif (!is_array($attrs)) {
+                    $attrs = [];
+                }
+                $vehicleNo = $attrs['vehicleNo'] ?? null;
+                if ($vehicleNo) {
+                    $vehicleNoLabel = (string) $vehicleNo;
+                    $vehicleLabel = $vehicleNoLabel . ' - ' . $singleDeviceName;
+                }
+            }
         }
 
         $lastTime = $lastEpoch ? date('Y-m-d H:i:s', $lastEpoch) : 'N/A';
@@ -2550,6 +2565,7 @@ class ReportService
             'vehicleId' => $vehicleLabel,
             'deviceId' => $deviceIdLabel,
             'deviceUniqueId' => $deviceUniqueIdLabel,
+            'vehicleNo' => $vehicleNoLabel,
             'duration' => $from . ' - ' . $to,
             'lastReport' => $lastTime,
             'lastLocation' => $lastLocation,
@@ -2559,6 +2575,11 @@ class ReportService
             'header' => $header,
             'rows' => $rows
         ];
+    }
+
+    public function fetchVehicleActivityDb($request, $deviceIds)
+    {
+        return $this->fetchAssetActivityDb($request, $deviceIds);
     }
 
     public function fetchVehicleActivity($request, $deviceIds)
