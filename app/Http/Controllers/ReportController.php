@@ -264,7 +264,7 @@ class ReportController extends Controller
 
             $deviceIds = $this->getDeviceIds($request);
             if (empty($deviceIds)) return response()->json([]);
-            return $this->reportService->fetchAssetActivity($request, $deviceIds);
+            return $this->reportService->fetchAssetActivityDb($request, $deviceIds);
         } catch (\Throwable $e) {
             Log::error('assetActivity failed', ['error' => $e->getMessage()]);
             return response()->json([]);
