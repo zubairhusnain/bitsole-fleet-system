@@ -107,7 +107,7 @@
                 <td class="text-muted small" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
                     {{ vehicle.address || '—' }}
                 </td>
-                <td>{{ vehicle.last_update || '—' }} {{</td>
+                <td>{{ vehicle.last_update || '—' }}</td>
                 <td class="text-center">
                     <span class="badge rounded-pill px-3 py-2" :class="isIgnitionOn(vehicle) ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'">
                         {{ isIgnitionOn(vehicle) ? 'Ignition On' : 'Ignition Off' }}
@@ -300,11 +300,10 @@ import "leaflet/dist/leaflet.css";
 import { LMap, LTileLayer, LPolygon, LMarker, LPopup, LControlZoom, LCircle } from "@vue-leaflet/vue-leaflet";
 import * as L from 'leaflet';
 import UiAlert from '../../components/UiAlert.vue';
-import { formatDateTime } from '../../utils/datetime';
 
 const route = useRoute();
 const zoneId = route.params.zoneId;
- 
+
 // State
 const zoneName = ref('');
 const zoneData = ref({});
@@ -329,10 +328,18 @@ const selectedMaintenanceStatus = ref('');
 const alertStatusTargetId = ref(null);
 const submittingStatus = ref(false);
 
-// Helper for date formatting (timezone-aware)
+// Helper for date formatting
 const formatDate = (dateStr) => {
     if (!dateStr || dateStr === 'N/A') return 'N/A';
-    return formatDateTime(dateStr);
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'N/A';
+    // Format: DD/MM/YYYY - HH:mm
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year}-${hours}:${minutes}`;
 };
 
 const parseAttrs = (a) => {
@@ -538,7 +545,7 @@ const totalPages = computed(() => Math.ceil(vehicles.value.length / pageSize));
 const startIndex = computed(() => (currentPage.value - 1) * pageSize);
 const endIndex = computed(() => startIndex.value + pageSize);
 const paginatedVehicles = computed(() => vehicles.value.slice(startIndex.value, endIndex.value));
-console.log('Last Report ',paginatedVehicles);
+
 const goToPage = (p) => currentPage.value = p;
 const prevPage = () => { if (currentPage.value > 1) currentPage.value--; };
 const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++; };
@@ -805,33 +812,16 @@ onMounted(async () => {
 
     const vlist = Array.isArray(md?.vehicles) ? md.vehicles : [];
     vehicles.value = vlist.map(v => {
-      const tc = v.tc_device || v.tcDevice || {};
-      const pos = tc.position || {};
-
-      const lat = Number(v.lat ?? v.latitude ?? pos.latitude);
-      const lon = Number(v.lng ?? v.longitude ?? pos.longitude);
+      const lat = Number(v.lat ?? v.latitude);
+      const lon = Number(v.lng ?? v.longitude);
       const valid =
         Number.isFinite(lat) &&
         Number.isFinite(lon) &&
         Math.abs(lat) <= 90 &&
         Math.abs(lon) <= 180 &&
         !(lat === 0 && lon === 0);
-
-      const rawLastUpdate =
-        pos.servertime ||
-        pos.fixtime ||
-        v.last_update ||
-        v.lastReport ||
-        v.last_report;
-
-      const formattedLastUpdate =
-        !rawLastUpdate
-          ? '-'
-          : formatDate(rawLastUpdate);
-
       return {
         ...v,
-        last_update: formattedLastUpdate,
         latitude: valid ? lat : undefined,
         longitude: valid ? lon : undefined,
       };
