@@ -27,7 +27,7 @@
             <label class="form-label small">Vehicle</label>
             <select v-model="vehicle" class="form-select">
               <option value="">-- All Vehicles --</option>
-              <option v-for="v in vehicles" :key="v.id" :value="v.device_id">{{ v.name }}</option>
+              <option v-for="v in vehicles" :key="v.id" :value="v.deviceId">{{ v.label }}</option>
             </select>
           </div>
           <div class="col-12 col-md-2">
@@ -59,7 +59,7 @@
           </div>
           <div class="col-12 col-md-3">
             <div class="small text-muted">Device ID</div>
-            <div class="fw-semibold">#{{ headerInfo.deviceId }}</div>
+            <div class="fw-semibold">#{{ headerInfo.deviceUniqueId || headerInfo.deviceId }}</div>
           </div>
           <div class="col-12 col-md-3">
             <div class="small text-muted">Duration</div>
@@ -165,9 +165,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
+import { formatDateTime, formatDate, formatTime } from '../../utils/datetime';
 
 const startDate = ref('');
 const endDate = ref('');
@@ -177,7 +178,22 @@ const apiLimit = ref(100);
 const loading = ref(false);
 const errorMessage = ref(null);
 const rows = ref([]);
-const headerInfo = ref(null);
+const headerInfoRaw = ref(null);
+const headerInfo = computed(() => {
+  if (!headerInfoRaw.value) return null;
+  const h = headerInfoRaw.value;
+  const [fromStr, toStr] = typeof h.duration === 'string' && h.duration.includes('-')
+    ? h.duration.split('-').map(s => s.trim())
+    : [null, null];
+  const formattedDuration = fromStr && toStr
+    ? `${formatDateTime(fromStr)} - ${formatDateTime(toStr)}`
+    : h.duration;
+  return {
+    ...h,
+    duration: formattedDuration,
+    lastReport: formatDateTime(h.lastReport)
+  };
+});
 const hasSearched = ref(false);
 
 // Pagination
@@ -196,10 +212,15 @@ const groupedRows = computed(() => {
   if (!pagedRows.value.length) return [];
   const groups = {};
   pagedRows.value.forEach(row => {
-    if (!groups[row.groupDate]) {
-      groups[row.groupDate] = [];
+    const key = formatDate(row.epoch ? row.epoch * 1000 : row.groupDate || row.date);
+    if (!groups[key]) {
+      groups[key] = [];
     }
-    groups[row.groupDate].push(row);
+    groups[key].push({
+      ...row,
+      date: formatDate(row.epoch ? row.epoch * 1000 : row.date),
+      time: formatTime(row.epoch ? row.epoch * 1000 : row.time)
+    });
   });
   return Object.keys(groups).map(date => ({
     date,
@@ -212,10 +233,9 @@ function prevPage() { if (page.value > 1) page.value--; }
 function nextPage() { if (page.value < totalPages.value) page.value++; }
 
 onMounted(async () => {
-  // Set default dates (Last 7 Days)
   const now = new Date();
   const start = new Date(now);
-  start.setDate(start.getDate() - 7); // Go back 7 days
+  start.setDate(start.getDate() - 7);
   start.setHours(0, 0, 0, 0);
 
   const end = new Date(now);
@@ -224,7 +244,6 @@ onMounted(async () => {
   startDate.value = toIsoLocal(start);
   endDate.value = toIsoLocal(end);
 
-  // Fetch vehicles
   try {
     const { data } = await axios.get('/web/reports/device-options');
     vehicles.value = data.options || [];
@@ -232,7 +251,11 @@ onMounted(async () => {
     console.error('Failed to load vehicles', e);
   }
 
-  // Auto search on load
+  handleSearch();
+});
+
+watch(vehicle, () => {
+  page.value = 1;
   handleSearch();
 });
 
@@ -246,7 +269,7 @@ async function handleSearch() {
   hasSearched.value = true;
   errorMessage.value = null;
   rows.value = [];
-  headerInfo.value = null;
+  headerInfoRaw.value = null;
 
   const deviceIds = vehicle.value ? [vehicle.value] : [];
 
@@ -262,7 +285,7 @@ async function handleSearch() {
 
     if (data.rows) {
       rows.value = data.rows;
-      headerInfo.value = data.header;
+      headerInfoRaw.value = data.header || null;
     }
   } catch (e) {
     console.error('Error fetching asset activity', e);

@@ -2532,10 +2532,19 @@ class ReportService
 
         $vehicleLabel = count($deviceIds) > 1 ? 'Multiple Vehicles (' . count($deviceIds) . ')' : $singleDeviceName;
         $deviceIdLabel = count($deviceIds) > 1 ? 'Multiple' : ($deviceIds[0] ?? 'N/A');
+        $deviceUniqueIdLabel = 'Multiple';
+        if (count($deviceIds) === 1) {
+            try {
+                $deviceUniqueIdLabel = (string) DB::connection('pgsql')->table('tc_devices')->where('id', (int)$deviceIds[0])->value('uniqueid') ?: 'N/A';
+            } catch (\Throwable $e) {
+                $deviceUniqueIdLabel = 'N/A';
+            }
+        }
 
         $header = [
             'vehicleId' => $vehicleLabel,
             'deviceId' => $deviceIdLabel,
+            'deviceUniqueId' => $deviceUniqueIdLabel,
             'duration' => date('Y/m/d H:i', strtotime($from)) . ' - ' . date('Y/m/d H:i', strtotime($to)),
             'lastReport' => $lastTime,
             'lastLocation' => $lastAddress,
