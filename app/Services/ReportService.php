@@ -262,13 +262,27 @@ class ReportService
             $hc = $evt ? $evt->count_hc : 0;
             $sv = $evt ? $evt->count_overspeed : 0;
 
-            // Calculate Points (100 - penalties)
             $points = 100 - ($ha * 5) - ($hb * 5) - ($hc * 5) - ($sv * 10);
-            $model = $tcDev ? ($tcDev->model ?? $tcDev->category ?? 'N/A') : 'N/A';
+            $attrs = $tcDev && $tcDev->attributes
+                ? (is_string($tcDev->attributes)
+                    ? (json_decode($tcDev->attributes, true) ?: [])
+                    : (is_array($tcDev->attributes) ? $tcDev->attributes : []))
+                : [];
+            $type = trim((string) data_get($attrs, 'type', ''));
+            $trackerModel = trim((string) (
+                data_get($attrs, 'trackerModel')
+                ?? data_get($tcDev, 'model')
+                ?? ''
+            ));
+            $typeModel = $type !== '' ? trim($type . ' - ' . $trackerModel) : $trackerModel;
+            if ($typeModel === '') {
+                $fallback = $tcDev ? ($tcDev->category ?? 'N/A') : 'N/A';
+                $typeModel = is_string($fallback) && trim($fallback) !== '' ? trim($fallback) : 'N/A';
+            }
 
             return [
                 'vehicleId' => $tcDev->name ?? 'Unknown',
-                'typeModel' => $model,
+                'typeModel' => $typeModel,
                 'distance' => round($distanceM / 1000, 2) . ' KM',
                 'duration' => $this->formatDurationHms($engineHoursMs),
                 'totalHA' => (int)$ha,
@@ -426,13 +440,30 @@ class ReportService
             $hc = $evs->filter(fn($e) => ($e['attributes']['alarm'] ?? null) === 'hardCornering')->count();
             $sv = $evs->where('type', 'deviceOverspeed')->count();
 
-            // Calculate Points (100 - penalties)
             $points = 100 - ($ha * 5) - ($hb * 5) - ($hc * 5) - ($sv * 10);
-            $model = $tcDev ? ($tcDev->model ?? $tcDev->category ?? 'N/A') : 'N/A';
+            $attrs = $tcDev && $tcDev->attributes
+                ? (is_string($tcDev->attributes)
+                    ? (json_decode($tcDev->attributes, true) ?: [])
+                    : (is_array($tcDev->attributes) ? $tcDev->attributes : []))
+                : [];
+            $type = trim((string) data_get($attrs, 'type', ''));
+            $trackerModel = trim((string) (
+                data_get($attrs, 'trackerModel')
+                ?? data_get($attrs, 'deviceModel')
+                ?? data_get($attrs, 'gpsModel')
+                ?? data_get($attrs, 'teltonikaModel')
+                ?? data_get($tcDev, 'model')
+                ?? ''
+            ));
+            $typeModel = $type !== '' ? trim($type . ' - ' . $trackerModel) : $trackerModel;
+            if ($typeModel === '') {
+                $fallback = $tcDev ? ($tcDev->category ?? 'N/A') : 'N/A';
+                $typeModel = is_string($fallback) && trim($fallback) !== '' ? trim($fallback) : 'N/A';
+            }
 
             return [
                 'vehicleId' => $sum['deviceName'] ?? 'Unknown',
-                'typeModel' => $model,
+                'typeModel' => $typeModel,
                 'distance' => round($distanceM / 1000, 2) . ' KM',
                 'duration' => $this->formatDurationHms($engineHoursMs),
                 'totalHA' => $ha ?: 0,
