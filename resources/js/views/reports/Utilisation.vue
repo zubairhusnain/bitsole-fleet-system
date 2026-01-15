@@ -6,7 +6,7 @@
         <li class="breadcrumb-item">Reports & Analytics</li>
         <li class="breadcrumb-item active" aria-current="page">Utilisation Report</li>
       </ol>
-    </div>  
+    </div>
     <h4 class="mb-3">Utilisation Report</h4>
     <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = ''" />
     <div class="card panel border rounded-3 shadow-0 mb-3">
@@ -77,7 +77,7 @@
             <div class="col-12 col-md-3">
                 <div class="bg-light rounded-2 p-3 h-100">
                     <div class="small fw-bold text-dark mb-1">Duration</div>
-                    <div class="small text-muted">{{ summary.durationDisplay }}</div>
+                    <div class="small text-muted">{{ summaryDuration }}</div>
                 </div>
             </div>
             <div class="col-12 col-md-3">
@@ -160,7 +160,7 @@
 import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
-
+import { formatDateTime } from '../../utils/datetime';
 const deviceOptions = ref([]);
 const selectedDeviceId = ref('');
 const selectedType = ref('Movement');
@@ -174,6 +174,19 @@ const summary = ref({
   deviceId: '',
   durationDisplay: '',
   totalDays: 0,
+});
+
+const summaryDuration = computed(() => {
+  if (!summary.value || !summary.value.durationDisplay) return '';
+  const raw = summary.value.durationDisplay;
+  if (typeof raw !== 'string') return raw;
+  const sep = ' - ';
+  const idx = raw.indexOf(sep);
+  if (idx === -1) return raw;
+  const fromStr = raw.slice(0, idx).trim();
+  const toStr = raw.slice(idx + sep.length).trim();
+  if (!fromStr || !toStr) return raw;
+  return `${formatDateTime(fromStr)} - ${formatDateTime(toStr)}`;
 });
 
 const rows = ref([]);
