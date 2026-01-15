@@ -291,7 +291,7 @@ class ReportController extends Controller
             return response()->json([]);
         }
     }
- 
+
     public function idling(Request $request)
     {
         try {
@@ -584,9 +584,9 @@ class ReportController extends Controller
                 'incidentId' => (int)$r->id,
                 'vehicleId' => (string)($r->vehicle_label ?? ''),
                 'typeModel' => (string)($r->type_model ?? ''),
-                'incidentStart' => $r->incident_start ? $r->incident_start->format('d-m-Y') : '',
-                'incidentEnd' => $r->incident_end ? $r->incident_end->format('d-m-Y') : '',
-                'impactTime' => $r->impact_time ? $r->impact_time->format('d-m-Y H:i') : '',
+                'incidentStart' => $r->incident_start ? $r->incident_start->format('Y-m-d H:i:s') : null,
+                'incidentEnd' => $r->incident_end ? $r->incident_end->format('Y-m-d H:i:s') : null,
+                'impactTime' => $r->impact_time ? $r->impact_time->format('Y-m-d H:i:s') : null,
                 'driver' => (string)($r->driver ?? 'N/A'),
                 'description' => (string)($r->description ?? ''),
                 'remarks' => (string)($r->remarks ?? ''),

@@ -107,8 +107,8 @@ import { formatDateTime } from '../../utils/datetime';
 
 const hasPerm = (m, a) => hasPermission(m, a);
 
-const fromDate = ref('');
-const toDate = ref('');
+const fromDate = ref(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+const toDate = ref(new Date().toISOString().slice(0, 10));
 const filterVehicleId = ref('');
 const deviceOptions = ref([]);
 const alert = ref({ message: '', type: '' });
