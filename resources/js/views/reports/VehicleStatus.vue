@@ -220,6 +220,7 @@ const processVehicleData = (list) => {
         // Merge: Device < Vehicle < Position (Standard Traccar/Laravel precedence)
         const mergedAttrs = { ...deviceAttrs, ...vehicleAttrs, ...attrs };
         const tel = formatTelemetry(mergedAttrs, { protocol: null, model: tc.model, preferNamedOdometer: true });
+        const deviceModelAttr = pickAttr(deviceAttrs, ['trackerModel']);
 
         const vehicleId = deviceAttrs.vehicleNo || deviceAttrs.vehicle_id || deviceAttrs.vehicleId || deviceAttrs.vehicleID || null;
 
@@ -247,15 +248,31 @@ const processVehicleData = (list) => {
         const ignRaw = mergedAttrs.ignition ?? v.ignition;
         const ignition = ignRaw === true || ignRaw === 1 || String(ignRaw).toLowerCase() === 'on';
 
+        let odometer = null;
+        if (tel?.odometer?.display) {
+            odometer = tel.odometer.display;
+        }
+        if (!odometer) {
+            const rawOdo = pickAttr(mergedAttrs, ['odometer', 'mileage', 'odometerKm', 'odometer_km', 'totalDistance', 'distance']);
+            if (rawOdo != null && rawOdo !== '') {
+                const n = Number(rawOdo);
+                if (Number.isFinite(n)) {
+                    odometer = `${Math.round(n).toLocaleString()} km`;
+                } else {
+                    odometer = String(rawOdo);
+                }
+            }
+        }
+
         return {
             id: v.device_id || v.id,
             vehicle_id: vehicleId || tc.name || v.name || 'Unknown',
             owner: v.manager ? v.manager.name : (v.group || 'N/A'),
             type_model: `${deviceAttrs.type || ''} ${tc.model || ''}`.trim() || 'N/A',
-            device_model: tc.model || 'N/A',
+            device_model: deviceModelAttr || tc.model || 'N/A',
             imei: tc.uniqueid || 'N/A',
             iccid: deviceAttrs.iccid || 'N/A',
-            odometer: tel?.odometer?.display || '0 km',
+            odometer: odometer || 'N/A',
             power: ignition ? 'On' : 'Off', // Mapping Power to Ignition status as common fallback
             last_report: formatDate(pos.servertime || pos.fixtime),
             longitude: pos.longitude ? parseFloat(pos.longitude).toFixed(5) : 'N/A',

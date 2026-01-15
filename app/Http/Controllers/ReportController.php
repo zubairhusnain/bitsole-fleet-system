@@ -110,13 +110,11 @@ class ReportController extends Controller
             $ignitionTimes[$evt->deviceid][$evt->type] = $evt->last_time;
         }
 
-        // Helper for date formatting
         $formatDate = function ($dateStr) {
             if (!$dateStr) return null;
-            return date('d/m/Y - h:i A', strtotime($dateStr));
+            return date('Y-m-d H:i:s', strtotime($dateStr));
         };
 
-        // Enrich the devices collection
         $devicesCollection->transform(function ($device) use ($ignitionTimes, $formatDate) {
             $ignOnTime = $ignitionTimes[$device->device_id]['ignitionOn'] ?? null;
             $ignOffTime = $ignitionTimes[$device->device_id]['ignitionOff'] ?? null;
