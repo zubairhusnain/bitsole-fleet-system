@@ -35,7 +35,7 @@
                             </span>
                         </RouterLink>
                     </li>
-                    <li class="nav-item user-menu" v-if="i sAuthed">
+                    <li class="nav-item user-menu" v-if="isAuthed">
                         <div class="nav-link d-flex align-items-center user-toggle">
                             <img v-if="avatarSrc" :src="avatarSrc" alt="Avatar" class="avatar-img" />
                             <span v-else class="avatar">{{ initials }}</span>
