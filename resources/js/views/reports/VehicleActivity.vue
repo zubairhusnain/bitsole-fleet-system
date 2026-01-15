@@ -224,9 +224,16 @@ const reportData = ref(null);
 const headerInfo = computed(() => {
   if (!reportData.value || !reportData.value.header) return null;
   const h = reportData.value.header;
-  const [fromStr, toStr] = typeof h.duration === 'string' && h.duration.includes('-')
-    ? h.duration.split('-').map(s => s.trim())
-    : [null, null];
+  let fromStr = null;
+  let toStr = null;
+  if (typeof h.duration === 'string') {
+    const sep = ' - ';
+    const idx = h.duration.indexOf(sep);
+    if (idx !== -1) {
+      fromStr = h.duration.slice(0, idx).trim();
+      toStr = h.duration.slice(idx + sep.length).trim();
+    }
+  }
   const formattedDuration = fromStr && toStr
     ? `${formatDateTime(fromStr)} - ${formatDateTime(toStr)}`
     : h.duration;
