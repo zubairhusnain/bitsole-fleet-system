@@ -66,12 +66,12 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in pagedRows" :key="row.deviceId + '_' + row.vehicleId">
+                  <tr v-for="row in pagedRows" :key="row.deviceId + '_' + row.vehicleId">
                 <td class="ps-3">{{ row.vehicleId }}</td>
                 <td>{{ row.typeModel }}</td>
-                <td>{{ row.incidentStart }}</td>
-                <td>{{ row.incidentEnd }}</td>
-                <td>{{ row.impactTime }}</td>
+                    <td>{{ formatDateTime(row.incidentStart) }}</td>
+                    <td>{{ formatDateTime(row.incidentEnd) }}</td>
+                    <td>{{ formatDateTime(row.impactTime) }}</td>
                 <td>{{ row.driver }}</td>
                 <td class="text-truncate" style="max-width: 200px;">{{ row.description }}</td>
                 <td class="text-truncate" style="max-width: 200px;">{{ row.remarks }}</td>
@@ -103,6 +103,7 @@ import { ref, onMounted, computed } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { hasPermission } from '../../auth';
+import { formatDateTime } from '../../utils/datetime';
 
 const hasPerm = (m, a) => hasPermission(m, a);
 

@@ -9,7 +9,7 @@
               <div class="fw-bold">Date</div>
               <div class="fw-bold">Distance</div>
           </div>
- 
+
           <div class="overflow-auto custom-scrollbar flex-grow-1">
             <div class="list-group list-group-flush">
               <template v-for="day in displayedRows" :key="day.key || (String(day.date || '') + '_' + String(day.deviceId || ''))">
@@ -79,7 +79,7 @@
                         <div class="d-flex justify-content-between align-items-start">
                            <div>
                               <div class="d-flex align-items-center gap-2 mb-1">
-                                  <div class="fw-bold small" :class="getTypeColor(item.type)">{{ item.time }}</div>
+                                  <div class="fw-bold small" :class="getTypeColor(item.type)">{{ displayTime(item) }}</div>
                               </div>
 
                               <div class="text-muted small mb-1" style="font-size: 0.8rem; line-height: 1.2;">{{ item.location }}</div>
@@ -158,6 +158,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
+import { formatTime } from '../../../../utils/datetime';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -357,7 +358,7 @@ function loadDayOnMap(day) {
                     fillOpacity: 0.8
                 }).addTo(map);
 
-                marker.bindPopup(`<b>${item.time}</b><br>${item.location}<br>${item.type.toUpperCase()}`);
+                marker.bindPopup(`<b>${displayTime(item)}</b><br>${item.location}<br>${item.type.toUpperCase()}`);
                 markers.push(marker);
             }
         });
@@ -470,8 +471,15 @@ function updatePlaybackMarker() {
     playbackMarker.setLatLng([pt[0], pt[1]]);
 }
 
-</script>
+function displayTime(item) {
+    const epoch = Number(item?.time_sort);
+    if (Number.isFinite(epoch) && epoch > 0) {
+        return formatTime(epoch * 1000);
+    }
+    return String(item?.time || '');
+}
 
+</script>
 <style scoped>
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;

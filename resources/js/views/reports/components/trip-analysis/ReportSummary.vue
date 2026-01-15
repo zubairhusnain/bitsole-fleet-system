@@ -13,7 +13,7 @@
         </div>
         <div class="col-12 col-md-3">
           <div class="small text-muted">Duration</div>
-          <div class="fw-semibold">{{ formatTime(dateRange?.start) }} - {{ formatTime(dateRange?.end) }}</div>
+          <div class="fw-semibold">{{ formatTimeRange(dateRange?.start, dateRange?.end) }}</div>
         </div>
         <div class="col-12 col-md-3">
           <div class="small text-muted">View Type</div>
@@ -27,9 +27,10 @@
     </div>
   </div>
 </template>
- 
+
 <script setup>
 import { computed } from 'vue';
+import { formatDateTime } from '../../../../utils/datetime';
 
 const props = defineProps({
   summary: Object,
@@ -62,8 +63,7 @@ const remarksText = computed(() => {
   }
 });
 
-const formatTime = (t) => {
-  if (!t) return '';
-  return t.replace('T', ' ');
+const formatTimeRange = (start, end) => {
+  return `${formatDateTime(start)} - ${formatDateTime(end)}`;
 };
 </script>
