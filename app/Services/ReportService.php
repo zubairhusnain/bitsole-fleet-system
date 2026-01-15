@@ -2511,14 +2511,18 @@ class ReportService
 
         $lastEpoch = null;
         $lastLocation = '';
+        $lastLat = null;
+        $lastLon = null;
 
-        $rows = array_map(function ($index, $row) use (&$lastEpoch, &$lastLocation) {
+        $rows = array_map(function ($index, $row) use (&$lastEpoch, &$lastLocation, &$lastLat, &$lastLon) {
             $row['key'] = $index;
 
             if ($lastEpoch === null || $row['epoch'] > $lastEpoch) {
                 $lastEpoch = $row['epoch'];
                 if (!$row['isEvent']) {
                     $lastLocation = $row['location'] ?: ($row['lat'] . ', ' . $row['lon']);
+                    $lastLat = $row['lat'];
+                    $lastLon = $row['lon'];
                 } else {
                     if ($row['location']) {
                         $lastLocation = $row['location'];
@@ -2569,6 +2573,8 @@ class ReportService
             'duration' => $from . ' - ' . $to,
             'lastReport' => $lastTime,
             'lastLocation' => $lastLocation,
+            'lastLocationLat' => $lastLat,
+            'lastLocationLon' => $lastLon,
         ];
 
         return [

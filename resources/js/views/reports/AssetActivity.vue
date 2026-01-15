@@ -79,7 +79,12 @@
                 rel="noopener"
                 class="text-primary text-decoration-underline"
               >
-                {{ headerInfo.lastLocation }}
+                <span v-if="headerInfo.lastLocationLat != null && headerInfo.lastLocationLon != null">
+                  {{ headerInfo.lastLocationLat }}, {{ headerInfo.lastLocationLon }}
+                </span>
+                <span v-else>
+                  {{ headerInfo.lastLocation }}
+                </span>
               </a>
               <span v-else>
                 {{ headerInfo.lastLocation }}

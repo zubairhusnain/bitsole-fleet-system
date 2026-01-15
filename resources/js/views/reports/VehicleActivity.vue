@@ -72,7 +72,12 @@
                 rel="noopener"
                 class="text-primary text-decoration-underline"
               >
-                {{ reportData.header.lastLocation }}
+                <span v-if="reportData.header.lastLocationLat != null && reportData.header.lastLocationLon != null">
+                  {{ reportData.header.lastLocationLat }}, {{ reportData.header.lastLocationLon }}
+                </span>
+                <span v-else>
+                  {{ reportData.header.lastLocation }}
+                </span>
               </a>
               <span v-else>
                 {{ reportData.header.lastLocation || 'N/A' }}
@@ -136,7 +141,7 @@
                       class="text-truncate d-inline-block"
                       style="max-width: 220px;"
                     >
-                      {{ row.location || `${row.lat}, ${row.lon}` }}
+                      {{ `${row.lat}, ${row.lon}` }}
                     </a>
                     <span v-else>{{ row.location }}</span>
                   </td>
