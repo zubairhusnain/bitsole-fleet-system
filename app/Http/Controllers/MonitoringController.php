@@ -344,8 +344,8 @@ class MonitoringController extends Controller
                 $ignOnTime = $ignitionTimes[$device->device_id]['ignitionOn'] ?? null;
                 $ignOffTime = $ignitionTimes[$device->device_id]['ignitionOff'] ?? null;
 
-                $device->last_ignition_on = $ignOnTime ? $formatDate($ignOnTime) : null;
-                $device->last_ignition_off = $ignOffTime ? $formatDate($ignOffTime) : null;
+                $device->last_ignition_on = $ignOnTime ? $ignOnTime : null;
+                $device->last_ignition_off = $ignOffTime ? $ignOffTime : null;
 
                 return $device;
             });

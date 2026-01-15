@@ -150,7 +150,11 @@
               </tr>
               <tr v-else v-for="zone in paginatedZones" :key="zone.id">
                 <td class="text-muted text-nowrap">{{ zone.name }}</td>
-                <td class="text-muted text-nowrap">{{ zone.description || '—' }}</td>
+                <td class="text-muted">
+                    <div style="white-space: pre-line; max-width: 200px;">
+                        {{ zone.description || '—' }}
+                    </div> 
+                </td>
                 <td class="text-muted text-nowrap">{{ formatDate(zone.created_at) }}</td>
                 <td class="text-muted text-nowrap">{{ formatDate(zone.updated_at) }}</td>
                 <td class="text-nowrap">

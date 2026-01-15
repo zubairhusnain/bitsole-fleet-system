@@ -89,7 +89,7 @@
                 <th class="fw-semibold py-2">Created</th>
                 <th class="fw-semibold py-2">Last Update</th>
                 <th class="fw-semibold py-2">Status</th>
-                <th class="fw-semibold py-2 text-end">Action</th>
+                <th class="fw-semibold py-2 text-end">Action</th> 
               </tr>
             </thead>
             <tbody>
@@ -99,7 +99,11 @@
               <tr v-for="row in pagedRows" :key="row.id" class="border-bottom">
                 <td class="text-muted text-nowrap">{{ row.zoneName }}</td>
                 <td class="text-muted text-nowrap">{{ row.owner }}</td>
-                <td class="text-muted text-nowrap">{{ row.description }}</td>
+                <td class="text-muted">
+                  <div style="white-space: pre-line; max-width: 320px;">
+                    {{ row.description }}
+                  </div>
+                </td>
                 <td class="text-muted text-nowrap">{{ row.created }}</td>
                 <td class="text-muted text-nowrap">{{ row.lastUpdate }}</td>
                 <td class="text-nowrap">
@@ -119,8 +123,8 @@
               </tr>
             </tbody>
           </table>
-        </div> 
-      </div> 
+        </div>
+      </div>
       <div class="card-footer d-flex align-items-center py-2">
         <div class="text-muted small me-auto">Showing {{ totalCount === 0 ? 0 : (startIndex + 1) }} to {{ totalCount === 0 ? 0 : Math.min(startIndex + pageSize, totalCount) }} of {{ totalCount }} results</div>
         <nav aria-label="Pagination" class="ms-auto">
