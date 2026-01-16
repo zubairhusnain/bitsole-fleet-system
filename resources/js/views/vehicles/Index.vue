@@ -22,7 +22,7 @@
                         <div class="input-group">
                             <span class="input-group-text"><i class="bi bi-search"></i></span>
                             <input v-model="query" type="text" class="form-control input-w-360"
-                                placeholder="Search vehicle/ID" />
+                                placeholder="Search" />
                             <span class="input-group-text"><i class="bi bi-sliders2"></i></span>
                         </div>
                     </div>
@@ -147,7 +147,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue';
+import { ref, computed, onMounted, inject, watch } from 'vue';
 import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
 import Swal from 'sweetalert2';
@@ -499,6 +499,10 @@ const totalCount = computed(() => meta.value.total || filtered.value.length);
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / meta.value.per_page)));
 const startIndex = computed(() => (page.value - 1) * meta.value.per_page);
 const pagedRows = computed(() => filtered.value.slice(startIndex.value, startIndex.value + meta.value.per_page));
+
+watch(query, () => {
+    page.value = 1;
+});
 
 console.log('pagedRows ',pagedRows);
 function ignitionClass(val) {
