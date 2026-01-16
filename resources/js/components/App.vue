@@ -194,7 +194,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode,'menu-open': route.path.startsWith('/reports') }" v-if="hasPerm('reports','read')">
+                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode,'menu-open': route.path.startsWith('/reports') }" v-if="!isAdminOrDistributor && hasPerm('reports','read')">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/reports') }">
                                 <i class="nav-icon bi bi-bar-chart"></i>
                                 <p>
