@@ -235,9 +235,9 @@
                             </div>
                         </div>
                         <div class="mt-3 small d-flex flex-wrap gap-4 border-top pt-2">
-                            <span class="fw-semibold text-primary">{{ uniqueId || '-' }}</span>
-                            <span class="fw-semibold">Lightning Racer</span>
-                            <span class="fw-semibold">3N1AB7AP4FY123456</span>
+                            <span class="fw-semibold text-primary">{{ trackerModel || '-' }}</span>
+                            <span class="fw-semibold">{{ uniqueId || '-' }}</span>
+                            <span class="fw-semibold">{{ vehicleNo || '' }}</span>
                         </div>
                     </div>
                 </div>
@@ -1649,6 +1649,8 @@ function pickAttrWithKey(keys) {
 }
 
 const plate = computed(() => pickAttr(['plate', 'registration', 'regNumber']));
+const trackerModel = computed(() => pickAttr(['trackerModel']));
+const vehicleNo = computed(() => pickAttr(['vehicleNo']));
 const vin = computed(() => pickAttr(['vin', 'VIN']));
 const odometerDisplay = computed(() => {
     const pos = detailPayload.value?.position || {};
