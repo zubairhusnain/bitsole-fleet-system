@@ -15,7 +15,12 @@ class VehicleModel extends Model
         'modelname',
         'odmeter_ioid',
         'fuel_ioid',
+        'attributes',
         'created_by',
+    ];
+
+    protected $casts = [
+        'attributes' => 'array',
     ];
 }
 
