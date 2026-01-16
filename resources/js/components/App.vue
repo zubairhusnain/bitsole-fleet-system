@@ -194,7 +194,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode,'menu-open': route.path.startsWith('/reports') }" v-if="hasPerm('reports','read')">
+                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode,'menu-open': route.path.startsWith('/reports') }" v-if="!isAdminOrDistributor && hasPerm('reports','read')">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/reports') }">
                                 <i class="nav-icon bi bi-bar-chart"></i>
                                 <p>
@@ -379,6 +379,13 @@ provide('isTestingMode', isTestingMode);
 
 
 const checkTestingMode = () => {
+    const email = String(authState?.user?.email || '').toLowerCase();
+    if (email === 'hello@testing.com') {
+        isTestingMode.value = true;
+        try { localStorage.setItem('testingMode', '1'); } catch {}
+        return;
+    }
+
     // Check for environment variable configuration
     const envTestingMode = import.meta.env.VITE_TESTING_MODE;
 
@@ -402,6 +409,7 @@ const checkTestingMode = () => {
 };
 
 watch(() => route.query, checkTestingMode, { immediate: true });
+watch(() => authState.user && authState.user.email, () => checkTestingMode());
 
 const isAuthed = computed(() => !!authState.user);
 
