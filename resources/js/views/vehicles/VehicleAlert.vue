@@ -80,7 +80,7 @@
                     step="any"
                   >
                 </div>
-
+ 
                 <!-- Period -->
                 <div class="col-md-2">
                   <label for="period" class="form-label">Period</label>
@@ -254,8 +254,8 @@ const alertTypeValues = typeOptions.map(o => o.value);
 const form = reactive({
   name: '',
   type: '',
-  start: 0,
-  period: 0,
+  start: '',
+  period: '',
   deviceId: 'all'
 });
 
@@ -357,6 +357,17 @@ const selectType = (value) => {
   form.type = value;
   typeDropdownOpen.value = false;
 };
+
+watch(
+  () => form.type,
+  () => {
+    if (isDateType.value) {
+      startDate.value = '';
+    }
+    form.start = '';
+    form.period = '';
+  }
+);
 
 onMounted(() => {
   fetchMaintenance();
@@ -471,8 +482,8 @@ const resetForm = () => {
   editingId.value = null;
   form.name = '';
   form.type = '';
-  form.start = 0;
-  form.period = 0;
+  form.start = '';
+  form.period = '';
   form.deviceId = 'all';
   error.value = '';
 };
