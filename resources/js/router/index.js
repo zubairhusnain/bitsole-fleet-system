@@ -24,6 +24,7 @@ const Users = () => import('../views/users/Index.vue');
 const UsersPermissions = () => import('../views/users/Permissions.vue');
 const Vehicles = () => import('../views/vehicles/Index.vue');
 const VehiclesMaintenance = () => import('../views/vehicles/Maintenance.vue');
+const VehiclesAlert = () => import('../views/vehicles/VehicleAlert.vue');
 const VehiclesOverview = () => import('../views/vehicles/Overview.vue');
 // Add Vehicle Detail route
 const VehicleDetail = () => import('../views/vehicles/Detail.vue');
@@ -78,6 +79,7 @@ const routes = [
   { path: '/users/:userId(\\d+)/edit', name: 'users-edit', component: () => import('../views/users/Edit.vue'), meta: { requiresAuth: true, title: 'Edit User', moduleKey: 'users', action: 'update' } },
   { path: '/vehicles', name: 'vehicles', component: Vehicles, meta: { requiresAuth: true, title: 'Vehicle Management', moduleKey: 'vehicles', action: 'read' } },
   { path: '/vehicles/maintenance', name: 'vehicles-maintenance', component: VehiclesMaintenance, meta: { requiresAuth: true, title: 'Vehicle Maintenance', moduleKey: 'vehicles.maintenance', action: 'read' } },
+  { path: '/vehicles/alerts', name: 'vehicles-alerts', component: VehiclesAlert, meta: { requiresAuth: true, title: 'Vehicle Alert', moduleKey: 'vehicles.maintenance', action: 'read' } },
   { path: '/vehicles/overview', name: 'vehicles-overview', component: VehiclesOverview, meta: { requiresAuth: true, title: 'Vehicle Overview', moduleKey: 'vehicles.overview', action: 'read' } },
   // Add Vehicle route
   { path: '/vehicles/new', name: 'vehicles-new', component: () => import('../views/vehicles/AddVehicle.vue'), meta: { requiresAuth: true, title: 'Add New Vehicle', moduleKey: 'vehicles', action: 'create' } },

@@ -5,7 +5,7 @@
       <ol class="breadcrumb mb-0 small text-muted">
         <li class="breadcrumb-item"><RouterLink to="/dashboard">Dashboard</RouterLink></li>
         <li class="breadcrumb-item"><RouterLink to="/vehicles">Vehicle Management</RouterLink></li>
-        <li class="breadcrumb-item active" aria-current="page">Maintenance</li>
+        <li class="breadcrumb-item active" aria-current="page">Vehicle Alert</li>
       </ol>
     </div>
 
@@ -16,7 +16,7 @@
       <div class="col-md-12 mb-4" v-if="(isEditing && hasPerm('vehicles.maintenance', 'update')) || (!isEditing && hasPerm('vehicles.maintenance', 'create'))">
         <div class="card border rounded-3 shadow-0">
           <div class="card-header bg-white border-bottom">
-            <h5 class="card-title mb-0">{{ isEditing ? 'Edit Maintenance' : 'Create Maintenance' }}</h5>
+            <h5 class="card-title mb-0">{{ isEditing ? 'Edit Vehicle Alert' : 'Create Vehicle Alert' }}</h5>
           </div>
           <div class="card-body bg-white">
             <form @submit.prevent="saveMaintenance">
@@ -38,17 +38,20 @@
                       <i class="bi" :class="typeDropdownOpen ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
                     </div>
                     <div v-if="typeDropdownOpen" class="alert-type-menu" @click.stop>
-                      <div
-                        v-for="option in typeOptions"
-                        :key="option.value"
-                        class="alert-type-option"
-                        :class="{ 'is-selected': form.type === option.value }"
-                        @click.stop="selectType(option.value)"
-                      >
-                        <span class="alert-type-radio">
-                          <span v-if="form.type === option.value" class="alert-type-radio-dot"></span>
-                        </span>
-                        <span class="alert-type-option-label">{{ option.label }}</span>
+                      <div v-for="group in typeGroups" :key="group.name" class="alert-type-group">
+                        <div class="alert-type-group-title">{{ group.name }}</div>
+                        <div
+                          v-for="option in group.options"
+                          :key="option.value"
+                          class="alert-type-option"
+                          :class="{ 'is-selected': form.type === option.value }"
+                          @click.stop="selectType(option.value)"
+                        >
+                          <span class="alert-type-radio">
+                            <span v-if="form.type === option.value" class="alert-type-radio-dot"></span>
+                          </span>
+                          <span class="alert-type-option-label">{{ option.label }}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -123,7 +126,7 @@
       <div class="col-md-12">
         <div class="card border rounded-3 shadow-0">
           <div class="card-header bg-white border-bottom">
-            <h5 class="card-title mb-0">Maintenance List</h5>
+            <h5 class="card-title mb-0">Vehicle Alert List</h5>
           </div>
           <div class="card-body p-0 bg-white">
             <div class="table-responsive">
@@ -143,7 +146,7 @@
                     <td colspan="5" class="text-center py-4 text-muted">Loading...</td>
                   </tr>
                   <tr v-else-if="maintenanceList.length === 0">
-                    <td colspan="5" class="text-center py-4 text-muted">No maintenance records found.</td>
+                    <td colspan="5" class="text-center py-4 text-muted">No alerts found.</td>
                   </tr>
                   <tr v-for="item in maintenanceList" :key="item.id">
                     <td>{{ item.name }}</td>
@@ -192,39 +195,124 @@ const isEditing = ref(false);
 const editingId = ref(null);
 const error = ref('');
 
-const typeOptions = [
-  { value: "odometer", label: "Odometer" },
-  { value: "totalDistance", label: "Total Distance" },
-  { value: "serviceOdometer", label: "Service Odometer" },
-  { value: "obdOdometer", label: "OBD Odometer" },
-  { value: "hours", label: "Hours / Engine Hours" },
-  { value: "drivingTime", label: "Driving Time" },
-  { value: "time", label: "Time (Days / Months)" }
+const typeGroups = [
+  {
+    name: "Driving Behavior Alerts",
+    options: [
+      { value: "speed", label: "Speed" },
+      { value: "rpm", label: "RPM" },
+      { value: "throttle", label: "Throttle" },
+      { value: "acceleration", label: "Acceleration" },
+      { value: "course", label: "Course" },
+      { value: "drivingTime", label: "Driving Time" }
+    ]
+  },
+  {
+    name: "Fuel Alerts",
+    options: [
+      { value: "fuel", label: "Fuel" },
+      { value: "fuelUsed", label: "Fuel Used" },
+      { value: "fuelConsumption", label: "Fuel Consumption" }
+    ]
+  },
+  {
+    name: "Engine & Health Alerts",
+    options: [
+      { value: "engineTemp", label: "Engine Temperature" },
+      { value: "coolantTemp", label: "Coolant Temperature" },
+      { value: "deviceTemp", label: "Device Temperature" }
+    ]
+  },
+  {
+    name: "Electrical & Power Alerts",
+    options: [
+      { value: "battery", label: "Battery" },
+      { value: "batteryLevel", label: "Battery Level" },
+      { value: "power", label: "Power" },
+      { value: "input", label: "Input" },
+      { value: "output", label: "Output" }
+    ]
+  },
+  {
+    name: "GPS & Signal Alerts",
+    options: [
+      { value: "gps", label: "GPS" },
+      { value: "accuracy", label: "Accuracy" },
+      { value: "hdop", label: "HDOP" },
+      { value: "pdop", label: "PDOP" },
+      { value: "sat", label: "Satellites" },
+      { value: "rssi", label: "RSSI" },
+      { value: "latitude", label: "Latitude" },
+      { value: "longitude", label: "Longitude" }
+    ]
+  }
 ];
-const maintenanceTypeValues = typeOptions.map(o => o.value);
+
+const typeOptions = typeGroups.flatMap(g => g.options);
+const alertTypeValues = typeOptions.map(o => o.value);
 
 const form = reactive({
   name: '',
   type: '',
   start: 0,
   period: 0,
-  deviceId: 'all' // Default to all
+  deviceId: 'all'
 });
+
+const typeDropdownOpen = ref(false);
+const selectedType = computed(() => typeOptions.find(opt => opt.value === form.type) || null);
 
 const isDateType = computed(() => form.type === 'time');
 const startDate = ref('');
 
 const typePlaceholders = computed(() => {
   switch (form.type) {
-    case 'odometer':
-    case 'totalDistance':
-    case 'serviceOdometer':
-    case 'obdOdometer':
-      return { start: 'Current reading (e.g. 100000)', period: 'Service interval (e.g. 5000)' };
-    case 'hours':
-      return { start: 'Current hours (e.g. 1000)', period: 'Interval (e.g. 100)' };
+    case 'speed':
+      return { start: 'Max speed km/h (e.g. 100)', period: 'Margin km/h (e.g. 10)' };
+    case 'rpm':
+      return { start: 'Max RPM (e.g. 4500)', period: 'Margin (e.g. 500)' };
+    case 'throttle':
+      return { start: 'Throttle % (e.g. 80)', period: 'Margin % (e.g. 10)' };
+    case 'acceleration':
+      return { start: 'Acceleration (e.g. 5)', period: 'Margin (e.g. 1)' };
+    case 'course':
+      return { start: 'Course change ° (e.g. 45)', period: '' };
     case 'drivingTime':
-      return { start: 'Driving time min (e.g. 120)', period: 'Interval min (e.g. 30)' };
+      return { start: 'Driving time h (e.g. 8)', period: 'Margin h (e.g. 1)' };
+    case 'fuel':
+      return { start: 'Fuel % (e.g. 15)', period: 'Margin % (e.g. 5)' };
+    case 'fuelUsed':
+      return { start: 'Fuel used L (e.g. 20)', period: 'Margin L (e.g. 5)' };
+    case 'fuelConsumption':
+      return { start: 'Consumption (e.g. 8)', period: 'Margin (e.g. 2)' };
+    case 'engineTemp':
+      return { start: 'Engine temp °C (e.g. 105)', period: 'Margin °C (e.g. 5)' };
+    case 'coolantTemp':
+      return { start: 'Coolant temp °C (e.g. 90)', period: 'Margin °C (e.g. 5)' };
+    case 'deviceTemp':
+      return { start: 'Device temp °C (e.g. 70)', period: 'Margin °C (e.g. 5)' };
+    case 'battery':
+      return { start: 'Battery state (e.g. 0)', period: '' };
+    case 'batteryLevel':
+      return { start: 'Battery % (e.g. 20)', period: 'Margin % (e.g. 5)' };
+    case 'power':
+      return { start: 'Power state (e.g. 0)', period: '' };
+    case 'input':
+    case 'output':
+      return { start: 'IO state (e.g. 1)', period: '' };
+    case 'gps':
+      return { start: 'GPS status (e.g. 0)', period: '' };
+    case 'accuracy':
+    case 'hdop':
+    case 'pdop':
+      return { start: 'Value (e.g. 5)', period: '' };
+    case 'sat':
+      return { start: 'Satellites (e.g. 4)', period: '' };
+    case 'rssi':
+      return { start: 'RSSI dBm (e.g. -90)', period: '' };
+    case 'latitude':
+    case 'longitude':
+      return { start: 'Threshold (e.g. geofence)', period: '' };
     case 'time':
       return { start: 'Select date', period: 'days(0)' };
     default:
@@ -261,9 +349,6 @@ watch(startDate, (val) => {
   }
 });
 
-const typeDropdownOpen = ref(false);
-const selectedType = computed(() => typeOptions.find(opt => opt.value === form.type) || null);
-
 const toggleTypeDropdown = () => {
   typeDropdownOpen.value = !typeDropdownOpen.value;
 };
@@ -283,7 +368,7 @@ const fetchMaintenance = async () => {
   try {
     const response = await axios.get('/web/vehicles/maintenance');
     const all = Array.isArray(response.data) ? response.data : [];
-    maintenanceList.value = all.filter(item => maintenanceTypeValues.includes(String(item.type)));
+    maintenanceList.value = all.filter(item => alertTypeValues.includes(String(item.type)));
   } catch (err) {
     error.value = 'Failed to load maintenance records';
     console.error('Error fetching maintenance:', err);
@@ -296,7 +381,6 @@ const fetchMaintenance = async () => {
 const fetchDevices = async () => {
   try {
     const response = await axios.get('/web/vehicles/maintenance/vehicle/options');
-    // Response is directly the array of options
     if (Array.isArray(response.data)) {
       devices.value = response.data;
     } else {
@@ -327,7 +411,6 @@ const saveMaintenance = async () => {
       await axios.post('/web/vehicles/maintenance', form);
     }
     await fetchMaintenance();
-    // Also re-fetch devices to update maintenanceIds in the list (if we rely on them for future edits)
     await fetchDevices();
     resetForm();
     Swal.fire('Success', 'Maintenance updated successfully', 'success');
@@ -347,21 +430,15 @@ const editMaintenance = (item) => {
   form.start = item.start;
   form.period = item.period;
 
-  // Use deviceIds from API response
   const assignedIds = item.deviceIds || [];
 
   if (assignedIds.length === 0) {
       form.deviceId = '';
   } else if (assignedIds.length >= devices.value.length && devices.value.length > 0) {
-      // Heuristic: if assigned count matches total device count, assume 'all'
-      // Note: This isn't perfect if devices list changes, but 'all' is a special UI state
       form.deviceId = 'all';
   } else if (assignedIds.length === 1) {
       form.deviceId = assignedIds[0];
   } else {
-      // If multiple devices but not all, default to 'all' or handle as multi-select
-      // Since UI only has single select or 'all', we default to 'all' or the first one?
-      // Given the logic in store/update, 'all' is safer to avoid unassigning others
       form.deviceId = 'all';
   }
 };

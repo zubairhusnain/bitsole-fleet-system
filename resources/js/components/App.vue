@@ -130,6 +130,13 @@
                                         <p>Vehicle Maintenance</p>
                                     </RouterLink>
                                 </li>
+                                <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('vehicles.maintenance','read')">
+                                    <RouterLink to="/vehicles/alerts" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/vehicles/alerts') }">
+                                        <i class="nav-icon bi bi-bell"></i>
+                                        <p>Vehicle Alert</p>
+                                    </RouterLink>
+                                </li>
                                 <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('vehicles.overview','read')">
                                     <RouterLink to="/vehicles/overview" class="nav-link"
                                         :class="{ active: route.path.startsWith('/vehicles/overview') || route.name === 'vehicles-detail' }">
