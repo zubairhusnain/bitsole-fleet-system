@@ -20,15 +20,19 @@
           </div>
           <div class="card-body bg-white">
             <form @submit.prevent="saveMaintenance">
-              <div class="row g-3 align-items-end">
-                <!-- Name -->
-                <div class="col-md-2">
+              <div class="row g-3">
+                <div class="col-md-6">
                   <label for="name" class="form-label">Name</label>
-                  <input type="text" id="name" v-model="form.name" class="form-control" required placeholder="e.g. Oil Change">
-                </div>
-
-                <!-- Type -->
-                <div class="col-md-2">
+                  <input
+                    type="text"
+                    id="name"
+                    v-model="form.name"
+                    class="form-control"
+                    required
+                    placeholder="e.g. Oil Change"
+                  >
+                </div> 
+                <div class="col-md-6">
                   <label for="type" class="form-label">Type</label>
                   <div class="alert-type-control">
                     <input type="hidden" id="type" :value="form.type">
@@ -53,9 +57,10 @@
                     </div>
                   </div>
                 </div>
+              </div>
 
-                <!-- Start -->
-                <div class="col-md-2">
+              <div class="row g-3 align-items-end mt-1">
+                <div class="col-md-3">
                   <label for="start" class="form-label">Start</label>
                   <input
                     v-if="isDateType"
@@ -77,9 +82,8 @@
                     step="any"
                   >
                 </div>
- 
-                <!-- Period -->
-                <div class="col-md-2">
+
+                <div class="col-md-3">
                   <label for="period" class="form-label">Period</label>
                   <input
                     type="number"
@@ -92,8 +96,7 @@
                   >
                 </div>
 
-                <!-- Device Selection -->
-                <div class="col-md-2">
+                <div class="col-md-3">
                   <label for="deviceId" class="form-label">Assign To</label>
                   <select id="deviceId" v-model="form.deviceId" class="form-select">
                     <option value="">None</option>
@@ -104,8 +107,7 @@
                   </select>
                 </div>
 
-                <!-- Actions -->
-                <div class="col-md-2 d-flex align-items-end">
+                <div class="col-md-3 d-flex align-items-end justify-content-md-end">
                   <button type="submit" class="btn btn-primary me-2" :disabled="saving">
                     <i class="bi bi-save me-1"></i> {{ isEditing ? 'Update' : 'Save' }}
                   </button>
