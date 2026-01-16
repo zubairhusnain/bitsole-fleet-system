@@ -115,18 +115,6 @@ class VehicleModelController extends Controller
                     'expression' => $expression,
                     'type' => 'number'
                 ];
-                $tracker = trim((string) $model->modelname);
-                if ($tracker !== '') {
-                    $trackerSlug = preg_replace('/[^A-Za-z0-9_]+/', '_', $tracker);
-                    $descriptionTracker = $tracker . ' - ' . $name . ' [' . $tracker . ']';
-                    $attributeTracker = $attribute . '_' . $trackerSlug;
-                    $desired[$descriptionTracker] = [
-                        'description' => $descriptionTracker,
-                        'attribute' => $attributeTracker,
-                        'expression' => $expression,
-                        'type' => 'number'
-                    ];
-                }
             }
         }
         if (isset($attrs['fuel']) && is_array($attrs['fuel'])) {
@@ -145,18 +133,6 @@ class VehicleModelController extends Controller
                     'expression' => $expression,
                     'type' => 'number'
                 ];
-                $tracker = trim((string) $model->modelname);
-                if ($tracker !== '') {
-                    $trackerSlug = preg_replace('/[^A-Za-z0-9_]+/', '_', $tracker);
-                    $descriptionTracker = $tracker . ' - ' . $name . ' [' . $tracker . ']';
-                    $attributeTracker = $attribute . '_' . $trackerSlug;
-                    $desired[$descriptionTracker] = [
-                        'description' => $descriptionTracker,
-                        'attribute' => $attributeTracker,
-                        'expression' => $expression,
-                        'type' => 'number'
-                    ];
-                }
             }
         }
 

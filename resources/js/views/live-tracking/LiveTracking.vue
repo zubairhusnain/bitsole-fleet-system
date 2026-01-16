@@ -391,7 +391,7 @@ function applyRealtimePositions(list) {
         }
         animateMarkerTo(id, toLat, toLon);
     });
-}
+} 
 
 function getPosition(v) {
     const pos = v.position || v.positionData || {};
@@ -473,7 +473,10 @@ watch(
         // Ensure a reasonable zoom to visualize 100m radius
         const current = typeof map.value?.getZoom === 'function' ? map.value.getZoom() : zoom.value;
         zoom.value = Math.max(current || 0, 15);
-    }
+        const mk = markerRefs.get(m.id);
+        try { mk?.openPopup?.(); } catch {}
+    },
+    { flush: 'post' }
 );
 
 function getImage(v) {

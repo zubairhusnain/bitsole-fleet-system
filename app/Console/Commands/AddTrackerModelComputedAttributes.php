@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use App\Helpers\Curl;
 use Illuminate\Support\Facades\Config;
 use App\Models\User;
+use App\Models\VehicleModel;
 
 class AddTrackerModelComputedAttributes extends Command
 {
@@ -80,7 +81,6 @@ class AddTrackerModelComputedAttributes extends Command
 
         $headers = ['Content-Type: application/json', 'Accept: application/json'];
         $respAttrs = static::curl('/api/attributes/computed', 'GET', $cookie, '', $headers);
-
         if ($respAttrs->responseCode < 200 || $respAttrs->responseCode >= 300) {
             $this->error('Failed to fetch computed attributes. Code: ' . ($respAttrs->responseCode ?? 0));
             return 1;
@@ -89,13 +89,6 @@ class AddTrackerModelComputedAttributes extends Command
         $existing = json_decode($respAttrs->response ?? '[]', true) ?? [];
         if (!is_array($existing)) {
             $existing = [];
-        }
-        $existingByDescription = [];
-        foreach ($existing as $ex) {
-            $desc = isset($ex['description']) ? (string) $ex['description'] : '';
-            if ($desc !== '') {
-                $existingByDescription[$desc] = true;
-            }
         }
 
         $trackerModels = [
@@ -112,12 +105,53 @@ class AddTrackerModelComputedAttributes extends Command
 
         $this->info('Tracker models: ' . implode(', ', $trackerModels));
 
+        $existingByDescription = [];
+        $baseAttributes = [];
+        $deleted = 0;
+
+        foreach ($existing as $ex) {
+            $desc = isset($ex['description']) ? (string) $ex['description'] : '';
+            if ($desc === '') {
+                continue;
+            }
+
+            $matchesTracker = false;
+            foreach ($trackerModels as $tracker) {
+                $tracker = trim((string) $tracker);
+                if ($tracker !== '' && str_contains($desc, $tracker)) {
+                    $matchesTracker = true;
+                    break;
+                }
+            }
+
+            if ($matchesTracker) {
+                if ($dryRun) {
+                    $this->line('Would delete: ' . $desc . ' (id=' . ($ex['id'] ?? 'null') . ')');
+                    $deleted++;
+                } else {
+                    if (isset($ex['id'])) {
+                        $respDelete = static::curl('/api/attributes/computed/' . $ex['id'], 'DELETE', $cookie, '', $headers);
+                        if ($respDelete->responseCode >= 200 && $respDelete->responseCode < 300) {
+                            $deleted++;
+                        } else {
+                            $this->warn('Failed to delete ' . $desc . ' (code ' . ($respDelete->responseCode ?? 0) . ')');
+                        }
+                    }
+                }
+                continue;
+            }
+
+            $existingByDescription[$desc] = true;
+            $baseAttributes[] = $ex;
+        }
+
         $created = 0;
         $skipped = 0;
 
-        $this->info('Processing ' . count($existing) . ' existing computed attributes for ' . count($trackerModels) . ' tracker models...');
+        $this->info('Processing ' . count($baseAttributes) . ' base computed attributes for ' . count($trackerModels) . ' tracker models...');
 
-        foreach ($existing as $ex) {
+        $byTracker = [];
+        foreach ($baseAttributes as $ex) {
             $baseDescription = isset($ex['description']) ? trim((string) $ex['description']) : '';
             $baseAttribute = isset($ex['attribute']) ? trim((string) $ex['attribute']) : '';
             $expression = isset($ex['expression']) ? (string) $ex['expression'] : '';
@@ -162,13 +196,72 @@ class AddTrackerModelComputedAttributes extends Command
                 } else {
                     $this->warn('Failed to create ' . $descriptionTracker . ' (code ' . ($respCreate->responseCode ?? 0) . ')');
                 }
+
+                if (!isset($byTracker[$tracker])) {
+                    $byTracker[$tracker] = [
+                        'odometer' => [],
+                        'fuel' => [],
+                    ];
+                }
+                $ioKey = null;
+                if (preg_match('/io\s*(\d+)/', $expression, $m)) {
+                    $ioKey = $m[1];
+                }
+                if ($ioKey === null && preg_match('/io(\d+)/', $expression, $m2)) {
+                    $ioKey = $m2[1];
+                }
+                if ($ioKey === null && preg_match('/io_(\d+)/', $expression, $m3)) {
+                    $ioKey = $m3[1];
+                }
+                if ($ioKey === null) {
+                    continue;
+                }
+                $lowerName = strtolower($baseAttribute . ' ' . $baseDescription);
+                $group = 'odometer';
+                if (str_contains($lowerName, 'fuel')) {
+                    $group = 'fuel';
+                }
+                $list =& $byTracker[$tracker][$group];
+                $existsLocal = false;
+                foreach ($list as $item) {
+                    if (isset($item['name'], $item['key']) && $item['name'] === $baseAttribute && $item['key'] === $ioKey) {
+                        $existsLocal = true;
+                        break;
+                    }
+                }
+                if (!$existsLocal) {
+                    $list[] = [
+                        'name' => $baseAttribute,
+                        'key' => $ioKey,
+                    ];
+                }
             }
         }
 
         if ($dryRun) {
-            $this->info('Dry run completed. Would create ' . $created . ' attributes; skipped ' . $skipped . '.');
+            $this->info('Dry run: would delete VehicleModel rows for models: ' . implode(', ', $trackerModels));
         } else {
-            $this->info('Done. Created ' . $created . ' attributes; skipped existing ' . $skipped . '.');
+            VehicleModel::query()->whereIn('modelname', $trackerModels)->delete();
+        }
+
+        foreach ($byTracker as $tracker => $groups) {
+            $model = VehicleModel::query()->firstOrNew(['modelname' => $tracker]);
+            $model->attributes = [
+                'odometer' => $groups['odometer'],
+                'fuel' => $groups['fuel'],
+            ];
+            if ($dryRun) {
+                $this->info('Dry run: would save attributes for model ' . $tracker . ' into application settings.');
+            } else {
+                $model->save();
+                $this->info('Saved attributes for model ' . $tracker . ' into application settings.');
+            }
+        }
+
+        if ($dryRun) {
+            $this->info('Dry run completed. Would delete ' . $deleted . ' tracker model attributes, create ' . $created . ' attributes; skipped ' . $skipped . '.');
+        } else {
+            $this->info('Done. Deleted ' . $deleted . ' tracker model attributes; created ' . $created . ' attributes; skipped existing ' . $skipped . '.');
         }
 
         return 0;
