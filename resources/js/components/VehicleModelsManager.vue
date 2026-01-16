@@ -25,11 +25,46 @@
           <tr v-for="model in models" :key="model.id">
             <td>{{ model.modelname }}</td>
             <td>
-              <div v-if="model.attributes">
-                <span v-if="model.attributes.odometer?.length" class="badge bg-info me-1">Odo: {{ model.attributes.odometer.length }}</span>
-                <span v-if="model.attributes.fuel?.length" class="badge bg-warning text-dark">Fuel: {{ model.attributes.fuel.length }}</span>
+              <div
+                v-if="
+                  model.attributes &&
+                  ((model.attributes.odometer && model.attributes.odometer.length) ||
+                    (model.attributes.fuel && model.attributes.fuel.length))
+                "
+              >
+                <table class="table table-sm mb-0">
+                  <thead>
+                    <tr class="small">
+                      <th class="border-0">Odometer</th>
+                      <th class="border-0">Fuel</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="(row, idx) in getAttributeRows(model)"
+                      :key="'attr-row-' + model.id + '-' + idx"
+                      class="small"
+                    >
+                      <td class="border-0 text-muted">
+                        <span v-if="row.odometer">
+                          {{ row.odometer.name }} ({{ row.odometer.key }})
+                        </span>
+                      </td>
+                      <td class="border-0 text-muted">
+                        <span v-if="row.fuel">
+                          {{ row.fuel.name }} ({{ row.fuel.key }})
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <span v-else class="text-muted">-</span>
+              <span
+                v-else
+                class="text-muted"
+              >
+                -
+              </span>
             </td>
             <td class="text-end">
               <button class="btn btn-sm btn-outline-primary me-2" @click="openModal(model)" title="Edit">
@@ -131,6 +166,20 @@ const form = reactive({
   odometerInputs: [],
   fuelInputs: []
 });
+
+function getAttributeRows(model) {
+  const odo = (model.attributes && model.attributes.odometer) || [];
+  const fuel = (model.attributes && model.attributes.fuel) || [];
+  const max = Math.max(odo.length, fuel.length);
+  const rows = [];
+  for (let i = 0; i < max; i += 1) {
+    rows.push({
+      odometer: odo[i] || null,
+      fuel: fuel[i] || null
+    });
+  }
+  return rows;
+}
 
 function addOdometerInput() {
   form.odometerInputs.push({ name: '', key: '' });
