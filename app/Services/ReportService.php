@@ -263,6 +263,7 @@ class ReportService
             $sv = $evt ? $evt->count_overspeed : 0;
 
             $points = 100 - ($ha * 5) - ($hb * 5) - ($hc * 5) - ($sv * 10);
+            $behaviourScore = (int) ($ha + $hb + $hc + $sv);
             $attrs = $tcDev && $tcDev->attributes
                 ? (is_string($tcDev->attributes)
                     ? (json_decode($tcDev->attributes, true) ?: [])
@@ -291,6 +292,7 @@ class ReportService
                 'totalSV' => (int)$sv,
                 'points' => $points,
                 'percentage' => max(0, min(100, $points)),
+                'behaviourScore' => $behaviourScore,
             ];
         });
 
@@ -309,7 +311,7 @@ class ReportService
                     $sortDesc = true;
                     break;
                 case 'behaviour':
-                    $sortBy = 'points';
+                    $sortBy = 'behaviourScore';
                     $sortDesc = true;
                     break;
             }
@@ -318,7 +320,7 @@ class ReportService
         $sortedRows = $sortDesc ? $rows->sortByDesc($sortBy) : $rows->sortBy($sortBy);
 
         // Tie-breaker
-        if (empty($request->vehicle_ids) || ($sortBy === 'points' && $sortDesc === true)) {
+        if (($sortBy === 'points' && $sortDesc === true) && empty($request->vehicle_ids)) {
             $sortedRows = $sortedRows->sort(function ($a, $b) {
                 $cmp = ($b['points'] <=> $a['points']);
                 if ($cmp !== 0) return $cmp;
