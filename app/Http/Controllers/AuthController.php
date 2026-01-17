@@ -160,7 +160,12 @@ class AuthController extends Controller
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        $target = User::query()->find($userId);
+        $userIdInt = (int)$userId;
+        if ($userIdInt <= 0) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        $target = User::query()->find($userIdInt);
         if (!$target) {
             return response()->json(['message' => 'User not found'], 404);
         }

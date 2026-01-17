@@ -63,9 +63,9 @@ Route::prefix('/web/auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::middleware(['auth'])->group(function () {
-        Route::post('/impersonate/{userId}', [AuthController::class, 'impersonate'])
-            ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
         Route::post('/impersonate/stop', [AuthController::class, 'stopImpersonate'])
+            ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+        Route::post('/impersonate/{userId}', [AuthController::class, 'impersonate'])
             ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     });
 });
@@ -272,4 +272,3 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/incidents/export-excel', [\App\Http\Controllers\ReportController::class, 'exportIncidentsExcel']);
     Route::get('/vehicle-ranking', [\App\Http\Controllers\ReportController::class, 'vehicleRanking']);
 });
-
