@@ -147,9 +147,6 @@ class AuthController extends Controller
         if (!$me) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
-        if (session()->has('impersonator_id')) {
-            return response()->json(['message' => 'Already impersonating'], 400);
-        }
 
         $target = User::query()->find($userId);
         if (!$target) {
@@ -169,7 +166,9 @@ class AuthController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        session(['impersonator_id' => $me->id]);
+        if (!session()->has('impersonator_id')) {
+            session(['impersonator_id' => $me->id]);
+        }
         Auth::login($target);
         $request->session()->regenerate();
 

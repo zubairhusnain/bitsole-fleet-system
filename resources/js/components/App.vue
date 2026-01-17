@@ -19,6 +19,22 @@
                 </ul>
                 <!--end::Start Navbar Links-->
                 <ul class="navbar-nav ms-auto">
+                    <li
+                        class="nav-item d-flex align-items-center me-2"
+                        v-if="isAuthed && authState.impersonator"
+                    >
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-secondary impersonation-btn"
+                            @click="stopImpersonation"
+                        >
+                            <i class="bi bi-arrow-return-left me-1"></i>
+                            Back to
+                            <span class="fw-semibold ms-1">
+                                {{ authState.impersonator.name || authState.impersonator.email || 'Previous user' }}
+                            </span>
+                        </button>
+                    </li>
                     <li class="nav-item d-flex align-items-center" :class="{ 'd-testingmode': !isTestingMode }" v-if="isAuthed">
                         <select v-model="timezone" @change="handleTimezoneChange" class="form-select form-select-sm timezone-select">
                             <option v-for="opt in timezoneOptions" :key="opt.value" :value="opt.value">
@@ -334,7 +350,8 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, provide } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
-import { authState, clearAuthCache, hasPermission, roleToNumber } from '../auth';
+import Swal from 'sweetalert2';
+import { authState, clearAuthCache, hasPermission, roleToNumber, refreshCsrf, getCurrentUser } from '../auth';
 import { getActiveTimezone, setTimezonePreference } from '../utils/datetime';
 
 // Resolve assets from Laravel backend in dev; use current origin in prod
@@ -661,6 +678,40 @@ async function logout() {
     router.push('/login');
 }
 
+async function stopImpersonation() {
+    try {
+        const result = await Swal.fire({
+            title: 'Return to previous user?',
+            text: 'Your session will switch back to the original account.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Switch back',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#0b5ed7',
+        });
+        if (!result.isConfirmed) return;
+
+        await axios.post('/web/auth/impersonate/stop');
+        clearAuthCache();
+        await refreshCsrf();
+        await getCurrentUser();
+        await Swal.fire({
+            title: 'Switched back',
+            icon: 'success',
+            timer: 1200,
+            showConfirmButton: false,
+        });
+        router.push('/');
+        window.location.reload();
+    } catch (e) {
+        await Swal.fire({
+            title: 'Failed to switch back',
+            text: e?.response?.data?.message || 'Please try again.',
+            icon: 'error',
+        });
+    }
+}
+
 function closeSidebar() {
     try {
         const body = document.body;
@@ -823,6 +874,12 @@ nav a.router-link-exact-active {
         margin-left: 0.5rem;
         margin-right: 0.5rem;
     }
+}
+
+.impersonation-btn {
+    border-radius: 999px;
+    padding-inline: 0.75rem;
+    font-size: 0.75rem;
 }
 
 @media (min-width: 992px) {
