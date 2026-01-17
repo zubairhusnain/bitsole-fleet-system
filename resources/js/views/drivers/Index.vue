@@ -13,16 +13,18 @@
       <div class="col-sm-12 col-md-12 col-xl-8"><h4 class="mb-0 fw-semibold">Drivers Directory</h4></div>
       <div class="col-sm-12 col-md-12 col-xl-4">
         <div class="row">
-            <div class="col-sm-12 col-md-6 col-xl-7">
-                <div class="input-group">
-                <span class="input-group-text"><i class="bi bi-search"></i></span>
-                <input v-model="query" type="text" class="form-control input-w-360" placeholder="Search driver/ID" />
-                <span class="input-group-text"><i class="bi bi-sliders2"></i></span>
-                </div>
+          <div class="col-sm-12 col-md-6 col-xl-7">
+            <div class="input-group flex-nowrap">
+              <span class="input-group-text"><i class="bi bi-search"></i></span>
+              <input v-model="query" type="text" class="form-control input-w-360" placeholder="Search driver/ID" />
+              <span class="input-group-text"><i class="bi bi-sliders2"></i></span>
             </div>
-            <div class="col-sm-12 col-md-6 col-xl-5" v-if="hasPerm('drivers','create')">
-                    <RouterLink to="/drivers/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> New Driver</RouterLink>
+          </div>
+          <div class="col-sm-12 col-md-6 col-xl-5" v-if="hasPerm('drivers','create')">
+            <div class="d-flex align-items-center justify-content-xl-end">
+              <RouterLink to="/drivers/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> New Driver</RouterLink>
             </div>
+          </div>
         </div>
       </div>
     </div>
@@ -282,3 +284,8 @@ function toEdit(row) {
   router.push(`/drivers/${row.id}/edit`);
 }
 </script>
+
+<style scoped>
+.input-w-360 { max-width: 360px; width: 100%; }
+.btn-app-dark { background-color: #0b0f28; color: #fff; border-radius: 12px; padding: .5rem .75rem; }
+</style>

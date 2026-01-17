@@ -13,21 +13,23 @@
         <div v-if="loading" class="text-muted small mb-2">Loading vehicles…</div>
         <!-- Page Title and Actions -->
         <div class="row mb-3">
-            <div class="col-sm-12 col-md-12 col-xl-8">
+            <div class="col-sm-12 col-md-12 col-xl-7">
                 <h4 class="mb-0 fw-semibold">Vehicles Management</h4>
             </div>
-            <div class="col-sm-12 col-md-12 col-xl-4">
+            <div class="col-sm-12 col-md-12 col-xl-5">
                 <div class="row">
-                    <div class="col-sm-12 col-md-6 col-lg-7 ml-auto">
-                        <div class="input-group">
+                    <div class="col-sm-12 col-md-6 col-xl-7">
+                        <div class="input-group flex-nowrap">
                             <span class="input-group-text"><i class="bi bi-search"></i></span>
                             <input v-model="query" type="text" class="form-control input-w-360"
                                 placeholder="Search" />
                             <span class="input-group-text"><i class="bi bi-sliders2"></i></span>
                         </div>
                     </div>
-                    <div class="col-sm-12 col-md-6 col-lg-5 ml-auto" v-if="hasPerm('vehicles','create')">
-                        <RouterLink to="/vehicles/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> List New Vehicle</RouterLink>
+                    <div class="col-sm-12 col-md-6 col-xl-5" v-if="hasPerm('vehicles','create')">
+                        <div class="d-flex align-items-center justify-content-xl-end">
+                            <RouterLink to="/vehicles/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> List New Vehicle</RouterLink>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -601,3 +603,8 @@ function toSettings(row) {
     router.push(`/vehicles/${row.device_id}/settings`);
 }
 </script>
+
+<style scoped>
+.input-w-360 { max-width: 360px; width: 100%; }
+.btn-app-dark { background-color: #0b0f28; color: #fff; border-radius: 12px; padding: .5rem .75rem; }
+</style>
