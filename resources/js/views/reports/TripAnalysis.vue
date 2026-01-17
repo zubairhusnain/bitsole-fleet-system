@@ -28,17 +28,24 @@
         <div class="card-body pt-2 pb-3 small">
           <p class="mb-2">
             Trip Analysis shows how your vehicles moved over time for the selected dates.
-            It uses GPS trip data to calculate distance, driving time, stop time and basic fuel usage where available.
+            It uses GPS trip data to calculate distance travelled, driving time, stop time and basic fuel usage where available.
+            Each trip is built from start and end points so you can see when movement began, where it ended and what happened in between.
           </p>
           <p class="mb-2">
             Use the view type to switch between different summaries:
-            Trip Summary gives one line per vehicle, Daily Breakdown shows each trip with stops and events,
+            Trip Summary gives one line per vehicle for a quick fleet-level overview,
+            Daily Breakdown shows each trip with stops, events and locations in time order,
             Daily and Monthly summaries group totals by day or month and can show charts,
-            and the “with map” view adds a route map for visual inspection.
+            and the “with map” view adds a route map so you can visually inspect paths and problem areas.
+          </p>
+          <p class="mb-2">
+            The report highlights driving patterns such as frequent short trips, long continuous driving, extended stops and
+            areas where the vehicle spent most of its time. Where your devices support it, fuel and event information
+            (for example harsh braking or overspeeding) is also included so you can link driving behaviour to fuel usage.
           </p>
           <p class="mb-0">
-            This report is useful to answer questions like “how far did each vehicle travel”, “when was it driving or stopped”
-            and “where did important driving events such as harsh braking or overspeeding happen”.
+            This report is useful to answer questions like “how far did each vehicle travel”, “when was it driving or stopped”,
+            “which days were most active” and “where did important driving events such as harsh braking or overspeeding happen”.
           </p>
         </div>
       </div>

@@ -31,14 +31,16 @@
         <div class="card-body pt-2 pb-3 small">
           <p class="mb-2">
             Incident Analysis Report aggregates incidents that have been logged against your vehicles and drivers.
-            Each row shows when the incident occurred, what type it was and a short description.
+            Each row shows when the incident occurred, what type it was, which vehicle and driver were involved and a short description.
           </p>
           <p class="mb-2">
-            Use the date range and vehicle filters to focus on specific periods or assets,
-            then export detailed records for auditing, insurance claims or internal investigations.
+            Use the date range and vehicle filters to focus on specific periods or assets, then export detailed records
+            for auditing, insurance claims or internal investigations. This makes it easier to review the full history
+            of an incident or group of incidents without collecting data from multiple places.
           </p>
           <p class="mb-0">
-            This report helps you understand recurring issues, track corrective actions and improve overall safety.
+            This report helps you understand recurring safety or operational issues, track corrective actions taken over time
+            and measure whether driver training or policy changes are reducing the number and severity of incidents.
           </p>
         </div>
       </div>

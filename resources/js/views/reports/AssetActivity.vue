@@ -27,16 +27,17 @@
         </div>
         <div class="card-body pt-2 pb-3 small">
           <p class="mb-2">
-            Asset Activity shows every tracking point received from your devices for the selected period.
-            Each row represents one GPS update with the vehicle’s location, movement status and key sensor values.
+            Asset Activity lists every tracking point received from your devices for the selected period.
+            Each row represents one GPS update with the vehicle’s location, movement status and key sensor values at that moment.
           </p>
           <p class="mb-2">
-            The status column classifies each point as Moving, Idle, Stopped or Offline based mainly on speed and ignition.
-            You can also see direction, speed, GSM and GPS signal strength, power and fuel level where supported by the device.
+            The status column classifies each point as Moving, Idle, Stopped or Offline based mainly on speed and ignition,
+            so you can quickly see how the vehicle’s state changed over time. You can also see direction, speed, GSM and GPS
+            signal strength, power and fuel level where supported by the device.
           </p>
           <p class="mb-0">
-            Use this report when you need a detailed timeline of where a vehicle was, how fast it was travelling
-            and whether the engine and tracking signals were healthy at each moment.
+            Use this report when you need a detailed “black box” style timeline of where a vehicle was, how fast it was travelling
+            and whether the engine and tracking signals were healthy at each point in the journey.
           </p>
         </div>
       </div>

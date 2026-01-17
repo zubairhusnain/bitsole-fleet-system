@@ -28,14 +28,16 @@
         <div class="card-body pt-2 pb-3 small">
           <p class="mb-2">
             Idling Report highlights periods when the engine was on but the vehicle was not moving.
-            Each row shows when idling started and ended, how long it lasted and where it occurred.
+            Each row shows when idling started and ended, how long it lasted and where it occurred on the map.
           </p>
           <p class="mb-2">
-            Use the idling time filter to focus on shorter or longer events,
-            so you can identify unnecessary fuel usage and spot vehicles left running for too long.
+            Use the idling time filter to focus on shorter or longer events so you can quickly find the most costly
+            cases. This helps you identify unnecessary fuel usage, vehicles left running at depots or customer sites
+            and patterns of behaviour that lead to avoidable engine hours.
           </p>
           <p class="mb-0">
-            This report is useful for enforcing idling policies, reducing fuel costs and improving driver behaviour.
+            This report is useful for enforcing idling policies, reducing fuel costs and coaching drivers to switch
+            off engines when vehicles are stationary for longer periods.
           </p>
         </div>
       </div>

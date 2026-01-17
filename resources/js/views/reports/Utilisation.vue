@@ -28,14 +28,17 @@
         <div class="card-body pt-2 pb-3 small">
           <p class="mb-2">
             Utilisation Report shows how consistently a vehicle was used over the selected period.
-            It summarises days with movement or engine-on time, distance covered and hourly activity.
+            It summarises days with movement or engine-on time, distance covered and hourly activity so you can see which
+            days were busy and which were quiet.
           </p>
           <p class="mb-2">
-            Switch between Movement and Engine Hours to focus on driving time or engine running time,
-            and use the daily breakdown to spot days with unusually low or high utilisation.
+            Switch between Movement and Engine Hours to focus on driving time or engine running time, and use the daily
+            breakdown to spot days with unusually low or high utilisation. This makes it easier to see if vehicles are
+            being underused, overworked or used in short, inefficient bursts.
           </p>
           <p class="mb-0">
-            This report is useful for identifying underused or overworked vehicles and planning fleet allocation.
+            This report is useful for balancing workload across your fleet, planning rotations and deciding whether you
+            need more or fewer vehicles to support your operations.
           </p>
         </div>
       </div>

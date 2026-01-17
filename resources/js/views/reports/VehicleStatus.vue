@@ -28,14 +28,16 @@
         <div class="card-body pt-2 pb-3 small">
           <p class="mb-2">
             Vehicle Status provides a snapshot of each tracked vehicle based on its latest GPS report.
-            It combines vehicle details, device information and current telemetry into a single table.
+            It brings together vehicle details, device information and current telemetry in a single table.
           </p>
           <p class="mb-2">
-            Use this report to see which vehicles are online, where they last reported from, their ignition state,
-            GPS signal quality, odometer reading and activation date.
+            Use this report to see which vehicles are currently online, where they last reported from, their ignition state,
+            GPS signal quality, odometer reading and activation date. This lets you quickly spot vehicles that may be offline
+            or showing unusual readings without opening multiple screens.
           </p>
           <p class="mb-0">
-            You can filter by vehicle or group and choose the output format when you need to export the same information.
+            You can filter by vehicle or group and choose an output format when you want to export the same information
+            for reporting, sharing with others or keeping records.
           </p>
         </div>
       </div>

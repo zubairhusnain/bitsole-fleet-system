@@ -28,14 +28,16 @@
         <div class="card-body pt-2 pb-3 small">
           <p class="mb-2">
             Analytics Overview provides a high-level summary of fleet performance over time,
-            combining utilisation, fuel efficiency and safety indicators.
+            bringing together utilisation, fuel efficiency and safety indicators in one place.
           </p>
           <p class="mb-2">
-            Use the date range and group filters to focus on a subset of vehicles and
-            compare how their key metrics change across different periods.
+            Use the date range and group filters to focus on a subset of vehicles and compare how their key metrics change
+            across different periods. This helps you see whether recent changes in routes, drivers or policies are having
+            a positive or negative impact.
           </p>
           <p class="mb-0">
-            This page is ideal for management dashboards and quick health checks of your fleet.
+            This page is ideal for management dashboards and quick health checks of your fleet, giving you a simple view
+            of whether things are generally improving, stable or need attention without diving into raw data tables.
           </p>
         </div>
       </div>

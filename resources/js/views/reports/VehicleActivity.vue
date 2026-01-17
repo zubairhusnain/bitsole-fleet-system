@@ -27,15 +27,17 @@
         </div>
         <div class="card-body pt-2 pb-3 small">
           <p class="mb-2">
-            Vehicle Activity shows a detailed timeline of one vehicle over the selected dates.
-            Each row represents a GPS point with status, speed, direction and signal information.
+            Vehicle Activity shows a detailed point-by-point timeline for a single vehicle over the selected dates.
+            Each row represents a GPS position with status, speed, direction, location and signal information.
           </p>
           <p class="mb-2">
-            Status is derived from movement and ignition, so you can quickly see when the vehicle was moving,
-            idling, stopped or offline, as well as where those events occurred.
+            Status is derived from movement and ignition, so you can clearly see when the vehicle was moving, idling,
+            stopped or offline and where those events occurred along the route. This helps you understand how the vehicle
+            was being used at each moment rather than just seeing totals.
           </p>
           <p class="mb-0">
-            Use this report for investigations that require a point-by-point reconstruction of a vehicle’s route and behaviour.
+            Use this report when you need to reconstruct a specific journey in detail, troubleshoot complaints or investigate
+            incidents that require a point-by-point view of the vehicle’s route and behaviour.
           </p>
         </div>
       </div>
@@ -61,10 +63,6 @@
               <option :value="null">--Select a Vehicle--</option>
               <option v-for="d in devices" :key="d.id" :value="d.id">{{ d.name }}</option>
             </select>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label small fw-semibold text-muted">Search Filter</label>
-            <input type="text" v-model="searchFilter" class="form-control" placeholder="-- Search Filter --" />
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label small fw-semibold text-muted d-block">&nbsp;</label>
@@ -251,7 +249,6 @@ const devices = ref([]);
 const selectedDevice = ref(null);
 const fromDate = ref(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
 const toDate = ref(new Date().toISOString().slice(0, 10));
-const searchFilter = ref('');
 const loading = ref(false);
 const errorMessage = ref(null);
 const reportData = ref(null);
@@ -286,13 +283,7 @@ const itemsPerPage = ref(20);
 // Computed
 const filteredRows = computed(() => {
   if (!reportData.value || !reportData.value.rows) return [];
-  if (!searchFilter.value) return reportData.value.rows;
-
-  const q = searchFilter.value.toLowerCase();
-  return reportData.value.rows.filter(r =>
-    r.status.toLowerCase().includes(q) ||
-    r.location.toLowerCase().includes(q)
-  );
+  return reportData.value.rows;
 });
 
 const totalPages = computed(() => Math.ceil(filteredRows.value.length / itemsPerPage.value));
