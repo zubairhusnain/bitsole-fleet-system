@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Log;
 use App\Helpers\Curl;
 
 class AuthController extends Controller
@@ -189,41 +190,57 @@ class AuthController extends Controller
 
     public function stopImpersonate(Request $request)
     {
-        $impersonatorId = session('impersonator_id');
-        if (!$impersonatorId) {
-            return response()->json(['message' => 'Not impersonating'], 400);
-        }
+        try {
+            $impersonatorId = session('impersonator_id');
+            if (!$impersonatorId) {
+                return response()->json(['message' => 'Not impersonating'], 400);
+            }
 
-        session()->forget('impersonator_id');
+            session()->forget('impersonator_id');
 
-        $original = User::query()->find($impersonatorId);
-        if (!$original) {
+            $original = User::query()->find($impersonatorId);
+            if (!$original) {
+                Auth::guard()->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+                try {
+                    session()->forget('user_module_keys');
+                } catch (\Throwable $e) {
+                }
+                return response()->json(['status' => 'logged_out']);
+            }
+
+            Auth::login($original);
+            $request->session()->regenerate();
+
+            try {
+                $keys = \App\Models\UserPermission::query()
+                    ->where('user_id', $original->id)
+                    ->pluck('module_key')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+                session(['user_module_keys' => $keys]);
+            } catch (\Throwable $e) {
+            }
+
+            return response()->json(['user' => Auth::user()]);
+        } catch (\Throwable $e) {
+            Log::error('stopImpersonate failed', [
+                'error' => $e->getMessage(),
+            ]);
+
             Auth::guard()->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
             try {
                 session()->forget('user_module_keys');
-            } catch (\Throwable $e) {
+            } catch (\Throwable $e2) {
             }
+
             return response()->json(['status' => 'logged_out']);
         }
-
-        Auth::login($original);
-        $request->session()->regenerate();
-
-        try {
-            $keys = \App\Models\UserPermission::query()
-                ->where('user_id', $original->id)
-                ->pluck('module_key')
-                ->filter()
-                ->unique()
-                ->values()
-                ->all();
-            session(['user_module_keys' => $keys]);
-        } catch (\Throwable $e) {
-        }
-
-        return response()->json(['user' => Auth::user()]);
     }
 
 }
