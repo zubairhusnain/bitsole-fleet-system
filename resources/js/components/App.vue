@@ -704,11 +704,12 @@ async function stopImpersonation() {
         router.push('/');
         window.location.reload();
     } catch (e) {
-        await Swal.fire({
-            title: 'Failed to switch back',
-            text: e?.response?.data?.message || 'Please try again.',
-            icon: 'error',
-        });
+        try {
+            await axios.post('/web/auth/logout');
+        } catch (_) {}
+        clearAuthCache();
+        router.push('/login');
+        window.location.reload();
     }
 }
 

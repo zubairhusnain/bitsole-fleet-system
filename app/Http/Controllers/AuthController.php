@@ -123,9 +123,20 @@ class AuthController extends Controller
 
         $impersonator = null;
         try {
-            $impersonatorId = session('impersonator_id');
-            if ($impersonatorId) {
-                $impersonator = User::query()->find($impersonatorId);
+            $stack = session('impersonator_stack');
+            if (!$stack && session()->has('impersonator_id')) {
+                $legacy = session('impersonator_id');
+                if ($legacy) {
+                    $stack = [$legacy];
+                    session(['impersonator_stack' => $stack]);
+                }
+                session()->forget('impersonator_id');
+            }
+            if (is_array($stack) && !empty($stack)) {
+                $impersonatorId = end($stack);
+                if ($impersonatorId) {
+                    $impersonator = User::query()->find($impersonatorId);
+                }
             }
         } catch (\Throwable $e) {
         }
@@ -167,9 +178,12 @@ class AuthController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        if (!session()->has('impersonator_id')) {
-            session(['impersonator_id' => $me->id]);
+        $stack = session('impersonator_stack', []);
+        if (!is_array($stack)) {
+            $stack = [];
         }
+        $stack[] = $me->id;
+        session(['impersonator_stack' => $stack]);
         Auth::login($target);
         $request->session()->regenerate();
 
@@ -191,20 +205,38 @@ class AuthController extends Controller
     public function stopImpersonate(Request $request)
     {
         try {
-            $impersonatorId = session('impersonator_id');
-            if (!$impersonatorId) {
+            $stack = session('impersonator_stack', []);
+            if ((!is_array($stack) || empty($stack)) && session()->has('impersonator_id')) {
+                $legacy = session('impersonator_id');
+                if ($legacy) {
+                    $stack = [$legacy];
+                    session(['impersonator_stack' => $stack]);
+                }
+                session()->forget('impersonator_id');
+            }
+
+            if (!is_array($stack) || empty($stack)) {
                 return response()->json(['message' => 'Not impersonating'], 400);
             }
 
-            session()->forget('impersonator_id');
+            $impersonatorId = array_pop($stack);
+            if (empty($stack)) {
+                session()->forget('impersonator_stack');
+            } else {
+                session(['impersonator_stack' => $stack]);
+            }
 
-            $original = User::query()->find($impersonatorId);
+            $original = $impersonatorId ? User::query()->find($impersonatorId) : null;
             if (!$original) {
                 Auth::guard()->logout();
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
                 try {
                     session()->forget('user_module_keys');
+                } catch (\Throwable $e) {
+                }
+                try {
+                    session()->forget('impersonator_stack');
                 } catch (\Throwable $e) {
                 }
                 return response()->json(['status' => 'logged_out']);
@@ -236,6 +268,10 @@ class AuthController extends Controller
             $request->session()->regenerateToken();
             try {
                 session()->forget('user_module_keys');
+            } catch (\Throwable $e2) {
+            }
+            try {
+                session()->forget('impersonator_stack');
             } catch (\Throwable $e2) {
             }
 
