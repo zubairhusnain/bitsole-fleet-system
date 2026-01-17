@@ -7,6 +7,7 @@ use App\Http\Controllers\VehicleModelController;
 use App\Http\Controllers\MaintenanceController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Http\Request;
 Route::get('/testing', function () {
 
@@ -154,6 +155,19 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/{deviceId}/notifications', [\App\Http\Controllers\VehicleController::class, 'notificationsDevice']);
     Route::post('/{deviceId}/notifications/assign', [\App\Http\Controllers\VehicleController::class, 'notificationsAssign']);
 
+    Route::post('/{deviceId}/clean-computed-attributes', function (\Illuminate\Http\Request $request, $deviceId) {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+        try {
+            Artisan::call('traccar:clean-device-computed', ['device_id' => $deviceId]);
+            return response()->json(['message' => 'Cleaned computed attributes for device ' . $deviceId]);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Failed to clean computed attributes', 'error' => $e->getMessage()], 500);
+        }
+    });
+
 });
 
 
@@ -266,4 +280,3 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/incidents/export-excel', [\App\Http\Controllers\ReportController::class, 'exportIncidentsExcel']);
     Route::get('/vehicle-ranking', [\App\Http\Controllers\ReportController::class, 'vehicleRanking']);
 });
- 
