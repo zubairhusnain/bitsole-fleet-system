@@ -12,8 +12,12 @@ class VehicleModelController extends Controller
     use Curl;
     public function options(Request $request)
     {
-        $list = VehicleModel::query()->orderBy('modelname')->pluck('modelname')->all();
-        return response()->json(['options' => $list]);
+        $models = VehicleModel::query()->orderBy('modelname')->get();
+        $list = $models->pluck('modelname')->all();
+        return response()->json([
+            'options' => $list,
+            'models' => $models,
+        ]);
     }
     public function index(Request $request)
     {

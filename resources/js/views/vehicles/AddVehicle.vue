@@ -26,19 +26,41 @@
               <input v-model="form.name" type="text" class="form-control" placeholder="e.g. Toyota Camry" />
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label small">Device ID ( IMEI )</label>
-              <input v-model="form.uniqueId" type="text" class="form-control" placeholder="e.g. 123456789012345" />
+              <label class="form-label small">Vehicle ID</label>
+              <input v-model="form.attributes.vehicleNo" type="text" class="form-control" placeholder="e.g. V-001" />
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label small">Tracker Model</label>
-              <select v-model="form.attributes.trackerModel" class="form-select">
-                <option value="">-- Select Tracker Model --</option>
-                <option v-for="opt in trackerModels" :key="opt" :value="opt">{{ opt }}</option>
+              <label class="form-label small">Vehicle Model</label>
+              <input v-model="form.model" type="text" class="form-control" placeholder="e.g. 2026" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Manufacturer</label>
+              <input v-model="form.attributes.manufacturer" type="text" class="form-control" placeholder="e.g. Toyota" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Registration Number</label>
+              <input v-model="form.attributes.registration" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="e.g. 987654" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Plate Number</label>
+              <input v-model="form.attributes.plate" type="text" class="form-control" placeholder="e.g. ABC-123" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Fuel Type</label>
+              <select v-model="form.attributes.fuelType" class="form-select">
+                <option value="">-- Select Fuel Type --</option>
+                <option>Diesel</option>
+                <option>Petrol</option>
+                <option>Electric Vehicle (EV)</option>
               </select>
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label small">Vehicle No</label>
-              <input v-model="form.attributes.vehicleNo" type="text" class="form-control" placeholder="e.g. V-001" />
+              <label class="form-label small">Fuel Average</label>
+              <input v-model.number="form.attributes.fuelAverage" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="e.g. 10" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Fuel Tank Capacity (Liters)</label>
+              <input v-model.number="form.attributes.fuelTankCapacity" type="number" min="0" step="0.1" inputmode="decimal" class="form-control" placeholder="e.g. 60" />
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Vehicle Type</label>
@@ -61,56 +83,52 @@
               <label class="form-label small">Vehicle Color</label>
               <input v-model="form.attributes.color" type="text" class="form-control" placeholder="e.g. White" />
             </div>
+          </div>
+        </div>
+      </div>
 
-
-
-            <div class="col-12 col-md-4">
-              <label class="form-label small">Model</label>
-              <input v-model="form.model" type="text" class="form-control" placeholder="e.g. 2023" />
+      <!-- Tracking Device Information -->
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Tracking Device Information</h6></div>
+        <div class="card-body">
+          <div class="row g-3 align-items-start">
+            <div class="col-12 col-md-6">
+              <label class="form-label small">Device ID (IMEI)</label>
+              <input v-model="form.uniqueId" type="text" class="form-control" placeholder="e.g. 123456789012345" />
             </div>
-            <div class="col-12 col-md-4">
-              <label class="form-label small">Manufacturer</label>
-              <input v-model="form.attributes.manufacturer" type="text" class="form-control" placeholder="e.g. Toyota" />
-            </div>
-
-            <div class="col-12 col-md-4">
-              <label class="form-label small">Registration Number</label>
-              <input v-model="form.attributes.registration" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="e.g. 987654" />
-            </div>
-            <div class="col-12 col-md-4">
-              <label class="form-label small">Plate Number</label>
-              <input v-model="form.attributes.plate" type="text" class="form-control" placeholder="e.g. ABC-123" />
-            </div>
-
-            <div class="col-12 col-md-4">
-              <label class="form-label small">Fuel Average</label>
-              <input
-                v-model.number="form.attributes.fuelAverage"
-                type="number"
-                min="0"
-                step="1"
-                inputmode="numeric"
-                pattern="[0-9]*"
-                class="form-control"
-                placeholder="e.g. 10"
-              />
-            </div>
-            <div class="col-12 col-md-4">
-              <label class="form-label small">Fuel Type</label>
-              <select v-model="form.attributes.fuelType" class="form-select">
-                <option value="">-- Select Fuel Type --</option>
-                <option>Diesel</option>
-                <option>Petrol</option>
-                <option>Electric Vehicle (EV)</option>
+            <div class="col-12 col-md-6">
+              <label class="form-label small">Tracker Model</label>
+              <select v-model="form.attributes.trackerModel" class="form-select">
+                <option value="">-- Select Tracker Model --</option>
+                <option v-for="opt in trackerModels" :key="opt" :value="opt">{{ opt }}</option>
               </select>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tracking Device Profile -->
+      <div class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Tracking Device Profile</h6></div>
+        <div class="card-body">
+          <div class="row g-3 align-items-start">
             <div class="col-12 col-md-4">
               <label class="form-label small">Max Speed</label>
               <input v-model="form.speedLimit" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="e.g. 120" />
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label small">Fuel Tank Capacity (Liters)</label>
-              <input v-model.number="form.attributes.fuelTankCapacity" type="number" min="0" step="0.1" inputmode="decimal" class="form-control" placeholder="e.g. 60" />
+              <label class="form-label small">Odometer Attribute</label>
+              <select v-model="form.attributes.odometerAttr" class="form-select">
+                <option value="">-- Select Odometer Attribute --</option>
+                <option v-for="opt in odometerOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Fuel Attribute</label>
+              <select v-model="form.attributes.fuelAttr" class="form-select">
+                <option value="">-- Select Fuel Attribute --</option>
+                <option v-for="opt in fuelOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
             </div>
           </div>
         </div>
@@ -152,7 +170,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onBeforeUnmount, onMounted } from 'vue';
+import { reactive, ref, onBeforeUnmount, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
@@ -223,19 +241,47 @@ onBeforeUnmount(() => {
 
 onMounted(async () => {
   try {
-    const { data } = await axios.get('/web/vehicles/models/options');
-    const opts = Array.isArray(data?.options) ? data.options : [];
-    console.log('model opts ',opts);
-    if (opts.length > 0) trackerModels.value = opts;
+    const resp = await axios.get('/web/vehicles/models/options');
+    const opts = Array.isArray(resp?.data?.options) ? resp.data.options : [];
+    const names = opts
+      .map(o => (typeof o === 'string' ? o : (o.modelname || o.name || '')))
+      .filter(Boolean);
+    if (names.length > 0) trackerModels.value = names;
   } catch {}
-  // Fallback: if still static and admin list is available
-  if (trackerModels.value && trackerModels.value.length && trackerModels.value[0].includes('Teltonika-')) {
-    try {
-      const { data } = await axios.get('/web/settings/vehicle-models');
-      const rows = Array.isArray(data?.models) ? data.models : [];
-      const names = rows.map(r => r.modelname).filter(Boolean);
-      if (names.length > 0) trackerModels.value = names;
-    } catch {}
+  await refreshModelAttributes(form.attributes.trackerModel);
+});
+
+const odometerOptions = ref([]);
+const fuelOptions = ref([]);
+
+async function refreshModelAttributes(modelName) {
+  odometerOptions.value = [];
+  fuelOptions.value = [];
+  if (!modelName) return;
+  try {
+    const { data } = await axios.get('/web/vehicles/models/options');
+    const rows = Array.isArray(data?.models) ? data.models : [];
+    const row = rows.find(r => String(r.modelname || '').trim() === String(modelName || '').trim());
+    if (row && row.attributes && typeof row.attributes === 'object') {
+      const attrs = row.attributes;
+      const odo = Array.isArray(attrs.odometer) ? attrs.odometer.map(i => i.name).filter(Boolean) : [];
+      const fuel = Array.isArray(attrs.fuel) ? attrs.fuel.map(i => i.name).filter(Boolean) : [];
+      odometerOptions.value = odo;
+      fuelOptions.value = fuel;
+      if (!form.attributes.odometerAttr && odo.length) form.attributes.odometerAttr = odo[0];
+      if (!form.attributes.fuelAttr && fuel.length) form.attributes.fuelAttr = fuel[0];
+    }
+  } catch {}
+}
+
+watch(() => form.attributes.trackerModel, (val) => {
+  form.attributes.odometerAttr = '';
+  form.attributes.fuelAttr = '';
+  if (val) {
+    refreshModelAttributes(val);
+  } else {
+    odometerOptions.value = [];
+    fuelOptions.value = [];
   }
 });
 

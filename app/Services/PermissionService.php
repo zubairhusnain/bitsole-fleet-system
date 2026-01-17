@@ -125,4 +125,82 @@ class PermissionService
             }
             return [ 'assigned' => $ok, 'failed' => $fail, 'errors' => $errors, 'deviceCount' => count($devices), 'attributeCount' => count($attrs) ];
         }
+
+        public function assignComputedAttributesForDevice(Request $request, int $deviceId, string $modelName, array $attributeNames)
+        {
+            $modelName = trim($modelName);
+            if ($deviceId <= 0 || $modelName === '') {
+                return;
+            }
+            $names = [];
+            foreach ($attributeNames as $n) {
+                $n = trim((string)$n);
+                if ($n === '') {
+                    continue;
+                }
+                $names[mb_strtolower($n)] = $n;
+            }
+            if (empty($names)) {
+                return;
+            }
+
+            $sessionId = $request->user()->traccarSession ?? session('cookie');
+
+            $headers = ['Content-Type: application/json', 'Accept' => 'application/json'];
+            $attrs = [];
+            $attrResp = static::curl('/api/attributes/computed', 'GET', $sessionId, '', $headers);
+            if ((int)($attrResp->responseCode ?? 0) >= 200 && (int)($attrResp->responseCode ?? 0) < 300) {
+                $attrs = json_decode($attrResp->response ?? '[]', true) ?? [];
+            }
+
+            if (empty($attrs)) {
+                return;
+            }
+
+            $prefix = $modelName . ' - ';
+            $matched = [];
+            foreach ($attrs as $a) {
+                $attrName = isset($a['attribute']) ? trim((string)$a['attribute']) : '';
+                if ($attrName === '') {
+                    continue;
+                }
+                $key = mb_strtolower($attrName);
+                if (!isset($names[$key])) {
+                    continue;
+                }
+                $desc = isset($a['description']) ? (string)$a['description'] : '';
+                if (strpos($desc, $prefix) !== 0) {
+                    continue;
+                }
+                if (!isset($a['id'])) {
+                    continue;
+                }
+                $matched[$key] = (int)$a['id'];
+            }
+
+            if (empty($matched)) {
+                return;
+            }
+
+            foreach ($matched as $key => $attrId) {
+                $data = json_encode(['deviceId' => (int)$deviceId, 'attributeId' => (int)$attrId]);
+                try {
+                    $resp = static::curl('/api/permissions', 'POST', $sessionId, $data, $headers);
+                    $code = (int)($resp->responseCode ?? 0);
+                    if (!($code >= 200 && $code < 300)) {
+                        Log::warning('Failed to assign computed attribute to device', [
+                            'deviceId' => $deviceId,
+                            'attributeId' => $attrId,
+                            'responseCode' => $code,
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Error assigning computed attribute to device', [
+                        'deviceId' => $deviceId,
+                        'attributeId' => $attrId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
 }

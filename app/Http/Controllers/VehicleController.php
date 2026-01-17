@@ -115,7 +115,7 @@ class VehicleController extends Controller
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
             'type','manufacturer','color','registration','plate','odometer','fuelAverage','photos','fuelTankCapacity','trackerModel',
-            'fuelType','fuel_type','vehicleNo','speedLimit'
+            'fuelType','fuel_type','vehicleNo','speedLimit','odometerAttr','fuelAttr'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
@@ -231,6 +231,30 @@ class VehicleController extends Controller
             'distributor_id' => $distributorIdLocal,
         ]);
 
+        // Assign selected computed attributes (odometer/fuel) for this model to the new device
+        $modelNameForAttrs = isset($attributes['trackerModel']) && $attributes['trackerModel'] !== ''
+            ? (string)$attributes['trackerModel']
+            : (string)$request->input('model', '');
+        $namesForAttrs = [];
+        if (!empty($attributes['odometerAttr'])) {
+            $namesForAttrs[] = $attributes['odometerAttr'];
+        }
+        if (!empty($attributes['fuelAttr'])) {
+            $namesForAttrs[] = $attributes['fuelAttr'];
+        }
+        if ($modelNameForAttrs !== '' && !empty($namesForAttrs)) {
+            try {
+                $this->permissionService->assignComputedAttributesForDevice($request, (int)$payload->id, $modelNameForAttrs, $namesForAttrs);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to assign computed attributes to new device', [
+                    'device_id' => $payload->id ?? null,
+                    'model' => $modelNameForAttrs,
+                    'attributes' => $namesForAttrs,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return response()->json([
             'message' => 'Vehicle created',
             'traccar' => $payload,
@@ -273,7 +297,7 @@ class VehicleController extends Controller
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
             'type','manufacturer','color','registration','plate','odometer','fuelAverage','photos','fuelTankCapacity','trackerModel',
-            'fuelType','fuel_type','vehicleNo','speedLimit'
+            'fuelType','fuel_type','vehicleNo','speedLimit','odometerAttr','fuelAttr'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
@@ -383,6 +407,30 @@ class VehicleController extends Controller
                 'user_id' => $userIdLocal,
                 'distributor_id' => $distributorIdLocal,
             ]);
+        }
+
+        // Assign selected computed attributes (odometer/fuel) for this model to this device
+        $modelNameForAttrs = isset($attributes['trackerModel']) && $attributes['trackerModel'] !== ''
+            ? (string)$attributes['trackerModel']
+            : (string)$request->input('model', '');
+        $namesForAttrs = [];
+        if (!empty($attributes['odometerAttr'])) {
+            $namesForAttrs[] = $attributes['odometerAttr'];
+        }
+        if (!empty($attributes['fuelAttr'])) {
+            $namesForAttrs[] = $attributes['fuelAttr'];
+        }
+        if ($modelNameForAttrs !== '' && !empty($namesForAttrs)) {
+            try {
+                $this->permissionService->assignComputedAttributesForDevice($request, (int)$deviceId, $modelNameForAttrs, $namesForAttrs);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to assign computed attributes to device on update', [
+                    'device_id' => $deviceId,
+                    'model' => $modelNameForAttrs,
+                    'attributes' => $namesForAttrs,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         // Delete removed images from storage
