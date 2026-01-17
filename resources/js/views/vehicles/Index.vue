@@ -85,15 +85,6 @@
                                         <button v-if="!row.blocked && hasPerm('vehicles','update')" class="btn btn-outline-secondary" :class="{ 'd-testingmode': !isTestingMode }" title="Settings" @click="toSettings(row)">
                                             <i class="bi bi-gear"></i>
                                         </button>
-                                        <button
-                                            v-if="!row.blocked && hasPerm('vehicles','update')"
-                                            class="btn btn-outline-danger"
-                                            :class="{ 'd-testingmode': !isTestingMode }"
-                                            title="Clean computed attributes"
-                                            @click="cleanComputed(row)"
-                                        >
-                                            <i class="bi bi-broom"></i>
-                                        </button>
                                         <button v-if="(hasPerm('vehicles','read') || hasPerm('vehicles.overview','read')) && !row.blocked && hasLocation(row)" class="btn btn-outline-primary" title="View" @click="toDetail(row)">
                                             <i class="bi bi-eye"></i>
                                         </button>
@@ -610,30 +601,6 @@ function toDetail(row) {
 function toSettings(row) {
     if (!row?.device_id) return;
     router.push(`/vehicles/${row.device_id}/settings`);
-}
-
-async function cleanComputed(row) {
-    if (!row?.device_id) return;
-    const id = row.device_id;
-    const result = await Swal.fire({
-        title: `Clean computed attributes for ${row.name || id}?`,
-        text: 'This keeps saved attributes (odometer/fuel) and removes others from this device.',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Clean',
-        cancelButtonText: 'Cancel',
-        confirmButtonColor: '#d63384',
-    });
-    if (!result.isConfirmed) return;
-    error.value = '';
-    try {
-        await axios.post(`/web/vehicles/${id}/clean-computed-attributes`);
-        await Swal.fire({ title: 'Cleaned', text: 'Computed attributes cleaned for this device.', icon: 'success', timer: 1400, showConfirmButton: false });
-    } catch (e) {
-        const msg = e?.response?.data?.message || 'Failed to clean computed attributes.';
-        error.value = msg;
-        await Swal.fire({ title: 'Clean failed', text: msg, icon: 'error' });
-    }
 }
 </script>
 

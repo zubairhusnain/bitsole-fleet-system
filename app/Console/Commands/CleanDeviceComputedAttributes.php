@@ -98,6 +98,7 @@ class CleanDeviceComputedAttributes extends Command
                 }
                 $key = mb_strtolower($attrName);
                 if (isset($keepMap[$key])) {
+                    $this->info('Skip attribute ' . $keepMap[$key] . '. Nothing to clean.');
                     continue;
                 }
                 if (!isset($a['id'])) {
@@ -105,7 +106,7 @@ class CleanDeviceComputedAttributes extends Command
                 }
                 $deleteAttrIds[] = (int)$a['id'];
             }
-
+            $this->info('removing attributes ' . count($deleteAttrIds) );
             $removed = 0;
             foreach ($deleteAttrIds as $attrId) {
                 $payload = json_encode(['deviceId' => $deviceId, 'attributeId' => $attrId]);
