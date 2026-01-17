@@ -1,6 +1,6 @@
 <template>
   <div class="card border rounded-3 shadow-0 mb-3">
-    <div class="card-header bg-white border-bottom-0 pt-3 ps-3"><h6 class="mb-0 fw-bold">Vehicle Activity Report Result</h6></div>
+    <div class="card-header bg-white border-bottom-0 pt-3 ps-3"><h6 class="mb-0 fw-bold">Trip Analysis Report Result</h6></div>
     <div class="card-body pt-0">
       <div class="row g-3">
         <div class="col-12 col-md-3">

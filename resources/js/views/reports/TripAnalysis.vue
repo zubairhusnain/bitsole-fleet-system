@@ -7,7 +7,42 @@
         <li class="breadcrumb-item active" aria-current="page">Trip Analysis Report</li>
       </ol>
     </div>
-    <h4 class="mb-3">Trip Analysis Report</h4>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div class="d-flex align-items-center">
+        <h4 class="mb-0">Trip Analysis Report</h4>
+        <button
+          type="button"
+          class="btn btn-link p-0 ms-2 text-muted"
+          :class="{ 'd-testingmode': !isTestingMode }"
+          @click="showInfo = !showInfo"
+        >
+          <i class="bi bi-info-circle"></i>
+        </button>
+      </div>
+    </div>
+    <div v-if="showInfo" class="mb-3" :class="{ 'd-testingmode': !isTestingMode }">
+      <div class="card border-0 bg-light">
+        <div class="card-header bg-transparent py-2">
+          <div class="fw-semibold small">About this report</div>
+        </div>
+        <div class="card-body pt-2 pb-3 small">
+          <p class="mb-2">
+            Trip Analysis shows how your vehicles moved over time for the selected dates.
+            It uses GPS trip data to calculate distance, driving time, stop time and basic fuel usage where available.
+          </p>
+          <p class="mb-2">
+            Use the view type to switch between different summaries:
+            Trip Summary gives one line per vehicle, Daily Breakdown shows each trip with stops and events,
+            Daily and Monthly summaries group totals by day or month and can show charts,
+            and the “with map” view adds a route map for visual inspection.
+          </p>
+          <p class="mb-0">
+            This report is useful to answer questions like “how far did each vehicle travel”, “when was it driving or stopped”
+            and “where did important driving events such as harsh braking or overspeeding happen”.
+          </p>
+        </div>
+      </div>
+    </div>
 
     <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = null" />
 
@@ -61,6 +96,14 @@
     </div>
 
     <template v-else>
+      <ReportSummary
+        v-if="isTestingMode"
+        :summary="activeSummary"
+        :vehicle="selectedVehicleInfo"
+        :dateRange="dateRange"
+        :viewType="viewType"
+      />
+
       <DailyBreakdown v-if="viewType === 'Daily Breakdown'" :rowsDailyTrips="rowsDailyTrips" :rowsDailyStops="rowsDailyStops" :summaryData="dailySummaryData" :vehicleInfo="selectedVehicleInfo" :startDate="startDate" :endDate="endDate" />
 
       <TripSummary v-else-if="viewType === 'Trip Summary'" :rowsTripSummary="rowsTripSummary" @view-details="handleViewDetails" />
@@ -78,9 +121,9 @@
 
   </div>
 </template>
- 
+
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch, inject } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import DailyBreakdown from './components/trip-analysis/DailyBreakdown.vue';
 import DailyBreakdownMap from './components/trip-analysis/DailyBreakdownMap.vue';
@@ -89,7 +132,11 @@ import DailySummaryList from './components/trip-analysis/DailySummaryList.vue';
 import MonthlySummary from './components/trip-analysis/MonthlySummary.vue';
 import MonthlySummaryList from './components/trip-analysis/MonthlySummaryList.vue';
 import TripSummary from './components/trip-analysis/TripSummary.vue';
+import ReportSummary from './components/trip-analysis/ReportSummary.vue';
 
+const isTestingMode = inject('isTestingMode', ref(false));
+
+const showInfo = ref(false);
 const startDate = ref('');
 const endDate = ref('');
 const vehicle = ref('');
@@ -119,6 +166,20 @@ const selectedVehicleInfo = computed(() => {
 
 const isVehicleRequired = computed(() => {
     return ['Daily Breakdown', 'Daily Breakdown (with map)'].includes(viewType.value);
+});
+
+const dateRange = computed(() => ({
+  start: startDate.value,
+  end: endDate.value
+}));
+
+const activeSummary = computed(() => {
+  if (viewType.value === 'Daily Breakdown') return dailySummaryData.value;
+  if (viewType.value === 'Daily Summary' || viewType.value === 'Daily Summary List') return dailySummaryTotals.value;
+  if (viewType.value === 'Monthly Summary' || viewType.value === 'Monthly Summary List') return monthlySummaryTotals.value;
+  if (viewType.value === 'Trip Summary') return null;
+  if (viewType.value === 'Daily Breakdown (with map)') return dailySummaryData.value;
+  return null;
 });
 
 const fetchVehicles = async () => {

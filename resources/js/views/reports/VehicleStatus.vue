@@ -7,7 +7,39 @@
         <li class="breadcrumb-item active" aria-current="page">Vehicle Status Report</li>
       </ol>
     </div>
-    <h4 class="mb-3">Vehicle Status Report</h4>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div class="d-flex align-items-center">
+        <h4 class="mb-0">Vehicle Status Report</h4>
+        <button
+          type="button"
+          class="btn btn-link p-0 ms-2 text-muted"
+          :class="{ 'd-testingmode': !isTestingMode }"
+          @click="showInfo = !showInfo"
+        >
+          <i class="bi bi-info-circle"></i>
+        </button>
+      </div>
+    </div>
+    <div v-if="showInfo" class="mb-3" :class="{ 'd-testingmode': !isTestingMode }">
+      <div class="card border-0 bg-light">
+        <div class="card-header bg-transparent py-2">
+          <div class="fw-semibold small">About this report</div>
+        </div>
+        <div class="card-body pt-2 pb-3 small">
+          <p class="mb-2">
+            Vehicle Status provides a snapshot of each tracked vehicle based on its latest GPS report.
+            It combines vehicle details, device information and current telemetry into a single table.
+          </p>
+          <p class="mb-2">
+            Use this report to see which vehicles are online, where they last reported from, their ignition state,
+            GPS signal quality, odometer reading and activation date.
+          </p>
+          <p class="mb-0">
+            You can filter by vehicle or group and choose the output format when you need to export the same information.
+          </p>
+        </div>
+      </div>
+    </div>
 
     <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = null" />
 
@@ -137,11 +169,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, inject } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { formatTelemetry } from '../../utils/telemetry';
 import { formatDateTime } from '../../utils/datetime';
+
+const isTestingMode = inject('isTestingMode', ref(false));
+const showInfo = ref(false);
 const vehicles = ref([]);
 const vehicleOptions = ref([]);
 const groupOptions = ref([]);

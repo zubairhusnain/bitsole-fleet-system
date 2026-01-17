@@ -7,7 +7,40 @@
         <li class="breadcrumb-item active" aria-current="page">Asset Activity Report</li>
       </ol>
     </div>
-    <h4 class="mb-3">Asset Activity Report</h4>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div class="d-flex align-items-center">
+        <h4 class="mb-0">Asset Activity Report</h4>
+        <button
+          type="button"
+          class="btn btn-link p-0 ms-2 text-muted"
+          :class="{ 'd-testingmode': !isTestingMode }"
+          @click="showInfo = !showInfo"
+        >
+          <i class="bi bi-info-circle"></i>
+        </button>
+      </div>
+    </div>
+    <div v-if="showInfo" class="mb-3" :class="{ 'd-testingmode': !isTestingMode }">
+      <div class="card border-0 bg-light">
+        <div class="card-header bg-transparent py-2">
+          <div class="fw-semibold small">About this report</div>
+        </div>
+        <div class="card-body pt-2 pb-3 small">
+          <p class="mb-2">
+            Asset Activity shows every tracking point received from your devices for the selected period.
+            Each row represents one GPS update with the vehicle’s location, movement status and key sensor values.
+          </p>
+          <p class="mb-2">
+            The status column classifies each point as Moving, Idle, Stopped or Offline based mainly on speed and ignition.
+            You can also see direction, speed, GSM and GPS signal strength, power and fuel level where supported by the device.
+          </p>
+          <p class="mb-0">
+            Use this report when you need a detailed timeline of where a vehicle was, how fast it was travelling
+            and whether the engine and tracking signals were healthy at each moment.
+          </p>
+        </div>
+      </div>
+    </div>
 
     <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = null" />
 
@@ -49,7 +82,7 @@
       </div>
     </div>
 
-    <div v-if="headerInfo" class="card border rounded-3 shadow-0 mb-3">
+    <div v-if="isTestingMode && headerInfo" class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header"><h6 class="mb-0">Vehicle Activity Report Result</h6></div>
       <div class="card-body">
         <div class="row g-3">
@@ -200,11 +233,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch, inject } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { formatDateTime, formatDate, formatTime } from '../../utils/datetime';
 
+const isTestingMode = inject('isTestingMode', ref(false));
+
+const showInfo = ref(false);
 const startDate = ref('');
 const endDate = ref('');
 const vehicle = ref('');

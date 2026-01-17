@@ -7,7 +7,39 @@
         <li class="breadcrumb-item active" aria-current="page">Utilisation Report</li>
       </ol>
     </div>
-    <h4 class="mb-3">Utilisation Report</h4>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div class="d-flex align-items-center">
+        <h4 class="mb-0">Utilisation Report</h4>
+        <button
+          type="button"
+          class="btn btn-link p-0 ms-2 text-muted"
+          :class="{ 'd-testingmode': !isTestingMode }"
+          @click="showInfo = !showInfo"
+        >
+          <i class="bi bi-info-circle"></i>
+        </button>
+      </div>
+    </div>
+    <div v-if="showInfo" class="mb-3" :class="{ 'd-testingmode': !isTestingMode }">
+      <div class="card border-0 bg-light">
+        <div class="card-header bg-transparent py-2">
+          <div class="fw-semibold small">About this report</div>
+        </div>
+        <div class="card-body pt-2 pb-3 small">
+          <p class="mb-2">
+            Utilisation Report shows how consistently a vehicle was used over the selected period.
+            It summarises days with movement or engine-on time, distance covered and hourly activity.
+          </p>
+          <p class="mb-2">
+            Switch between Movement and Engine Hours to focus on driving time or engine running time,
+            and use the daily breakdown to spot days with unusually low or high utilisation.
+          </p>
+          <p class="mb-0">
+            This report is useful for identifying underused or overworked vehicles and planning fleet allocation.
+          </p>
+        </div>
+      </div>
+    </div>
     <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = ''" />
     <div class="card panel border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white py-3"><h6 class="mb-0 fw-bold">Search Option</h6></div>
@@ -46,7 +78,7 @@
       </div>
     </div>
 
-    <div class="card border rounded-3 shadow-0 mb-3">
+    <div v-if="isTestingMode" class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
         <h6 class="mb-0 fw-bold">Utilisation Report Result</h6>
         <div class="d-flex align-items-right gap-3">
@@ -157,10 +189,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, inject } from 'vue';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
 import { formatDateTime } from '../../utils/datetime';
+
+const isTestingMode = inject('isTestingMode', ref(false));
+const showInfo = ref(false);
 const deviceOptions = ref([]);
 const selectedDeviceId = ref('');
 const selectedType = ref('Movement');

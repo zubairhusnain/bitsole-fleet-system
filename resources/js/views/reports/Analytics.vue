@@ -7,7 +7,39 @@
         <li class="breadcrumb-item active" aria-current="page">Analytics Overview</li>
       </ol>
     </div>
-    <h4 class="mb-3">Analytics Overview</h4>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div class="d-flex align-items-center">
+        <h4 class="mb-0">Analytics Overview</h4>
+        <button
+          type="button"
+          class="btn btn-link p-0 ms-2 text-muted"
+          :class="{ 'd-testingmode': !isTestingMode }"
+          @click="showInfo = !showInfo"
+        >
+          <i class="bi bi-info-circle"></i>
+        </button>
+      </div>
+    </div>
+    <div v-if="showInfo" class="mb-3" :class="{ 'd-testingmode': !isTestingMode }">
+      <div class="card border-0 bg-light">
+        <div class="card-header bg-transparent py-2">
+          <div class="fw-semibold small">About this page</div>
+        </div>
+        <div class="card-body pt-2 pb-3 small">
+          <p class="mb-2">
+            Analytics Overview provides a high-level summary of fleet performance over time,
+            combining utilisation, fuel efficiency and safety indicators.
+          </p>
+          <p class="mb-2">
+            Use the date range and group filters to focus on a subset of vehicles and
+            compare how their key metrics change across different periods.
+          </p>
+          <p class="mb-0">
+            This page is ideal for management dashboards and quick health checks of your fleet.
+          </p>
+        </div>
+      </div>
+    </div>
     <div class="card panel border rounded-3 shadow-0 mb-3">
       <div class="card-header"><h6 class="mb-0">Search Option </h6></div>
       <div class="card-body">
@@ -86,11 +118,12 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, inject } from 'vue';
 
 const startDate = ref('');
 const endDate = ref('');
-// Analytics logic here
+const isTestingMode = inject('isTestingMode', ref(false));
+const showInfo = ref(false);
 </script>
 
 <style scoped>

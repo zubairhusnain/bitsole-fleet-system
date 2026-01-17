@@ -7,7 +7,17 @@
         <li class="breadcrumb-item active" aria-current="page">Vehicle Ranking Report</li>
       </ol>
     </div>
-    <h4 class="mb-3">Vehicle Ranking Report <i class="bi bi-info-circle text-muted ms-2" style="font-size: 0.6em; cursor: help;" data-bs-toggle="tooltip" data-bs-html="true" title="<div class='text-start'><strong>Vehicle Ranking System</strong><br>Every vehicle starts with <strong>100 points</strong>.<br>Points are deducted for unsafe events:<br>• Hard Acceleration: -5 pts<br>• Hard Braking: -5 pts<br>• Hard Cornering: -5 pts<br>• Speeding: -10 pts<br>Higher score indicates safer driving.</div>"></i></h4>
+    <h4 class="mb-3">
+      Vehicle Ranking Report
+      <i
+        class="bi bi-info-circle text-muted ms-2"
+        :class="{ 'd-testingmode': !isTestingMode }"
+        style="font-size: 0.6em; cursor: help;"
+        data-bs-toggle="tooltip"
+        data-bs-html="true"
+        title="<div class='text-start'><strong>Vehicle Ranking System</strong><br>Every vehicle starts with <strong>100 points</strong>.<br>Points are deducted for unsafe events:<br>• Hard Acceleration: -5 pts<br>• Hard Braking: -5 pts<br>• Hard Cornering: -5 pts<br>• Speeding: -10 pts<br>Higher score indicates safer driving.</div>"
+      ></i>
+    </h4>
 
     <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = null" />
 
@@ -60,12 +70,54 @@
                 <th>Type/Model</th>
                 <th class="text-center">Distance</th>
                 <th class="text-center">Duration</th>
-                <th class="text-center" data-bs-toggle="tooltip" title="Total number of hard acceleration events">Total HA <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
-                <th class="text-center" data-bs-toggle="tooltip" title="Total number of hard braking events">Total HB <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
-                <th class="text-center" data-bs-toggle="tooltip" title="Total number of hard cornering events">Total HC <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
-                <th class="text-center" data-bs-toggle="tooltip" title="Total number of speed limit violations">Total SV <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
-                <th class="text-center" data-bs-toggle="tooltip" title="Driver safety score (starts at 100)">Points <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
-                <th class="text-center" data-bs-toggle="tooltip" title="Overall performance rating">Percentage <i class="bi bi-info-circle text-muted ms-1" style="font-size: 0.8em;"></i></th>
+                <th class="text-center" data-bs-toggle="tooltip" title="Total number of hard acceleration events">
+                  Total HA
+                  <i
+                    class="bi bi-info-circle text-muted ms-1"
+                    :class="{ 'd-testingmode': !isTestingMode }"
+                    style="font-size: 0.8em;"
+                  ></i>
+                </th>
+                <th class="text-center" data-bs-toggle="tooltip" title="Total number of hard braking events">
+                  Total HB
+                  <i
+                    class="bi bi-info-circle text-muted ms-1"
+                    :class="{ 'd-testingmode': !isTestingMode }"
+                    style="font-size: 0.8em;"
+                  ></i>
+                </th>
+                <th class="text-center" data-bs-toggle="tooltip" title="Total number of hard cornering events">
+                  Total HC
+                  <i
+                    class="bi bi-info-circle text-muted ms-1"
+                    :class="{ 'd-testingmode': !isTestingMode }"
+                    style="font-size: 0.8em;"
+                  ></i>
+                </th>
+                <th class="text-center" data-bs-toggle="tooltip" title="Total number of speed limit violations">
+                  Total SV
+                  <i
+                    class="bi bi-info-circle text-muted ms-1"
+                    :class="{ 'd-testingmode': !isTestingMode }"
+                    style="font-size: 0.8em;"
+                  ></i>
+                </th>
+                <th class="text-center" data-bs-toggle="tooltip" title="Driver safety score (starts at 100)">
+                  Points
+                  <i
+                    class="bi bi-info-circle text-muted ms-1"
+                    :class="{ 'd-testingmode': !isTestingMode }"
+                    style="font-size: 0.8em;"
+                  ></i>
+                </th>
+                <th class="text-center" data-bs-toggle="tooltip" title="Overall performance rating">
+                  Percentage
+                  <i
+                    class="bi bi-info-circle text-muted ms-1"
+                    :class="{ 'd-testingmode': !isTestingMode }"
+                    style="font-size: 0.8em;"
+                  ></i>
+                </th>
                 <th class="text-center">Rank</th>
                 <th class="text-center pe-3">Action</th>
               </tr>
@@ -108,9 +160,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, inject } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
+
+const isTestingMode = inject('isTestingMode', ref(false));
 
 const rows = ref([]);
 const loading = ref(false);

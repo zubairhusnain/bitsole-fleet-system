@@ -7,7 +7,39 @@
         <li class="breadcrumb-item active" aria-current="page">Vehicle Activity Report</li>
       </ol>
     </div>
-    <h4 class="mb-3">Vehicle Activity Report</h4>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div class="d-flex align-items-center">
+        <h4 class="mb-0">Vehicle Activity Report</h4>
+        <button
+          type="button"
+          class="btn btn-link p-0 ms-2 text-muted"
+          :class="{ 'd-testingmode': !isTestingMode }"
+          @click="showInfo = !showInfo"
+        >
+          <i class="bi bi-info-circle"></i>
+        </button>
+      </div>
+    </div>
+    <div v-if="showInfo" class="mb-3" :class="{ 'd-testingmode': !isTestingMode }">
+      <div class="card border-0 bg-light">
+        <div class="card-header bg-transparent py-2">
+          <div class="fw-semibold small">About this report</div>
+        </div>
+        <div class="card-body pt-2 pb-3 small">
+          <p class="mb-2">
+            Vehicle Activity shows a detailed timeline of one vehicle over the selected dates.
+            Each row represents a GPS point with status, speed, direction and signal information.
+          </p>
+          <p class="mb-2">
+            Status is derived from movement and ignition, so you can quickly see when the vehicle was moving,
+            idling, stopped or offline, as well as where those events occurred.
+          </p>
+          <p class="mb-0">
+            Use this report for investigations that require a point-by-point reconstruction of a vehicle’s route and behaviour.
+          </p>
+        </div>
+      </div>
+    </div>
 
     <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = null" />
 
@@ -42,7 +74,7 @@
       </div>
     </div>
 
-    <div v-if="headerInfo" class="card border rounded-3 shadow-0 mb-3">
+    <div v-if="isTestingMode && headerInfo" class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header"><h6 class="mb-0">Vehicle Activity Report Result</h6></div>
       <div class="card-body">
         <div class="row g-3">
@@ -203,13 +235,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, inject } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
 import { formatDateTime, formatDate, formatTime } from '../../utils/datetime';
 
 const router = useRouter();
+const isTestingMode = inject('isTestingMode', ref(false));
+
+const showInfo = ref(false);
 
 // State
 const devices = ref([]);

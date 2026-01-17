@@ -8,9 +8,40 @@
       </ol>
     </div>
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h4 class="mb-0">Incident Analysis Report</h4>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div class="d-flex align-items-center">
+        <h4 class="mb-0">Incident Analysis Report</h4>
+        <button
+          type="button"
+          class="btn btn-link p-0 ms-2 text-muted"
+          :class="{ 'd-testingmode': !isTestingMode }"
+          @click="showInfo = !showInfo"
+        >
+          <i class="bi bi-info-circle"></i>
+        </button>
+      </div>
       <RouterLink to="/reports/incident/new" class="btn btn-dark btn-sm px-3 py-2">Add New Incident</RouterLink>
+    </div>
+
+    <div v-if="showInfo" class="mb-3" :class="{ 'd-testingmode': !isTestingMode }">
+      <div class="card border-0 bg-light">
+        <div class="card-header bg-transparent py-2">
+          <div class="fw-semibold small">About this report</div>
+        </div>
+        <div class="card-body pt-2 pb-3 small">
+          <p class="mb-2">
+            Incident Analysis Report aggregates incidents that have been logged against your vehicles and drivers.
+            Each row shows when the incident occurred, what type it was and a short description.
+          </p>
+          <p class="mb-2">
+            Use the date range and vehicle filters to focus on specific periods or assets,
+            then export detailed records for auditing, insurance claims or internal investigations.
+          </p>
+          <p class="mb-0">
+            This report helps you understand recurring issues, track corrective actions and improve overall safety.
+          </p>
+        </div>
+      </div>
     </div>
 
     <!-- Alerts -->
@@ -99,7 +130,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, inject } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { hasPermission } from '../../auth';
@@ -107,6 +138,8 @@ import { formatDateTime } from '../../utils/datetime';
 
 const hasPerm = (m, a) => hasPermission(m, a);
 
+const isTestingMode = inject('isTestingMode', ref(false));
+const showInfo = ref(false);
 const fromDate = ref(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
 const toDate = ref(new Date().toISOString().slice(0, 10));
 const filterVehicleId = ref('');
