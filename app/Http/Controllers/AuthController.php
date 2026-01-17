@@ -220,6 +220,7 @@ class AuthController extends Controller
             }
 
             $impersonatorId = array_pop($stack);
+
             if (empty($stack)) {
                 session()->forget('impersonator_stack');
             } else {
