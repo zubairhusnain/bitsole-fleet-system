@@ -216,6 +216,8 @@ const form = reactive({
   }
 });
 
+const hydrating = ref(false);
+
 // Resolve assets from Laravel backend in dev; use current origin in prod
 const assetBase = import.meta.env.DEV ? (import.meta.env.VITE_BACKEND_PROXY_TARGET || 'http://127.0.0.1:8001') : window.location.origin;
 function toPhotoUrl(path) {
@@ -265,9 +267,6 @@ onMounted(async () => {
     const tc = data?.tc_device;
     if (tc) {
       hydrateFormFromTc(tc);
-      if (form.attributes.trackerModel) {
-        refreshModelAttributes(form.attributes.trackerModel);
-      }
       loading.value = false;
     } else {
       loading.value = false;
@@ -288,7 +287,7 @@ onMounted(async () => {
   }
 });
 
-async function refreshModelAttributes(modelName) {
+async function refreshModelAttributes(modelName, keepSelection = false) {
   odometerOptions.value = [];
   fuelOptions.value = [];
   if (!modelName) return;
@@ -302,13 +301,18 @@ async function refreshModelAttributes(modelName) {
       const fuel = Array.isArray(attrs.fuel) ? attrs.fuel.map(i => i.name).filter(Boolean) : [];
       odometerOptions.value = odo;
       fuelOptions.value = fuel;
-      if (!form.attributes.odometerAttr && odo.length) form.attributes.odometerAttr = odo[0];
-      if (!form.attributes.fuelAttr && fuel.length) form.attributes.fuelAttr = fuel[0];
+      if (!keepSelection) {
+        if (!form.attributes.odometerAttr && odo.length) form.attributes.odometerAttr = odo[0];
+        if (!form.attributes.fuelAttr && fuel.length) form.attributes.fuelAttr = fuel[0];
+      }
     }
   } catch {}
 }
 
 watch(() => form.attributes.trackerModel, (val) => {
+  if (hydrating.value) {
+    return;
+  }
   form.attributes.odometerAttr = '';
   form.attributes.fuelAttr = '';
   if (val) {
@@ -328,6 +332,7 @@ function parseAttrsMaybe(attr) {
 }
 
 function hydrateFormFromTc(tc) {
+  hydrating.value = true;
   const attrs = parseAttrsMaybe(tc.attributes);
   form.name = tc.name || '';
   form.uniqueId = tc.uniqueId || tc.uniqueid || '';
@@ -358,6 +363,12 @@ function hydrateFormFromTc(tc) {
   form.attributes.fuelTankCapacity = attrs.fuelTankCapacity || attrs.FuelTankCapacity || attrs.fueltankcapacity || '';
   form.attributes.odometerAttr = attrs.odometerAttr || attrs.odometer_attribute || '';
   form.attributes.fuelAttr = attrs.fuelAttr || attrs.fuel_attribute || '';
+
+  if (form.attributes.trackerModel) {
+    refreshModelAttributes(form.attributes.trackerModel, true);
+  }
+
+  hydrating.value = false;
 
   // Hydrate previews from existing attributes.photos if present
   const photosArr = Array.isArray(attrs.photos)
