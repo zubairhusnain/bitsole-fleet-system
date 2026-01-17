@@ -62,6 +62,10 @@ Route::prefix('/web/auth')->group(function () {
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+    Route::middleware(['auth'])->group(function () {
+        Route::post('/impersonate/{userId}', [AuthController::class, 'impersonate']);
+        Route::post('/impersonate/stop', [AuthController::class, 'stopImpersonate']);
+    });
 });
 
 // Auth-protected admin APIs (session-based)

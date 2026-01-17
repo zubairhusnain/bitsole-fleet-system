@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { reactive } from 'vue';
 
-export const authState = reactive({ user: null, permissions: {}, fetched: false });
+export const authState = reactive({ user: null, impersonator: null, permissions: {}, fetched: false });
 
 export function roleToNumber(r) {
   if (typeof r === 'string') {
@@ -23,8 +23,10 @@ export async function getCurrentUser() {
     authState.user = data?.user ?? null;
     if (authState.user) authState.user.role = roleToNumber(authState.user.role);
     authState.permissions = data?.permissions ?? {};
+    authState.impersonator = data?.impersonator ?? null;
   } catch (e) {
     authState.user = null;
+    authState.impersonator = null;
   } finally {
     authState.fetched = true;
   }
@@ -38,12 +40,14 @@ export async function ensureAuthenticated() {
 
 export function clearAuthCache() {
   authState.user = null;
+  authState.impersonator = null;
   authState.fetched = false;
 }
 
 export function setAuthenticatedUser(user) {
   authState.user = user ?? null;
   if (authState.user) authState.user.role = roleToNumber(authState.user.role);
+   authState.impersonator = null;
   authState.fetched = true;
 }
 

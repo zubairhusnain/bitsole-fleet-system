@@ -102,7 +102,7 @@ class AuthController extends Controller
     {
         $user = $request->user();
         if (!$user) {
-            return response()->json(['user' => null, 'permissions' => []]);
+            return response()->json(['user' => null, 'permissions' => [], 'impersonator' => null]);
         }
         // Ensure session holds module keys for middleware performance
         try {
@@ -119,7 +119,17 @@ class AuthController extends Controller
         } catch (\Throwable $e) { /* ignore seeding errors */ }
         $modules = array_keys(\App\Http\Middleware\ModulePermission::modules());
         $perms = \App\Support\Permissions::effectiveMap($user, $modules);
-        return response()->json(['user' => $user, 'permissions' => $perms]);
+
+        $impersonator = null;
+        try {
+            $impersonatorId = session('impersonator_id');
+            if ($impersonatorId) {
+                $impersonator = User::query()->find($impersonatorId);
+            }
+        } catch (\Throwable $e) {
+        }
+
+        return response()->json(['user' => $user, 'permissions' => $perms, 'impersonator' => $impersonator]);
     }
 
     public function logout(Request $request)
@@ -129,6 +139,92 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
         try { session()->forget('user_module_keys'); } catch (\Throwable $e) {}
         return response()->json(['status' => 'logged_out']);
+    }
+
+    public function impersonate(Request $request, $userId)
+    {
+        $me = $request->user();
+        if (!$me) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+        if (session()->has('impersonator_id')) {
+            return response()->json(['message' => 'Already impersonating'], 400);
+        }
+
+        $target = User::query()->find($userId);
+        if (!$target) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        $can = false;
+        if ($me->isAdmin() && (int)$target->role === User::ROLE_DISTRIBUTOR) {
+            $can = true;
+        } elseif ($me->isDistributor()
+            && (int)$target->role === User::ROLE_FLEET_MANAGER
+            && (int)$target->distributor_id === (int)$me->id) {
+            $can = true;
+        }
+
+        if (!$can) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        session(['impersonator_id' => $me->id]);
+        Auth::login($target);
+        $request->session()->regenerate();
+
+        try {
+            $keys = \App\Models\UserPermission::query()
+                ->where('user_id', $target->id)
+                ->pluck('module_key')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+            session(['user_module_keys' => $keys]);
+        } catch (\Throwable $e) {
+        }
+
+        return response()->json(['user' => Auth::user()]);
+    }
+
+    public function stopImpersonate(Request $request)
+    {
+        $impersonatorId = session('impersonator_id');
+        if (!$impersonatorId) {
+            return response()->json(['message' => 'Not impersonating'], 400);
+        }
+
+        session()->forget('impersonator_id');
+
+        $original = User::query()->find($impersonatorId);
+        if (!$original) {
+            Auth::guard()->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            try {
+                session()->forget('user_module_keys');
+            } catch (\Throwable $e) {
+            }
+            return response()->json(['status' => 'logged_out']);
+        }
+
+        Auth::login($original);
+        $request->session()->regenerate();
+
+        try {
+            $keys = \App\Models\UserPermission::query()
+                ->where('user_id', $original->id)
+                ->pluck('module_key')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+            session(['user_module_keys' => $keys]);
+        } catch (\Throwable $e) {
+        }
+
+        return response()->json(['user' => Auth::user()]);
     }
 
 }
