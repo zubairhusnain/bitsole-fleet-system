@@ -252,16 +252,6 @@ onMounted(async () => {
     if (names.length > 0) trackerModels.value = names;
   } catch {}
 
-  // Fallback: if still static and admin list is available
-  if (trackerModels.value && trackerModels.value.length && trackerModels.value[0].includes('Teltonika-')) {
-    try {
-      const { data } = await axios.get('/web/settings/vehicle-models');
-      const rows = Array.isArray(data?.models) ? data.models : [];
-      const names = rows.map(r => r.modelname).filter(Boolean);
-      if (names.length > 0) trackerModels.value = names;
-    } catch {}
-  }
-
   try {
     const { data } = await axios.get(`/web/vehicles/${deviceId}`);
     const tc = data?.tc_device;
