@@ -7,17 +7,49 @@
         <li class="breadcrumb-item active" aria-current="page">Vehicle Ranking Report</li>
       </ol>
     </div>
-    <h4 class="mb-3">
-      Vehicle Ranking Report
-      <i
-        class="bi bi-info-circle text-muted ms-2"
-        :class="{ 'd-testingmode': !isTestingMode }"
-        style="font-size: 0.6em; cursor: help;"
-        data-bs-toggle="tooltip"
-        data-bs-html="true"
-        title="<div class='text-start'><strong>Vehicle Ranking System</strong><br>Every vehicle starts with <strong>100 points</strong>.<br>Points are deducted for unsafe events:<br>• Hard Acceleration: -5 pts<br>• Hard Braking: -5 pts<br>• Hard Cornering: -5 pts<br>• Speeding: -10 pts<br>Higher score indicates safer driving.</div>"
-      ></i>
-    </h4>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div class="d-flex align-items-center">
+        <h4 class="mb-0">Vehicle Ranking Report</h4>
+        <button
+          type="button"
+          class="btn btn-link p-0 ms-2 text-muted"
+          :class="{ 'd-testingmode': !isTestingMode }"
+          @click="showInfo = !showInfo"
+        >
+          <i class="bi bi-info-circle"></i>
+        </button>
+      </div>
+    </div>
+    <div v-if="showInfo" class="mb-3" :class="{ 'd-testingmode': !isTestingMode }">
+      <div class="card border-0 bg-light">
+        <div class="card-header bg-transparent py-2">
+          <div class="fw-semibold small">About this report</div>
+        </div>
+        <div class="card-body pt-2 pb-3 small">
+          <p class="mb-2">
+            Vehicle Ranking Report compares the driving behaviour of vehicles over the selected duration
+            using a simple points-based safety score. Every vehicle starts with 100 points and loses points
+            whenever harsh or unsafe events are detected from the tracking data.
+          </p>
+          <p class="mb-2">
+            The score is reduced for hard acceleration, hard braking, hard cornering and speeding events.
+            More frequent or more severe events lead to a lower score, while vehicles with smoother driving
+            and fewer violations keep more of their original points.
+          </p>
+          <p class="mb-2">
+            Use the Type option to switch between different views: Ranking by Percentage shows performance
+            as an overall score out of 100%, Ranking by Total Points focuses on the remaining safety score,
+            and Driving Behaviour highlights the underlying event counts to help explain why a vehicle is
+            ranked higher or lower.
+          </p>
+          <p class="mb-0">
+            This report is useful for identifying your safest and riskiest vehicles or drivers, tracking the
+            impact of training or policies over time, and quickly spotting vehicles that generate many harsh
+            events even if they do not drive long distances.
+          </p>
+        </div>
+      </div>
+    </div>
 
     <UiAlert :show="!!errorMessage" :message="errorMessage" variant="danger" dismissible @dismiss="errorMessage = null" />
 
@@ -165,6 +197,8 @@ import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 
 const isTestingMode = inject('isTestingMode', ref(false));
+
+const showInfo = ref(false);
 
 const rows = ref([]);
 const loading = ref(false);
