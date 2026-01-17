@@ -691,7 +691,13 @@ async function stopImpersonation() {
         });
         if (!result.isConfirmed) return;
 
-        await axios.post('/web/auth/impersonate/stop');
+        const res = await axios.post('/web/auth/impersonate/stop');
+        if (res?.data?.status === 'logged_out') {
+            clearAuthCache();
+            router.push('/login');
+            window.location.reload();
+            return;
+        }
         clearAuthCache();
         await refreshCsrf();
         await getCurrentUser();
@@ -704,12 +710,21 @@ async function stopImpersonation() {
         router.push('/');
         window.location.reload();
     } catch (e) {
-        try {
-            await axios.post('/web/auth/logout');
-        } catch (_) {}
-        clearAuthCache();
-        router.push('/login');
-        window.location.reload();
+        const status = e?.response?.status;
+        const msg = e?.response?.data?.message || 'Failed to switch back to previous user.';
+        await Swal.fire({
+            title: 'Switch failed',
+            text: msg,
+            icon: 'error',
+        });
+        if (status === 401) {
+            try {
+                await axios.post('/web/auth/logout');
+            } catch (_) {}
+            clearAuthCache();
+            router.push('/login');
+            window.location.reload();
+        }
     }
 }
 
