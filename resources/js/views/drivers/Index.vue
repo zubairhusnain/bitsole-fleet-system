@@ -16,7 +16,7 @@
           <div class="col-sm-12 col-md-6 col-xl-7">
             <div class="input-group flex-nowrap">
               <span class="input-group-text"><i class="bi bi-search"></i></span>
-              <input v-model="query" type="text" class="form-control input-w-360" placeholder="Search driver/ID" />
+               <input v-model="query" type="text" class="form-control input-w-360" placeholder="Search driver/ID" />
             </div>
           </div>
           <div class="col-sm-12 col-md-6 col-xl-5" v-if="hasPerm('drivers','create')">

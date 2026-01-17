@@ -25,7 +25,7 @@
                                 placeholder="Search" />
                         </div>
                     </div>
-                    <div class="col-sm-12 col-md-6 col-xl-5" v-if="hasPerm('vehicles','create')">
+                     <div class="col-sm-12 col-md-6 col-xl-5" v-if="hasPerm('vehicles','create')">
                         <div class="d-flex align-items-center justify-content-xl-end">
                             <RouterLink to="/vehicles/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> List New Vehicle</RouterLink>
                         </div>
