@@ -10,10 +10,10 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Assign computed attributes hourly
-Schedule::command('assign:computed-attributes')
-    ->hourly()
-    ->withoutOverlapping()
-    ->runInBackground();
+// Schedule::command('assign:computed-attributes')
+//     ->hourly()
+//     ->withoutOverlapping()
+//     ->runInBackground();
 
 // Poll alerts service - runs continuously
 // In production, ensure the scheduler is running (cron)
