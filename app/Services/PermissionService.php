@@ -126,21 +126,32 @@ class PermissionService
             return [ 'assigned' => $ok, 'failed' => $fail, 'errors' => $errors, 'deviceCount' => count($devices), 'attributeCount' => count($attrs) ];
         }
 
-        public function assignComputedAttributesForDevice(Request $request, int $deviceId, string $modelName, array $attributeNames)
+        public function assignComputedAttributesForDevice(Request $request, int $deviceId, string $modelName, array $attributeNames, array $deleteNames = [])
         {
             $modelName = trim($modelName);
             if ($deviceId <= 0 || $modelName === '') {
                 return;
             }
-            $names = [];
+            $assignNames = [];
             foreach ($attributeNames as $n) {
                 $n = trim((string)$n);
                 if ($n === '') {
                     continue;
                 }
-                $names[mb_strtolower($n)] = $n;
+                $assignNames[mb_strtolower($n)] = $n;
             }
-            if (empty($names)) {
+
+            $deleteNamesMap = [];
+            $allDelete = array_merge($deleteNames, $attributeNames);
+            foreach ($allDelete as $n) {
+                $n = trim((string)$n);
+                if ($n === '') {
+                    continue;
+                }
+                $deleteNamesMap[mb_strtolower($n)] = $n;
+            }
+
+            if (empty($assignNames) && empty($deleteNamesMap)) {
                 return;
             }
 
@@ -156,6 +167,43 @@ class PermissionService
             if (empty($attrs)) {
                 return;
             }
+ 
+            $deleteAttrIds = [];
+            if (!empty($deleteNamesMap)) {
+                foreach ($attrs as $a) {
+                    $attrName = isset($a['attribute']) ? trim((string)$a['attribute']) : '';
+                    if ($attrName === '') {
+                        continue;
+                    }
+                    $key = mb_strtolower($attrName);
+                    if (!isset($deleteNamesMap[$key])) {
+                        continue;
+                    }
+                    if (!isset($a['id'])) {
+                        continue;
+                    }
+                    $deleteAttrIds[] = (int)$a['id'];
+                }
+            }
+
+            if (!empty($deleteAttrIds)) {
+                foreach ($deleteAttrIds as $attrId) {
+                    $dataDelete = json_encode(['deviceId' => (int)$deviceId, 'attributeId' => (int)$attrId]);
+                    try {
+                        static::curl('/api/permissions', 'DELETE', $sessionId, $dataDelete, $headers);
+                    } catch (\Throwable $e) {
+                        Log::warning('Error removing computed attribute from device', [
+                            'deviceId' => $deviceId,
+                            'attributeId' => $attrId,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
+            if (empty($assignNames)) {
+                return;
+            }
 
             $prefix = $modelName . ' - ';
             $matched = [];
@@ -165,7 +213,7 @@ class PermissionService
                     continue;
                 }
                 $key = mb_strtolower($attrName);
-                if (!isset($names[$key])) {
+                if (!isset($assignNames[$key])) {
                     continue;
                 }
                 $desc = isset($a['description']) ? (string)$a['description'] : '';

@@ -236,15 +236,29 @@ class VehicleController extends Controller
             ? (string)$attributes['trackerModel']
             : (string)$request->input('model', '');
         $namesForAttrs = [];
+        $deleteNamesForAttrs = [];
+
         if (!empty($attributes['odometerAttr'])) {
-            $namesForAttrs[] = $attributes['odometerAttr'];
+            $v = trim((string)$attributes['odometerAttr']);
+            if ($v !== '') {
+                $namesForAttrs[] = $v;
+                $deleteNamesForAttrs[] = $v;
+            }
         }
         if (!empty($attributes['fuelAttr'])) {
-            $namesForAttrs[] = $attributes['fuelAttr'];
+            $v = trim((string)$attributes['fuelAttr']);
+            if ($v !== '') {
+                if (!in_array($v, $namesForAttrs, true)) {
+                    $namesForAttrs[] = $v;
+                }
+                if (!in_array($v, $deleteNamesForAttrs, true)) {
+                    $deleteNamesForAttrs[] = $v;
+                }
+            }
         }
-        if ($modelNameForAttrs !== '' && !empty($namesForAttrs)) {
+        if ($modelNameForAttrs !== '' && (!empty($namesForAttrs) || !empty($deleteNamesForAttrs))) {
             try {
-                $this->permissionService->assignComputedAttributesForDevice($request, (int)$payload->id, $modelNameForAttrs, $namesForAttrs);
+                $this->permissionService->assignComputedAttributesForDevice($request, (int)$payload->id, $modelNameForAttrs, $namesForAttrs, $deleteNamesForAttrs);
             } catch (\Throwable $e) {
                 Log::warning('Failed to assign computed attributes to new device', [
                     'device_id' => $payload->id ?? null,
@@ -323,6 +337,9 @@ class VehicleController extends Controller
         }
 
 
+        $oldOdometerAttr = null;
+        $oldFuelAttr = null;
+
         // Load existing photos from tracking server attributes
         $existingPhotos = [];
         try {
@@ -333,6 +350,8 @@ class VehicleController extends Controller
                     ? $tc->attributes
                     : (json_decode($tc->attributes, true) ?? []);
                 $existingPhotos = array_values(array_filter(is_array($existingAttrs['photos'] ?? []) ? $existingAttrs['photos'] : []));
+                $oldOdometerAttr = isset($existingAttrs['odometerAttr']) ? (string)$existingAttrs['odometerAttr'] : null;
+                $oldFuelAttr = isset($existingAttrs['fuelAttr']) ? (string)$existingAttrs['fuelAttr'] : null;
             }
         } catch (\Throwable $e) {
             Log::warning('Failed to load existing vehicle photos for update', ['device_id' => $deviceId, 'error' => $e->getMessage()]);
@@ -414,15 +433,43 @@ class VehicleController extends Controller
             ? (string)$attributes['trackerModel']
             : (string)$request->input('model', '');
         $namesForAttrs = [];
+        $deleteNamesForAttrs = [];
+
+        $valsToDelete = [
+            $oldOdometerAttr,
+            $oldFuelAttr,
+            $attributes['odometerAttr'] ?? null,
+            $attributes['fuelAttr'] ?? null,
+        ];
+        foreach ($valsToDelete as $n) {
+            if ($n === null || $n === '') {
+                continue;
+            }
+            $nStr = trim((string)$n);
+            if ($nStr === '') {
+                continue;
+            }
+            if (!in_array($nStr, $deleteNamesForAttrs, true)) {
+                $deleteNamesForAttrs[] = $nStr;
+            }
+        }
+
         if (!empty($attributes['odometerAttr'])) {
-            $namesForAttrs[] = $attributes['odometerAttr'];
+            $v = trim((string)$attributes['odometerAttr']);
+            if ($v !== '' && !in_array($v, $namesForAttrs, true)) {
+                $namesForAttrs[] = $v;
+            }
         }
         if (!empty($attributes['fuelAttr'])) {
-            $namesForAttrs[] = $attributes['fuelAttr'];
+            $v = trim((string)$attributes['fuelAttr']);
+            if ($v !== '' && !in_array($v, $namesForAttrs, true)) {
+                $namesForAttrs[] = $v;
+            }
         }
-        if ($modelNameForAttrs !== '' && !empty($namesForAttrs)) {
+
+        if ($modelNameForAttrs !== '' && (!empty($namesForAttrs) || !empty($deleteNamesForAttrs))) {
             try {
-                $this->permissionService->assignComputedAttributesForDevice($request, (int)$deviceId, $modelNameForAttrs, $namesForAttrs);
+                $this->permissionService->assignComputedAttributesForDevice($request, (int)$deviceId, $modelNameForAttrs, $namesForAttrs, $deleteNamesForAttrs);
             } catch (\Throwable $e) {
                 Log::warning('Failed to assign computed attributes to device on update', [
                     'device_id' => $deviceId,
