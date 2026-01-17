@@ -1,19 +1,22 @@
-// Shared telemetry formatter for odometer and fuel (extensible)
-// Accepts raw attributes (object or JSON string) and optional context (e.g., protocol)
-
-// Model-specific mappings for telemetry keys
-// Keep this small and explicit to avoid misdetections.
-const MODEL_FUEL_MAPPINGS = {
-  // BMW 530i (Teltonika): io48 observed as fuel level percent
-  '530i': { key: 'io48', type: 'percent' },
-};
-
 export function parseAttrs(raw) {
   try {
     return typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
   } catch {
     return {};
   }
+}
+
+function toLowerMap(attrs) {
+  const result = {};
+  for (const key of Object.keys(attrs || {})) {
+    result[String(key).toLowerCase()] = attrs[key];
+  }
+  return result;
+}
+
+function toNumber(val) {
+  const n = typeof val === 'string' ? parseFloat(val) : (typeof val === 'number' ? val : null);
+  return Number.isFinite(n) ? n : null;
 }
 
 function formatNumberKm(km) {
@@ -26,29 +29,17 @@ function formatNumberKm(km) {
 }
 
 export function formatOdometer(rawAttrs, ctx = {}) {
-    console.log('odometer key value ',rawAttrs);
   const attrs = parseAttrs(rawAttrs);
-  const protocol = String(ctx?.protocol || '').toLowerCase();
-  const preferNamed = !!ctx?.preferNamedOdometer;
+  const preferredOdoNameRaw = ctx?.odometerAttr;
   const userPriorityKeys = ['CAN_Total_Mileage_87', 'OBD_Total_Mileage_389', 'GNSS_Total_Odometer_16'];
   const distanceKeys = ['totalDistance', 'distance', 'tripDistance'];
   const primary = ['odometer', 'mileage', 'odometerKm', 'odometer_km'];
-  // Unified order: check ALL userPriorityKeys first, then specific IO IDs, then generic keys
-  const orderIoFirst = [
+  const orderedKeys = [
     ...userPriorityKeys,
     '87', '389', '16', '50',
     ...primary,
     ...distanceKeys
   ];
-  // Unified order for Named First: Priority keys and their IOs should still precede generic 'odometer'
-  const orderNamedFirst = [
-    ...userPriorityKeys,
-    '87', '389', '16', '50',
-    ...primary,
-    ...distanceKeys
-  ];
-
-  const orderedKeys = preferNamed ? orderNamedFirst : orderIoFirst;
   const getIoVal = (n) => {
     const forms = [String(n), 'io' + String(n), 'io_' + String(n), 'io-' + String(n)];
     for (const f of forms) {
@@ -58,15 +49,25 @@ export function formatOdometer(rawAttrs, ctx = {}) {
   };
 
   // Create case-insensitive map for named keys
-  const attrsLower = {};
-  for (const key of Object.keys(attrs)) {
-    attrsLower[key.toLowerCase()] = attrs[key];
-  }
+  const attrsLower = toLowerMap(attrs);
 
-  const parseNum = (val) => {
-    const n = typeof val === 'string' ? parseFloat(val) : (typeof val === 'number' ? val : null);
-    return Number.isFinite(n) ? n : null;
-  };
+  const preferredOdoName = typeof preferredOdoNameRaw === 'string' ? preferredOdoNameRaw.trim() : '';
+  if (preferredOdoName) {
+    const lowerName = preferredOdoName.toLowerCase();
+    const valPreferred = Object.prototype.hasOwnProperty.call(attrs, preferredOdoName)
+      ? attrs[preferredOdoName]
+      : attrsLower[lowerName];
+    const nPreferred = toNumber(valPreferred);
+    if (valPreferred != null && valPreferred !== '' && nPreferred !== null && nPreferred > -1) {
+      let kmPreferred = nPreferred / 1000;
+      return {
+        key: preferredOdoName,
+        raw: valPreferred,
+        km: kmPreferred,
+        display: formatNumberKm(kmPreferred),
+      };
+    }
+  }
 
   let keyFound = null;
   // REMOVED pre-check for 16 to respect orderedKeys priority
@@ -83,29 +84,21 @@ export function formatOdometer(rawAttrs, ctx = {}) {
     const exists = val != null && val !== '';
 
     if (exists) {
-        // Condition: Check for > -1 for ALL keys (especially IO IDs and priority keys)
-        const n = parseNum(val);
-        // if (n !== null && n <= -1) continue;
-        // Logic Update:
-        // 1. Priority Keys: skip if <= -1
-        // 2. IO Keys: skip if 0 (allow -1)
-        // 3. Others: skip if <= -1
+      const n = toNumber(val);
+      if (n === null) continue;
 
-        if (n === null) continue;
+      const isIoKey = ['87', '389', '16', '50'].includes(k);
+      const isPriorityKey = userPriorityKeys.includes(k);
 
-        const isIoKey = ['87', '389', '16', '50'].includes(k);
-        const isPriorityKey = userPriorityKeys.includes(k);
+      if (isIoKey) {
+        if (n === 0) continue;
+      } else if (isPriorityKey) {
+        if (n <= -1) continue;
+      } else {
+        if (n <= -1) continue;
+      }
 
-        if (isIoKey) {
-          if (n === 0) continue;
-        } else if (isPriorityKey) {
-          if (n <= -1) continue;
-        } else {
-          // Default for others
-          if (n <= -1) continue;
-        }
-
-        if (keyFound == null) { keyFound = k; break; }
+      if (keyFound == null) { keyFound = k; break; }
     }
   }
 
@@ -118,11 +111,11 @@ export function formatOdometer(rawAttrs, ctx = {}) {
     let specialKey = null;
     let specialRawVal = null;
     {
-      const v16 = parseNum(getAttrVal('16'));
+      const v16 = toNumber(getAttrVal('16'));
       if (Number.isFinite(v16) && v16 > 0) { specialKey = '16'; specialRawVal = v16; }
     }
     if (!specialKey) {
-      const v389 = parseNum(getAttrVal('389'));
+      const v389 = toNumber(getAttrVal('389'));
       if (Number.isFinite(v389) && v389 > 0) { specialKey = '389'; specialRawVal = v389; }
     }
     if (specialKey) { keyFound = specialKey; }
@@ -148,14 +141,10 @@ export function formatOdometer(rawAttrs, ctx = {}) {
 
 export function formatFuel(rawAttrs, ctx = {}) {
   const attrs = parseAttrs(rawAttrs);
-  const model = String(ctx?.model || '').trim();
-  const lower = Object.fromEntries(Object.entries(attrs).map(([k,v]) => [String(k).toLowerCase(), v]));
+  const lower = toLowerMap(attrs);
   const capacity = ctx?.capacity ?? ctx?.fuelTankCapacity ?? null;
+  const preferredFuelNameRaw = ctx?.fuelAttr;
 
-  const num = (v) => {
-    const n = typeof v === 'string' ? parseFloat(v) : (typeof v === 'number' ? v : null);
-    return Number.isFinite(n) ? n : null;
-  };
   const resolveByName = null;
 
   const percentFuelPercent = lower['fuelpercent'];
@@ -186,6 +175,48 @@ export function formatFuel(rawAttrs, ctx = {}) {
   const litersKeyName = null;
   const analogKeyName = null;
 
+  const preferredFuelName = typeof preferredFuelNameRaw === 'string' ? preferredFuelNameRaw.trim() : '';
+  if (preferredFuelName) {
+    const lowerName = preferredFuelName.toLowerCase();
+    const valPreferred = Object.prototype.hasOwnProperty.call(attrs, preferredFuelName)
+      ? attrs[preferredFuelName]
+      : lower[lowerName];
+    const nPreferred = toNumber(valPreferred);
+    if (valPreferred != null && valPreferred !== '' && nPreferred !== null) {
+      const capNumCfg = Number.isFinite(parseFloat(capacity)) ? parseFloat(capacity) : null;
+      let percentCfg = null;
+      let litersCfg = null;
+      if (capNumCfg !== null && nPreferred >= 0 && nPreferred <= 100) {
+        percentCfg = Math.round(nPreferred);
+        litersCfg = Math.round((capNumCfg * percentCfg / 100) * 10) / 10;
+      } else {
+        litersCfg = Math.round(nPreferred * 10) / 10;
+      }
+      const badgeVariantCfg = percentCfg == null ? null : (percentCfg >= 60 ? 'success' : (percentCfg >= 30 ? 'warning' : 'danger'));
+      let displayCfg = null;
+      if (litersCfg != null && percentCfg != null) {
+        displayCfg = `${litersCfg} L (${percentCfg}%)`;
+      } else if (litersCfg != null) {
+        displayCfg = `${litersCfg} L`;
+      } else if (percentCfg != null) {
+        displayCfg = `${percentCfg}%`;
+      }
+      if (displayCfg != null) {
+        return {
+          isPercent: percentCfg != null && litersCfg == null,
+          percent: percentCfg,
+          liters: litersCfg,
+          capacity: capNumCfg,
+          variant: badgeVariantCfg,
+          raw: nPreferred,
+          key: preferredFuelName,
+          source: 'configured',
+          display: displayCfg,
+        };
+      }
+    }
+  }
+
   // Resolve percent
   let percent = null;
   let percentKeyUsed = null;
@@ -199,8 +230,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
       { key: 'io48', val: io48 },
     ];
     for (const c of candidates) {
-      const n = num(c.val);
-      // Check for > -1 for ALL candidates
+      const n = toNumber(c.val);
       if (n !== null && n <= -1) continue;
 
       if (n != null) { percent = Math.max(0, Math.min(100, Math.round(n))); percentKeyUsed = c.key; break; }
@@ -224,8 +254,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
       { key: 'io84', val: io84 },
     ];
     for (const c of candidates) {
-      const n = num(c.val);
-      // Check for > -1 for ALL candidates
+      const n = toNumber(c.val);
       if (n !== null && n <= -1) continue;
 
       if (n != null) { liters = Math.round(n * 10) / 10; litersKeyUsed = c.key; break; }
@@ -259,9 +288,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
       { key: 'adc3', val: lower['adc3'] },
     ];
     for (const c of rawCandidates) {
-      const n = typeof c.val === 'string' ? parseFloat(c.val) : (typeof c.val === 'number' ? c.val : null);
-
-      // Check for > -1 for ALL candidates
+      const n = toNumber(c.val);
       if (Number.isFinite(n) && n <= -1) continue;
 
       if (Number.isFinite(n)) { raw = n; rawKeyUsed = c.key; break; }
@@ -269,10 +296,10 @@ export function formatFuel(rawAttrs, ctx = {}) {
   }
 
   // Optional calibration for analog: empty/full/scale/offset
-  const emptyVal = num(lower['fuelanalogempty'] ?? lower['fuel_empty'] ?? lower['analog_empty']);
-  const fullVal = num(lower['fuelanalogfull'] ?? lower['fuel_full'] ?? lower['analog_full']);
-  const scale = num(lower['fuelanalogscale'] ?? lower['analog_scale']) ?? 1;
-  const offset = num(lower['fuelanalogoffset'] ?? lower['analog_offset']) ?? 0;
+  const emptyVal = toNumber(lower['fuelanalogempty'] ?? lower['fuel_empty'] ?? lower['analog_empty']);
+  const fullVal = toNumber(lower['fuelanalogfull'] ?? lower['fuel_full'] ?? lower['analog_full']);
+  const scale = toNumber(lower['fuelanalogscale'] ?? lower['analog_scale']) ?? 1;
+  const offset = toNumber(lower['fuelanalogoffset'] ?? lower['analog_offset']) ?? 0;
   let percentFromAnalog = false;
   if (raw != null) {
     const adjusted = raw * scale + offset;

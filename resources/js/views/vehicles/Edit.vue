@@ -313,8 +313,8 @@ watch(() => form.attributes.trackerModel, (val) => {
   if (hydrating.value) {
     return;
   }
-  form.attributes.odometerAttr = '';
-  form.attributes.fuelAttr = '';
+//   form.attributes.odometerAttr = '';
+//   form.attributes.fuelAttr = '';
   if (val) {
     refreshModelAttributes(val);
   } else {

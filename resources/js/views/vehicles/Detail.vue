@@ -1632,6 +1632,14 @@ const deviceAttrsFromDevice = computed(() => parseAttrsMaybe(device.value?.tcDev
 const deviceAttrs = computed(() => ({ ...deviceAttrsFromDevice.value, ...deviceAttrsFromDetail.value }));
 const positionAttrs = computed(() => parseAttrsMaybe(detailPayload.value?.position?.attributes));
 const tcAttrs = computed(() => ({ ...deviceAttrs.value, ...positionAttrs.value }));
+const configuredOdometerAttr = computed(() => {
+    const a = deviceAttrs.value || {};
+    return a.odometerAttr || a.odometer_attribute || null;
+});
+const configuredFuelAttr = computed(() => {
+    const a = deviceAttrs.value || {};
+    return a.fuelAttr || a.fuel_attribute || null;
+});
 function pickAttr(keys) {
     const a = tcAttrs.value || {};
     for (const k of keys) {
@@ -1655,7 +1663,7 @@ const vin = computed(() => pickAttr(['vin', 'VIN']));
 const odometerDisplay = computed(() => {
     const pos = detailPayload.value?.position || {};
     const mergedAttrs = tcAttrs.value || {};
-    const tel = formatTelemetry(mergedAttrs, { protocol: pos?.protocol, model: model.value, preferNamedOdometer: true });
+    const tel = formatTelemetry(mergedAttrs, { protocol: pos?.protocol, model: model.value, preferNamedOdometer: true, odometerAttr: configuredOdometerAttr.value });
     return tel?.odometer?.display ?? '-';
 });
 
@@ -1670,7 +1678,7 @@ const fuelInfo = computed(() => {
     let has = false;
     for (const k of keys) { const v = posAttrs?.[k]; if (v !== undefined && v !== null && v !== '') { has = true; break; } }
     const capacity = has ? capacityRaw : null;
-    return formatTelemetry(posAttrs, { protocol: pos?.protocol, model: model.value, capacity });
+    return formatTelemetry(posAttrs, { protocol: pos?.protocol, model: model.value, capacity, fuelAttr: configuredFuelAttr.value });
 });
 const fuelLevelDisplay = computed(() => {
     const f = fuelInfo.value?.fuel;

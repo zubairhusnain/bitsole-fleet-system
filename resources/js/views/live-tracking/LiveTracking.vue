@@ -619,6 +619,7 @@ function fuelDisplay(v) {
     const model = v.model || (v.tc_device?.model ?? v.tcDevice?.model) || null;
   const devRaw = (v.tc_device?.attributes ?? v.tcDevice?.attributes ?? v.attributes) || {};
   const devAttrs = parseAttrs(devRaw);
+  const configuredFuelAttr = devAttrs?.fuelAttr || devAttrs?.fuel_attribute || null;
   const capKeys = ['fuelTankCapacity','FuelTankCapacity','fueltankcapacity','fuel_capacity','fuelCapacity','tankCapacity','fuel_tank_capacity'];
   let cap = null;
   for (const k of capKeys) {
@@ -631,7 +632,7 @@ function fuelDisplay(v) {
   const keys = ['fuelLevel','fuel_percent','fuelpercentage','fuelPercent','fuelPercent','fuelLiter','fuelLiters','FuelLiters','fuel','io89','89','io48','48','io84','84','io67','67','io68','68','io69','69','io240','240','io241','241','io242','242','io243','243','fuelRaw','analog1','analog2','analog3','adc1','adc2','adc3'];
   let has = false;
   for (const k of keys) { const v = posAttrs?.[k]; if (v !== undefined && v !== null && v !== '') { has = true; break; } }
-  const tel = formatTelemetry(posAttrs, { protocol: pos.protocol, model, capacity: (has ? capNum : null), preferNamedOdometer: true });
+  const tel = formatTelemetry(posAttrs, { protocol: pos.protocol, model, capacity: (has ? capNum : null), preferNamedOdometer: true, fuelAttr: configuredFuelAttr });
     if (!tel.fuel) return null;
     const liters = tel.fuel.liters;
     const percent = tel.fuel.percent;
@@ -652,10 +653,11 @@ function odometerDisplay(v) {
     const posAttrs = parseAttrs(pos.attributes);
     // User feedback: odometer value is in position attribute. Prioritize position attributes.
     const mergedAttrs = { ...trackerAttrs, ...vehicleAttrs, ...posAttrs };
+    const configuredOdometerAttr = vehicleAttrs.odometerAttr || vehicleAttrs.odometer_attribute || trackerAttrs.odometerAttr || trackerAttrs.odometer_attribute || null;
 
     // Pass protocol as null to prevent formatTelemetry from assuming 'odometer' key is in meters for Teltonika.
     // This aligns with Detail page behavior where the value (e.g. 118,213) is treated as km.
-    const tel = formatTelemetry(mergedAttrs, { protocol: null, model, preferNamedOdometer: true });
+    const tel = formatTelemetry(mergedAttrs, { protocol: null, model, preferNamedOdometer: true, odometerAttr: configuredOdometerAttr });
     return tel?.odometer?.display ?? null;
 }
 
