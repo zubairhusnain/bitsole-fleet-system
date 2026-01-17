@@ -313,15 +313,6 @@ export function formatFuel(rawAttrs, ctx = {}) {
     }
   }
 
-  // Generic heuristic: scan any numeric attribute whose key includes 'fuel'
-  if (raw == null) {
-    for (const [k, v] of Object.entries(lower)) {
-      if (!k.includes('fuel')) continue;
-      const n = typeof v === 'string' ? parseFloat(v) : (typeof v === 'number' ? v : null);
-      if (Number.isFinite(n) && n > -1) { raw = n; rawKeyUsed = k; break; }
-    }
-  }
-
   // Normalize ignition value from attributes (affects percent=0 handling)
   let ignition = null;
   try {
