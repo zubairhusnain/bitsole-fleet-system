@@ -28,7 +28,7 @@ Schedule::command('events:check-columns')
     ->withoutOverlapping()
     ->runInBackground();
 
-// Database-only backups daily (can be disabled via env)
+// Database backup daily using custom command (can be disabled via env)
 if (env('BACKUP_ENABLED', true)) {
     Schedule::command('backup:cleanup-old')->daily()->at('01:00');
     Schedule::command('backup:database-only')->daily()->at('01:30');

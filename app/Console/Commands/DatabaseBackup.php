@@ -7,12 +7,13 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use ZipArchive;
 
 class DatabaseBackup extends Command
 {
     protected $signature = 'backup:database-only';
 
-    protected $description = 'Create a database-only PostgreSQL backup as a .sql file';
+    protected $description = 'Create a database-only PostgreSQL backup as a zip file';
 
     public function handle()
     {
@@ -43,21 +44,23 @@ class DatabaseBackup extends Command
         $dumpBinaryPath = rtrim((string) env('DB_DUMP_BINARY_PATH', ''), '/');
         $pgDump = $dumpBinaryPath ? $dumpBinaryPath.'/pg_dump' : 'pg_dump';
 
-        $backupBaseName = env('BACKUP_NAME', env('APP_NAME', 'database-backup'));
-        $backupSlug = Str::slug($backupBaseName ?: 'database-backup');
-
         $disk = Storage::disk('local');
-        $directory = $backupSlug;
+        $backupDir = config('backup.backup.name', Str::slug(config('app.name', 'laravel-backup')));
+        $directory = $backupDir;
 
         if (!$disk->exists($directory)) {
             $disk->makeDirectory($directory);
         }
 
         $timestamp = now()->format('Y-m-d-His');
-        $fileName = "{$backupSlug}-{$timestamp}.sql";
-        $fullPath = $disk->path($directory.'/'.$fileName);
+        $prefix = Str::slug(env('BACKUP_NAME', config('app.name', 'database-backup')));
+        $zipFileName = "{$prefix}-{$timestamp}.zip";
+        $zipFullPath = $disk->path($directory.'/'.$zipFileName);
 
-        $this->info("Creating database backup: {$fileName}");
+        $innerSqlName = Str::slug(config('app.name', 'app'), '-').'-database-backup.sql';
+        $tmpSqlPath = $disk->path($directory.'/.tmp-'.$timestamp.'.sql');
+
+        $this->info("Creating database backup: {$zipFileName}");
 
         $process = new Process([
             $pgDump,
@@ -77,20 +80,39 @@ class DatabaseBackup extends Command
         $process->setTimeout(300);
         $process->setIdleTimeout(300);
 
-        $process->run(function ($type, $buffer) use ($fullPath) {
-            file_put_contents($fullPath, $buffer, FILE_APPEND);
+        $process->run(function ($type, $buffer) use ($tmpSqlPath) {
+            file_put_contents($tmpSqlPath, $buffer, FILE_APPEND);
         });
 
         if (!$process->isSuccessful()) {
             $this->error('Database backup failed: '.$process->getErrorOutput());
-            if (file_exists($fullPath)) {
-                @unlink($fullPath);
+            if (file_exists($tmpSqlPath)) {
+                @unlink($tmpSqlPath);
+            }
+            if (file_exists($zipFullPath)) {
+                @unlink($zipFullPath);
             }
             return 1;
         }
 
-        $size = filesize($fullPath);
-        $this->info('Database backup completed: '.$fileName.' ('.$this->humanFileSize($size).')');
+        $zip = new ZipArchive();
+        if ($zip->open($zipFullPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            $this->error('Unable to create zip archive for database backup.');
+            if (file_exists($tmpSqlPath)) {
+                @unlink($tmpSqlPath);
+            }
+            return 1;
+        }
+
+        $zip->addFile($tmpSqlPath, $innerSqlName);
+        $zip->close();
+
+        if (file_exists($tmpSqlPath)) {
+            @unlink($tmpSqlPath);
+        }
+
+        $size = filesize($zipFullPath);
+        $this->info('Database backup completed: '.$zipFileName.' ('.$this->humanFileSize($size).')');
 
         return 0;
     }
@@ -102,9 +124,14 @@ class DatabaseBackup extends Command
         }
 
         $sz = 'BKMGTP';
-        $factor = floor((strlen((string) $bytes) - 1) / 3);
+        $factor = (int) floor((strlen((string) $bytes) - 1) / 3);
+        $maxIndex = strlen($sz) - 1;
+        if ($factor < 0) {
+            $factor = 0;
+        } elseif ($factor > $maxIndex) {
+            $factor = $maxIndex;
+        }
 
         return sprintf("%.{$decimals}f", $bytes / pow(1024, $factor)).$sz[$factor];
     }
 }
-
