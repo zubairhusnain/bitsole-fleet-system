@@ -20,20 +20,12 @@ class BackupController extends Controller
         $this->checkAdmin($request);
 
         $disk = Storage::disk('local');
-        // Use the same logic as config/backup.php / DatabaseBackup to determine folders
-        $primaryDir = config('backup.backup.name', \Illuminate\Support\Str::slug(config('app.name', 'laravel-backup')));
-        $fallbackDir = \Illuminate\Support\Str::slug(config('app.name', 'laravel-backup'));
-
-        $dirs = array_unique([$primaryDir, $fallbackDir]);
+        $backupDir = \Illuminate\Support\Str::slug(env('BACKUP_NAME', env('APP_NAME', 'laravel-backup')));
 
         $files = [];
         try {
-            foreach ($dirs as $dir) {
-                if ($disk->exists($dir)) {
-                    foreach ($disk->files($dir) as $file) {
-                        $files[] = $file;
-                    }
-                }
+            if ($disk->exists($backupDir)) {
+                $files = $disk->files($backupDir);
             }
         } catch (\Exception $e) {
             return response()->json(['backups' => []]);

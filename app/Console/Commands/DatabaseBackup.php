@@ -45,15 +45,14 @@ class DatabaseBackup extends Command
         $pgDump = $dumpBinaryPath ? $dumpBinaryPath.'/pg_dump' : 'pg_dump';
 
         $disk = Storage::disk('local');
-        $backupDir = config('backup.backup.name', Str::slug(config('app.name', 'laravel-backup')));
-        $directory = $backupDir;
+        $directory = Str::slug(env('BACKUP_NAME', env('APP_NAME', 'laravel-backup')));
 
         if (!$disk->exists($directory)) {
             $disk->makeDirectory($directory);
         }
 
         $timestamp = now()->format('Y-m-d-His');
-        $prefix = Str::slug(env('BACKUP_NAME', config('app.name', 'database-backup')));
+        $prefix = Str::slug(env('BACKUP_NAME', env('APP_NAME', 'database-backup')));
         $zipFileName = "{$prefix}-{$timestamp}.zip";
         $zipFullPath = $disk->path($directory.'/'.$zipFileName);
 

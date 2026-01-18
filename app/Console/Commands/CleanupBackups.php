@@ -28,7 +28,7 @@ class CleanupBackups extends Command
     public function handle()
     {
         $disk = Storage::disk('local');
-        $backupName = config('backup.backup.name', \Illuminate\Support\Str::slug(config('app.name', 'laravel-backup')));
+        $backupName = \Illuminate\Support\Str::slug(env('BACKUP_NAME', env('APP_NAME', 'laravel-backup')));
 
         // Ensure the directory exists
         if (!$disk->exists($backupName)) {
