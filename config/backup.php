@@ -7,7 +7,7 @@ return [
          * The name of this application. You can use this name to monitor
          * the backups.
          */
-        'name' => \Illuminate\Support\Str::slug(env('APP_NAME', 'laravel-backup')),
+        'name' => \Illuminate\Support\Str::slug(env('BACKUP_NAME', env('APP_NAME', 'laravel-backup'))),
 
         'source' => [
             'files' => [

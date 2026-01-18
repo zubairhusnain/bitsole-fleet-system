@@ -21,16 +21,16 @@ class BackupController extends Controller
 
         $disk = Storage::disk('local');
         // Use the same logic as config/backup.php to determine the folder name
-        $appName = \Illuminate\Support\Str::slug(config('app.name', 'laravel-backup'));
+        $backupName = config('backup.backup.name', \Illuminate\Support\Str::slug(config('app.name', 'laravel-backup')));
 
         // Ensure we are looking at the right folder
         try {
-            if (!$disk->exists($appName)) {
+            if (!$disk->exists($backupName)) {
                 // If directory doesn't exist, try to create it or return empty
                 // Returning empty is safer
                 return response()->json(['backups' => []]);
             }
-            $files = $disk->files($appName);
+            $files = $disk->files($backupName);
         } catch (\Exception $e) {
             // Log the error or just return empty list to avoid breaking the UI
             // \Log::error('Backup listing failed: ' . $e->getMessage());

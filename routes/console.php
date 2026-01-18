@@ -28,10 +28,12 @@ Schedule::command('events:check-columns')
     ->withoutOverlapping()
     ->runInBackground();
 
-// Backup database and files daily
-// Custom cleanup to keep only last 10 days
-Schedule::command('backup:cleanup-old')->daily()->at('01:00');
-Schedule::command('backup:run')->daily()->at('01:30');
+// Backup database and files daily (can be disabled via env)
+if (env('BACKUP_ENABLED', true)) {
+    // Custom cleanup to keep only last configured days
+    Schedule::command('backup:cleanup-old')->daily()->at('01:00');
+    Schedule::command('backup:run')->daily()->at('01:30');
+}
 
 // Backfill missing addresses in tc_positions
 // Runs continuously (restarts if stopped) to fix blank addresses

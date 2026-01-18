@@ -20,7 +20,7 @@ class CleanupBackups extends Command
      *
      * @var string
      */
-    protected $description = 'Delete backups older than 10 days';
+    protected $description = 'Delete backups older than configured retention days';
 
     /**
      * Execute the console command.
@@ -28,26 +28,27 @@ class CleanupBackups extends Command
     public function handle()
     {
         $disk = Storage::disk('local');
-        $appName = config('app.name');
-        
+        $backupName = config('backup.backup.name', \Illuminate\Support\Str::slug(config('app.name', 'laravel-backup')));
+
         // Ensure the directory exists
-        if (!$disk->exists($appName)) {
-            $this->info("Backup directory '{$appName}' does not exist.");
+        if (!$disk->exists($backupName)) {
+            $this->info("Backup directory '{$backupName}' does not exist.");
             return 0;
         }
 
-        $files = $disk->files($appName);
+        $files = $disk->files($backupName);
         $count = 0;
         $deleted = 0;
 
-        $threshold = Carbon::now()->subDays(10)->timestamp;
+        $retentionDays = (int) env('BACKUP_RETENTION_DAYS', 10);
+        $threshold = Carbon::now()->subDays($retentionDays)->timestamp;
 
-        $this->info("Scanning for backups older than 10 days in '{$appName}'...");
+        $this->info("Scanning for backups older than {$retentionDays} days in '{$backupName}'...");
 
         foreach ($files as $file) {
             if (pathinfo($file, PATHINFO_EXTENSION) === 'zip') {
                 $lastModified = $disk->lastModified($file);
-                
+
                 if ($lastModified < $threshold) {
                     $disk->delete($file);
                     $this->info("Deleted: " . basename($file));
@@ -58,7 +59,7 @@ class CleanupBackups extends Command
         }
 
         $this->info("Cleanup complete. Scanned {$count} files, deleted {$deleted} files.");
-        
+
         return 0;
     }
 }
