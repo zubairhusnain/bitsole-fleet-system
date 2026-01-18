@@ -180,7 +180,13 @@
                                     <span v-if="loadingGeofences" class="spinner-border spinner-border-sm ms-2" role="status"></span>
                                 </div>
                             </div>
-                            <LMap v-if="mapReady" :zoom="zoom" :center="mapCenter" @ready="onMapReady" style="height: 100%; width: 100%;">
+                            <div style="position: absolute; top: 10px; left: 10px; z-index: 1000; background: white; padding: 6px 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Map provider">
+                                    <button type="button" class="btn btn-outline-primary" :class="{ active: mapProvider === 'leaflet' }" @click="mapProvider = 'leaflet'">Leaflet</button>
+                                    <button type="button" class="btn btn-outline-primary" :class="{ active: mapProvider === 'google' }" @click="mapProvider = 'google'">Google</button>
+                                </div>
+                            </div> 
+                            <LMap v-if="mapReady && mapProvider === 'leaflet'" :zoom="zoom" :center="mapCenter" @ready="onMapReady" style="height: 100%; width: 100%;">
                                 <LTileLayer :url="tileUrl" :attribution="tileAttribution" />
                                 <LMarker :lat-lng="currentLatLng || mapCenter" ref="markerRef" />
 
@@ -194,6 +200,13 @@
                                 </template>
 
                             </LMap>
+                            <GoogleMap
+                                v-else-if="mapReady && mapProvider === 'google'"
+                                :center="currentLatLng || mapCenter"
+                                :zoom="zoom"
+                                :zones="visibleZones"
+                                @error="mapProvider = 'leaflet'"
+                            />
                             <div v-else class="placeholder-glow" style="height: 100%">
                                 <span class="placeholder col-12" style="height: 100%"></span>
                             </div>
@@ -763,6 +776,7 @@ import L from 'leaflet';
 import { formatTelemetry } from '../../utils/telemetry';
 import { getCurrentUser } from '../../auth';
 import UiAlert from '../../components/UiAlert.vue';
+import GoogleMap from '../../components/GoogleMap.vue';
 
 // Ensure Leaflet default marker icons load correctly under Vite bundling
 try {
@@ -1022,6 +1036,7 @@ const markerRef = ref(null);
 const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const tileAttribution = '&copy; OpenStreetMap contributors';
 const polylineColor = '#007bff';
+const mapProvider = ref('leaflet');
 
 // Device switcher state and helpers
 const deviceOptions = ref([]);
