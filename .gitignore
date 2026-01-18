@@ -21,6 +21,7 @@
 /storage/*.key
 /storage/pail
 /vendor
+/storage/app/private/
 
 # Ignore environment-specific constants file
 config/constants.php
