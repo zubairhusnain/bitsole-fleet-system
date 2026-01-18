@@ -39,7 +39,8 @@ class BackupController extends Controller
 
         $backups = [];
         foreach ($files as $file) {
-            if (pathinfo($file, PATHINFO_EXTENSION) === 'zip') {
+            $extension = pathinfo($file, PATHINFO_EXTENSION);
+            if (in_array($extension, ['sql', 'zip'], true)) {
                 $backups[] = [
                     'path' => $file,
                     'name' => basename($file),

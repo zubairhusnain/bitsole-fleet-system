@@ -46,7 +46,8 @@ class CleanupBackups extends Command
         $this->info("Scanning for backups older than {$retentionDays} days in '{$backupName}'...");
 
         foreach ($files as $file) {
-            if (pathinfo($file, PATHINFO_EXTENSION) === 'zip') {
+            $extension = pathinfo($file, PATHINFO_EXTENSION);
+            if (in_array($extension, ['sql', 'zip'], true)) {
                 $lastModified = $disk->lastModified($file);
 
                 if ($lastModified < $threshold) {
