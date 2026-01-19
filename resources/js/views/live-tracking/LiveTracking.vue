@@ -1368,7 +1368,7 @@ onBeforeUnmount(() => {
 }
 
 /* Popup layout improvements */
-.popup-card {
+:global(.popup-card) {
     max-width: min(320px, 85vw);
     box-sizing: border-box;
     font-size: 13px;
@@ -1376,13 +1376,20 @@ onBeforeUnmount(() => {
     word-break: break-word;
 }
 
-.popup-title-row {
+:global(.popup-title-row) {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
     flex-wrap: wrap;
-    width:90% !important;
+    width: 90% !important;
+    max-width: 90% !important;
+    margin-right: auto;
+}
+
+:global(.popup-title) {
+    white-space: normal !important;
+    word-break: break-word !important;
 }
 
 /* Leaflet popup tweaks (scoped deep selectors) */
@@ -1392,6 +1399,20 @@ onBeforeUnmount(() => {
 }
 #liveMap :deep(.leaflet-popup-content-wrapper) {
     border-radius: 10px;
+}
+
+/* Force close button to top right and ensure visibility */
+#liveMap :deep(.leaflet-popup-close-button) {
+    top: 6px !important;
+    right: 6px !important;
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 20px !important;
+    z-index: 1000 !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    color: #666 !important;
 }
 
 /* Slightly raise Leaflet zoom control on LiveTracking */
