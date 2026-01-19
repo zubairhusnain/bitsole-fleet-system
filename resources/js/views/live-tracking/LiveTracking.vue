@@ -1179,6 +1179,7 @@ onBeforeUnmount(() => {
     font-weight: 600;
     margin-bottom: 4px;
     padding-right:15px;
+    width:90% !important;
 }
 
 .popup-row {
