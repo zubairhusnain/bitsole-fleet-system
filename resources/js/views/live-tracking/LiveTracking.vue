@@ -51,7 +51,7 @@
                </div>
              </div>
             <div v-if="showMap" class="map-inner" style="height: 100%; width: 100%; position: relative;">
-              <div v-if="isTestingMode" class="map-provider-switcher" style="position: absolute; bottom: 10px; left: 10px; z-index: 3000; background: white; padding: 6px 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
+              <div v-if="isTestingMode" class="map-provider-switcher" style="position: absolute; top: 10px !important; right: 10px !important; z-index: 3000; background: white; padding: 6px 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
                 <div class="btn-group btn-group-sm" role="group" aria-label="Map provider">
                   <button type="button" class="btn btn-outline-primary" :class="{ active: mapProvider === 'leaflet' }" @click="mapProvider = 'leaflet'">Leaflet</button>
                   <button type="button" class="btn btn-outline-primary" :class="{ active: mapProvider === 'google' }" @click="mapProvider = 'google'">Google</button>
@@ -148,12 +148,13 @@ import { formatTelemetry } from '../../utils/telemetry';
 import { formatDateTime } from '../../utils/datetime';
 import GoogleMap from '../../components/GoogleMap.vue';
 
-const isTestingMode = inject('isTestingMode', ref(false));
+
 const map = ref(null);
 const googleMap = ref(null);
 const markerRefs = new Map();
 
 const router = useRouter();
+const isTestingMode = inject('isTestingMode', ref(false));
 
 async function logout() {
     try { await axios.post('/web/auth/logout'); } catch {}

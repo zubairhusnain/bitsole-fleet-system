@@ -372,10 +372,10 @@ function openSelectedIfAny() {
   const key = String(id);
   const mk = vehicleMarkers.get(key);
   if (!mk) return;
-  const pos = mk.getPosition();
-  if (pos) {
-    try { map.value.setCenter(pos); } catch {}
-  }
+
+  // NOTE: We do NOT center the map here. Centering should only happen on explicit user interaction (click/select),
+  // not on every position update. This prevents the "refreshing" jumpy behavior.
+
   const info = vehicleInfoWindows.get(key);
   if (info) {
     if (selectedInfoWindow && selectedInfoWindow !== info) {
