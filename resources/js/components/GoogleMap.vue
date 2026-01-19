@@ -30,6 +30,14 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  markers: {
+    type: Array,
+    default: () => [],
+  },
+  selectedId: {
+    type: [String, Number, null],
+    default: null,
+  },
 });
 
 const emit = defineEmits(['ready', 'click', 'error']);
@@ -39,6 +47,9 @@ const map = ref(null);
 const marker = ref(null);
 let zoneMarkers = [];
 let routeLines = [];
+let vehicleMarkers = new Map();
+let vehicleInfoWindows = new Map();
+let selectedInfoWindow = null;
 
 let googleMapsPromise = null;
 
@@ -80,6 +91,94 @@ function clearZonesAndRoutes() {
   routeLines = [];
 }
 
+function clearVehicleMarkers() {
+  try {
+    vehicleMarkers.forEach((m) => m.setMap(null));
+  } catch {}
+  vehicleMarkers = new Map();
+  try {
+    vehicleInfoWindows.forEach((i) => i.close());
+  } catch {}
+  vehicleInfoWindows = new Map();
+  if (selectedInfoWindow) {
+    try { selectedInfoWindow.close(); } catch {}
+    selectedInfoWindow = null;
+  }
+}
+
+function syncVehicleMarkers() {
+  if (!map.value || !(window.google && window.google.maps && window.google.maps.Marker)) return;
+  const items = Array.isArray(props.markers) ? props.markers : [];
+  const nextIds = new Set();
+
+  items.forEach((m) => {
+    const id = m && m.id;
+    const lat = Number(m.lat);
+    const lng = Number(m.lon ?? m.lng);
+    if ((id === null || id === undefined) || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const key = String(id);
+    nextIds.add(key);
+    const pos = new window.google.maps.LatLng(lat, lng);
+    let mk = vehicleMarkers.get(key);
+    const iconUrl = m.iconUrl || null;
+    const icon = iconUrl
+      ? {
+          url: iconUrl,
+          scaledSize: new window.google.maps.Size(36, 48),
+          anchor: new window.google.maps.Point(18, 44),
+        }
+      : null;
+    const popupHtml = m.popup || null;
+    let info = null;
+
+    if (!mk) {
+      const options = { position: pos, map: map.value };
+      if (icon) options.icon = icon;
+      mk = new window.google.maps.Marker(options);
+      vehicleMarkers.set(key, mk);
+      if (popupHtml) {
+        info = vehicleInfoWindows.get(key) || new window.google.maps.InfoWindow({ content: popupHtml });
+        vehicleInfoWindows.set(key, info);
+        mk.addListener('click', () => {
+          if (selectedInfoWindow && selectedInfoWindow !== info) {
+            try { selectedInfoWindow.close(); } catch {}
+          }
+          selectedInfoWindow = info;
+          try { info.open({ map: map.value, anchor: mk }); } catch {}
+        });
+      }
+    } else {
+      mk.setPosition(pos);
+      if (icon) mk.setIcon(icon);
+      if (popupHtml) {
+        info = vehicleInfoWindows.get(key);
+        if (!info) {
+          info = new window.google.maps.InfoWindow({ content: popupHtml });
+          vehicleInfoWindows.set(key, info);
+        } else {
+          // Only update content if changed to prevent flickering/re-rendering
+          const currentContent = info.getContent();
+          if (currentContent !== popupHtml) {
+             info.setContent(popupHtml);
+          }
+        }
+      }
+    }
+  });
+
+  vehicleMarkers.forEach((mk, key) => {
+    if (!nextIds.has(key)) {
+      try { mk.setMap(null); } catch {}
+      vehicleMarkers.delete(key);
+      const info = vehicleInfoWindows.get(key);
+      if (info) {
+        try { info.close(); } catch {}
+        vehicleInfoWindows.delete(key);
+      }
+    }
+  });
+}
+
 function updateZonesAndRoutes() {
   if (!map.value || !(window.google && window.google.maps && window.google.maps.Map)) return;
   clearZonesAndRoutes();
@@ -119,14 +218,38 @@ function updateZonesAndRoutes() {
       });
     }
     zoneMarkers.push(zoneMarker);
-    const polyline = new window.google.maps.Polyline({
-      path: [deviceLatLng, zoneLatLng],
-      strokeColor: '#007bff',
-      strokeOpacity: 0.8,
-      strokeWeight: 4,
-    });
-    polyline.setMap(map.value);
-    routeLines.push(polyline);
+
+    // Draw route using Directions Service
+    const directionsService = new window.google.maps.DirectionsService();
+    directionsService.route(
+      {
+        origin: deviceLatLng,
+        destination: zoneLatLng,
+        travelMode: window.google.maps.TravelMode.DRIVING,
+      },
+      (result, status) => {
+        if (status === window.google.maps.DirectionsStatus.OK) {
+          const polyline = new window.google.maps.Polyline({
+            path: result.routes[0].overview_path,
+            strokeColor: '#6610f2',
+            strokeOpacity: 0.7,
+            strokeWeight: 4,
+          });
+          polyline.setMap(map.value);
+          routeLines.push(polyline);
+        } else {
+           // Fallback to straight line if routing fails
+            const polyline = new window.google.maps.Polyline({
+              path: [deviceLatLng, zoneLatLng],
+              strokeColor: '#6610f2',
+              strokeOpacity: 0.7,
+              strokeWeight: 4,
+            });
+            polyline.setMap(map.value);
+            routeLines.push(polyline);
+        }
+      }
+    );
   });
 }
 
@@ -135,17 +258,26 @@ function initMap() {
   const centerArr = Array.isArray(props.center) ? props.center : [0, 0];
   const lat = Number(centerArr[0]) || 0;
   const lng = Number(centerArr[1]) || 0;
+  const hasMarkers = Array.isArray(props.markers) && props.markers.length > 0;
   const options = {
     center: { lat, lng },
     zoom: Number(props.zoom) || 13,
     mapTypeId: props.mapTypeId || 'roadmap',
-    disableDefaultUI: props.disableDefaultUi,
+    disableDefaultUI: true,
+    zoomControl: true,
+    zoomControlOptions: {
+      position: window.google.maps.ControlPosition.RIGHT_BOTTOM,
+    },
   };
   map.value = new window.google.maps.Map(mapEl.value, options);
-  marker.value = new window.google.maps.Marker({
-    position: options.center,
-    map: map.value,
-  });
+  if (!hasMarkers) {
+    marker.value = new window.google.maps.Marker({
+      position: options.center,
+      map: map.value,
+    });
+  } else {
+    syncVehicleMarkers();
+  }
   if (props.clickable && map.value) {
     map.value.addListener('click', (e) => {
       try {
@@ -155,6 +287,8 @@ function initMap() {
   }
   emit('ready', map.value);
   updateZonesAndRoutes();
+  // Ensure selected marker popup opens on initial map ready
+  openSelectedIfAny();
 }
 
 onMounted(async () => {
@@ -192,6 +326,69 @@ watch(
 );
 
 watch(
+  () => props.markers,
+  () => {
+    syncVehicleMarkers();
+    // Re-open selected popup if markers changed and selection exists
+    openSelectedIfAny();
+  },
+  { deep: true }
+);
+
+watch(
+  () => props.selectedId,
+  (id) => {
+    if (!map.value) return;
+    if (id === null || id === undefined) {
+      if (selectedInfoWindow) {
+        try { selectedInfoWindow.close(); } catch {}
+        selectedInfoWindow = null;
+      }
+      return;
+    }
+    const key = String(id);
+    const mk = vehicleMarkers.get(key);
+    if (!mk) return;
+    const pos = mk.getPosition();
+    if (pos) {
+      try { map.value.setCenter(pos); } catch {}
+    }
+    const info = vehicleInfoWindows.get(key);
+    if (info) {
+      if (selectedInfoWindow && selectedInfoWindow !== info) {
+        try { selectedInfoWindow.close(); } catch {}
+      }
+      selectedInfoWindow = info;
+      // If already open on the same map, don't re-open to avoid flickering
+      if (info.getMap()) return;
+      try { info.open({ map: map.value, anchor: mk }); } catch {}
+    }
+  }
+);
+
+function openSelectedIfAny() {
+  const id = props.selectedId;
+  if (id === null || id === undefined || !map.value) return;
+  const key = String(id);
+  const mk = vehicleMarkers.get(key);
+  if (!mk) return;
+  const pos = mk.getPosition();
+  if (pos) {
+    try { map.value.setCenter(pos); } catch {}
+  }
+  const info = vehicleInfoWindows.get(key);
+  if (info) {
+    if (selectedInfoWindow && selectedInfoWindow !== info) {
+      try { selectedInfoWindow.close(); } catch {}
+    }
+    selectedInfoWindow = info;
+    // If already open on the same map, don't re-open to avoid flickering
+    if (info.getMap()) return;
+    try { info.open({ map: map.value, anchor: mk }); } catch {}
+  }
+}
+
+watch(
   () => props.zoom,
   (z) => {
     const zoomVal = Number(z);
@@ -214,7 +411,7 @@ onBeforeUnmount(() => {
     marker.value = null;
   }
   clearZonesAndRoutes();
+  clearVehicleMarkers();
   map.value = null;
 });
 </script>
-

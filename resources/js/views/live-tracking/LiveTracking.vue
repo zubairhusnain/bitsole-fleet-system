@@ -14,7 +14,7 @@
                  <i class="bi me-1" :class="panelVisible ? 'bi-x-lg' : 'bi-list'"></i>
                  <span class="toggle-title">Vehicle List</span>
              </button>
-            <!-- Panel outside l-map for desktop -->
+            <!-- Panel outside map for desktop -->
              <div v-if="!isMobile && panelVisible" class="panel-floating is-visible">
                <div class="panel-header">
                  <h3 class="panel-title">Search Vehicle</h3>
@@ -50,60 +50,94 @@
                  </div>
                </div>
              </div>
-            <l-map v-if="showMap" id="liveMap" :zoom="zoom" :center="center" :options="mapOptions" @ready="onMapReady">
-            <l-tile-layer :url="tileUrl" :attribution="tileAttribution" />
-            <!-- Circle removed per request -->
-            <l-marker v-for="m in markerItems" :key="m.id" :lat-lng="[m.lat, m.lon]" :icon="isSelected(m.id) ? focusIcon : carIcon" :ref="el => setMarkerRef(m.id, el)">
-            <l-popup>
-            <div class="popup-card" v-html="m.popup"></div>
-            </l-popup>
-            </l-marker>
-            <!-- Panel rendered inside the map container (plain layer) -->
-             <transition name="mobile-panel">
-             <div v-if="isMobile && panelVisible" class="panel-floating">
-              <div class="panel-header">
-                <h3 class="panel-title">Search Vehicle</h3>
-                <label class="form-label small">Vehicle Name</label>
-                <input v-model="query" type="text" class="form-control panel-input" placeholder="eg. Transit Van" />
-              </div>
-              <div class="panel-body" @wheel.stop>
-                <div v-if="loading" class="text-muted small">Loading…</div>
-                <div v-else>
-                <div v-for="v in filtered" :key="deviceKey(v)" :class="['vehicle-card', { 'is-selected': selectedId === deviceKey(v) }]" @click.stop="focusVehicle(v)" @mousedown.stop @touchstart.stop @pointerdown.stop>
-                    <div class="vehicle-avatar">
-                      <img v-if="getImage(v) && !brokenImages[deviceKey(v)]" :src="getImage(v)" alt="" @error="brokenImages[deviceKey(v)] = true" />
-                    </div>
-                    <div class="vehicle-info">
-                      <div class="vehicle-name-row">
-                        <div class="vehicle-name">{{ deviceName(v) }}</div>
-                        <img :src="getIcon(v)" class="status-icon" alt="" />
-                      </div>
-                      <div class="vehicle-meta-lines">
-                        <div class="meta-line">
-                          <span class="meta-label">Device:</span>
-                          <span class="meta-value">{{ getVehicleMeta(v).model || '—' }}</span>
-                          <span class="icon-dot" :class="statusDotClass(v)"></span>
-                        </div>
-                        <div class="meta-line">
-                          <span class="meta-label">Number Plate:</span>
-                          <span class="meta-value">{{ getVehicleMeta(v).plate || '—' }}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div v-if="!filtered.length" class="text-muted small">No vehicles found.</div>
+            <div v-if="showMap" class="map-inner" style="height: 100%; width: 100%; position: relative;">
+              <div v-if="isTestingMode" class="map-provider-switcher" style="position: absolute; bottom: 10px; left: 10px; z-index: 3000; background: white; padding: 6px 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
+                <div class="btn-group btn-group-sm" role="group" aria-label="Map provider">
+                  <button type="button" class="btn btn-outline-primary" :class="{ active: mapProvider === 'leaflet' }" @click="mapProvider = 'leaflet'">Leaflet</button>
+                  <button type="button" class="btn btn-outline-primary" :class="{ active: mapProvider === 'google' }" @click="mapProvider = 'google'">Google</button>
                 </div>
               </div>
+              <l-map v-if="mapProvider === 'leaflet'" id="liveMap" :zoom="zoom" :center="center" :options="mapOptions" @ready="onMapReady">
+                <l-tile-layer :url="tileUrl" :attribution="tileAttribution" />
+                <l-marker
+                  v-for="m in markerItems"
+                  :key="m.id"
+                  :lat-lng="[m.lat, m.lon]"
+                  :icon="isSelected(m.id) ? focusIcon : carIcon"
+                  :ref="el => setMarkerRef(m.id, el)"
+                >
+                  <l-popup>
+                    <div class="popup-card" v-html="m.popup"></div>
+                  </l-popup>
+                </l-marker>
+              </l-map>
+              <GoogleMap
+                v-else
+                :center="center"
+                :zoom="zoom"
+                :markers="markerItems"
+                :selected-id="selectedId"
+                @ready="onGoogleMapReady"
+                @error="onGoogleMapError"
+              />
+              <transition name="mobile-panel">
+                <div v-if="isMobile && panelVisible" class="panel-floating">
+                  <div class="panel-header">
+                    <h3 class="panel-title">Search Vehicle</h3>
+                    <label class="form-label small">Vehicle Name</label>
+                    <input v-model="query" type="text" class="form-control panel-input" placeholder="eg. Transit Van" />
+                  </div>
+                  <div class="panel-body" @wheel.stop>
+                    <div v-if="loading" class="text-muted small">Loading…</div>
+                    <div v-else>
+                      <div
+                        v-for="v in filtered"
+                        :key="deviceKey(v)"
+                        :class="['vehicle-card', { 'is-selected': selectedId === deviceKey(v) }]"
+                        @click.stop="focusVehicle(v)"
+                        @mousedown.stop
+                        @touchstart.stop
+                        @pointerdown.stop
+                      >
+                        <div class="vehicle-avatar">
+                          <img
+                            v-if="getImage(v) && !brokenImages[deviceKey(v)]"
+                            :src="getImage(v)"
+                            alt=""
+                            @error="brokenImages[deviceKey(v)] = true"
+                          />
+                        </div>
+                        <div class="vehicle-info">
+                          <div class="vehicle-name-row">
+                            <div class="vehicle-name">{{ deviceName(v) }}</div>
+                            <img :src="getIcon(v)" class="status-icon" alt="" />
+                          </div>
+                          <div class="vehicle-meta-lines">
+                            <div class="meta-line">
+                              <span class="meta-label">Device:</span>
+                              <span class="meta-value">{{ getVehicleMeta(v).model || '—' }}</span>
+                              <span class="icon-dot" :class="statusDotClass(v)"></span>
+                            </div>
+                            <div class="meta-line">
+                              <span class="meta-label">Number Plate:</span>
+                              <span class="meta-value">{{ getVehicleMeta(v).plate || '—' }}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div v-if="!filtered.length" class="text-muted small">No vehicles found.</div>
+                    </div>
+                  </div>
+                </div>
+              </transition>
             </div>
-            </transition>
-            </l-map>
         </div>
     </div>
 </template>
 
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { getCurrentUser, clearAuthCache } from '../../auth';
@@ -112,8 +146,11 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { formatTelemetry } from '../../utils/telemetry';
 import { formatDateTime } from '../../utils/datetime';
+import GoogleMap from '../../components/GoogleMap.vue';
 
+const isTestingMode = inject('isTestingMode', ref(false));
 const map = ref(null);
+const googleMap = ref(null);
 const markerRefs = new Map();
 
 const router = useRouter();
@@ -141,6 +178,14 @@ function onMapReady(mapObj) {
     try { map.value.zoomControl.setPosition('bottomright'); } catch {}
 }
 
+function onGoogleMapReady(mapObj) {
+    googleMap.value = mapObj;
+}
+
+function onGoogleMapError() {
+    mapProvider.value = 'leaflet';
+}
+
 function setMarkerRef(id, el) {
     try {
         const mk = el?.leafletObject ?? el;
@@ -151,12 +196,13 @@ function setMarkerRef(id, el) {
 
 
 const showMap = ref(true);
+const mapProvider = ref('leaflet');
 const zoom = ref(4);
 const center = ref([39.8283, -98.5795]);
 const selectedId = ref(null);
-const mapOptions = { zoomControl: true, preferCanvas: true };
+const mapOptions = { zoomControl: true, preferCanvas: true, attributionControl: false };
 const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const tileAttribution = '&copy; OpenStreetMap contributors';
+const tileAttribution = '';
 const fitDone = ref(false);
 const loading = ref(false);
 const error = ref('');
@@ -441,7 +487,8 @@ const markerItems = computed(() => {
             const disp = displayPositions[id];
             const dlat = typeof disp?.lat === 'number' ? disp.lat : lat;
             const dlon = typeof disp?.lon === 'number' ? disp.lon : lon;
-            return { id, lat: dlat, lon: dlon, popup: popupHtml(v) };
+            const iconUrl = isSelected(id) ? '/images/markers/focus-marker.svg' : '/images/markers/device-pin.png';
+            return { id, lat: dlat, lon: dlon, popup: popupHtml(v), iconUrl };
         })
         .filter(m => typeof m.lat === 'number' && typeof m.lon === 'number')
         .sort((a, b) => String(a.id).localeCompare(String(b.id)));
@@ -455,10 +502,23 @@ const selectedMarker = computed(() => {
 watch(
     markerItems,
     (list) => {
-        if (map.value && !fitDone.value && list.length && !selectedId.value) {
-            const bounds = L.latLngBounds(list.map(m => [m.lat, m.lon]));
-            try { map.value.fitBounds(bounds.pad(0.2)); } catch { map.value.fitBounds(bounds); }
-            fitDone.value = true;
+        if (!fitDone.value && list.length && !selectedId.value) {
+            if (mapProvider.value === 'leaflet' && map.value) {
+                const bounds = L.latLngBounds(list.map(m => [m.lat, m.lon]));
+                try { map.value.fitBounds(bounds.pad(0.2)); } catch { map.value.fitBounds(bounds); }
+                fitDone.value = true;
+            } else if (mapProvider.value === 'google' && googleMap.value && window.google && window.google.maps && window.google.maps.LatLngBounds) {
+                const bounds = new window.google.maps.LatLngBounds();
+                list.forEach(m => {
+                    const lat = Number(m.lat);
+                    const lon = Number(m.lon);
+                    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+                        bounds.extend({ lat, lng: lon });
+                    }
+                });
+                try { googleMap.value.fitBounds(bounds); } catch {}
+                fitDone.value = true;
+            }
         }
     },
     { flush: 'post' }
@@ -470,8 +530,14 @@ watch(
     (m) => {
         if (!m) return;
         center.value = [m.lat, m.lon];
-        // Ensure a reasonable zoom to visualize 100m radius
-        const current = typeof map.value?.getZoom === 'function' ? map.value.getZoom() : zoom.value;
+        let current;
+        if (mapProvider.value === 'leaflet') {
+            current = typeof map.value?.getZoom === 'function' ? map.value.getZoom() : zoom.value;
+        } else if (mapProvider.value === 'google') {
+            current = typeof googleMap.value?.getZoom === 'function' ? googleMap.value.getZoom() : zoom.value;
+        } else {
+            current = zoom.value;
+        }
         zoom.value = Math.max(current || 0, 15);
     }
 );
@@ -721,21 +787,21 @@ function popupHtml(v) {
     const id = trackingId(v);
     const detailUrl = typeof id === 'number' || typeof id === 'string' ? `/vehicles/${id}` : null;
     return `
-    <div class="popup-card">
-      <div class="popup-title-row">
-        <div class="popup-title">${name}</div>
-        <div class="popup-status ${sClass}">
+    <div class="popup-card" style="box-sizing:border-box; font-size:13px; line-height:1.4; word-break:break-word;">
+      <div class="popup-title-row" style="margin:0 0 8px 0;">
+        <div class="popup-title" style="font-weight:700; font-size:14px; margin-bottom:2px;">${name}</div>
+        <div class="popup-status ${sClass}" style="display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; line-height:1;">
           ${isOnline ? '<span class="icon-buffering"></span>' : '<span class="icon-dot"></span>'}
           <span class="status-text">${sLabel}</span>
         </div>
       </div>
-      <div class="popup-row"><span>Unique ID:</span> <strong>${uniq}</strong></div>
-      <div class="popup-row"><span>Last Update:</span> <strong>${lu}</strong></div>
-      <div class="popup-row"><span>Ignition:</span> <strong>${ign}</strong></div>
-      <div class="popup-row"><span>Speed:</span> <strong>${sp ?? '-'} km/h</strong></div>
-      <div class="popup-row"><span>Odometer:</span> <strong>${odo ?? '—'}</strong></div>
-      <div class="popup-row"><span>Fuel:</span> <strong>${fuel ?? '—'}</strong></div>
-      <div class="popup-row"><span>Location:</span> <span>${locText}</span></div>
+      <div class="popup-row" style="display:flex;gap:6px;"><span>Unique ID:</span> <strong>${uniq}</strong></div>
+      <div class="popup-row" style="display:flex;gap:6px;"><span>Last Update:</span> <strong>${lu}</strong></div>
+      <div class="popup-row" style="display:flex;gap:6px;"><span>Ignition:</span> <strong>${ign}</strong></div>
+      <div class="popup-row" style="display:flex;gap:6px;"><span>Speed:</span> <strong>${sp ?? '-'} km/h</strong></div>
+      <div class="popup-row" style="display:flex;gap:6px;"><span>Odometer:</span> <strong>${odo ?? '—'}</strong></div>
+      <div class="popup-row" style="display:flex;gap:6px;"><span>Fuel:</span> <strong>${fuel ?? '—'}</strong></div>
+      <div class="popup-row" style="display:flex;gap:6px;"><span>Location:</span> <span>${locText}</span></div>
       ${detailUrl ? `<div class="popup-row"><a href="${detailUrl}" class="text-primary text-decoration-underline">View Details</a></div>` : ''}
     </div>
   `;
@@ -775,22 +841,57 @@ function focusVehicle(v) {
     const { lat, lon } = getPosition(v);
     const id = deviceKey(v);
     if (typeof id !== 'undefined' && id !== null) selectedId.value = id;
-    if (map.value && typeof lat === 'number' && typeof lon === 'number') {
-        fitDone.value = true; // prevent fitBounds from pulling view away
+    if (typeof lat === 'number' && typeof lon === 'number') {
+        fitDone.value = true;
         const desiredZoom = 15;
-        const currentZoom = typeof map.value.getZoom === 'function' ? map.value.getZoom() : zoom.value;
+        let currentZoom = zoom.value;
+        if (mapProvider.value === 'leaflet' && map.value && typeof map.value.getZoom === 'function') {
+            currentZoom = map.value.getZoom();
+        } else if (mapProvider.value === 'google' && googleMap.value && typeof googleMap.value.getZoom === 'function') {
+            currentZoom = googleMap.value.getZoom();
+        }
         const z = Math.max(currentZoom || 0, desiredZoom);
         center.value = [lat, lon];
         zoom.value = z;
-        try {
-            if (typeof map.value.setView === 'function') {
-                map.value.setView([lat, lon], z, { animate: true });
-            }
-        } catch {}
-        const mk = markerRefs.get(id);
-        try { mk?.openPopup?.(); } catch {}
+        if (mapProvider.value === 'leaflet' && map.value) {
+            try {
+                if (typeof map.value.setView === 'function') {
+                    map.value.setView([lat, lon], z, { animate: true });
+                }
+            } catch {}
+            const mk = markerRefs.get(id);
+            try { mk?.openPopup?.(); } catch {}
+        }
     }
 }
+
+// When switching providers, reset fit and re-open selected popup on the new map
+watch(
+    mapProvider,
+    async (prov) => {
+        fitDone.value = false;
+        // Allow new map to render its markers first
+        try { await nextTick(); } catch {}
+        if (!selectedId.value) return;
+        const sel = markerItems.value.find(m => String(m.id) === String(selectedId.value));
+        if (!sel) return;
+        const lat = Number(sel.lat);
+        const lon = Number(sel.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+        center.value = [lat, lon];
+        zoom.value = Math.max(zoom.value || 0, 15);
+        if (prov === 'leaflet') {
+            try {
+                if (map.value && typeof map.value.setView === 'function') {
+                    map.value.setView([lat, lon], zoom.value, { animate: true });
+                }
+            } catch {}
+            const mk = markerRefs.get(selectedId.value);
+            try { mk?.openPopup?.(); } catch {}
+        }
+        // For Google, the GoogleMap component will auto-open the selected popup on ready
+    }
+);
 
 onMounted(() => {
     // Preload icons to avoid delay on first click
@@ -1076,6 +1177,7 @@ onBeforeUnmount(() => {
 .popup-title {
     font-weight: 600;
     margin-bottom: 4px;
+    padding-right:15px;
 }
 
 .popup-row {
@@ -1294,6 +1396,26 @@ onBeforeUnmount(() => {
 /* Slightly raise Leaflet zoom control on LiveTracking */
 #liveMap :deep(.leaflet-top .leaflet-control-zoom) {
     margin-top: 2px;
+}
+
+/* Google Maps InfoWindow adjustments to align content with close icon */
+:global(.gm-style .gm-style-iw-c) {
+    padding: 0 !important;
+    border-radius: 8px !important;
+}
+:global(.gm-style .gm-style-iw-d) {
+    overflow: hidden !important;
+    padding: 12px 15px 12px 12px !important; /* Right padding to accommodate close button */
+    max-height: none !important;
+    margin-top:-36px;
+}
+:global(.gm-style .gm-style-iw .popup-title-row) {
+    margin-top: 0 !important;
+}
+:global(.gm-style .gm-ui-hover-effect) {
+    top: 10px !important; /* Vertically center with title text (approx) */
+    right: 0px !important;
+    opacity: 0.6;
 }
 
 </style>

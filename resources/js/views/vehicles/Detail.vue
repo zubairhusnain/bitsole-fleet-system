@@ -180,13 +180,13 @@
                                     <span v-if="loadingGeofences" class="spinner-border spinner-border-sm ms-2" role="status"></span>
                                 </div>
                             </div>
-                            <div style="position: absolute; top: 10px; left: 10px; z-index: 1000; background: white; padding: 6px 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
+                            <div v-if="isTestingMode" style="position: absolute; bottom: 10px; left: 10px; z-index: 1000; background: white; padding: 6px 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
                                 <div class="btn-group btn-group-sm" role="group" aria-label="Map provider">
                                     <button type="button" class="btn btn-outline-primary" :class="{ active: mapProvider === 'leaflet' }" @click="mapProvider = 'leaflet'">Leaflet</button>
                                     <button type="button" class="btn btn-outline-primary" :class="{ active: mapProvider === 'google' }" @click="mapProvider = 'google'">Google</button>
                                 </div>
-                            </div> 
-                            <LMap v-if="mapReady && mapProvider === 'leaflet'" :zoom="zoom" :center="mapCenter" @ready="onMapReady" style="height: 100%; width: 100%;">
+                            </div>
+                            <LMap v-if="mapReady && mapProvider === 'leaflet'" :zoom="zoom" :center="mapCenter" :options="{ zoomControl: false }" @ready="onMapReady" style="height: 100%; width: 100%;">
                                 <LTileLayer :url="tileUrl" :attribution="tileAttribution" />
                                 <LMarker :lat-lng="currentLatLng || mapCenter" ref="markerRef" />
 
@@ -765,7 +765,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, inject } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { LMap, LTileLayer, LMarker, LPolyline, LPopup, LCircle, LPolygon } from '@vue-leaflet/vue-leaflet';
@@ -789,6 +789,7 @@ try {
     });
 } catch {}
 
+const isTestingMode = inject('isTestingMode', ref(false));
 const route = useRoute();
 const router = useRouter();
 const deviceId = computed(() => parseInt(route.params.deviceId));
@@ -984,6 +985,11 @@ function routingErrorMessage(e) {
 
 function onMapReady(map) {
     mapInstance = map;
+    if (routingControl) {
+        try { routingControl.remove(); } catch (e) {}
+        routingControl = null;
+    }
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
     initRouting();
 }
 
