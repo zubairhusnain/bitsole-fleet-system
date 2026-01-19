@@ -1178,8 +1178,6 @@ onBeforeUnmount(() => {
 .popup-title {
     font-weight: 600;
     margin-bottom: 4px;
-    padding-right:15px;
-    width:90% !important;
 }
 
 .popup-row {
@@ -1384,6 +1382,7 @@ onBeforeUnmount(() => {
     justify-content: space-between;
     gap: 8px;
     flex-wrap: wrap;
+    width:90% !important;
 }
 
 /* Leaflet popup tweaks (scoped deep selectors) */
