@@ -1407,13 +1407,13 @@ onBeforeUnmount(() => {
     overflow: hidden !important;
     padding: 12px 15px 12px 12px !important; /* Right padding to accommodate close button */
     max-height: none !important;
-    margin-top:-36px;
+    margin-top:-44px;
 }
 :global(.gm-style .gm-style-iw .popup-title-row) {
     margin-top: 0 !important;
 }
 :global(.gm-style .gm-ui-hover-effect) {
-    top: 10px !important; /* Vertically center with title text (approx) */
+    top: 0px !important; /* Vertically center with title text (approx) */
     right: 0px !important;
     opacity: 0.6;
 }
