@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
+use App\Models\TcDriver;
 
 class DriverController extends Controller
 {
@@ -136,7 +138,7 @@ class DriverController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'uniqueId' => ['required', 'string'],
+            'uniqueId' => ['required', 'string', Rule::unique(TcDriver::class, 'uniqueid')],
             'attributes' => ['nullable'],
             'licenceImage' => ['nullable', 'file', 'image', 'mimes:jpeg,png', 'max:4096'],
             'avatar' => ['nullable', 'file', 'image', 'mimes:jpeg,png', 'max:4096'],
@@ -341,7 +343,7 @@ class DriverController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'uniqueId' => ['required', 'string'],
+            'uniqueId' => ['required', 'string', Rule::unique(TcDriver::class, 'uniqueid')->ignore($driverId)],
             'attributes' => ['nullable'],
             'licenceImage' => ['nullable', 'file', 'image', 'mimes:jpeg,png', 'max:4096'],
             'avatar' => ['nullable', 'file', 'image', 'mimes:jpeg,png', 'max:4096'],

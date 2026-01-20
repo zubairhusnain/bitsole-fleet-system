@@ -22,8 +22,9 @@
         <div class="card-body">
           <div class="row g-3 align-items-start">
             <div class="col-12 col-md-3">
-              <label class="form-label small">Driver ID</label>
-              <input v-model="form.driverId" type="text" class="form-control" placeholder="DRV-1016" />
+              <label class="form-label small">Driver ID <span class="text-danger">*</span></label>
+              <input v-model="form.driverId" type="text" class="form-control" :class="{ 'is-invalid': errors.driverId }" placeholder="DRV-1016" required />
+              <div class="invalid-feedback" v-if="errors.driverId">{{ errors.driverId }}</div>
             </div>
             <div class="col-12 col-md-3">
               <label class="form-label small">Full Name</label>
@@ -158,7 +159,7 @@ import UiAlert from '../../components/UiAlert.vue';
 const router = useRouter();
 
 const form = reactive({
-  driverId: 'DRV-1016',
+  driverId: '',
   fullName: '',
   gender: '',
   dob: '',
@@ -322,7 +323,23 @@ async function submit() {
     message.value = data?.message || 'Driver created';
     setTimeout(() => router.push('/drivers'), 300);
   } catch (e) {
-    error.value = e?.response?.data?.message || 'Failed to add driver';
+    if (e?.response?.status === 422 && e?.response?.data?.errors) {
+       // Laravel validation errors
+       const backendErrors = e.response.data.errors;
+       if (backendErrors.uniqueId) errors.driverId = backendErrors.uniqueId[0];
+       // Map other errors if needed, or just show generic message
+       error.value = e?.response?.data?.message || 'Validation failed';
+    } else if (e?.response?.data?.message && (
+        e.response.data.message.toLowerCase().includes('uniqueid') || 
+        e.response.data.message.toLowerCase().includes('driver id') ||
+        e.response.data.message.toLowerCase().includes('duplicate')
+    )) {
+       // Handle 502 or other errors related to uniqueness from DriverService
+       errors.driverId = e.response.data.message;
+       error.value = 'Driver ID must be unique';
+    } else {
+       error.value = e?.response?.data?.message || 'Failed to add driver';
+    }
   } finally {
     submitting.value = false;
   }
