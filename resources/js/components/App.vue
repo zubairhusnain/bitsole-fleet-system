@@ -669,6 +669,7 @@ watch(() => isGuestPage.value, async (isGuest) => {
 // No manual menu-open manipulation; AdminLTE handles accordion via data attributes
 
 async function logout() {
+        localStorage.removeItem('testingMode');
     try {
         await axios.post('/web/auth/logout');
     } catch (e) {
