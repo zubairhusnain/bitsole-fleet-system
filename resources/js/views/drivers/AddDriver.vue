@@ -177,6 +177,7 @@ const form = reactive({
   avatar: null,
 });
 
+const errors = reactive({});
 const message = ref('');
 const error = ref('');
 const submitting = ref(false);
@@ -229,6 +230,7 @@ function onFile(event) {
 async function submit() {
   message.value = '';
   error.value = '';
+  Object.keys(errors).forEach(key => delete errors[key]);
   submitting.value = true;
 
   // Validate DOB is before today
@@ -330,7 +332,7 @@ async function submit() {
        // Map other errors if needed, or just show generic message
        error.value = e?.response?.data?.message || 'Validation failed';
     } else if (e?.response?.data?.message && (
-        e.response.data.message.toLowerCase().includes('uniqueid') || 
+        e.response.data.message.toLowerCase().includes('uniqueid') ||
         e.response.data.message.toLowerCase().includes('driver id') ||
         e.response.data.message.toLowerCase().includes('duplicate')
     )) {
