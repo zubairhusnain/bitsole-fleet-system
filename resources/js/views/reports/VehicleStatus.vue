@@ -93,7 +93,6 @@
                 <th>Type/Model</th>
                 <th>Device Model</th>
                 <th>IMEI</th>
-                <th>ICCID</th>
                 <th>Odometer</th>
                 <th>Power</th>
                 <th>Last Report</th>
@@ -121,7 +120,6 @@
                 <td>{{ row.type_model }}</td>
                 <td>{{ row.device_model }}</td>
                 <td>{{ row.imei }}</td>
-                <td>{{ row.iccid }}</td>
                 <td>{{ row.odometer }}</td>
                 <td>
                   <span class="badge" :class="row.power === 'On' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'">
@@ -347,7 +345,7 @@ const downloadCSV = async () => {
 
         rows.forEach(r => {
             const vals = [
-                r.vehicle_id, r.owner, r.type_model, r.device_model, r.imei, r.iccid,
+                r.vehicle_id, r.owner, r.type_model, r.device_model, r.imei,
                 r.odometer, r.power, r.last_report, r.longitude, r.latitude,
                 `"${(r.location || '').replace(/"/g, '""')}"`, // Escape quotes
                 r.speed, r.gps_signal, r.ignition ? 'ON' : 'OFF', r.last_ignition_on, r.last_ignition_off, r.activation_date

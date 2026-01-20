@@ -54,7 +54,6 @@
                 <td>{{ $row['type_model'] }}</td>
                 <td>{{ $row['device_model'] }}</td>
                 <td>{{ $row['imei'] }}</td>
-                <td>{{ $row['iccid'] }}</td>
                 <td>{{ $row['odometer'] }}</td>
                 <td class="text-center">
                     <span class="badge {{ $row['power'] === 'On' ? 'bg-success' : 'bg-danger' }}">

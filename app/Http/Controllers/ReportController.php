@@ -168,7 +168,6 @@ class ReportController extends Controller
                 'type_model' => trim(($deviceAttrs['type'] ?? '') . ' ' . ($tc?->model ?? '')),
                 'device_model' => $tc?->model ?? 'N/A',
                 'imei' => $tc?->uniqueid ?? 'N/A',
-                'iccid' => $deviceAttrs['iccid'] ?? 'N/A',
                 'odometer' => $odometer,
                 'power' => $ignition ? 'On' : 'Off',
                 'last_report' => $pos?->servertime ? date('d/m/Y - h:i A', strtotime($pos->servertime)) : 'N/A',
