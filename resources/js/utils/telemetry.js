@@ -182,7 +182,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
       ? attrs[preferredFuelName]
       : lower[lowerName];
     const nPreferred = toNumber(valPreferred);
-    if (valPreferred != null && valPreferred !== '' && nPreferred !== null) {
+    if (valPreferred != null && valPreferred !== '' && nPreferred !== null && nPreferred > -1) {
       const capNumCfg = Number.isFinite(parseFloat(capacity)) ? parseFloat(capacity) : null;
       let percentCfg = null;
       let litersCfg = null;
