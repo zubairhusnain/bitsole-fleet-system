@@ -12,6 +12,45 @@ use App\Models\TcGeofence;
 
 class VehicleController extends Controller
 {
+    private function updateModelDefaults($attributes)
+    {
+        if (empty($attributes['trackerModel']) || empty($attributes['fuelAttr'])) {
+            return;
+        }
+        $modelName = $attributes['trackerModel'];
+        $fuelAttr = $attributes['fuelAttr'];
+
+        // Only update if we have at least one of the values to save
+        if (!isset($attributes['fuelMin']) && !isset($attributes['fuelMax']) && !isset($attributes['fuelReverse'])) {
+            return;
+        }
+
+        $model = \App\Models\VehicleModel::where('modelname', $modelName)->first();
+        if (!$model) return;
+
+        $modelAttrs = $model->attributes ?? [];
+        if (!isset($modelAttrs['fuel']) || !is_array($modelAttrs['fuel'])) {
+            return;
+        }
+
+        $updated = false;
+        foreach ($modelAttrs['fuel'] as &$fuel) {
+            if (isset($fuel['name']) && $fuel['name'] === $fuelAttr) {
+                // Update defaults
+                if (isset($attributes['fuelMin'])) $fuel['default_min'] = $attributes['fuelMin'];
+                if (isset($attributes['fuelMax'])) $fuel['default_max'] = $attributes['fuelMax'];
+                if (isset($attributes['fuelReverse'])) $fuel['default_reverse'] = $attributes['fuelReverse'];
+                $updated = true;
+                break;
+            }
+        } 
+
+        if ($updated) {
+            $model->attributes = $modelAttrs;
+            $model->save();
+        }
+    }
+
     /**
      * List vehicles with tracking server join/eager load, role-aware.
      */
@@ -115,7 +154,8 @@ class VehicleController extends Controller
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
             'type','manufacturer','color','registration','plate','odometer','fuelAverage','photos','fuelTankCapacity','trackerModel',
-            'fuelType','fuel_type','vehicleNo','speedLimit','odometerAttr','fuelAttr'
+            'fuelType','fuel_type','vehicleNo','speedLimit','odometerAttr','fuelAttr',
+            'cameraModel','cameraImi','speedAttr','fuelMin','fuelMax','fuelReverse'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
@@ -231,6 +271,8 @@ class VehicleController extends Controller
             'distributor_id' => $distributorIdLocal,
         ]);
 
+        $this->updateModelDefaults($attributes);
+
         // Assign selected computed attributes (odometer/fuel) for this model to the new device
         $modelNameForAttrs = isset($attributes['trackerModel']) && $attributes['trackerModel'] !== ''
             ? (string)$attributes['trackerModel']
@@ -311,7 +353,8 @@ class VehicleController extends Controller
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
             'type','manufacturer','color','registration','plate','odometer','fuelAverage','photos','fuelTankCapacity','trackerModel',
-            'fuelType','fuel_type','vehicleNo','speedLimit','odometerAttr','fuelAttr'
+            'fuelType','fuel_type','vehicleNo','speedLimit','odometerAttr','fuelAttr',
+            'cameraModel','cameraImi','speedAttr','fuelMin','fuelMax','fuelReverse'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
@@ -488,6 +531,8 @@ class VehicleController extends Controller
                 }
             }
         }
+
+        $this->updateModelDefaults($attributes);
 
         return response()->json([
             'message' => 'Vehicle updated',

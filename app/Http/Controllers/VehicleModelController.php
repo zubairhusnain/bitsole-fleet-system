@@ -82,10 +82,6 @@ class VehicleModelController extends Controller
         if ($dup !== null) {
             return response()->json(['message' => 'Duplicate attribute name "'.$dup.'" for this model'], 422);
         }
-        $dupRemote = $this->getTraccarDuplicateAttributeName($attrs, $data['modelname']);
-        if ($dupRemote !== null) {
-            return response()->json(['message' => 'Attribute name "'.$dupRemote.'" already exists in tracking server'], 422);
-        }
         $row->attributes = is_array($attrs) ? $attrs : null;
 
         $row->save();
@@ -93,6 +89,12 @@ class VehicleModelController extends Controller
         $this->syncComputedAttributes($row);
 
         return response()->json(['message' => 'Model updated', 'model' => $row]);
+    }
+
+    private function getTraccarSession()
+    {
+        $user = request()->user();
+        return $user->traccarSession ?? session('cookie');
     }
 
     private function syncComputedAttributes($model)
@@ -111,7 +113,7 @@ class VehicleModelController extends Controller
                     continue;
                 }
                 $description = $model->modelname . ' - ' . $name;
-                $expression = "(io$key ?: -1)";
+                $expression = "($key ?: -1)";
                 $attribute = $name;
                 $desired[$description] = [
                     'description' => $description,
@@ -129,7 +131,28 @@ class VehicleModelController extends Controller
                     continue;
                 }
                 $description = $model->modelname . ' - ' . $name;
-                $expression = "(io$key ?: -1)";
+                // Note: The frontend may pass 'is_analog' (boolean), but we currently treat all fuel attributes
+                // with the same expression pattern. If analog logic requires different handling (e.g. scaling),
+                // it can be implemented here based on that flag.
+                $expression = "($key ?: -1)";
+                $attribute = $name;
+                $desired[$description] = [
+                    'description' => $description,
+                    'attribute' => $attribute,
+                    'expression' => $expression,
+                    'type' => 'number'
+                ];
+            }
+        }
+        if (isset($attrs['speed']) && is_array($attrs['speed'])) {
+            foreach ($attrs['speed'] as $a) {
+                $name = trim($a['name'] ?? '');
+                $key = trim($a['key'] ?? '');
+                if (!$name || !$key) {
+                    continue;
+                }
+                $description = $model->modelname . ' - ' . $name;
+                $expression = "($key ?: -1)";
                 $attribute = $name;
                 $desired[$description] = [
                     'description' => $description,
@@ -140,17 +163,7 @@ class VehicleModelController extends Controller
             }
         }
 
-        // Login logic
-        $sessionId = session('cookie');
-        if (empty($sessionId)) {
-            try {
-                $email = Config::get('constants.Constants.adminEmail');
-                $password = Config::get('constants.Constants.adminPassword');
-                $data = 'email=' . urlencode($email) . '&password=' . urlencode($password);
-                $resp = static::curl('/api/session', 'POST', '', $data, [Config::get('constants.Constants.urlEncoded')]);
-                $sessionId = $resp->cookieData ?? null;
-            } catch (\Throwable $e) {}
-        }
+        $sessionId = $this->getTraccarSession();
 
         if (!$sessionId) return;
 
@@ -182,16 +195,7 @@ class VehicleModelController extends Controller
 
     private function removeComputedAttributes($model)
     {
-        $sessionId = session('cookie');
-        if (empty($sessionId)) {
-            try {
-                $email = Config::get('constants.Constants.adminEmail');
-                $password = Config::get('constants.Constants.adminPassword');
-                $data = 'email=' . urlencode($email) . '&password=' . urlencode($password);
-                $resp = static::curl('/api/session', 'POST', '', $data, [Config::get('constants.Constants.urlEncoded')]);
-                $sessionId = $resp->cookieData ?? null;
-            } catch (\Throwable $e) {}
-        }
+        $sessionId = $this->getTraccarSession();
 
         if (!$sessionId) return;
 
@@ -218,7 +222,7 @@ class VehicleModelController extends Controller
             return null;
         }
         $seen = [];
-        $groups = ['odometer', 'fuel'];
+        $groups = ['odometer', 'fuel', 'speed'];
         foreach ($groups as $group) {
             if (!isset($attrs[$group]) || !is_array($attrs[$group])) {
                 continue;
@@ -235,71 +239,6 @@ class VehicleModelController extends Controller
                 $seen[$key] = true;
             }
         }
-        return null;
-    }
-
-    private function getTraccarDuplicateAttributeName($attrs, $modelName)
-    {
-        if (is_string($attrs)) {
-            $decoded = json_decode($attrs, true);
-            $attrs = is_array($decoded) ? $decoded : null;
-        }
-        if (!is_array($attrs)) {
-            return null;
-        }
-        $names = [];
-        $groups = ['odometer', 'fuel'];
-        foreach ($groups as $group) {
-            if (!isset($attrs[$group]) || !is_array($attrs[$group])) {
-                continue;
-            }
-            foreach ($attrs[$group] as $item) {
-                $name = isset($item['name']) ? trim((string)$item['name']) : '';
-                if ($name === '') {
-                    continue;
-                }
-                $names[mb_strtolower($name)] = $name;
-            }
-        }
-        if (empty($names)) {
-            return null;
-        }
-
-        $sessionId = session('cookie');
-        if (empty($sessionId)) {
-            try {
-                $email = Config::get('constants.Constants.adminEmail');
-                $password = Config::get('constants.Constants.adminPassword');
-                $data = 'email=' . urlencode($email) . '&password=' . urlencode($password);
-                $resp = static::curl('/api/session', 'POST', '', $data, [Config::get('constants.Constants.urlEncoded')]);
-                $sessionId = $resp->cookieData ?? null;
-            } catch (\Throwable $e) {}
-        }
-
-        if (!$sessionId) {
-            return null;
-        }
-
-        $headers = ['Content-Type: application/json', 'Accept: application/json'];
-        $resp = static::curl('/api/attributes/computed', 'GET', $sessionId, '', $headers);
-        $existing = json_decode($resp->response ?? '[]', true) ?? [];
-
-        $prefix = $modelName . ' - ';
-        foreach ($existing as $ex) {
-            $attrName = isset($ex['attribute']) ? trim((string)$ex['attribute']) : '';
-            if ($attrName === '') {
-                continue;
-            }
-            $key = mb_strtolower($attrName);
-            if (!isset($names[$key])) {
-                continue;
-            }
-            $desc = isset($ex['description']) ? (string)$ex['description'] : '';
-            if (strpos($desc, $prefix) !== 0) {
-                return $names[$key];
-            }
-        }
-
         return null;
     }
 }
