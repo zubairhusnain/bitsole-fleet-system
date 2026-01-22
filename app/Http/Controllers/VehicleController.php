@@ -12,6 +12,45 @@ use App\Models\TcGeofence;
 
 class VehicleController extends Controller
 {
+    private function updateModelDefaults($attributes)
+    {
+        if (empty($attributes['trackerModel']) || empty($attributes['fuelAttr'])) {
+            return;
+        }
+        $modelName = $attributes['trackerModel'];
+        $fuelAttr = $attributes['fuelAttr'];
+
+        // Only update if we have at least one of the values to save
+        if (!isset($attributes['fuelMin']) && !isset($attributes['fuelMax']) && !isset($attributes['fuelReverse'])) {
+            return;
+        }
+
+        $model = \App\Models\VehicleModel::where('modelname', $modelName)->first();
+        if (!$model) return;
+
+        $modelAttrs = $model->attributes ?? [];
+        if (!isset($modelAttrs['fuel']) || !is_array($modelAttrs['fuel'])) {
+            return;
+        }
+
+        $updated = false;
+        foreach ($modelAttrs['fuel'] as &$fuel) {
+            if (isset($fuel['name']) && $fuel['name'] === $fuelAttr) {
+                // Update defaults
+                if (isset($attributes['fuelMin'])) $fuel['default_min'] = $attributes['fuelMin'];
+                if (isset($attributes['fuelMax'])) $fuel['default_max'] = $attributes['fuelMax'];
+                if (isset($attributes['fuelReverse'])) $fuel['default_reverse'] = $attributes['fuelReverse'];
+                $updated = true;
+                break;
+            }
+        } 
+
+        if ($updated) {
+            $model->attributes = $modelAttrs;
+            $model->save();
+        }
+    }
+
     /**
      * List vehicles with tracking server join/eager load, role-aware.
      */
@@ -232,22 +271,12 @@ class VehicleController extends Controller
             'distributor_id' => $distributorIdLocal,
         ]);
 
+        $this->updateModelDefaults($attributes);
+
         // Assign selected computed attributes (odometer/fuel) for this model to the new device
         $modelNameForAttrs = isset($attributes['trackerModel']) && $attributes['trackerModel'] !== ''
             ? (string)$attributes['trackerModel']
             : (string)$request->input('model', '');
-
-        // Update VehicleModel defaults for analog fuel if present
-        if ($modelNameForAttrs !== '' && !empty($attributes['fuelAttr'])) {
-            $this->updateModelAnalogDefaults(
-                $modelNameForAttrs,
-                $attributes['fuelAttr'],
-                $attributes['fuelMin'] ?? null,
-                $attributes['fuelMax'] ?? null,
-                $attributes['fuelReverse'] ?? null
-            );
-        }
-
         $namesForAttrs = [];
         $deleteNamesForAttrs = [];
 
@@ -446,18 +475,6 @@ class VehicleController extends Controller
         $modelNameForAttrs = isset($attributes['trackerModel']) && $attributes['trackerModel'] !== ''
             ? (string)$attributes['trackerModel']
             : (string)$request->input('model', '');
-
-        // Update VehicleModel defaults for analog fuel if present
-        if ($modelNameForAttrs !== '' && !empty($attributes['fuelAttr'])) {
-            $this->updateModelAnalogDefaults(
-                $modelNameForAttrs,
-                $attributes['fuelAttr'],
-                $attributes['fuelMin'] ?? null,
-                $attributes['fuelMax'] ?? null,
-                $attributes['fuelReverse'] ?? null
-            );
-        }
-
         $namesForAttrs = [];
         $deleteNamesForAttrs = [];
 
@@ -514,6 +531,8 @@ class VehicleController extends Controller
                 }
             }
         }
+
+        $this->updateModelDefaults($attributes);
 
         return response()->json([
             'message' => 'Vehicle updated',
@@ -1454,46 +1473,5 @@ class VehicleController extends Controller
         }
 
         return response()->json(['message' => 'Vehicle activated'], 200);
-    }
-
-    /**
-     * Update the VehicleModel analog fuel defaults.
-     */
-    private function updateModelAnalogDefaults($trackerModelName, $fuelAttrName, $min, $max, $reverse)
-    {
-        if (empty($trackerModelName) || empty($fuelAttrName)) {
-            return;
-        }
-
-        $model = \App\Models\VehicleModel::where('modelname', $trackerModelName)->first();
-        if (!$model || !is_array($model->attributes)) {
-            return;
-        }
-
-        $attributes = $model->attributes;
-        $changed = false;
-
-        if (isset($attributes['fuel']) && is_array($attributes['fuel'])) {
-            foreach ($attributes['fuel'] as &$attr) {
-                if (isset($attr['name']) && $attr['name'] === $fuelAttrName) {
-                    // Update values if they differ
-                    if (($attr['min'] ?? '') != $min ||
-                        ($attr['max'] ?? '') != $max ||
-                        ($attr['reverse'] ?? '') != $reverse) {
-
-                        $attr['min'] = $min;
-                        $attr['max'] = $max;
-                        $attr['reverse'] = $reverse;
-                        $changed = true;
-                    }
-                    break;
-                }
-            }
-        }
-
-        if ($changed) {
-            $model->attributes = $attributes;
-            $model->save();
-        }
     }
 }

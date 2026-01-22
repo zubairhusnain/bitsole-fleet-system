@@ -256,9 +256,6 @@ const form = reactive({
     fuelAverage: '',
     fuelType: '',
     trackerModel: '',
-    odometerAttr: '',
-    fuelAttr: '',
-    speedAttr: '',
     fuelMin: '',
     fuelMax: '',
     fuelReverse: '',
@@ -280,10 +277,11 @@ function updateAnalogStatus() {
   const detail = fuelAttributeDetails.value.find(d => d.name === attrName);
   isAnalogFuel.value = !!(detail && detail.is_analog);
 
-  if (isAnalogFuel.value && !hydrating.value) {
-    if (form.attributes.fuelMin === '' || form.attributes.fuelMin === null) form.attributes.fuelMin = detail.min ?? '';
-    if (form.attributes.fuelMax === '' || form.attributes.fuelMax === null) form.attributes.fuelMax = detail.max ?? '';
-    if (form.attributes.fuelReverse === '' || form.attributes.fuelReverse === null) form.attributes.fuelReverse = detail.reverse ?? '';
+  // Pre-fill defaults if analog is enabled and fields are empty
+  if (isAnalogFuel.value && detail) {
+    if ((form.attributes.fuelMin === '' || form.attributes.fuelMin === null) && detail.default_min !== undefined) form.attributes.fuelMin = detail.default_min;
+    if ((form.attributes.fuelMax === '' || form.attributes.fuelMax === null) && detail.default_max !== undefined) form.attributes.fuelMax = detail.default_max;
+    if ((form.attributes.fuelReverse === '' || form.attributes.fuelReverse === null) && detail.default_reverse !== undefined) form.attributes.fuelReverse = detail.default_reverse;
   }
 }
 
@@ -381,16 +379,6 @@ async function refreshModelAttributes(modelName, keepSelection = false) {
       odometerOptions.value = odo;
       fuelOptions.value = fuel;
       speedOptions.value = speed;
-
-      if (!keepSelection) {
-        form.attributes.odometerAttr = '';
-        form.attributes.fuelAttr = '';
-        form.attributes.speedAttr = '';
-        form.attributes.fuelMin = '';
-        form.attributes.fuelMax = '';
-        form.attributes.fuelReverse = '';
-      }
-
       updateAnalogStatus();
     } else {
       // Model not found or invalid
@@ -398,16 +386,6 @@ async function refreshModelAttributes(modelName, keepSelection = false) {
       fuelOptions.value = [];
       fuelAttributeDetails.value = [];
       speedOptions.value = [];
-
-      if (!keepSelection) {
-        form.attributes.odometerAttr = '';
-        form.attributes.fuelAttr = '';
-        form.attributes.speedAttr = '';
-        form.attributes.fuelMin = '';
-        form.attributes.fuelMax = '';
-        form.attributes.fuelReverse = '';
-      }
-
       isAnalogFuel.value = false;
     }
   } catch {}
