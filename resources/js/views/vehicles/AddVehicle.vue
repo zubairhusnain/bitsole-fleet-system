@@ -236,6 +236,9 @@ const form = reactive({
     fuelAverage: '',
     fuelType: '',
     trackerModel: '',
+    odometerAttr: '',
+    fuelAttr: '',
+    speedAttr: '',
     fuelTankCapacity: '',
     fuelMin: '',
     fuelMax: '',
@@ -243,7 +246,6 @@ const form = reactive({
     cameraModel: '',
     cameraImi: ''
   },
-
 });
 
 const fuelAttributeDetails = ref([]);
@@ -258,6 +260,12 @@ function updateAnalogStatus() {
   }
   const detail = fuelAttributeDetails.value.find(d => d.name === attrName);
   isAnalogFuel.value = !!(detail && detail.is_analog);
+
+  if (isAnalogFuel.value) {
+    if (form.attributes.fuelMin === '' || form.attributes.fuelMin === null) form.attributes.fuelMin = detail.min ?? '';
+    if (form.attributes.fuelMax === '' || form.attributes.fuelMax === null) form.attributes.fuelMax = detail.max ?? '';
+    if (form.attributes.fuelReverse === '' || form.attributes.fuelReverse === null) form.attributes.fuelReverse = detail.reverse ?? '';
+  }
 }
 
 const previews = ref([null, null, null]);
