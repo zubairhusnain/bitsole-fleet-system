@@ -12,7 +12,7 @@
         <button class="nav-link" :class="{ active: activeTab === 'alerts' }" @click="activeTab = 'alerts'">Global Alert Settings</button>
       </li>
       <li class="nav-item">
-        <button class="nav-link" :class="{ active: activeTab === 'models' }" @click="activeTab = 'models'">Vehicle Model</button>
+        <button class="nav-link" :class="{ active: activeTab === 'models' }" @click="activeTab = 'models'">Device Model</button>
       </li>
       <li class="nav-item">
         <button class="nav-link" :class="{ active: activeTab === 'backup' }" @click="activeTab = 'backup'">System Backup</button>
@@ -65,7 +65,7 @@
         </div>
       </div>
 
-      <!-- Tab 2: Vehicle Model -->
+      <!-- Tab 2: Device Model -->
       <div v-if="activeTab === 'models'" class="tab-pane fade show active">
         <div class="card">
           <div class="card-body">
@@ -93,7 +93,7 @@
                     <th>Date</th>
                     <th class="text-end">Actions</th>
                   </tr>
-                </thead>
+                </thead> 
                 <tbody>
                   <tr v-if="backupLoading && !backups.length">
                     <td colspan="4" class="text-center p-3">Loading backups...</td>
@@ -155,7 +155,7 @@ const activeTab = ref('alerts');
 const isTestingMode = inject('isTestingMode', ref(false));
 
 const loading = ref(false);
-const saving = ref(false); 
+const saving = ref(false);
 const notificationChannel = ref({ web: true, mail: false, mobile: false });
 const requestData = ref([]);
 const notificationType = ref([]);
@@ -166,7 +166,7 @@ const error = ref('');
 const backups = ref([]);
 const backupLoading = ref(false);
 const isAdmin = computed(() => authState.user && authState.user.role === 3);
- 
+
 function toggleTestingMode() {
   const newVal = !isTestingMode.value;
   isTestingMode.value = newVal;

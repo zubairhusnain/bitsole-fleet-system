@@ -1,9 +1,9 @@
 <template>
   <div class="vehicle-models-manager">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h6 class="mb-0">Vehicle Models</h6>
+      <h6 class="mb-0">Device Models</h6>
       <button class="btn btn-sm btn-primary" @click="openModal()" :disabled="loading">
-        <i class="bi bi-plus-lg"></i> Add Model
+        <i class="bi bi-plus-lg"></i> Add Device Model
       </button>
     </div>
 
@@ -13,14 +13,14 @@
       <table class="table table-hover mb-0 align-middle">
         <thead class="table-light">
           <tr>
-            <th>Model Name</th>
+            <th>Device Model</th>
             <th>Attributes</th>
             <th class="text-end">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="!models.length">
-            <td colspan="3" class="text-center p-3 text-muted">No vehicle models found.</td>
+            <td colspan="3" class="text-center p-3 text-muted">No device models found.</td>
           </tr>
           <tr v-for="model in models" :key="model.id">
             <td>{{ model.modelname }}</td>
@@ -29,7 +29,8 @@
                 v-if="
                   model.attributes &&
                   ((model.attributes.odometer && model.attributes.odometer.length) ||
-                    (model.attributes.fuel && model.attributes.fuel.length))
+                    (model.attributes.fuel && model.attributes.fuel.length) ||
+                    (model.attributes.speed && model.attributes.speed.length))
                 "
               >
                 <table class="table table-sm mb-0">
@@ -37,6 +38,7 @@
                     <tr class="small">
                       <th class="border-0">Odometer</th>
                       <th class="border-0">Fuel</th>
+                      <th class="border-0">Speed</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -53,6 +55,11 @@
                       <td class="border-0 text-muted">
                         <span v-if="row.fuel">
                           {{ row.fuel.name }} ({{ row.fuel.key }})
+                        </span>
+                      </td>
+                      <td class="border-0 text-muted">
+                        <span v-if="row.speed">
+                          {{ row.speed.name }} ({{ row.speed.key }})
                         </span>
                       </td>
                     </tr>
@@ -98,12 +105,14 @@
                   <label class="form-label fw-bold mb-0">Odometer Attributes</label>
                   <button type="button" class="btn btn-sm btn-outline-secondary" @click="addOdometerInput"><i class="bi bi-plus"></i> Add</button>
                 </div>
-                <div v-for="(input, idx) in form.odometerInputs" :key="'odo-'+idx" class="row g-2 mb-2 align-items-center">
+                <div v-for="(input, idx) in form.odometerInputs" :key="'odo-'+idx" class="row g-2 mb-2 align-items-start">
                   <div class="col-5">
-                    <input type="text" class="form-control form-control-sm" v-model="input.name" placeholder="Name (e.g. Dashboard)">
+                    <input type="text" class="form-control form-control-sm" :class="{ 'is-invalid': input.nameError }" v-model="input.name" placeholder="Name (e.g. Dashboard)">
+                    <div v-if="input.nameError" class="invalid-feedback">{{ input.nameError }}</div>
                   </div>
                   <div class="col-5">
-                    <input type="text" class="form-control form-control-sm" v-model="input.key" placeholder="Key (e.g. 16)">
+                    <input type="text" class="form-control form-control-sm" :class="{ 'is-invalid': input.keyError }" v-model="input.key" placeholder="Key (e.g. 16)">
+                    <div v-if="input.keyError" class="invalid-feedback">{{ input.keyError }}</div>
                   </div>
                   <div class="col-2">
                      <button type="button" class="btn btn-sm btn-outline-danger w-100" @click="removeOdometerInput(idx)"><i class="bi bi-trash"></i></button>
@@ -117,18 +126,49 @@
                   <label class="form-label fw-bold mb-0">Fuel Attributes</label>
                   <button type="button" class="btn btn-sm btn-outline-secondary" @click="addFuelInput"><i class="bi bi-plus"></i> Add</button>
                 </div>
-                <div v-for="(input, idx) in form.fuelInputs" :key="'fuel-'+idx" class="row g-2 mb-2 align-items-center">
-                  <div class="col-5">
-                    <input type="text" class="form-control form-control-sm" v-model="input.name" placeholder="Name (e.g. Tank 1)">
+                <div v-for="(input, idx) in form.fuelInputs" :key="'fuel-'+idx" class="row g-2 mb-2 align-items-start">
+                  <div class="col-4">
+                    <input type="text" class="form-control form-control-sm" :class="{ 'is-invalid': input.nameError }" v-model="input.name" placeholder="Name (e.g. Tank 1)" required pattern=".*\S+.*" title="Must not be empty or whitespace">
+                    <div v-if="input.nameError" class="invalid-feedback">{{ input.nameError }}</div>
                   </div>
-                  <div class="col-5">
-                    <input type="text" class="form-control form-control-sm" v-model="input.key" placeholder="Key (e.g. 84)">
+                  <div class="col-4">
+                    <input type="text" class="form-control form-control-sm" :class="{ 'is-invalid': input.keyError }" v-model="input.key" placeholder="Key (e.g. 84)" required pattern=".*\S+.*" title="Must not be empty or whitespace">
+                    <div v-if="input.keyError" class="invalid-feedback">{{ input.keyError }}</div>
+                  </div>
+                  <div class="col-2 text-center pt-1">
+                    <div class="form-check d-inline-block">
+                        <input class="form-check-input" type="checkbox" v-model="input.is_analog" :id="'fuel-check-'+idx">
+                        <label class="form-check-label small" :for="'fuel-check-'+idx">
+                            Analog
+                        </label>
+                    </div>
                   </div>
                   <div class="col-2">
                      <button type="button" class="btn btn-sm btn-outline-danger w-100" @click="removeFuelInput(idx)"><i class="bi bi-trash"></i></button>
                   </div>
                 </div>
                  <div v-if="!form.fuelInputs.length" class="text-muted small fst-italic">No fuel attributes configured.</div>
+              </div>
+
+              <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <label class="form-label fw-bold mb-0">Speed Attributes</label>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" @click="addSpeedInput"><i class="bi bi-plus"></i> Add</button>
+                </div>
+                <div v-for="(input, idx) in form.speedInputs" :key="'speed-'+idx" class="row g-2 mb-2 align-items-start">
+                  <div class="col-5">
+                    <input type="text" class="form-control form-control-sm" :class="{ 'is-invalid': input.nameError }" v-model="input.name" placeholder="Name (e.g. Speed)">
+                    <div v-if="input.nameError" class="invalid-feedback">{{ input.nameError }}</div>
+                  </div>
+                  <div class="col-5">
+                    <input type="text" class="form-control form-control-sm" :class="{ 'is-invalid': input.keyError }" v-model="input.key" placeholder="Key (e.g. speed)">
+                    <div v-if="input.keyError" class="invalid-feedback">{{ input.keyError }}</div>
+                  </div>
+                  <div class="col-2">
+                     <button type="button" class="btn btn-sm btn-outline-danger w-100" @click="removeSpeedInput(idx)"><i class="bi bi-trash"></i></button>
+                  </div>
+                </div>
+                 <div v-if="!form.speedInputs.length" class="text-muted small fst-italic">No speed attributes configured.</div>
               </div>
               <div class="d-flex justify-content-end">
                 <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
@@ -164,34 +204,43 @@ const editingId = ref(null);
 const form = reactive({
   modelname: '',
   odometerInputs: [],
-  fuelInputs: []
+  fuelInputs: [],
+  speedInputs: []
 });
 
 function getAttributeRows(model) {
   const odo = (model.attributes && model.attributes.odometer) || [];
   const fuel = (model.attributes && model.attributes.fuel) || [];
-  const max = Math.max(odo.length, fuel.length);
+  const speed = (model.attributes && model.attributes.speed) || [];
+  const max = Math.max(odo.length, fuel.length, speed.length);
   const rows = [];
   for (let i = 0; i < max; i += 1) {
     rows.push({
       odometer: odo[i] || null,
-      fuel: fuel[i] || null
+      fuel: fuel[i] || null,
+      speed: speed[i] || null
     });
   }
   return rows;
 }
 
 function addOdometerInput() {
-  form.odometerInputs.push({ name: '', key: '' });
+  form.odometerInputs.push({ name: '', key: '', nameError: '', keyError: '' });
 }
 function removeOdometerInput(index) {
   form.odometerInputs.splice(index, 1);
 }
 function addFuelInput() {
-  form.fuelInputs.push({ name: '', key: '' });
+  form.fuelInputs.push({ name: '', key: '', is_analog: false, nameError: '', keyError: '' });
 }
 function removeFuelInput(index) {
   form.fuelInputs.splice(index, 1);
+}
+function addSpeedInput() {
+  form.speedInputs.push({ name: '', key: '', nameError: '', keyError: '' });
+}
+function removeSpeedInput(index) {
+  form.speedInputs.splice(index, 1);
 }
 
 async function fetchModels() {
@@ -213,14 +262,21 @@ function openModal(model = null) {
     editingId.value = model.id;
     form.modelname = model.modelname;
     const attrs = model.attributes || {};
-    form.odometerInputs = attrs.odometer ? JSON.parse(JSON.stringify(attrs.odometer)) : [];
-    form.fuelInputs = attrs.fuel ? JSON.parse(JSON.stringify(attrs.fuel)) : [];
+    form.odometerInputs = attrs.odometer ? JSON.parse(JSON.stringify(attrs.odometer)).map(i => ({...i, nameError: '', keyError: ''})) : [];
+    form.fuelInputs = attrs.fuel ? JSON.parse(JSON.stringify(attrs.fuel)).map(f => ({
+      ...f,
+      is_analog: !!f.is_analog,
+      nameError: '',
+      keyError: ''
+    })) : [];
+    form.speedInputs = attrs.speed ? JSON.parse(JSON.stringify(attrs.speed)).map(i => ({...i, nameError: '', keyError: ''})) : [];
   } else {
     isEditing.value = false;
     editingId.value = null;
     form.modelname = '';
     form.odometerInputs = [];
     form.fuelInputs = [];
+    form.speedInputs = [];
   }
 
   if (!bsModal && modalRef.value) {
@@ -237,13 +293,56 @@ function openModal(model = null) {
 }
 
 async function saveModel() {
+  let hasError = false;
+
+  const validate = (inputs, type) => {
+    inputs.forEach(input => {
+      input.nameError = '';
+      input.keyError = '';
+
+      if (!input.name || !input.name.trim()) {
+        input.nameError = 'Name is required';
+        hasError = true;
+      } else if (/\s/.test(input.name)) {
+        input.nameError = 'Spaces are not allowed';
+        hasError = true;
+      }
+
+      if (!input.key || !input.key.trim()) {
+        input.keyError = 'Key is required';
+        hasError = true;
+      } else if (/\s/.test(input.key)) {
+        input.keyError = 'Spaces are not allowed';
+        hasError = true;
+      }
+    });
+  };
+
+  validate(form.odometerInputs, 'Odometer');
+  validate(form.fuelInputs, 'Fuel');
+  validate(form.speedInputs, 'Speed');
+
+  if (hasError) {
+    // Optionally show a general toast, or just rely on inline errors
+    // Swal.fire({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, icon: 'error', title: 'Please correct errors' });
+    return;
+  }
+
   saving.value = true;
   try {
+    // Strip error fields before sending
+    const clean = (inputs) => inputs.map(({ name, key, is_analog }) => {
+        const obj = { name, key };
+        if (typeof is_analog !== 'undefined') obj.is_analog = is_analog;
+        return obj;
+    });
+
     const payload = {
       modelname: form.modelname,
       attributes: {
-        odometer: form.odometerInputs,
-        fuel: form.fuelInputs
+        odometer: clean(form.odometerInputs),
+        fuel: clean(form.fuelInputs),
+        speed: clean(form.speedInputs)
       }
     };
 
