@@ -115,7 +115,8 @@ class VehicleController extends Controller
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
             'type','manufacturer','color','registration','plate','odometer','fuelAverage','photos','fuelTankCapacity','trackerModel',
-            'fuelType','fuel_type','vehicleNo','speedLimit','odometerAttr','fuelAttr'
+            'fuelType','fuel_type','vehicleNo','speedLimit','odometerAttr','fuelAttr',
+            'cameraModel','cameraImi','speedAttr','fuelMin','fuelMax','fuelReverse'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 
@@ -311,7 +312,8 @@ class VehicleController extends Controller
         // Sanitize attributes: whitelist known keys only
         $allowedKeys = [
             'type','manufacturer','color','registration','plate','odometer','fuelAverage','photos','fuelTankCapacity','trackerModel',
-            'fuelType','fuel_type','vehicleNo','speedLimit','odometerAttr','fuelAttr'
+            'fuelType','fuel_type','vehicleNo','speedLimit','odometerAttr','fuelAttr',
+            'cameraModel','cameraImi','speedAttr','fuelMin','fuelMax','fuelReverse'
         ];
         $attributes = array_intersect_key($attributes, array_flip($allowedKeys));
 

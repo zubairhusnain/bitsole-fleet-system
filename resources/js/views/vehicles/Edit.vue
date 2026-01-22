@@ -58,6 +58,10 @@
               <input v-model="form.attributes.color" type="text" class="form-control" placeholder="e.g. White" />
             </div>
             <div class="col-12 col-md-4">
+              <label class="form-label small">Max Speed</label>
+              <input v-model="form.speedLimit" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="e.g. 120" />
+            </div>
+            <div class="col-12 col-md-4">
               <label class="form-label small">Model</label>
               <input v-model="form.model" type="text" class="form-control" placeholder="e.g. 2023" />
             </div>
@@ -131,9 +135,13 @@
         <div class="card-body">
           <div class="row g-3 align-items-start">
             <div class="col-12 col-md-4">
-              <label class="form-label small">Max Speed</label>
-              <input v-model="form.speedLimit" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="e.g. 120" />
+              <label class="form-label small">Speed Attribute</label>
+              <select v-model="form.attributes.speedAttr" class="form-select">
+                <option value="">-- Select Speed Attribute --</option>
+                <option v-for="opt in speedOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
             </div>
+
             <div class="col-12 col-md-4">
               <label class="form-label small">Odometer Attribute</label>
               <select v-model="form.attributes.odometerAttr" class="form-select">
@@ -147,6 +155,41 @@
                 <option value="">-- Select Fuel Attribute --</option>
                 <option v-for="opt in fuelOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
+            </div>
+
+            <!-- Analog Fuel Configuration -->
+            <div v-if="isAnalogFuel" class="col-12">
+              <div class="row g-3">
+                <div class="col-12 col-md-4">
+                  <label class="form-label small">Minimum Value</label>
+                  <input v-model="form.attributes.fuelMin" type="number" step="any" class="form-control" placeholder="e.g. 0" />
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label small">Maximum Value</label>
+                  <input v-model="form.attributes.fuelMax" type="number" step="any" class="form-control" placeholder="e.g. 100" />
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label small">Reverse</label>
+                  <input v-model="form.attributes.fuelReverse" type="number" step="any" class="form-control" placeholder="e.g. 1" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Camera Configuration -->
+      <div v-if="!loading" class="card mb-3">
+        <div class="card-header"><h6 class="mb-0">Camera Configuration</h6></div>
+        <div class="card-body">
+          <div class="row g-3 align-items-start">
+            <div class="col-12 col-md-6">
+              <label class="form-label small">Camera Model</label>
+              <input v-model="form.attributes.cameraModel" type="text" class="form-control" placeholder="e.g. CM-1234" />
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label small">Camera IMI</label>
+              <input v-model="form.attributes.cameraImi" type="text" class="form-control" placeholder="e.g. IMI-01" />
             </div>
           </div>
         </div>
@@ -188,7 +231,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted, watch } from 'vue';
+import { reactive, ref, onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
@@ -212,9 +255,28 @@ const form = reactive({
 
     fuelAverage: '',
     fuelType: '',
-    trackerModel: ''
+    trackerModel: '',
+    fuelMin: '',
+    fuelMax: '',
+    fuelReverse: '',
+    cameraModel: '',
+    cameraImi: ''
   }
 });
+
+const fuelAttributeDetails = ref([]);
+
+const isAnalogFuel = ref(false);
+
+function updateAnalogStatus() {
+  const attrName = form.attributes.fuelAttr;
+  if (!attrName) {
+    isAnalogFuel.value = false;
+    return;
+  }
+  const detail = fuelAttributeDetails.value.find(d => d.name === attrName);
+  isAnalogFuel.value = !!(detail && detail.is_analog);
+}
 
 const hydrating = ref(false);
 
@@ -236,8 +298,10 @@ const error = ref('');
 const submitting = ref(false);
 const loading = ref(true);
 const trackerModels = ref(['Teltonika-FMC-003','Teltonika-FMC-150','Teltonika-FMC-130','Teltonika-FMC-920']);
+const allModels = ref([]);
 const odometerOptions = ref([]);
 const fuelOptions = ref([]);
+const speedOptions = ref([]);
 
 function dismissError() { error.value = ''; }
 function dismissMessage() { message.value = ''; }
@@ -246,6 +310,7 @@ onMounted(async () => {
   try {
     const { data } = await axios.get('/web/vehicles/models/options');
     const opts = Array.isArray(data?.options) ? data.options : [];
+    allModels.value = Array.isArray(data?.models) ? data.models : [];
     const names = opts
       .map(o => (typeof o === 'string' ? o : (o.modelname || o.name || '')))
       .filter(Boolean);
@@ -278,38 +343,62 @@ onMounted(async () => {
 });
 
 async function refreshModelAttributes(modelName, keepSelection = false) {
-  odometerOptions.value = [];
-  fuelOptions.value = [];
-  if (!modelName) return;
+  if (!modelName) {
+    isAnalogFuel.value = false;
+    odometerOptions.value = [];
+    fuelOptions.value = [];
+    fuelAttributeDetails.value = [];
+    speedOptions.value = [];
+    return;
+  }
+
   try {
-    const { data } = await axios.get('/web/vehicles/models/options');
-    const rows = Array.isArray(data?.models) ? data.models : [];
+    let rows = allModels.value;
+    if (rows.length === 0) {
+      const { data } = await axios.get('/web/vehicles/models/options');
+      rows = Array.isArray(data?.models) ? data.models : [];
+      allModels.value = rows;
+    }
+
     const row = rows.find(r => String(r.modelname || '').trim() === String(modelName || '').trim());
     if (row && row.attributes && typeof row.attributes === 'object') {
       const attrs = row.attributes;
       const odo = Array.isArray(attrs.odometer) ? attrs.odometer.map(i => i.name).filter(Boolean) : [];
-      const fuel = Array.isArray(attrs.fuel) ? attrs.fuel.map(i => i.name).filter(Boolean) : [];
+      const fuelList = Array.isArray(attrs.fuel) ? attrs.fuel : [];
+      const fuel = fuelList.map(i => i.name).filter(Boolean);
+      const speed = Array.isArray(attrs.speed) ? attrs.speed.map(i => i.name).filter(Boolean) : [];
+
+      fuelAttributeDetails.value = fuelList;
       odometerOptions.value = odo;
       fuelOptions.value = fuel;
-      if (!keepSelection) {
-        if (!form.attributes.odometerAttr && odo.length) form.attributes.odometerAttr = odo[0];
-        if (!form.attributes.fuelAttr && fuel.length) form.attributes.fuelAttr = fuel[0];
-      }
+      speedOptions.value = speed;
+      updateAnalogStatus();
+    } else {
+      // Model not found or invalid
+      odometerOptions.value = [];
+      fuelOptions.value = [];
+      fuelAttributeDetails.value = [];
+      speedOptions.value = [];
+      isAnalogFuel.value = false;
     }
   } catch {}
 }
+
+watch(() => form.attributes.fuelAttr, updateAnalogStatus);
 
 watch(() => form.attributes.trackerModel, (val) => {
   if (hydrating.value) {
     return;
   }
-//   form.attributes.odometerAttr = '';
-//   form.attributes.fuelAttr = '';
+
+
   if (val) {
     refreshModelAttributes(val);
   } else {
     odometerOptions.value = [];
     fuelOptions.value = [];
+    fuelAttributeDetails.value = [];
+    speedOptions.value = [];
   }
 });
 
@@ -353,6 +442,12 @@ function hydrateFormFromTc(tc) {
   form.attributes.fuelTankCapacity = attrs.fuelTankCapacity || attrs.FuelTankCapacity || attrs.fueltankcapacity || '';
   form.attributes.odometerAttr = attrs.odometerAttr || attrs.odometer_attribute || '';
   form.attributes.fuelAttr = attrs.fuelAttr || attrs.fuel_attribute || '';
+  form.attributes.speedAttr = attrs.speedAttr || attrs.speed_attribute || '';
+  form.attributes.fuelMin = attrs.fuelMin || attrs.speedMin || '';
+  form.attributes.fuelMax = attrs.fuelMax || attrs.speedMax || '';
+  form.attributes.fuelReverse = attrs.fuelReverse || attrs.speedReverse || '';
+  form.attributes.cameraModel = attrs.cameraModel || '';
+  form.attributes.cameraImi = attrs.cameraImi || '';
 
   if (form.attributes.trackerModel) {
     refreshModelAttributes(form.attributes.trackerModel, true);
@@ -431,6 +526,18 @@ async function submit() {
     const keptPhotos = existingPhotos.value.filter(Boolean);
     attrsOut.photos = keptPhotos;
     attrsOut.speedLimit = form.speedLimit ?? '';
+    // Cleanup old speed keys if they exist
+    delete attrsOut.speedMin;
+    delete attrsOut.speedMax;
+    delete attrsOut.speedReverse;
+
+    // If fuel is not analog, remove analog config values
+    if (!isAnalogFuel.value) {
+      delete attrsOut.fuelMin;
+      delete attrsOut.fuelMax;
+      delete attrsOut.fuelReverse;
+    }
+
     fd.append('attributes', JSON.stringify(attrsOut));
     blobs.value.forEach((file, i) => { if (file) fd.append(`images[${i}]`, file); });
     // Use POST with method override to ensure Laravel parses multipart fields/files
