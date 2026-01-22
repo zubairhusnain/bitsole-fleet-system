@@ -708,7 +708,7 @@ async function stopImpersonation() {
             timer: 1200,
             showConfirmButton: false,
         });
-        router.push('/');
+        router.push('/dashboard');
         window.location.reload();
     } catch (e) {
         const status = e?.response?.status;
