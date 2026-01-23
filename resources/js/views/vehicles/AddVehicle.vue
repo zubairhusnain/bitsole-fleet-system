@@ -119,7 +119,7 @@
             <div class="col-12 col-md-4">
               <label class="form-label small">Speed Attribute</label>
               <select v-model="form.attributes.speedAttr" class="form-select">
-                <option value="">-- Select Speed Attribute --</option>
+                <option value="">-- Default Speed Attribute --</option>
                 <option v-for="opt in speedOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
             </div>
@@ -127,14 +127,14 @@
             <div class="col-12 col-md-4">
               <label class="form-label small">Odometer Attribute</label>
               <select v-model="form.attributes.odometerAttr" class="form-select">
-                <option value="">-- Select Odometer Attribute --</option>
+                <option value="">-- Default Odometer Attribute --</option>
                 <option v-for="opt in odometerOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
             </div>
             <div class="col-12 col-md-4">
               <label class="form-label small">Fuel Attribute</label>
               <select v-model="form.attributes.fuelAttr" class="form-select">
-                <option value="">-- Select Fuel Attribute --</option>
+                <option value="">-- Default Fuel Attribute --</option>
                 <option v-for="opt in fuelOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
             </div>
