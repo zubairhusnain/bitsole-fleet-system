@@ -190,7 +190,14 @@ function onGoogleMapError() {
 function setMarkerRef(id, el) {
     try {
         const mk = el?.leafletObject ?? el;
-        if (mk) markerRefs.set(id, mk);
+        if (mk) {
+            markerRefs.set(id, mk);
+            if (mapProvider.value === 'leaflet' && String(id) === String(selectedId.value)) {
+                setTimeout(() => {
+                    try { mk.openPopup(); } catch {}
+                }, 200);
+            }
+        }
         else markerRefs.delete(id);
     } catch {}
 }
@@ -874,23 +881,14 @@ watch(
         // Allow new map to render its markers first
         try { await nextTick(); } catch {}
         if (!selectedId.value) return;
-        const sel = markerItems.value.find(m => String(m.id) === String(selectedId.value));
-        if (!sel) return;
-        const lat = Number(sel.lat);
-        const lon = Number(sel.lon);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-        center.value = [lat, lon];
-        zoom.value = Math.max(zoom.value || 0, 15);
-        if (prov === 'leaflet') {
-            try {
-                if (map.value && typeof map.value.setView === 'function') {
-                    map.value.setView([lat, lon], zoom.value, { animate: true });
-                }
-            } catch {}
-            const mk = markerRefs.get(selectedId.value);
-            try { mk?.openPopup?.(); } catch {}
+
+        // Trigger click again on selected vehicle after delay
+        const v = vehicles.value.find(veh => String(deviceKey(veh)) === String(selectedId.value));
+        if (v) {
+            setTimeout(() => {
+                focusVehicle(v);
+            }, 200);
         }
-        // For Google, the GoogleMap component will auto-open the selected popup on ready
     }
 );
 

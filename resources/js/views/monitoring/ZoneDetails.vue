@@ -19,22 +19,7 @@
     <!-- Map Section -->
     <div class="card border rounded-4 shadow-0 bg-white mb-4 overflow-hidden">
       <div class="card-body p-0 position-relative" style="height: 500px;">
-        <!-- Map Type Controls -->
-        <div class="position-absolute top-0 start-0 m-3 z-3 d-flex gap-2" style="z-index: 1000;">
-          <div class="btn-group shadow-sm" role="group">
-            <button type="button" class="btn btn-sm" :class="mapType === 'osm' ? 'btn-dark' : 'btn-light'" @click="mapType = 'osm'">Map</button>
-            <button type="button" class="btn btn-sm" :class="mapType === 'satellite' ? 'btn-dark' : 'btn-light'" @click="mapType = 'satellite'">Satellite</button>
-          </div>
-        </div>
-
-        <div class="position-absolute bottom-0 start-0 m-3 z-3" style="z-index: 1000;">
-             <!-- Draw Zone button from image, assuming generic action or just visual for now since this is details -->
-             <button class="btn btn-info text-white btn-sm shadow-sm" disabled>
-                <i class="bi bi-pencil-square me-1"></i> Draw Zone
-            </button>
-        </div>
-
-        <l-map :key="mapKey" ref="mapRef" v-if="mapReady" :zoom="zoom" :center="center" :options="{ zoomControl: false }" @ready="onMapReady">
+        <l-map :key="mapKey" ref="mapRef" v-if="mapReady && mapType !== 'google'" :zoom="zoom" :center="center" :options="{ zoomControl: false }" @ready="onMapReady">
           <l-tile-layer :url="tileUrl" :attribution="tileAttribution" />
           <l-control-zoom position="bottomright" />
 
@@ -67,6 +52,31 @@
             </l-popup>
           </l-marker>
         </l-map>
+
+        <GoogleMap
+            v-if="mapReady && mapType === 'google'"
+            :center="center"
+            :zoom="zoom"
+            :markers="googleMarkers"
+            :polygons="googlePolygons"
+            :circles="googleCircles"
+        />
+
+        <!-- Map Type Controls -->
+        <div class="position-absolute top-0 start-0 m-3 z-3 d-flex gap-2" style="z-index: 2000;">
+          <div class="btn-group shadow-sm" role="group">
+            <button type="button" class="btn btn-sm" :class="mapType === 'osm' ? 'btn-dark' : 'btn-light'" @click="mapType = 'osm'">Map</button>
+            <button type="button" class="btn btn-sm" :class="mapType === 'satellite' ? 'btn-dark' : 'btn-light'" @click="mapType = 'satellite'">Satellite</button>
+            <button type="button" class="btn btn-sm" :class="mapType === 'google' ? 'btn-dark' : 'btn-light'" @click="mapType = 'google'">Google</button>
+          </div>
+        </div>
+
+        <div class="position-absolute bottom-0 start-0 m-3 z-3" style="z-index: 2000;">
+             <!-- Draw Zone button from image, assuming generic action or just visual for now since this is details -->
+             <button class="btn btn-info text-white btn-sm shadow-sm" disabled>
+                <i class="bi bi-pencil-square me-1"></i> Draw Zone
+            </button>
+        </div>
       </div>
     </div>
 
@@ -300,6 +310,7 @@ import "leaflet/dist/leaflet.css";
 import { LMap, LTileLayer, LPolygon, LMarker, LPopup, LControlZoom, LCircle } from "@vue-leaflet/vue-leaflet";
 import * as L from 'leaflet';
 import UiAlert from '../../components/UiAlert.vue';
+import GoogleMap from '../../components/GoogleMap.vue';
 
 const route = useRoute();
 const zoneId = route.params.zoneId;
@@ -538,6 +549,52 @@ const isOnline = (v) => {
 
 const hasZoneLocation = computed(() => {
     return (zonePolygon.value.length > 0 || zoneCircle.value) && center.value && (center.value[0] !== 0 || center.value[1] !== 0);
+});
+
+// Google Map Data
+const googleMarkers = computed(() => {
+    return vehicles.value.map(v => ({
+        id: v.id,
+        lat: v.latitude,
+        lng: v.longitude,
+        iconUrl: '/images/markers/focus-marker.svg',
+        popup: `
+            <div class="text-center">
+                <strong>${v.name}</strong><br>
+                <span class="badge my-1 ${isIgnitionOn(v) ? 'bg-success' : 'bg-danger'}">
+                    ${isIgnitionOn(v) ? 'Ignition On' : 'Ignition Off'}
+                </span><br>
+                ${v.speed} km/h
+            </div>
+        `
+    }));
+});
+
+const googlePolygons = computed(() => {
+    if (!zonePolygon.value.length) return [];
+    return [{
+        paths: zonePolygon.value,
+        options: {
+            color: '#1070e3',
+            fillColor: '#1070e3',
+            fillOpacity: 0.25,
+            weight: 2
+        }
+    }];
+});
+
+const googleCircles = computed(() => {
+    if (!zoneCircle.value) return [];
+    return [{
+        center: zoneCircle.value.center,
+        radius: zoneCircle.value.radius,
+        options: {
+            color: '#3f8fd7',
+            fillColor: '#3f8fd7',
+            fillOpacity: 0.25,
+            weight: 1
+        }
+    }];
 });
 
 // Pagination Computed

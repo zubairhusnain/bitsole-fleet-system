@@ -38,6 +38,14 @@ const props = defineProps({
     type: [String, Number, null],
     default: null,
   },
+  polygons: {
+    type: Array,
+    default: () => [],
+  },
+  circles: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 const emit = defineEmits(['ready', 'click', 'error']);
@@ -47,6 +55,7 @@ const map = ref(null);
 const marker = ref(null);
 let zoneMarkers = [];
 let routeLines = [];
+let shapeOverlays = []; // Polygons and circles
 let vehicleMarkers = new Map();
 let vehicleInfoWindows = new Map();
 let selectedInfoWindow = null;
@@ -87,8 +96,12 @@ function clearZonesAndRoutes() {
   try {
     routeLines.forEach((l) => l.setMap(null));
   } catch {}
+  try {
+    shapeOverlays.forEach((s) => s.setMap(null));
+  } catch {}
   zoneMarkers = [];
   routeLines = [];
+  shapeOverlays = [];
 }
 
 function clearVehicleMarkers() {
@@ -251,6 +264,45 @@ function updateZonesAndRoutes() {
       }
     );
   });
+
+  // Draw Polygons
+  const polyArr = Array.isArray(props.polygons) ? props.polygons : [];
+  polyArr.forEach((p) => {
+    if (!p || !Array.isArray(p.paths)) return;
+    const paths = p.paths.map(pt => ({ lat: Number(pt[0]), lng: Number(pt[1]) }));
+    const opts = p.options || {};
+    const polygon = new window.google.maps.Polygon({
+        paths,
+        strokeColor: opts.color || '#1070e3',
+        strokeOpacity: 0.8,
+        strokeWeight: opts.weight || 2,
+        fillColor: opts.fillColor || '#1070e3',
+        fillOpacity: opts.fillOpacity || 0.25,
+        map: map.value
+    });
+    shapeOverlays.push(polygon);
+  });
+
+  // Draw Circles
+  const circArr = Array.isArray(props.circles) ? props.circles : [];
+  circArr.forEach((c) => {
+    if (!c || !c.center) return;
+    const center = { lat: Number(c.center[0]), lng: Number(c.center[1]) };
+    const radius = Number(c.radius);
+    if (!Number.isFinite(radius)) return;
+    const opts = c.options || {};
+    const circle = new window.google.maps.Circle({
+        center,
+        radius,
+        strokeColor: opts.color || '#3f8fd7',
+        strokeOpacity: 0.8,
+        strokeWeight: opts.weight || 1,
+        fillColor: opts.fillColor || '#3f8fd7',
+        fillOpacity: opts.fillOpacity || 0.25,
+        map: map.value
+    });
+    shapeOverlays.push(circle);
+  });
 }
 
 function initMap() {
@@ -319,6 +371,22 @@ watch(
 
 watch(
   () => props.zones,
+  () => {
+    updateZonesAndRoutes();
+  },
+  { deep: true }
+);
+
+watch(
+  () => props.polygons,
+  () => {
+    updateZonesAndRoutes();
+  },
+  { deep: true }
+);
+
+watch(
+  () => props.circles,
   () => {
     updateZonesAndRoutes();
   },
