@@ -67,7 +67,7 @@ function loadGoogleMapsScript() {
   if (window.google && window.google.maps && window.google.maps.Map) return Promise.resolve();
   if (googleMapsPromise) return googleMapsPromise;
   googleMapsPromise = new Promise((resolve, reject) => {
-    const id = 'google-maps-script';
+    const id = 'google-maps-api-script';
     if (document.getElementById(id)) {
       const check = () => {
         if (window.google && window.google.maps && window.google.maps.Map) resolve();
@@ -79,7 +79,7 @@ function loadGoogleMapsScript() {
     const s = document.createElement('script');
     s.id = id;
     const base = 'https://maps.googleapis.com/maps/api/js';
-    s.src = apiKey ? `${base}?key=${apiKey}` : base;
+    s.src = apiKey ? `${base}?key=${apiKey}&libraries=places` : `${base}?libraries=places`;
     s.async = true;
     s.defer = true;
     s.onload = () => resolve();

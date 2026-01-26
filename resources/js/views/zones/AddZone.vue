@@ -340,7 +340,7 @@ watch(() => form.type, (v) => {
   if (v !== 'circle') { geofenceInfo.radius = null; form.radius = undefined; }
 });
 
-// Google Places loader (optional, used if API key provided)
+// Google Places loader (consistent with GoogleMap.vue)
 let googlePlacesPromise = null;
 function loadGooglePlacesScript() {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -348,9 +348,8 @@ function loadGooglePlacesScript() {
   if (window.google && window.google.maps && window.google.maps.places) return Promise.resolve();
   if (googlePlacesPromise) return googlePlacesPromise;
   googlePlacesPromise = new Promise((resolve, reject) => {
-    const id = 'google-places-script';
+    const id = 'google-maps-api-script';
     if (document.getElementById(id)) {
-      // if script exists, wait until google is ready
       const check = () => {
         if (window.google && window.google.maps && window.google.maps.places) resolve();
         else setTimeout(check, 200);

@@ -340,7 +340,7 @@ watch(() => form.type, (v) => {
   }
 });
 
-// Google Places loader (optional)
+// Google Places loader (consistent with GoogleMap.vue)
 let googlePlacesPromise = null;
 function loadGooglePlacesScript() {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -348,7 +348,7 @@ function loadGooglePlacesScript() {
   if (window.google && window.google.maps && window.google.maps.places) return Promise.resolve();
   if (googlePlacesPromise) return googlePlacesPromise;
   googlePlacesPromise = new Promise((resolve, reject) => {
-    const id = 'google-places-script';
+    const id = 'google-maps-api-script';
     if (document.getElementById(id)) {
       const check = () => {
         if (window.google && window.google.maps && window.google.maps.places) resolve();
