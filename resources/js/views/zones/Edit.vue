@@ -76,9 +76,33 @@
           <input v-model="form.polygon" type="hidden" />
         </div>
 
-        <!-- Map -->
-        <div class="map-frame mt-3">
-          <l-map :key="mapKey" id="zoneEditMap" :zoom="zoom" :center="center" :options="mapOptions" @ready="onMapReady">
+        <div class="map-frame mt-3" style="position: relative; height: 500px;">
+          <!-- Map Provider Toggle -->
+          <div class="btn-group" role="group" style="position: absolute; top: 10px; right: 100px; z-index: 1000;">
+             <button type="button" class="btn btn-sm shadow-sm" :class="mapProvider === 'leaflet' ? 'btn-primary' : 'btn-light'" @click="mapProvider = 'leaflet'">Leaflet</button>
+             <button type="button" class="btn btn-sm shadow-sm" :class="mapProvider === 'google' ? 'btn-primary' : 'btn-light'" @click="mapProvider = 'google'">Google Maps</button>
+          </div>
+
+          <!-- Google Maps Search -->
+          <div v-if="mapProvider === 'google'" class="input-group input-group-sm shadow-sm" style="position: absolute; top: 10px; left: 10px; z-index: 1000; max-width: 300px;">
+             <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+             <input ref="googleSearchInput" type="text" class="form-control" placeholder="Search Google Places..." />
+          </div>
+
+          <GoogleMap
+            v-if="mapProvider === 'google'"
+            ref="googleMapRef"
+            :center="center"
+            :zoom="zoom"
+            :markers="googleMarkers"
+            :polygons="googlePolygons"
+            :circles="googleCircles"
+            :clickable="true"
+            @click="onGoogleMapClick"
+            @marker-dragend="onGoogleMarkerDragEnd"
+            @ready="onGoogleMapReady"
+          />
+          <l-map v-if="mapProvider === 'leaflet'" :key="mapKey" id="zoneEditMap" :zoom="zoom" :center="center" :options="mapOptions" @ready="onMapReady">
             <l-tile-layer :url="tileUrl" :attribution="tileAttribution" />
             <!-- Default center marker -->
             <l-marker :lat-lng="center" />
@@ -90,9 +114,9 @@
             <l-marker v-if="searchMarkerLatLng" :lat-lng="searchMarkerLatLng" :draggable="true" @dragend="onSearchMarkerDragEnd" />
           </l-map>
           <!-- Map tools: Reset shape to original and center to current location -->
-          <div class="map-tools">
+          <div class="map-tools" style="position: absolute; top: 10px; right: 10px; z-index: 1000;">
             <div class="btn-group btn-group-sm" role="group">
-              <button type="button" class="btn btn-light" @click="resetWholeMap">
+              <button type="button" class="btn btn-light shadow-sm" @click="resetWholeMap">
                 <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
               </button>
             </div>
@@ -117,6 +141,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { LMap, LTileLayer, LPolygon, LCircle, LCircleMarker, LMarker } from '@vue-leaflet/vue-leaflet';
+import GoogleMap from '../../components/GoogleMap.vue';
 import { GeoSearchControl, OpenStreetMapProvider } from 'leaflet-geosearch';
 import 'leaflet-geosearch/dist/geosearch.css';
 import 'leaflet/dist/leaflet.css';
@@ -162,6 +187,7 @@ const zoom = ref(15);
 const center = ref([38.627, -90.199]);
 const basemap = ref('map');
 const mapKey = ref(0);
+const mapProvider = ref('leaflet'); // 'leaflet' or 'google'
 const tileAttribution = '© OpenStreetMap contributors';
 const mapOptions = { zoomControl: true };
 const mapRef = ref(null);
@@ -173,12 +199,100 @@ const tileUrl = computed(() => {
     : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 });
 
+const googleMarkers = computed(() => {
+  const markers = [];
+  // Polygon vertices
+  if (form.type === 'polygon') {
+    polygonPoints.value.forEach((p, i) => {
+      markers.push({ id: 'poly-' + i, lat: p[0], lng: p[1], draggable: true, type: 'polygon', index: i });
+    });
+  }
+  // Rectangle vertices
+  else if (form.type === 'rectangle') {
+    rectanglePoints.value.forEach((p, i) => {
+      markers.push({ id: 'rect-' + i, lat: p[0], lng: p[1], draggable: true, type: 'rectangle', index: i });
+    });
+  }
+  // Search marker
+  if (searchMarkerLatLng.value) {
+    markers.push({
+      id: 'search-marker',
+      lat: searchMarkerLatLng.value[0],
+      lng: searchMarkerLatLng.value[1],
+      draggable: true,
+      type: 'search'
+    });
+  }
+  // Center marker (matches Leaflet's l-marker)
+  if (center.value && (form.type === 'circle' || (!polygonPoints.value.length && !rectanglePoints.value.length))) {
+      markers.push({
+          id: 'center-marker',
+          lat: center.value[0],
+          lng: center.value[1],
+          draggable: false
+      });
+  }
+  return markers;
+});
+
+const googlePolygons = computed(() => {
+  if (polygonPoints.value.length >= 3) {
+    return [{
+      paths: polygonPoints.value.map(p => ({ lat: p[0], lng: p[1] })),
+      options: { color: '#1070e3', fillColor: '#1070e3', fillOpacity: 0.25 }
+    }];
+  }
+  return [];
+});
+
+const googleCircles = computed(() => {
+  if (form.type === 'circle' && circleCenter.value) {
+    return [{
+      center: { lat: circleCenter.value[0], lng: circleCenter.value[1] },
+      radius: Number(form.radius || 100),
+      options: { color: '#3f8fd7', fillColor: '#3f8fd7', fillOpacity: 0.25 }
+    }];
+  }
+  return [];
+});
+
 const circleCenter = ref(null);
 const polygonPoints = ref([]);
 const rectanglePoints = ref([]);
 const drawing = ref(false);
 const searchQuery = ref('');
 const searchMarkerLatLng = ref(null);
+const googleSearchInput = ref(null);
+
+watch(mapProvider, async (val) => {
+  if (val === 'google') {
+    try {
+      await loadGooglePlacesScript();
+      setTimeout(() => {
+        if (googleSearchInput.value) {
+          setupGoogleAutocomplete(googleSearchInput.value, (lat, lng) => {
+            center.value = [lat, lng];
+            searchMarkerLatLng.value = [lat, lng];
+            form.coordinates = `${lat},${lng}`;
+            if (form.type === 'circle') {
+              circleCenter.value = [lat, lng];
+              if (!form.radius || !Number.isFinite(Number(form.radius))) {
+                form.radius = 1000;
+              }
+              geofenceInfo.lat = lat;
+              geofenceInfo.lng = lng;
+              geofenceInfo.coordinates = [[lat, lng]];
+              geofenceInfo.radius = form.radius;
+            }
+          });
+        }
+      }, 200);
+    } catch (e) {
+      console.error('Failed to load Google Places', e);
+    }
+  }
+});
+
 // Persist the originally loaded shape so type switching can re-render exact geometry
 const loadedShape = ref({ type: null, coordinates: [], lat: null, lng: null, radius: null });
 
@@ -314,6 +428,20 @@ function parseWKTArea(area) {
 }
 
 function fitMapToCurrentShape() {
+  if (mapProvider.value === 'google') {
+    const gm = googleMapRef.value;
+    if (!gm) return;
+    if (Array.isArray(polygonPoints.value) && polygonPoints.value.length) {
+      gm.fitBounds(polygonPoints.value);
+      return;
+    }
+    if (Array.isArray(rectanglePoints.value) && rectanglePoints.value.length === 2) {
+      gm.fitBounds(rectanglePoints.value);
+      return;
+    }
+    // For circle or default, center is handled by center watcher
+    return;
+  }
   const map = mapRef.value;
   try {
     if (!map) return;
@@ -376,6 +504,24 @@ function renderLoadedShape() {
   setTimeout(() => { try { const m = mapRef.value; m && m.invalidateSize(true); fitMapToCurrentShape(); } catch {} }, 40);
 }
 
+function onGoogleMarkerDragEnd(e) {
+  const marker = googleMarkers.value.find(m => m.id === e.id);
+  if (!marker) return;
+
+  const eventMock = { target: { getLatLng: () => ({ lat: e.lat, lng: e.lng }) } };
+
+  if (marker.type === 'search') {
+    onSearchMarkerDragEnd(eventMock);
+  } else if (marker.type === 'polygon' || marker.type === 'rectangle') {
+    onDrawMarkerDragEnd(marker.type, marker.index, eventMock);
+  }
+}
+
+function onGoogleMapClick(e) {
+  const eventMock = { latlng: { lat: e.lat, lng: e.lng } };
+  onMapClick(eventMock);
+}
+
 function centerToCurrentLocation() {
   const map = mapRef.value;
   return new Promise((resolve) => {
@@ -422,6 +568,10 @@ async function resetWholeMap() {
     await centerToCurrentLocation();
   } catch {}
 }
+function onGoogleMapReady() {
+  setTimeout(() => fitMapToCurrentShape(), 100);
+}
+
 function onMapReady(map) {
   mapRef.value = map;
   attachGeocoderControl(map);

@@ -60,10 +60,11 @@
             :markers="googleMarkers"
             :polygons="googlePolygons"
             :circles="googleCircles"
+            @ready="onGoogleMapReady"
         />
 
         <!-- Map Type Controls -->
-        <div class="position-absolute top-0 start-0 m-3 z-3 d-flex gap-2" style="z-index: 2000;">
+        <div class="position-absolute top-0 start-0 m-3 d-flex gap-2" style="z-index: 9999;">
           <div class="btn-group shadow-sm" role="group">
             <button type="button" class="btn btn-sm" :class="mapType === 'osm' ? 'btn-dark' : 'btn-light'" @click="mapType = 'osm'">Map</button>
             <button type="button" class="btn btn-sm" :class="mapType === 'satellite' ? 'btn-dark' : 'btn-light'" @click="mapType = 'satellite'">Satellite</button>
@@ -71,12 +72,7 @@
           </div>
         </div>
 
-        <div class="position-absolute bottom-0 start-0 m-3 z-3" style="z-index: 2000;">
-             <!-- Draw Zone button from image, assuming generic action or just visual for now since this is details -->
-             <button class="btn btn-info text-white btn-sm shadow-sm" disabled>
-                <i class="bi bi-pencil-square me-1"></i> Draw Zone
-            </button>
-        </div>
+
       </div>
     </div>
 
@@ -606,6 +602,44 @@ const paginatedVehicles = computed(() => vehicles.value.slice(startIndex.value, 
 const goToPage = (p) => currentPage.value = p;
 const prevPage = () => { if (currentPage.value > 1) currentPage.value--; };
 const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++; };
+
+const onGoogleMapReady = (mapInstance) => {
+    if (!mapInstance || !window.google || !window.google.maps) return;
+
+    const bounds = new window.google.maps.LatLngBounds();
+    let hasPolygon = false;
+
+    if (zonePolygon.value && zonePolygon.value.length) {
+        zonePolygon.value.forEach(pt => {
+            if (Array.isArray(pt) && pt.length >= 2) {
+                bounds.extend({ lat: Number(pt[0]), lng: Number(pt[1]) });
+                hasPolygon = true;
+            }
+        });
+    }
+
+    if (hasPolygon) {
+        mapInstance.fitBounds(bounds);
+        // Check if bounds are too small (effectively a point)
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        if (Math.abs(ne.lat() - sw.lat()) < 0.0001 && Math.abs(ne.lng() - sw.lng()) < 0.0001) {
+             mapInstance.setZoom(15);
+        }
+    } else if (zoneCircle.value) {
+        const c = zoneCircle.value.center;
+        if (Array.isArray(c) && c.length >= 2) {
+             mapInstance.setCenter({ lat: Number(c[0]), lng: Number(c[1]) });
+             mapInstance.setZoom(14); // High zoom for circle
+        }
+    } else {
+         // Fallback high zoom
+         mapInstance.setZoom(14);
+         if (center.value && center.value[0] !== 0) {
+            mapInstance.setCenter({ lat: center.value[0], lng: center.value[1] });
+         }
+    }
+};
 
 const onMapReady = (map) => {
     // Invalidate size to ensure correct rendering

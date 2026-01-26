@@ -48,7 +48,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['ready', 'click', 'error']);
+const emit = defineEmits(['ready', 'click', 'error', 'marker-dragend']);
 
 const mapEl = ref(null);
 const map = ref(null);
@@ -147,8 +147,16 @@ function syncVehicleMarkers() {
     if (!mk) {
       const options = { position: pos, map: map.value };
       if (icon) options.icon = icon;
+      if (m.draggable) options.draggable = true;
       mk = new window.google.maps.Marker(options);
       vehicleMarkers.set(key, mk);
+
+      if (m.draggable) {
+          mk.addListener('dragend', (e) => {
+               emit('marker-dragend', { id: m.id, lat: e.latLng.lat(), lng: e.latLng.lng() });
+          });
+      }
+
       if (popupHtml) {
         info = vehicleInfoWindows.get(key) || new window.google.maps.InfoWindow({ content: popupHtml });
         vehicleInfoWindows.set(key, info);
@@ -163,6 +171,7 @@ function syncVehicleMarkers() {
     } else {
       mk.setPosition(pos);
       if (icon) mk.setIcon(icon);
+      if (m.draggable !== undefined) mk.setDraggable(!!m.draggable);
       if (popupHtml) {
         info = vehicleInfoWindows.get(key);
         if (!info) {
@@ -268,8 +277,17 @@ function updateZonesAndRoutes() {
   // Draw Polygons
   const polyArr = Array.isArray(props.polygons) ? props.polygons : [];
   polyArr.forEach((p) => {
-    if (!p || !Array.isArray(p.paths)) return;
-    const paths = p.paths.map(pt => ({ lat: Number(pt[0]), lng: Number(pt[1]) }));
+    if (!p || !Array.isArray(p.paths) || !p.paths.length) return;
+
+    // Normalize paths to {lat, lng}
+    const paths = p.paths.map(pt => {
+        if (pt && typeof pt.lat === 'number' && typeof pt.lng === 'number') return { lat: pt.lat, lng: pt.lng };
+        if (Array.isArray(pt) && pt.length >= 2) return { lat: Number(pt[0]), lng: Number(pt[1]) };
+        return null;
+    }).filter(pt => pt && Number.isFinite(pt.lat) && Number.isFinite(pt.lng));
+
+    if (!paths.length) return;
+
     const opts = p.options || {};
     const polygon = new window.google.maps.Polygon({
         paths,
@@ -287,9 +305,19 @@ function updateZonesAndRoutes() {
   const circArr = Array.isArray(props.circles) ? props.circles : [];
   circArr.forEach((c) => {
     if (!c || !c.center) return;
-    const center = { lat: Number(c.center[0]), lng: Number(c.center[1]) };
+
+    let center = null;
+    if (c.center && typeof c.center.lat === 'number' && typeof c.center.lng === 'number') {
+        center = { lat: c.center.lat, lng: c.center.lng };
+    } else if (Array.isArray(c.center) && c.center.length >= 2) {
+        center = { lat: Number(c.center[0]), lng: Number(c.center[1]) };
+    }
+
+    if (!center || !Number.isFinite(center.lat) || !Number.isFinite(center.lng)) return;
+
     const radius = Number(c.radius);
     if (!Number.isFinite(radius)) return;
+
     const opts = c.options || {};
     const circle = new window.google.maps.Circle({
         center,
@@ -482,4 +510,24 @@ onBeforeUnmount(() => {
   clearVehicleMarkers();
   map.value = null;
 });
+
+function fitBounds(bounds) {
+  if (!map.value || !bounds) return;
+  // Handle LatLngBoundsLiteral {north, south, east, west} or Google LatLngBounds object
+  if (typeof bounds.extend === 'function' || (bounds.north !== undefined && bounds.south !== undefined)) {
+    map.value.fitBounds(bounds);
+    return;
+  }
+  // Handle array of points [[lat,lng],...] or [{lat,lng},...]
+  if (Array.isArray(bounds) && bounds.length > 0) {
+     const b = new window.google.maps.LatLngBounds();
+     bounds.forEach(pt => {
+         if (Array.isArray(pt) && pt.length >= 2) b.extend({ lat: Number(pt[0]), lng: Number(pt[1]) });
+         else if (pt && typeof pt.lat === 'number' && typeof pt.lng === 'number') b.extend(pt);
+     });
+     if (!b.isEmpty()) map.value.fitBounds(b);
+  }
+}
+
+defineExpose({ map, fitBounds });
 </script>
