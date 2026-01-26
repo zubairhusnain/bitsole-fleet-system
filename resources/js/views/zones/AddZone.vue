@@ -399,6 +399,109 @@ function setupGoogleAutocomplete(input, onPlaceSelected, clearSuggestionsCb) {
   } catch {}
 }
 
+let drawingManager = null;
+
+function setupGoogleDrawingManager() {
+  const map = googleMapRef.value?.map;
+  if (!map || !window.google || !window.google.maps.drawing) return;
+
+  if (!drawingManager) {
+    drawingManager = new window.google.maps.drawing.DrawingManager({
+      drawingMode: null,
+      drawingControl: true,
+      drawingControlOptions: {
+        position: window.google.maps.ControlPosition.TOP_CENTER,
+        drawingModes: []
+      },
+      polygonOptions: {
+        fillColor: '#1070e3',
+        fillOpacity: 0.25,
+        strokeWeight: 2,
+        clickable: true,
+        editable: true,
+        zIndex: 1
+      },
+      rectangleOptions: {
+        fillColor: '#1070e3',
+        fillOpacity: 0.25,
+        strokeWeight: 2,
+        clickable: true,
+        editable: true,
+        zIndex: 1
+      }
+    });
+    drawingManager.setMap(map);
+
+    window.google.maps.event.addListener(drawingManager, 'overlaycomplete', (e) => {
+      const newShape = e.overlay;
+      newShape.setMap(null);
+
+      if (e.type === 'polygon') {
+        const path = newShape.getPath();
+        const pts = [];
+        for (let i = 0; i < path.getLength(); i++) {
+          const xy = path.getAt(i);
+          pts.push([xy.lat(), xy.lng()]);
+        }
+        polygonPoints.value = pts;
+        circleCenter.value = null;
+        form.polygon = polygonPoints.value.map(p => `${p[0]},${p[1]}`).join('; ');
+        form.coordinates = '';
+      } else if (e.type === 'rectangle') {
+        const bounds = newShape.getBounds();
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        rectanglePoints.value = [[sw.lat(), sw.lng()], [ne.lat(), ne.lng()]];
+        polygonPoints.value = [
+             [sw.lat(), sw.lng()],
+             [sw.lat(), ne.lng()],
+             [ne.lat(), ne.lng()],
+             [ne.lat(), sw.lng()]
+        ];
+        circleCenter.value = null;
+        form.coordinates = `${sw.lat()},${sw.lng()}; ${ne.lat()},${ne.lng()}`;
+        form.polygon = '';
+      }
+      drawingManager.setDrawingMode(null);
+    });
+  }
+  updateDrawingMode();
+}
+
+function updateDrawingMode() {
+  if (!drawingManager || !window.google) return;
+  const dm = drawingManager;
+  // Clear any existing modes
+  dm.setOptions({
+    drawingControlOptions: {
+      position: window.google.maps.ControlPosition.TOP_CENTER,
+      drawingModes: []
+    }
+  });
+
+  if (form.type === 'polygon') {
+    dm.setOptions({
+      drawingControl: true,
+      drawingControlOptions: {
+        position: window.google.maps.ControlPosition.TOP_CENTER,
+        drawingModes: [window.google.maps.drawing.OverlayType.POLYGON]
+      }
+    });
+  } else if (form.type === 'rectangle') {
+    dm.setOptions({
+      drawingControl: true,
+      drawingControlOptions: {
+        position: window.google.maps.ControlPosition.TOP_CENTER,
+        drawingModes: [window.google.maps.drawing.OverlayType.RECTANGLE]
+      }
+    });
+  } else {
+    // Circle or other: disable drawing tools (handled by click/radius input)
+    dm.setDrawingMode(null);
+    dm.setOptions({ drawingControl: false });
+  }
+}
+
 function onGoogleMapReady() {
   setTimeout(() => fitMapToCurrentShape(), 100);
   setupGoogleDrawingManager();
