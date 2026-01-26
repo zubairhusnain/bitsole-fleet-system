@@ -68,7 +68,7 @@
           <div class="btn-group shadow-sm" role="group">
             <button type="button" class="btn btn-sm" :class="mapType === 'osm' ? 'btn-dark' : 'btn-light'" @click="mapType = 'osm'">Map</button>
             <button type="button" class="btn btn-sm" :class="mapType === 'satellite' ? 'btn-dark' : 'btn-light'" @click="mapType = 'satellite'">Satellite</button>
-            <button type="button" class="btn btn-sm" :class="mapType === 'google' ? 'btn-dark' : 'btn-light'" @click="mapType = 'google'">Google</button>
+            <button type="button" v-if="isTestingMode" class="btn btn-sm" :class="mapType === 'google' ? 'btn-dark' : 'btn-light'" @click="mapType = 'google'">Google</button>
           </div>
         </div>
 
@@ -325,6 +325,7 @@ const loading = ref(true);
 const mapType = ref('osm');
 const mapKey = ref(0);
 const mapRef = ref(null);
+const isTestingMode = ref(false);
 
 // Modal State
 const selectedVehicle = ref(null);

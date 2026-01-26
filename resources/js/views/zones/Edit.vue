@@ -78,7 +78,7 @@
 
         <div class="map-frame mt-3" style="position: relative; height: 500px;">
           <!-- Map Provider Toggle -->
-          <div class="btn-group" role="group" style="position: absolute; top: 10px; right: 100px; z-index: 1000;">
+          <div class="btn-group" role="group" style="position: absolute; top: 10px; right: 100px; z-index: 1000;" v-if="isTestingMode">
              <button type="button" class="btn btn-sm shadow-sm" :class="mapProvider === 'leaflet' ? 'btn-primary' : 'btn-light'" @click="mapProvider = 'leaflet'">Leaflet</button>
              <button type="button" class="btn btn-sm shadow-sm" :class="mapProvider === 'google' ? 'btn-primary' : 'btn-light'" @click="mapProvider = 'google'">Google Maps</button>
           </div>
@@ -194,6 +194,7 @@ const mapRef = ref(null);
 const googleMapRef = ref(null);
 const googleMapInternal = ref(null);
 const suppressTypeWatch = ref(false);
+const isTestingMode = ref(false);
 
 const tileUrl = computed(() => {
   return basemap.value === 'sat'
@@ -701,7 +702,6 @@ function onGoogleMapReady(mapInstance) {
   // Backup fit to ensure it catches if the first one fired too early
   setTimeout(() => {
     fitMapToCurrentShape();
-    resetWholeMap();
   }, 800);
 }
 
@@ -754,91 +754,6 @@ function onGoogleMarkerDragEnd(e) {
 function onGoogleMapClick(e) {
   const eventMock = { latlng: { lat: e.lat, lng: e.lng } };
   onMapClick(eventMock);
-}
-
-function centerToCurrentLocation() {
-  const map = mapRef.value;
-  return new Promise((resolve) => {
-    try {
-      if (navigator?.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
-            center.value = [lat, lon];
-            searchMarkerLatLng.value = [lat, lon];
-            if (form.type === 'circle') {
-              circleCenter.value = [lat, lon];
-              form.coordinates = `${lat},${lon}`;
-              form.radius = typeof form.radius === 'number' ? form.radius : (geofenceInfo.radius || 1000);
-              geofenceInfo.lat = lat; geofenceInfo.lng = lon; geofenceInfo.coordinates = [[lat, lon]];
-            } else {
-              const d = 0.01;
-              polygonPoints.value = [
-                [lat - d, lon - d],
-                [lat + d, lon - d],
-                [lat + d, lon + d],
-                [lat - d, lon + d]
-              ];
-              if (form.type === 'rectangle') {
-                rectanglePoints.value = [[lat - d, lon - d], [lat + d, lon + d]];
-                geofenceInfo.coordinates = rectanglePoints.value.map(p => [p[0], p[1]]);
-              } else {
-                geofenceInfo.coordinates = polygonPoints.value.map(p => [p[0], p[1]]);
-              }
-            }
-            zoom.value = 16;
-            try { map && map.setView([lat, lon], Math.max(13, map.getZoom())); } catch {}
-            setTimeout(() => { fitMapToCurrentShape(); }, 100);
-            resolve();
-          },
-          () => {
-            // Fallback to current center if geolocation fails
-            const [lat, lon] = center.value;
-            if (form.type !== 'circle') {
-              const d = 0.01;
-              polygonPoints.value = [
-                [lat - d, lon - d],
-                [lat + d, lon - d],
-                [lat + d, lon + d],
-                [lat - d, lon + d]
-              ];
-              if (form.type === 'rectangle') {
-                rectanglePoints.value = [[lat - d, lon - d], [lat + d, lon + d]];
-                geofenceInfo.coordinates = rectanglePoints.value.map(p => [p[0], p[1]]);
-              } else {
-                geofenceInfo.coordinates = polygonPoints.value.map(p => [p[0], p[1]]);
-              }
-            }
-            zoom.value = 16;
-            setTimeout(() => { fitMapToCurrentShape(); }, 100);
-            resolve();
-          }
-        );
-      } else {
-        // Fallback if no geolocation support
-        const [lat, lon] = center.value;
-        if (form.type !== 'circle') {
-          const d = 0.01;
-          polygonPoints.value = [
-            [lat - d, lon - d],
-            [lat + d, lon - d],
-            [lat + d, lon + d],
-            [lat - d, lon + d]
-          ];
-          if (form.type === 'rectangle') {
-            rectanglePoints.value = [[lat - d, lon - d], [lat + d, lon + d]];
-            geofenceInfo.coordinates = rectanglePoints.value.map(p => [p[0], p[1]]);
-          } else {
-            geofenceInfo.coordinates = polygonPoints.value.map(p => [p[0], p[1]]);
-          }
-        }
-        zoom.value = 16;
-        setTimeout(() => { fitMapToCurrentShape(); }, 100);
-        resolve();
-      }
-    } catch { resolve(); }
-  });
 }
 
 async function resetWholeMap() {
