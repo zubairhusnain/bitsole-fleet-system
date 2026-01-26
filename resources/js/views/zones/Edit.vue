@@ -192,6 +192,7 @@ const tileAttribution = '© OpenStreetMap contributors';
 const mapOptions = { zoomControl: true };
 const mapRef = ref(null);
 const googleMapRef = ref(null);
+const googleMapInternal = ref(null);
 const suppressTypeWatch = ref(false);
 
 const tileUrl = computed(() => {
@@ -271,8 +272,17 @@ watch(mapProvider, async (val) => {
   if (val === 'google') {
     // Attempt to fit shape as soon as provider switches, with retries
     const tryFit = () => {
-      if (googleMapRef.value) fitMapToCurrentShape();
-      else setTimeout(tryFit, 100);
+      // Check if map is actually ready via internal ref or component ref
+      const gmInternal = googleMapInternal.value;
+      const gmComp = googleMapRef.value;
+      const isMapReady = gmInternal || (gmComp && (gmComp.map || (gmComp.map && gmComp.map.value)));
+
+      if (isMapReady) {
+        fitMapToCurrentShape();
+        setupGoogleDrawingManager();
+      } else {
+        setTimeout(tryFit, 100);
+      }
     };
     tryFit();
     // Additional backups
@@ -505,32 +515,38 @@ function parseWKTArea(area) {
 
 function fitMapToCurrentShape() {
   if (mapProvider.value === 'google') {
-    const gm = googleMapRef.value;
-    if (!gm) return;
+    let gm = googleMapInternal.value;
+    if (!gm) {
+      // Fallback to component ref if internal not set yet
+      const comp = googleMapRef.value;
+      if (comp && comp.map) {
+         gm = comp.map.value || comp.map; // Handle ref or raw
+      }
+    }
+
+    if (!gm || typeof gm.setCenter !== 'function') return;
+
     if (Array.isArray(polygonPoints.value) && polygonPoints.value.length) {
-      gm.fitBounds(polygonPoints.value);
+      const bounds = new window.google.maps.LatLngBounds();
+      polygonPoints.value.forEach(p => bounds.extend({ lat: p[0], lng: p[1] }));
+      gm.fitBounds(bounds);
       return;
     }
     if (Array.isArray(rectanglePoints.value) && rectanglePoints.value.length === 2) {
-      gm.fitBounds(rectanglePoints.value);
+      const bounds = new window.google.maps.LatLngBounds();
+      rectanglePoints.value.forEach(p => bounds.extend({ lat: p[0], lng: p[1] }));
+      gm.fitBounds(bounds);
       return;
     }
     if (Array.isArray(circleCenter.value) && circleCenter.value.length === 2) {
-       const mapInstance = gm.map && gm.map.setCenter ? gm.map : (gm.map ? gm.map.value : null);
-       if (mapInstance) {
-          mapInstance.setCenter({ lat: circleCenter.value[0], lng: circleCenter.value[1] });
-          mapInstance.setZoom(16);
-       }
+       gm.setCenter({ lat: circleCenter.value[0], lng: circleCenter.value[1] });
+       gm.setZoom(16);
        return;
     }
     if (Array.isArray(center.value) && center.value.length === 2) {
-       const mapInstance = gm.map && gm.map.setCenter ? gm.map : (gm.map ? gm.map.value : null);
-       if (mapInstance) {
-          mapInstance.setCenter({ lat: center.value[0], lng: center.value[1] });
-          mapInstance.setZoom(Math.max(13, mapInstance.getZoom()));
-       }
+       gm.setCenter({ lat: center.value[0], lng: center.value[1] });
+       gm.setZoom(Math.max(13, gm.getZoom()));
     }
-    // For circle or default, center is handled by center watcher
     return;
   }
   const map = mapRef.value;
@@ -565,8 +581,13 @@ function fitMapToCurrentShape() {
 let drawingManager = null;
 
 function setupGoogleDrawingManager() {
-  const gm = googleMapRef.value;
-  const map = gm?.map && gm.map.setCenter ? gm.map : (gm?.map ? gm.map.value : null);
+  let map = googleMapInternal.value;
+  if (!map) {
+      const gm = googleMapRef.value;
+      if (gm && gm.map) {
+          map = gm.map.value || gm.map;
+      }
+  }
   if (!map || !window.google || !window.google.maps.drawing) return;
 
   if (!drawingManager) {
@@ -668,10 +689,19 @@ function updateDrawingMode() {
   }
 }
 
-function onGoogleMapReady() {
+function onGoogleMapReady(mapInstance) {
+  if (mapInstance) googleMapInternal.value = mapInstance;
+
+  // Reduce delay to make it feel more responsive, but keep a backup
   setTimeout(() => {
     fitMapToCurrentShape();
     setupGoogleDrawingManager();
+  }, 200);
+
+  // Backup fit to ensure it catches if the first one fired too early
+  setTimeout(() => {
+    fitMapToCurrentShape();
+    resetWholeMap();
   }, 800);
 }
 

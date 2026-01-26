@@ -207,6 +207,7 @@ const tileAttribution = '© OpenStreetMap contributors';
 const mapOptions = { zoomControl: true };
 const mapRef = ref(null);
 const googleMapRef = ref(null);
+const googleMapInternal = ref(null);
 
 const tileUrl = computed(() => {
   return basemap.value === 'sat'
@@ -499,11 +500,12 @@ function updateDrawingMode() {
   }
 }
 
-function onGoogleMapReady() {
+function onGoogleMapReady(mapInstance) {
+  if (mapInstance) googleMapInternal.value = mapInstance;
   setTimeout(() => {
     fitMapToCurrentShape();
     setupGoogleDrawingManager();
-  }, 500);
+  }, 200);
 }
 
 function onMapReady(map) {
@@ -1036,42 +1038,38 @@ function clearGeomanLayers() {
 
 function fitMapToCurrentShape() {
   if (mapProvider.value === 'google') {
-    const gm = googleMapRef.value;
-    if (!gm) return;
+    let gm = googleMapInternal.value;
+    if (!gm) {
+        const comp = googleMapRef.value;
+        if (comp && comp.map) {
+            gm = comp.map.value || comp.map;
+        }
+    }
+    if (!gm || typeof gm.setCenter !== 'function') return;
 
     // Prioritize centering on current location (center.value) for Add Zone
-    // This ensures the map focuses on the user's location/marker even if a default shape exists
     if (Array.isArray(center.value) && center.value.length === 2) {
-      const mapInstance = gm.map && gm.map.setCenter ? gm.map : (gm.map ? gm.map.value : null);
-      if (mapInstance) {
-        mapInstance.setCenter({ lat: center.value[0], lng: center.value[1] });
-        mapInstance.setZoom(16);
-      }
+      gm.setCenter({ lat: center.value[0], lng: center.value[1] });
+      gm.setZoom(16);
       return;
     }
 
     if (Array.isArray(polygonPoints.value) && polygonPoints.value.length) {
-      gm.fitBounds(polygonPoints.value);
+      const bounds = new window.google.maps.LatLngBounds();
+      polygonPoints.value.forEach(p => bounds.extend({ lat: p[0], lng: p[1] }));
+      gm.fitBounds(bounds);
       return;
     }
     if (Array.isArray(rectanglePoints.value) && rectanglePoints.value.length === 2) {
-      gm.fitBounds(rectanglePoints.value);
+      const bounds = new window.google.maps.LatLngBounds();
+      rectanglePoints.value.forEach(p => bounds.extend({ lat: p[0], lng: p[1] }));
+      gm.fitBounds(bounds);
       return;
     }
     if (Array.isArray(circleCenter.value) && circleCenter.value.length === 2) {
-      const mapInstance = gm.map && gm.map.setCenter ? gm.map : (gm.map ? gm.map.value : null);
-      if (mapInstance) {
-        mapInstance.setCenter({ lat: circleCenter.value[0], lng: circleCenter.value[1] });
-        mapInstance.setZoom(16);
-      }
-      return;
-    }
-    if (Array.isArray(center.value) && center.value.length === 2) {
-      const mapInstance = gm.map && gm.map.setCenter ? gm.map : (gm.map ? gm.map.value : null);
-      if (mapInstance) {
-        mapInstance.setCenter({ lat: center.value[0], lng: center.value[1] });
-        mapInstance.setZoom(Math.max(13, mapInstance.getZoom()));
-      }
+       gm.setCenter({ lat: circleCenter.value[0], lng: circleCenter.value[1] });
+       gm.setZoom(16);
+       return;
     }
     return;
   }

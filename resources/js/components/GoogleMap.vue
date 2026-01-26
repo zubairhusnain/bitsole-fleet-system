@@ -43,7 +43,7 @@ const props = defineProps({
     default: () => [],
   },
   circles: {
-    type: Array, 
+    type: Array,
     default: () => [],
   },
 });
@@ -549,5 +549,5 @@ function fitBounds(bounds) {
   }
 }
 
-defineExpose({ map, fitBounds });
+defineExpose({ map, fitBounds, vehicleMarkers, vehicleInfoWindows });
 </script>
