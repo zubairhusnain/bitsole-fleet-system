@@ -338,6 +338,7 @@ watch(() => form.type, (v) => {
        ];
     }
   }
+  updateDrawingMode();
 });
 
 // Google Places loader (consistent with GoogleMap.vue)
@@ -345,13 +346,25 @@ let googlePlacesPromise = null;
 function loadGooglePlacesScript() {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   if (!apiKey) return Promise.reject(new Error('Missing Google API key'));
-  if (window.google && window.google.maps && window.google.maps.places) return Promise.resolve();
+
+  // Helper to check if the loaded Google Maps is likely the real one and not a shim
+  const isRealGoogleMaps = () => {
+    return window.google &&
+           window.google.maps &&
+           window.google.maps.places &&
+           window.google.maps.Map &&
+           // Real Google Maps API usually exposes a version property
+           window.google.maps.version;
+  };
+
+  if (isRealGoogleMaps()) return Promise.resolve();
+
   if (googlePlacesPromise) return googlePlacesPromise;
   googlePlacesPromise = new Promise((resolve, reject) => {
     const id = 'google-maps-api-script';
     if (document.getElementById(id)) {
       const check = () => {
-        if (window.google && window.google.maps && window.google.maps.places) resolve();
+        if (isRealGoogleMaps()) resolve();
         else setTimeout(check, 200);
       };
       check();
@@ -359,7 +372,7 @@ function loadGooglePlacesScript() {
     }
     const s = document.createElement('script');
     s.id = id;
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,drawing`;
     s.async = true;
     s.defer = true;
     s.onload = () => resolve();
@@ -591,6 +604,7 @@ function centerToCurrentLocation() {
 
 async function resetWholeMap() {
   try {
+    if (drawingManager) drawingManager.setDrawingMode(null);
     // Clear all shapes and geoman layers, reset geofence info
     clearShapes();
     updateGeomanControls();
