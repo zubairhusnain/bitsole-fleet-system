@@ -236,7 +236,7 @@ const googleMarkers = computed(() => {
 });
 
 const googlePolygons = computed(() => {
-  if (polygonPoints.value.length >= 3) {
+  if ((form.type === 'polygon' || form.type === 'rectangle') && polygonPoints.value.length >= 3) {
     return [{
       paths: polygonPoints.value.map(p => ({ lat: p[0], lng: p[1] })),
       options: { color: '#1070e3', fillColor: '#1070e3', fillOpacity: 0.25 }
@@ -300,7 +300,33 @@ const loadedShape = ref({ type: null, coordinates: [], lat: null, lng: null, rad
 watch(() => form.name, (v) => { geofenceInfo.name = String(v || '').trim(); });
 watch(() => form.description, (v) => { geofenceInfo.address = String(v || '').trim(); });
 watch(() => form.radius, (v) => { geofenceInfo.radius = typeof v === 'number' ? v : geofenceInfo.radius; });
-watch(() => form.type, (v) => { geofenceInfo.type = v; });
+watch(() => form.type, (v) => {
+  if (suppressTypeWatch.value) return;
+  geofenceInfo.type = v;
+
+  // Clear/Setup shapes based on type
+  if (v === 'circle') {
+    polygonPoints.value = [];
+    rectanglePoints.value = [];
+    // Default to center if no circle exists
+    if (!circleCenter.value) {
+      circleCenter.value = [...center.value];
+      form.radius = form.radius || 1000;
+    }
+  } else {
+    circleCenter.value = null;
+    if (v === 'polygon' && polygonPoints.value.length === 0) {
+       const c = center.value;
+       const d = 0.01;
+       polygonPoints.value = [
+         [c[0]-d, c[1]-d],
+         [c[0]+d, c[1]-d],
+         [c[0]+d, c[1]+d],
+         [c[0]-d, c[1]+d]
+       ];
+    }
+  }
+});
 
 // Google Places loader (optional)
 let googlePlacesPromise = null;

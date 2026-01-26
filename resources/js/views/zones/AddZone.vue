@@ -251,7 +251,8 @@ const googleMarkers = computed(() => {
 });
 
 const googlePolygons = computed(() => {
-  if (polygonPoints.value.length >= 3) {
+  // Only show polygon if type matches
+  if ((form.type === 'polygon' || form.type === 'rectangle') && polygonPoints.value.length >= 3) {
     return [{
       paths: polygonPoints.value.map(p => ({ lat: p[0], lng: p[1] })),
       options: { color: '#1070e3', fillColor: '#1070e3', fillOpacity: 0.25 }
