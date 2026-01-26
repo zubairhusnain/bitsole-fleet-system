@@ -43,7 +43,7 @@ const props = defineProps({
     default: () => [],
   },
   circles: {
-    type: Array,
+    type: Array, 
     default: () => [],
   },
 });
@@ -383,9 +383,12 @@ function initMap() {
     });
   }
   emit('ready', map.value);
+  // Draw shapes immediately
   updateZonesAndRoutes();
-  // Ensure selected marker popup opens on initial map ready
-  openSelectedIfAny();
+  // Delay popup slightly to ensure UI is ready
+  setTimeout(() => {
+    openSelectedIfAny();
+  }, 200);
 }
 
 onMounted(async () => {

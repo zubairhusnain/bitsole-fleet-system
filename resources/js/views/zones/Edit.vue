@@ -221,11 +221,12 @@ const googleMarkers = computed(() => {
       lat: searchMarkerLatLng.value[0],
       lng: searchMarkerLatLng.value[1],
       draggable: true,
-      type: 'search'
+      type: 'search',
+      iconUrl: searchMarkerIcon.value
     });
   }
   // Center marker (matches Leaflet's l-marker)
-  if (center.value && (form.type === 'circle' || (!polygonPoints.value.length && !rectanglePoints.value.length))) {
+  if (center.value) {
       markers.push({
           id: 'center-marker',
           lat: center.value[0],
@@ -263,18 +264,30 @@ const rectanglePoints = ref([]);
 const drawing = ref(false);
 const searchQuery = ref('');
 const searchMarkerLatLng = ref(null);
+const searchMarkerIcon = ref(null);
 const googleSearchInput = ref(null);
 
 watch(mapProvider, async (val) => {
   if (val === 'google') {
+    // Attempt to fit shape as soon as provider switches, with retries
+    const tryFit = () => {
+      if (googleMapRef.value) fitMapToCurrentShape();
+      else setTimeout(tryFit, 100);
+    };
+    tryFit();
+    // Additional backups
+    setTimeout(() => { fitMapToCurrentShape(); }, 500);
+    setTimeout(() => { fitMapToCurrentShape(); }, 1200);
+
     try {
       await loadGooglePlacesScript();
       setTimeout(() => {
         if (googleSearchInput.value) {
-          setupGoogleAutocomplete(googleSearchInput.value, (lat, lng, meta = {}) => {
-            const addr = String(meta.address || '').trim();
+          setupGoogleAutocomplete(googleSearchInput.value, (lat, lng, icon) => {
+            const addr = googleSearchInput.value.value;
             center.value = [lat, lng];
             searchMarkerLatLng.value = [lat, lng];
+            searchMarkerIcon.value = icon;
             form.coordinates = `${lat},${lng}`;
             if (form.type === 'circle') {
               circleCenter.value = [lat, lng];
@@ -403,14 +416,9 @@ function setupGoogleAutocomplete(input, onPlaceSelected, clearSuggestionsCb) {
       if (!place || !place.geometry || !place.geometry.location) return;
       const lat = place.geometry.location.lat();
       const lon = place.geometry.location.lng();
-      const formatted = String(place.formatted_address || '').trim();
-      const name = String(place.name || '').trim();
-      const address = formatted || name || input.value;
-      input.value = address || input.value;
+      input.value = place.formatted_address || place.name || input.value;
       if (typeof clearSuggestionsCb === 'function') clearSuggestionsCb();
-      if (typeof onPlaceSelected === 'function') {
-        onPlaceSelected(lat, lon, { address, icon: place.icon || null });
-      }
+      if (typeof onPlaceSelected === 'function') onPlaceSelected(lat, lon, place.icon || null);
     });
   } catch {}
 }
@@ -507,6 +515,21 @@ function fitMapToCurrentShape() {
       gm.fitBounds(rectanglePoints.value);
       return;
     }
+    if (Array.isArray(circleCenter.value) && circleCenter.value.length === 2) {
+       const mapInstance = gm.map && gm.map.setCenter ? gm.map : (gm.map ? gm.map.value : null);
+       if (mapInstance) {
+          mapInstance.setCenter({ lat: circleCenter.value[0], lng: circleCenter.value[1] });
+          mapInstance.setZoom(16);
+       }
+       return;
+    }
+    if (Array.isArray(center.value) && center.value.length === 2) {
+       const mapInstance = gm.map && gm.map.setCenter ? gm.map : (gm.map ? gm.map.value : null);
+       if (mapInstance) {
+          mapInstance.setCenter({ lat: center.value[0], lng: center.value[1] });
+          mapInstance.setZoom(Math.max(13, mapInstance.getZoom()));
+       }
+    }
     // For circle or default, center is handled by center watcher
     return;
   }
@@ -537,6 +560,119 @@ function fitMapToCurrentShape() {
       map.setView(L.latLng(center.value[0], center.value[1]), Math.max(13, map.getZoom()));
     }
   } catch {}
+}
+
+let drawingManager = null;
+
+function setupGoogleDrawingManager() {
+  const gm = googleMapRef.value;
+  const map = gm?.map && gm.map.setCenter ? gm.map : (gm?.map ? gm.map.value : null);
+  if (!map || !window.google || !window.google.maps.drawing) return;
+
+  if (!drawingManager) {
+    drawingManager = new window.google.maps.drawing.DrawingManager({
+      drawingMode: null,
+      drawingControl: true,
+      drawingControlOptions: {
+        position: window.google.maps.ControlPosition.TOP_CENTER,
+        drawingModes: []
+      },
+      polygonOptions: {
+        fillColor: '#1070e3',
+        fillOpacity: 0.25,
+        strokeWeight: 2,
+        clickable: true,
+        editable: true,
+        zIndex: 1
+      },
+      rectangleOptions: {
+        fillColor: '#1070e3',
+        fillOpacity: 0.25,
+        strokeWeight: 2,
+        clickable: true,
+        editable: true,
+        zIndex: 1
+      }
+    });
+
+    window.google.maps.event.addListener(drawingManager, 'overlaycomplete', (e) => {
+      const newShape = e.overlay;
+      newShape.setMap(null);
+
+      if (e.type === 'polygon') {
+        const path = newShape.getPath();
+        const pts = [];
+        for (let i = 0; i < path.getLength(); i++) {
+          const xy = path.getAt(i);
+          pts.push([xy.lat(), xy.lng()]);
+        }
+        polygonPoints.value = pts;
+        circleCenter.value = null;
+        form.polygon = polygonPoints.value.map(p => `${p[0]},${p[1]}`).join('; ');
+        form.coordinates = '';
+      } else if (e.type === 'rectangle') {
+        const bounds = newShape.getBounds();
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        rectanglePoints.value = [[sw.lat(), sw.lng()], [ne.lat(), ne.lng()]];
+        polygonPoints.value = [
+             [sw.lat(), sw.lng()],
+             [sw.lat(), ne.lng()],
+             [ne.lat(), ne.lng()],
+             [ne.lat(), sw.lng()]
+        ];
+        circleCenter.value = null;
+        form.coordinates = `${sw.lat()},${sw.lng()}; ${ne.lat()},${ne.lng()}`;
+        form.polygon = '';
+      }
+      drawingManager.setDrawingMode(null);
+    });
+  }
+
+  // ALWAYS bind to the current map instance, in case it changed (e.g. toggled providers)
+  drawingManager.setMap(map);
+  updateDrawingMode();
+}
+
+function updateDrawingMode() {
+  if (!drawingManager || !window.google) return;
+  const dm = drawingManager;
+  // Clear any existing modes
+  dm.setOptions({
+    drawingControlOptions: {
+      position: window.google.maps.ControlPosition.TOP_CENTER,
+      drawingModes: []
+    }
+  });
+
+  if (form.type === 'polygon') {
+    dm.setOptions({
+      drawingControl: true,
+      drawingControlOptions: {
+        position: window.google.maps.ControlPosition.TOP_CENTER,
+        drawingModes: [window.google.maps.drawing.OverlayType.POLYGON]
+      }
+    });
+  } else if (form.type === 'rectangle') {
+    dm.setOptions({
+      drawingControl: true,
+      drawingControlOptions: {
+        position: window.google.maps.ControlPosition.TOP_CENTER,
+        drawingModes: [window.google.maps.drawing.OverlayType.RECTANGLE]
+      }
+    });
+  } else {
+    // Circle or other: disable drawing tools (handled by click/radius input)
+    dm.setDrawingMode(null);
+    dm.setOptions({ drawingControl: false });
+  }
+}
+
+function onGoogleMapReady() {
+  setTimeout(() => {
+    fitMapToCurrentShape();
+    setupGoogleDrawingManager();
+  }, 800);
 }
 
 function renderLoadedShape() {
@@ -606,13 +742,69 @@ function centerToCurrentLocation() {
               form.coordinates = `${lat},${lon}`;
               form.radius = typeof form.radius === 'number' ? form.radius : (geofenceInfo.radius || 1000);
               geofenceInfo.lat = lat; geofenceInfo.lng = lon; geofenceInfo.coordinates = [[lat, lon]];
+            } else {
+              const d = 0.01;
+              polygonPoints.value = [
+                [lat - d, lon - d],
+                [lat + d, lon - d],
+                [lat + d, lon + d],
+                [lat - d, lon + d]
+              ];
+              if (form.type === 'rectangle') {
+                rectanglePoints.value = [[lat - d, lon - d], [lat + d, lon + d]];
+                geofenceInfo.coordinates = rectanglePoints.value.map(p => [p[0], p[1]]);
+              } else {
+                geofenceInfo.coordinates = polygonPoints.value.map(p => [p[0], p[1]]);
+              }
             }
+            zoom.value = 16;
             try { map && map.setView([lat, lon], Math.max(13, map.getZoom())); } catch {}
+            setTimeout(() => { fitMapToCurrentShape(); }, 100);
             resolve();
           },
-          () => { resolve(); }
+          () => {
+            // Fallback to current center if geolocation fails
+            const [lat, lon] = center.value;
+            if (form.type !== 'circle') {
+              const d = 0.01;
+              polygonPoints.value = [
+                [lat - d, lon - d],
+                [lat + d, lon - d],
+                [lat + d, lon + d],
+                [lat - d, lon + d]
+              ];
+              if (form.type === 'rectangle') {
+                rectanglePoints.value = [[lat - d, lon - d], [lat + d, lon + d]];
+                geofenceInfo.coordinates = rectanglePoints.value.map(p => [p[0], p[1]]);
+              } else {
+                geofenceInfo.coordinates = polygonPoints.value.map(p => [p[0], p[1]]);
+              }
+            }
+            zoom.value = 16;
+            setTimeout(() => { fitMapToCurrentShape(); }, 100);
+            resolve();
+          }
         );
       } else {
+        // Fallback if no geolocation support
+        const [lat, lon] = center.value;
+        if (form.type !== 'circle') {
+          const d = 0.01;
+          polygonPoints.value = [
+            [lat - d, lon - d],
+            [lat + d, lon - d],
+            [lat + d, lon + d],
+            [lat - d, lon + d]
+          ];
+          if (form.type === 'rectangle') {
+            rectanglePoints.value = [[lat - d, lon - d], [lat + d, lon + d]];
+            geofenceInfo.coordinates = rectanglePoints.value.map(p => [p[0], p[1]]);
+          } else {
+            geofenceInfo.coordinates = polygonPoints.value.map(p => [p[0], p[1]]);
+          }
+        }
+        zoom.value = 16;
+        setTimeout(() => { fitMapToCurrentShape(); }, 100);
         resolve();
       }
     } catch { resolve(); }
@@ -622,130 +814,11 @@ function centerToCurrentLocation() {
 async function resetWholeMap() {
   try {
     if (drawingManager) drawingManager.setDrawingMode(null);
-    // Clear all shapes and geoman layers, reset geofence info
-    clearShapes();
-    updateGeomanControls();
-    drawing.value = form.type !== 'circle';
-    searchMarkerLatLng.value = null;
-    geofenceInfo.coordinates = [];
-    geofenceInfo.lat = null;
-    geofenceInfo.lng = null;
-    // Refresh map rendering
-    mapKey.value++;
-    const m = mapRef.value; try { m && m.invalidateSize(true); } catch {}
-    // Center to current device location if available
-    await centerToCurrentLocation();
+    // Clear all shapes and geoman layers, then restore loaded shape
+    renderLoadedShape();
   } catch {}
 }
-let drawingManager = null;
 
-function setupGoogleDrawingManager() {
-  const map = googleMapRef.value?.map;
-  if (!map || !window.google || !window.google.maps.drawing) return;
-
-  if (!drawingManager) {
-    drawingManager = new window.google.maps.drawing.DrawingManager({
-      drawingMode: null,
-      drawingControl: true,
-      drawingControlOptions: {
-        position: window.google.maps.ControlPosition.TOP_CENTER,
-        drawingModes: []
-      },
-      polygonOptions: {
-        fillColor: '#1070e3',
-        fillOpacity: 0.25,
-        strokeWeight: 2,
-        clickable: true,
-        editable: true,
-        zIndex: 1
-      },
-      rectangleOptions: {
-        fillColor: '#1070e3',
-        fillOpacity: 0.25,
-        strokeWeight: 2,
-        clickable: true,
-        editable: true,
-        zIndex: 1
-      }
-    });
-    drawingManager.setMap(map);
-
-    window.google.maps.event.addListener(drawingManager, 'overlaycomplete', (e) => {
-      const newShape = e.overlay;
-      newShape.setMap(null);
-
-      if (e.type === 'polygon') {
-        const path = newShape.getPath();
-        const pts = [];
-        for (let i = 0; i < path.getLength(); i++) {
-          const xy = path.getAt(i);
-          pts.push([xy.lat(), xy.lng()]);
-        }
-        polygonPoints.value = pts;
-        circleCenter.value = null;
-        form.polygon = polygonPoints.value.map(p => `${p[0]},${p[1]}`).join('; ');
-        form.coordinates = '';
-      } else if (e.type === 'rectangle') {
-        const bounds = newShape.getBounds();
-        const ne = bounds.getNorthEast();
-        const sw = bounds.getSouthWest();
-        rectanglePoints.value = [[sw.lat(), sw.lng()], [ne.lat(), ne.lng()]];
-        polygonPoints.value = [
-             [sw.lat(), sw.lng()],
-             [sw.lat(), ne.lng()],
-             [ne.lat(), ne.lng()],
-             [ne.lat(), sw.lng()]
-        ];
-        circleCenter.value = null;
-        form.coordinates = `${sw.lat()},${sw.lng()}; ${ne.lat()},${ne.lng()}`;
-        form.polygon = '';
-      }
-      drawingManager.setDrawingMode(null);
-    });
-  }
-  updateDrawingMode();
-}
-
-function updateDrawingMode() {
-  if (!drawingManager || !window.google) return;
-  const dm = drawingManager;
-  // Clear any existing modes
-  dm.setOptions({
-    drawingControlOptions: {
-      position: window.google.maps.ControlPosition.TOP_CENTER,
-      drawingModes: []
-    }
-  });
-
-  if (form.type === 'polygon') {
-    dm.setOptions({
-      drawingControl: true,
-      drawingControlOptions: {
-        position: window.google.maps.ControlPosition.TOP_CENTER,
-        drawingModes: [window.google.maps.drawing.OverlayType.POLYGON]
-      }
-    });
-  } else if (form.type === 'rectangle') {
-    dm.setOptions({
-      drawingControl: true,
-      drawingControlOptions: {
-        position: window.google.maps.ControlPosition.TOP_CENTER,
-        drawingModes: [window.google.maps.drawing.OverlayType.RECTANGLE]
-      }
-    });
-  } else {
-    // Circle or other: disable drawing tools (handled by click/radius input)
-    dm.setDrawingMode(null);
-    dm.setOptions({ drawingControl: false });
-  }
-}
-
-function onGoogleMapReady() {
-  setTimeout(() => {
-    fitMapToCurrentShape();
-    setupGoogleDrawingManager();
-  }, 100);
-}
 
 function onMapReady(map) {
   mapRef.value = map;
@@ -900,6 +973,10 @@ async function loadZone() {
 
     // If we don't have a real address yet (or it's just name/description), try reverse geocoding by center
     setTimeout(() => { try { reverseGeocodeForCenter(); } catch {} }, 500);
+
+    // Ensure map fits the loaded shape
+    setTimeout(() => { fitMapToCurrentShape(); }, 1000);
+
     suppressTypeWatch.value = false;
     // Debug: log what was parsed to help diagnose if shape still missing
     try { console.debug('[Edit] Geofence loaded', { remote, attrs, type: form.type, polygonPoints: polygonPoints.value, rectanglePoints: rectanglePoints.value, circleCenter: circleCenter.value, radius: form.radius }); } catch {}

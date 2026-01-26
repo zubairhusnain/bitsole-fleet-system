@@ -239,8 +239,8 @@ const googleMarkers = computed(() => {
       iconUrl: searchMarkerIcon.value
     });
   }
-  // Center marker for circle mode (matches Leaflet's l-circle-marker)
-  if (form.type === 'circle' && center.value) {
+  // Center marker (matches Leaflet's l-circle-marker which is always visible)
+  if (center.value) {
     markers.push({
       id: 'center-marker',
       lat: center.value[0],
@@ -279,6 +279,7 @@ const rectanglePoints = ref([]); // two opposite corners
 const drawing = ref(false);
 const searchQuery = ref('');
 const searchMarkerLatLng = ref(null);
+const searchMarkerIcon = ref(null);
 const googleSearchInput = ref(null);
 
 watch(mapProvider, async (val) => {
@@ -334,13 +335,6 @@ const initialShape = ref({ type: null, polygon: [], circle: null, radius: null }
 watch(() => form.name, (v) => { geofenceInfo.name = String(v || '').trim(); });
 watch(() => form.description, (v) => { geofenceInfo.address = String(v || '').trim(); });
 watch(() => form.radius, (v) => { geofenceInfo.radius = typeof v === 'number' ? v : geofenceInfo.radius; });
-watch(() => form.type, (v) => {
-  geofenceInfo.type = v;
-  geofenceInfo.coordinates = [];
-  geofenceInfo.lat = null;
-  geofenceInfo.lng = null;
-  if (v !== 'circle') { geofenceInfo.radius = null; form.radius = undefined; }
-});
 
 // Google Places loader (consistent with GoogleMap.vue)
 let googlePlacesPromise = null;
@@ -402,7 +396,8 @@ function setupGoogleAutocomplete(input, onPlaceSelected, clearSuggestionsCb) {
 let drawingManager = null;
 
 function setupGoogleDrawingManager() {
-  const map = googleMapRef.value?.map;
+  const gm = googleMapRef.value;
+  const map = gm?.map && gm.map.setCenter ? gm.map : (gm?.map ? gm.map.value : null);
   if (!map || !window.google || !window.google.maps.drawing) return;
 
   if (!drawingManager) {
@@ -430,7 +425,6 @@ function setupGoogleDrawingManager() {
         zIndex: 1
       }
     });
-    drawingManager.setMap(map);
 
     window.google.maps.event.addListener(drawingManager, 'overlaycomplete', (e) => {
       const newShape = e.overlay;
@@ -465,6 +459,9 @@ function setupGoogleDrawingManager() {
       drawingManager.setDrawingMode(null);
     });
   }
+
+  // ALWAYS bind to the current map instance, in case it changed (e.g. toggled providers)
+  drawingManager.setMap(map);
   updateDrawingMode();
 }
 
@@ -503,8 +500,10 @@ function updateDrawingMode() {
 }
 
 function onGoogleMapReady() {
-  setTimeout(() => fitMapToCurrentShape(), 100);
-  setupGoogleDrawingManager();
+  setTimeout(() => {
+    fitMapToCurrentShape();
+    setupGoogleDrawingManager();
+  }, 500);
 }
 
 function onMapReady(map) {
@@ -1039,6 +1038,18 @@ function fitMapToCurrentShape() {
   if (mapProvider.value === 'google') {
     const gm = googleMapRef.value;
     if (!gm) return;
+
+    // Prioritize centering on current location (center.value) for Add Zone
+    // This ensures the map focuses on the user's location/marker even if a default shape exists
+    if (Array.isArray(center.value) && center.value.length === 2) {
+      const mapInstance = gm.map && gm.map.setCenter ? gm.map : (gm.map ? gm.map.value : null);
+      if (mapInstance) {
+        mapInstance.setCenter({ lat: center.value[0], lng: center.value[1] });
+        mapInstance.setZoom(16);
+      }
+      return;
+    }
+
     if (Array.isArray(polygonPoints.value) && polygonPoints.value.length) {
       gm.fitBounds(polygonPoints.value);
       return;
@@ -1048,15 +1059,19 @@ function fitMapToCurrentShape() {
       return;
     }
     if (Array.isArray(circleCenter.value) && circleCenter.value.length === 2) {
-      // For circle, we just center. fitBounds on a point is basically centering.
-      // But maybe we want to zoom? GoogleMap watches center, so just setting center is enough if we updated it.
-      // But here we are just "fitting".
-      // Let's assume center.value is already up to date or we can't easily zoom to radius without calculation.
-      // So we'll skip specific radius fitting for now or implement it.
-      // Simple approximation: create bounds from center +/- radius.
-      // But radius is in meters. Converting to lat/lng diff is complex.
-      // We'll rely on center update for circle.
+      const mapInstance = gm.map && gm.map.setCenter ? gm.map : (gm.map ? gm.map.value : null);
+      if (mapInstance) {
+        mapInstance.setCenter({ lat: circleCenter.value[0], lng: circleCenter.value[1] });
+        mapInstance.setZoom(16);
+      }
       return;
+    }
+    if (Array.isArray(center.value) && center.value.length === 2) {
+      const mapInstance = gm.map && gm.map.setCenter ? gm.map : (gm.map ? gm.map.value : null);
+      if (mapInstance) {
+        mapInstance.setCenter({ lat: center.value[0], lng: center.value[1] });
+        mapInstance.setZoom(Math.max(13, mapInstance.getZoom()));
+      }
     }
     return;
   }
@@ -1104,13 +1119,62 @@ function centerToCurrentLocation() {
               circleCenter.value = [lat, lon];
               form.coordinates = `${lat},${lon}`;
               form.radius = typeof form.radius === 'number' ? form.radius : (initialShape.value.radius || 1000);
+            } else {
+              const d = 0.01;
+              polygonPoints.value = [
+                [lat - d, lon - d],
+                [lat + d, lon - d],
+                [lat + d, lon + d],
+                [lat - d, lon + d]
+              ];
+              if (form.type === 'rectangle') {
+                rectanglePoints.value = [[lat - d, lon - d], [lat + d, lon + d]];
+              }
             }
+            // Ensure zoom level is appropriate for viewing the location/shape
+            zoom.value = 16;
             try { map && map.setView([lat, lon], Math.max(13, map.getZoom())); } catch {}
+            // Fit map to the new shape (especially for Google Maps)
+            setTimeout(() => { fitMapToCurrentShape(); }, 2000);
             resolve();
           },
-          () => { resolve(); }
+          () => {
+            // Fallback to current center if geolocation fails
+            const [lat, lon] = center.value;
+            if (form.type !== 'circle') {
+              const d = 0.01;
+              polygonPoints.value = [
+                [lat - d, lon - d],
+                [lat + d, lon - d],
+                [lat + d, lon + d],
+                [lat - d, lon + d]
+              ];
+              if (form.type === 'rectangle') {
+                rectanglePoints.value = [[lat - d, lon - d], [lat + d, lon + d]];
+              }
+            }
+            zoom.value = 16;
+            setTimeout(() => { fitMapToCurrentShape(); }, 2000);
+            resolve();
+          }
         );
       } else {
+        // Fallback if no geolocation support
+        const [lat, lon] = center.value;
+        if (form.type !== 'circle') {
+          const d = 0.01;
+          polygonPoints.value = [
+            [lat - d, lon - d],
+            [lat + d, lon - d],
+            [lat + d, lon + d],
+            [lat - d, lon + d]
+          ];
+          if (form.type === 'rectangle') {
+            rectanglePoints.value = [[lat - d, lon - d], [lat + d, lon + d]];
+          }
+        }
+        zoom.value = 16;
+        setTimeout(() => { fitMapToCurrentShape(); }, 2000);
         resolve();
       }
     } catch { resolve(); }
@@ -1150,6 +1214,10 @@ watch(() => form.type, async () => {
   geofenceInfo.coordinates = [];
   geofenceInfo.lat = null;
   geofenceInfo.lng = null;
+  if (form.type !== 'circle') {
+     geofenceInfo.radius = null;
+     form.radius = undefined;
+  }
 
   await centerToCurrentLocation();
 });
