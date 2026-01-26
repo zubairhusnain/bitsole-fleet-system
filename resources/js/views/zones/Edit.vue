@@ -271,7 +271,8 @@ watch(mapProvider, async (val) => {
       await loadGooglePlacesScript();
       setTimeout(() => {
         if (googleSearchInput.value) {
-          setupGoogleAutocomplete(googleSearchInput.value, (lat, lng) => {
+          setupGoogleAutocomplete(googleSearchInput.value, (lat, lng, meta = {}) => {
+            const addr = String(meta.address || '').trim();
             center.value = [lat, lng];
             searchMarkerLatLng.value = [lat, lng];
             form.coordinates = `${lat},${lng}`;
@@ -284,18 +285,28 @@ watch(mapProvider, async (val) => {
               geofenceInfo.lng = lng;
               geofenceInfo.coordinates = [[lat, lng]];
               geofenceInfo.radius = form.radius;
+              if (addr) {
+                geofenceInfo.address = addr;
+              }
             } else {
-                 // For Polygon/Rectangle, move the drawing area to the searched location
-                 const d = 0.01;
-                 polygonPoints.value = [
-                   [lat-d, lng-d],
-                   [lat+d, lng-d],
-                   [lat+d, lng+d],
-                   [lat-d, lng+d]
-                 ];
-                 if (form.type === 'rectangle') {
-                    rectanglePoints.value = [[lat-d, lng-d], [lat+d, lng+d]];
-                 }
+              const d = 0.01;
+              polygonPoints.value = [
+                [lat - d, lng - d],
+                [lat + d, lng - d],
+                [lat + d, lng + d],
+                [lat - d, lng + d]
+              ];
+              if (form.type === 'rectangle') {
+                rectanglePoints.value = [[lat - d, lng - d], [lat + d, lng + d]];
+                geofenceInfo.coordinates = rectanglePoints.value.map(p => [p[0], p[1]]);
+              } else {
+                geofenceInfo.coordinates = polygonPoints.value.map(p => [p[0], p[1]]);
+              }
+              geofenceInfo.lat = lat;
+              geofenceInfo.lng = lng;
+              if (addr) {
+                geofenceInfo.address = addr;
+              }
             }
           });
         }
@@ -392,9 +403,14 @@ function setupGoogleAutocomplete(input, onPlaceSelected, clearSuggestionsCb) {
       if (!place || !place.geometry || !place.geometry.location) return;
       const lat = place.geometry.location.lat();
       const lon = place.geometry.location.lng();
-      input.value = place.formatted_address || place.name || input.value;
+      const formatted = String(place.formatted_address || '').trim();
+      const name = String(place.name || '').trim();
+      const address = formatted || name || input.value;
+      input.value = address || input.value;
       if (typeof clearSuggestionsCb === 'function') clearSuggestionsCb();
-      if (typeof onPlaceSelected === 'function') onPlaceSelected(lat, lon);
+      if (typeof onPlaceSelected === 'function') {
+        onPlaceSelected(lat, lon, { address, icon: place.icon || null });
+      }
     });
   } catch {}
 }

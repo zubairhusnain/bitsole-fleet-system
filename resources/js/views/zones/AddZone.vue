@@ -1136,12 +1136,13 @@ async function resetWholeMap() {
   } catch {}
 }
 
-watch(() => form.type, () => {
+watch(() => form.type, async () => {
   // When switching type, clear shapes and auto-enter drawing mode for polygon/rectangle
   clearShapes();
+  searchMarkerLatLng.value = null;
   updateGeomanControls();
   drawing.value = form.type !== 'circle';
-  searchMarkerLatLng.value = null;
+
   mapKey.value++;
   const map = mapRef.value; try { map && map.invalidateSize(true); } catch {}
   // Also refresh geofenceInfo
@@ -1149,6 +1150,8 @@ watch(() => form.type, () => {
   geofenceInfo.coordinates = [];
   geofenceInfo.lat = null;
   geofenceInfo.lng = null;
+
+  await centerToCurrentLocation();
 });
 
 async function searchAddress() {
