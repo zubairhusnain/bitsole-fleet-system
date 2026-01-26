@@ -291,17 +291,33 @@ watch(mapProvider, async (val) => {
             searchMarkerLatLng.value = [lat, lng];
             form.coordinates = `${lat},${lng}`;
             if (form.type === 'circle') {
-              circleCenter.value = [lat, lng];
-              if (!form.radius || !Number.isFinite(Number(form.radius))) {
-                form.radius = 1000;
+                circleCenter.value = [lat, lng];
+                if (!form.radius || !Number.isFinite(Number(form.radius))) {
+                  form.radius = 1000;
+                }
+                geofenceInfo.lat = lat;
+                geofenceInfo.lng = lng;
+                geofenceInfo.coordinates = [[lat, lng]];
+                geofenceInfo.radius = form.radius;
+              } else {
+                 // For Polygon/Rectangle, move the drawing area to the searched location
+                 // Create a default box around the new center
+                 const d = 0.01; // approx 1km
+                 polygonPoints.value = [
+                   [lat-d, lng-d],
+                   [lat+d, lng-d],
+                   [lat+d, lng+d],
+                   [lat-d, lng+d]
+                 ];
+                 if (form.type === 'rectangle') {
+                    rectanglePoints.value = [[lat-d, lng-d], [lat+d, lng+d]];
+                 }
+                 // Clear previous coordinates since we moved the shape
+                 form.polygon = '';
+                 form.coordinates = '';
               }
-              geofenceInfo.lat = lat;
-              geofenceInfo.lng = lng;
-              geofenceInfo.coordinates = [[lat, lng]];
-              geofenceInfo.radius = form.radius;
-            }
-          });
-        }
+            });
+          }
       }, 200);
     } catch (e) {
       console.error('Failed to load Google Places', e);
@@ -416,6 +432,31 @@ function drawDemo() {
 onMounted(() => {
   // Pre-render demo polygon so the map doesn’t look empty
   drawDemo();
+  // Try to get user location
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      center.value = [lat, lng];
+
+      // If form is clean (no user input yet), update the shape to user location
+      if (!form.coordinates && !form.polygon && form.type === 'circle') {
+          circleCenter.value = [lat, lng];
+          form.coordinates = `${lat},${lng}`;
+      } else if (!form.polygon && form.type !== 'circle' && polygonPoints.value.length === 4) {
+          // Move demo polygon to user location
+          const d = 0.01;
+          polygonPoints.value = [
+             [lat-d, lng-d],
+             [lat+d, lng-d],
+             [lat+d, lng+d],
+             [lat-d, lng+d]
+          ];
+      }
+    }, (err) => {
+       console.warn('Geolocation failed', err);
+    });
+  }
   // Capture initial shape after demo draw
   try {
     if (polygonPoints.value.length >= 3) {

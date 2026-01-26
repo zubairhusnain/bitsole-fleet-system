@@ -283,6 +283,18 @@ watch(mapProvider, async (val) => {
               geofenceInfo.lng = lng;
               geofenceInfo.coordinates = [[lat, lng]];
               geofenceInfo.radius = form.radius;
+            } else {
+                 // For Polygon/Rectangle, move the drawing area to the searched location
+                 const d = 0.01;
+                 polygonPoints.value = [
+                   [lat-d, lng-d],
+                   [lat+d, lng-d],
+                   [lat+d, lng+d],
+                   [lat-d, lng+d]
+                 ];
+                 if (form.type === 'rectangle') {
+                    rectanglePoints.value = [[lat-d, lng-d], [lat+d, lng+d]];
+                 }
             }
           });
         }
