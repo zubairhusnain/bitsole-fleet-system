@@ -71,7 +71,7 @@
             </div>
 
             <div class="col-12 col-md-4">
-              <label class="form-label small">Registration Number</label>
+              <label class="form-label small">Document Registration number</label>
               <input v-model="form.attributes.registration" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="e.g. 987654" />
             </div>
             <div class="col-12 col-md-4">

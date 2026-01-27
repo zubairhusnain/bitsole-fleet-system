@@ -780,11 +780,12 @@ function isSelected(id) {
 }
 
 function popupHtml(v) {
-    const { ignition, speed, address } = getPosition(v);
+    const { ignition, speed, address, lat, lon } = getPosition(v);
     const name = deviceName(v);
     const sp = speedKmh(speed);
     const ign = ignition === null ? 'Unknown' : ignition ? 'On' : 'Off';
-    const locText = address || 'Coordinates available';
+    const hasCoords = typeof lat === 'number' && typeof lon === 'number';
+    const locText = address || (hasCoords ? `<a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" class="text-primary text-decoration-underline">Live Tracking</a>` : 'Coordinates available');
     const uniq = uniqueId(v) || '—';
     const lu = formatTime(lastUpdate(v));
     const sClass = statusClass(v);
