@@ -151,13 +151,25 @@ function syncVehicleMarkers() {
     const pos = new window.google.maps.LatLng(lat, lng);
     let mk = vehicleMarkers.get(key);
     const iconUrl = m.iconUrl || null;
-    const icon = iconUrl
-      ? {
+    let icon = null;
+
+    if (m.isMoving) {
+       icon = {
+          path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+          scale: 5,
+          fillColor: '#28a745',
+          fillOpacity: 1,
+          strokeWeight: 1,
+          rotation: Number(m.course) || 0,
+          anchor: new window.google.maps.Point(0, 2.5)
+       };
+    } else if (iconUrl) {
+       icon = {
           url: iconUrl,
           scaledSize: new window.google.maps.Size(36, 48),
           anchor: new window.google.maps.Point(18, 44),
-        }
-      : null;
+       };
+    }
     const popupHtml = m.popup || null;
     let info = null;
 

@@ -51,7 +51,7 @@
                </div>
              </div>
             <div v-if="showMap" class="map-inner" style="height: 100%; width: 100%; position: relative;">
-              <div v-if="isTestingMode" class="map-provider-switcher" style="position: absolute; top: 10px !important; right: 10px !important; z-index: 3000; background: white; padding: 6px 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
+              <div v-if="isTestingMode" class="map-provider-switcher" style="position: absolute; bottom: 30px !important; right: 70px !important; z-index: 3000; background: white; padding: 6px 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
                 <div class="btn-group btn-group-sm" role="group" aria-label="Map provider">
                   <button type="button" class="btn btn-outline-primary" :class="{ active: mapProvider === 'leaflet' }" @click="mapProvider = 'leaflet'">Leaflet</button>
                   <button type="button" class="btn btn-outline-primary" :class="{ active: mapProvider === 'google' }" @click="mapProvider = 'google'">Google</button>
@@ -63,8 +63,9 @@
                   v-for="m in markerItems"
                   :key="m.id"
                   :lat-lng="[m.lat, m.lon]"
-                  :icon="isSelected(m.id) ? focusIcon : carIcon"
+                  :icon="getLeafletIcon(m)"
                   :ref="el => setMarkerRef(m.id, el)"
+                  :z-index-offset="m.isMoving ? 1000 : 0"
                 >
                   <l-popup>
                     <div class="popup-card" v-html="m.popup"></div>
@@ -466,8 +467,10 @@ function getPosition(v) {
     }
     const speedRaw = pos.speed ?? null;
     const speed = typeof speedRaw === 'string' ? parseFloat(speedRaw) : speedRaw; // Traccar speed usually in knots
+    const courseRaw = pos.course ?? null;
+    const course = typeof courseRaw === 'string' ? parseFloat(courseRaw) : courseRaw;
     const address = pos.address || null;
-    return { lat, lon, ignition, speed, address, raw: pos };
+    return { lat, lon, ignition, speed, address, course, raw: pos };
 }
 
 function hasLocation(v) {
@@ -490,17 +493,33 @@ const filtered = computed(() => {
 const markerItems = computed(() => {
     return filtered.value
         .map(v => {
-            const { lat, lon } = getPosition(v);
+            const { lat, lon, speed, course } = getPosition(v);
             const id = deviceKey(v);
             const disp = displayPositions[id];
             const dlat = typeof disp?.lat === 'number' ? disp.lat : lat;
             const dlon = typeof disp?.lon === 'number' ? disp.lon : lon;
+            const sp = speedKmh(speed) || 0;
+            const isMoving = sp > 0;
             const iconUrl = isSelected(id) ? '/images/markers/focus-marker.svg' : '/images/markers/device-pin.png';
-            return { id, lat: dlat, lon: dlon, popup: popupHtml(v), iconUrl };
+            return { id, lat: dlat, lon: dlon, popup: popupHtml(v), iconUrl, course: course || 0, isMoving };
         })
         .filter(m => typeof m.lat === 'number' && typeof m.lon === 'number')
         .sort((a, b) => String(a.id).localeCompare(String(b.id)));
 });
+
+function getLeafletIcon(m) {
+     if (m.isMoving) {
+         return L.divIcon({
+             className: 'arrow-marker-icon',
+             html: `<img src="/images/markers/arrow.svg" style="transform: rotate(${m.course}deg); width: 24px; height: 24px; display: block;" alt="arrow" />`,
+             iconSize: [24, 24],
+             iconAnchor: [12, 12],
+             popupAnchor: [0, -12]
+         });
+     }
+     if (isSelected(m.id)) return focusIcon;
+     return carIcon;
+ }
 
 const selectedMarker = computed(() => {
     if (!selectedId.value) return null;
