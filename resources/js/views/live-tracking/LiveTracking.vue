@@ -622,7 +622,7 @@ watch(
         } else {
             current = zoom.value;
         }
-        zoom.value = Math.max(current || 0, 15);
+        zoom.value = Math.max(current || 0, 17);
     }
 );
 
@@ -934,7 +934,7 @@ function focusVehicle(v) {
     if (typeof id !== 'undefined' && id !== null) selectedId.value = id;
     if (typeof lat === 'number' && typeof lon === 'number') {
         fitDone.value = true;
-        const desiredZoom = 15;
+        const desiredZoom = 17;
         let currentZoom = zoom.value;
         if (mapProvider.value === 'leaflet' && map.value && typeof map.value.getZoom === 'function') {
             currentZoom = map.value.getZoom();
