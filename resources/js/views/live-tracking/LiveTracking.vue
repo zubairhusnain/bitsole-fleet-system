@@ -467,10 +467,24 @@ function getPosition(v) {
     }
     const speedRaw = pos.speed ?? null;
     const speed = typeof speedRaw === 'string' ? parseFloat(speedRaw) : speedRaw; // Traccar speed usually in knots
-    const courseRaw = pos.course ?? null;
+    const courseRaw =
+        pos.course
+        ?? pos.attributes?.course
+        ?? pos.heading
+        ?? pos.attributes?.heading
+        ?? pos.bearing
+        ?? pos.attributes?.bearing
+        ?? null;
     const course = typeof courseRaw === 'string' ? parseFloat(courseRaw) : courseRaw;
+    const motionRaw = pos.attributes?.motion ?? pos.motion ?? null;
+    let motion = null;
+    if (motionRaw !== null && motionRaw !== undefined) {
+        const s = String(motionRaw).toLowerCase();
+        motion = s === 'true' || s === '1' || motionRaw === true || motionRaw === 1 ? true
+            : (s === 'false' || s === '0' || motionRaw === false || motionRaw === 0 ? false : null);
+    }
     const address = pos.address || null;
-    return { lat, lon, ignition, speed, address, course, raw: pos };
+    return { lat, lon, ignition, speed, address, course, motion, raw: pos };
 }
 
 function hasLocation(v) {
@@ -493,13 +507,13 @@ const filtered = computed(() => {
 const markerItems = computed(() => {
     return filtered.value
         .map(v => {
-            const { lat, lon, speed, course } = getPosition(v);
+            const { lat, lon, speed, course, motion } = getPosition(v);
             const id = deviceKey(v);
             const disp = displayPositions[id];
             const dlat = typeof disp?.lat === 'number' ? disp.lat : lat;
             const dlon = typeof disp?.lon === 'number' ? disp.lon : lon;
-            const sp = speedKmh(speed) || 0;
-            const isMoving = sp > 0;
+            const spRounded = speedKmh(speed);
+            const isMoving = (motion === true) || (typeof spRounded === 'number' && spRounded > 0);
             const iconUrl = isSelected(id) ? '/images/markers/focus-marker.svg' : '/images/markers/device-pin.png';
             return { id, lat: dlat, lon: dlon, popup: popupHtml(v), iconUrl, course: course || 0, isMoving };
         })
@@ -510,12 +524,12 @@ const markerItems = computed(() => {
 function getLeafletIcon(m) {
      if (m.isMoving) {
          return L.divIcon({
-             className: 'arrow-marker-icon',
-             html: `<img src="/images/markers/arrow.svg" style="transform: rotate(${m.course}deg); width: 24px; height: 24px; display: block;" alt="arrow" />`,
-             iconSize: [24, 24],
-             iconAnchor: [12, 12],
-             popupAnchor: [0, -12]
-         });
+            className: 'arrow-marker-icon',
+            html: `<img src="/images/markers/arrow.svg" style="transform: rotate(${m.course}deg); width: 36px; height: 36px; display: block;" alt="arrow" />`,
+            iconSize: [36, 36],
+            iconAnchor: [18, 18],
+            popupAnchor: [0, -18]
+        });
      }
      if (isSelected(m.id)) return focusIcon;
      return carIcon;

@@ -153,17 +153,18 @@ function syncVehicleMarkers() {
     const iconUrl = m.iconUrl || null;
     let icon = null;
 
-    if (m.isMoving) {
-       icon = {
-          path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-          scale: 5,
-          fillColor: '#28a745',
-          fillOpacity: 1,
-          strokeWeight: 1,
-          rotation: Number(m.course) || 0,
-          anchor: new window.google.maps.Point(0, 2.5)
-       };
-    } else if (iconUrl) {
+    if (m.isMoving) { 
+        icon = {
+           path: 'M12 3L22 21L12 17L2 21L12 3Z',
+           scale: 1.5,
+           fillColor: '#28a745',
+           fillOpacity: 1,
+           strokeColor: 'white',
+           strokeWeight: 2,
+           rotation: Number(m.course) || 0,
+           anchor: new window.google.maps.Point(12, 12)
+        };
+     } else if (iconUrl) {
        icon = {
           url: iconUrl,
           scaledSize: new window.google.maps.Size(36, 48),
