@@ -153,29 +153,33 @@ function syncVehicleMarkers() {
     const iconUrl = m.iconUrl || null;
     let icon = null;
 
-    if (m.isMoving) { 
-        icon = {
-           path: 'M12 3L22 21L12 17L2 21L12 3Z',
-           scale: 1.5,
-           fillColor: '#28a745',
-           fillOpacity: 1,
-           strokeColor: 'white',
-           strokeWeight: 2,
-           rotation: Number(m.course) || 0,
-           anchor: new window.google.maps.Point(12, 12)
-        };
-     } else if (iconUrl) {
-       icon = {
-          url: iconUrl,
-          scaledSize: new window.google.maps.Size(36, 48),
-          anchor: new window.google.maps.Point(18, 44),
-       };
+    const isSelected = String(m.id) === String(props.selectedId);
+
+    if (isSelected && m.isMoving) {
+      icon = {
+        path: 'M12 3L22 21L12 17L2 21L12 3Z',
+        scale: 1.5,
+        fillColor: '#28a745',
+        fillOpacity: 1,
+        strokeColor: 'white',
+        strokeWeight: 2,
+        rotation: Number(m.course) || 0,
+        anchor: new window.google.maps.Point(12, 12),
+      };
+    } else if (iconUrl) {
+      icon = {
+        url: iconUrl,
+        scaledSize: new window.google.maps.Size(36, 48),
+        anchor: new window.google.maps.Point(18, 44),
+      };
     }
     const popupHtml = m.popup || null;
     let info = null;
 
+    const zIndex = isSelected ? 1000 : 1;
+
     if (!mk) {
-      const options = { position: pos, map: map.value };
+      const options = { position: pos, map: map.value, zIndex };
       if (icon) options.icon = icon;
       if (m.draggable) options.draggable = true;
       mk = new window.google.maps.Marker(options);
@@ -200,6 +204,7 @@ function syncVehicleMarkers() {
       }
     } else {
       mk.setPosition(pos);
+      mk.setZIndex(zIndex);
       if (icon) mk.setIcon(icon);
       if (m.draggable !== undefined) mk.setDraggable(!!m.draggable);
       if (popupHtml) {

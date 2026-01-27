@@ -65,9 +65,9 @@
                   :lat-lng="[m.lat, m.lon]"
                   :icon="getLeafletIcon(m)"
                   :ref="el => setMarkerRef(m.id, el)"
-                  :z-index-offset="m.isMoving ? 1000 : 0"
+                  :z-index-offset="isSelected(m.id) ? 2000 : (m.isMoving ? 1000 : 0)"
                 >
-                  <l-popup>
+                  <l-popup :options="{ autoPan: false }">
                     <div class="popup-card" v-html="m.popup"></div>
                   </l-popup>
                 </l-marker>
@@ -287,15 +287,16 @@ function parseAttrs(val) {
 }
 
 // Animated marker display positions (decoupled from raw device positions)
-const displayPositions = reactive({}); // { [id]: { lat, lon } }
+const displayPositions = reactive({}); // { [id]: { lat, lon, course } }
 const animations = new Map(); // { id -> { raf } }
-const ANIM_MS = 1000; // default animation duration per update
+const ANIM_MS = 5000; // Match polling interval for smooth continuous movement
 const JUMP_CUTOFF_METERS = 1500; // skip animation for large jumps
 
-function setDisplayPos(id, lat, lon) {
+function setDisplayPos(id, lat, lon, course) {
     if (typeof id === 'undefined' || id === null) return;
     if (typeof lat !== 'number' || typeof lon !== 'number') return;
-    displayPositions[id] = { lat, lon };
+    const prev = displayPositions[id];
+    displayPositions[id] = { lat, lon, course: typeof course === 'number' ? course : (prev?.course ?? 0) };
 }
 
 function easeInOutCubic(t) {
@@ -314,25 +315,57 @@ function distanceMeters(a, b) {
     return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-function animateMarkerTo(id, toLat, toLon, duration = ANIM_MS) {
+function calculateBearing(startLat, startLon, destLat, destLon) {
+    const startLatRad = startLat * Math.PI / 180;
+    const startLonRad = startLon * Math.PI / 180;
+    const destLatRad = destLat * Math.PI / 180;
+    const destLonRad = destLon * Math.PI / 180;
+
+    const y = Math.sin(destLonRad - startLonRad) * Math.cos(destLatRad);
+    const x = Math.cos(startLatRad) * Math.sin(destLatRad) -
+        Math.sin(startLatRad) * Math.cos(destLatRad) * Math.cos(destLonRad - startLonRad);
+    let brng = Math.atan2(y, x);
+    brng = brng * 180 / Math.PI;
+    return (brng + 360) % 360;
+}
+
+function animateMarkerTo(id, toLat, toLon, toCourse, duration = ANIM_MS) {
     if (typeof toLat !== 'number' || typeof toLon !== 'number') return;
     const current = displayPositions[id];
     const from = current && typeof current.lat === 'number' && typeof current.lon === 'number' ? current : null;
+
+    // Fallback: Calculate bearing if missing
+    let targetCourse = toCourse;
+    if ((targetCourse === null || targetCourse === undefined) && from) {
+         if (distanceMeters(from, { lat: toLat, lon: toLon }) > 2) {
+             targetCourse = calculateBearing(from.lat, from.lon, toLat, toLon);
+         } else {
+             targetCourse = from.course;
+         }
+    }
+
     if (!from) {
         // No current display state; snap to target to establish baseline
-        setDisplayPos(id, toLat, toLon);
+        setDisplayPos(id, toLat, toLon, targetCourse || 0);
         return;
     }
     const dist = distanceMeters(from, { lat: toLat, lon: toLon });
     if (!Number.isFinite(dist) || dist > JUMP_CUTOFF_METERS) {
         // Large jump or invalid; snap without animating
-        setDisplayPos(id, toLat, toLon);
+        setDisplayPos(id, toLat, toLon, targetCourse || 0);
         return;
     }
     const startLat = from.lat;
     const startLon = from.lon;
+    const startCourse = from.course || 0;
+
     const dLat = toLat - startLat;
     const dLon = toLon - startLon;
+
+    // Angular distance logic for shortest path
+    let dCourse = (targetCourse || 0) - startCourse;
+    dCourse = (dCourse + 540) % 360 - 180;
+
     const startTime = performance?.now ? performance.now() : Date.now();
     const prev = animations.get(id);
     if (prev?.raf) {
@@ -342,8 +375,10 @@ function animateMarkerTo(id, toLat, toLon, duration = ANIM_MS) {
     const step = (now) => {
         const tRaw = Math.min(1, ((now ?? (performance?.now ? performance.now() : Date.now())) - startTime) / duration);
         const t = tRaw < 0 ? 0 : tRaw;
-        const e = easeInOutCubic(t);
-        setDisplayPos(id, startLat + dLat * e, startLon + dLon * e);
+        // Use linear interpolation for smooth continuous movement between updates
+        // const e = easeInOutCubic(t);
+        const e = t;
+        setDisplayPos(id, startLat + dLat * e, startLon + dLon * e, startCourse + dCourse * e);
         if (t < 1) {
             anim.raf = requestAnimationFrame(step);
         } else {
@@ -436,15 +471,20 @@ function applyRealtimePositions(list) {
         const toLonRaw = p.longitude ?? p.lon ?? null;
         const toLat = typeof toLatRaw === 'string' ? parseFloat(toLatRaw) : toLatRaw;
         const toLon = typeof toLonRaw === 'string' ? parseFloat(toLonRaw) : toLonRaw;
+
+        // Extract course from payload
+        const toCourseRaw = p.course ?? p.heading ?? p.bearing ?? p.attributes?.course ?? p.attributes?.heading ?? null;
+        const toCourse = typeof toCourseRaw === 'string' ? parseFloat(toCourseRaw) : toCourseRaw;
+
         if (!id || !Number.isFinite(toLat) || !Number.isFinite(toLon)) return;
         if (!displayPositions[id]) {
             const prevV = before.get(id);
             const prevPos = prevV ? getPosition(prevV) : null;
             if (prevPos && typeof prevPos.lat === 'number' && typeof prevPos.lon === 'number') {
-                setDisplayPos(id, prevPos.lat, prevPos.lon);
+                setDisplayPos(id, prevPos.lat, prevPos.lon, prevPos.course);
             }
         }
-        animateMarkerTo(id, toLat, toLon);
+        animateMarkerTo(id, toLat, toLon, toCourse);
     });
 }
 
@@ -512,26 +552,29 @@ const markerItems = computed(() => {
             const disp = displayPositions[id];
             const dlat = typeof disp?.lat === 'number' ? disp.lat : lat;
             const dlon = typeof disp?.lon === 'number' ? disp.lon : lon;
+            const dCourse = typeof disp?.course === 'number' ? disp.course : (course || 0);
             const spRounded = speedKmh(speed);
             const isMoving = (motion === true) || (typeof spRounded === 'number' && spRounded > 0);
             const iconUrl = isSelected(id) ? '/images/markers/focus-marker.svg' : '/images/markers/device-pin.png';
-            return { id, lat: dlat, lon: dlon, popup: popupHtml(v), iconUrl, course: course || 0, isMoving };
+            return { id, lat: dlat, lon: dlon, popup: popupHtml(v), iconUrl, course: dCourse, isMoving };
         })
         .filter(m => typeof m.lat === 'number' && typeof m.lon === 'number')
         .sort((a, b) => String(a.id).localeCompare(String(b.id)));
 });
 
 function getLeafletIcon(m) {
-     if (m.isMoving) {
-         return L.divIcon({
-            className: 'arrow-marker-icon',
-            html: `<img src="/images/markers/arrow.svg" style="transform: rotate(${m.course}deg); width: 36px; height: 36px; display: block;" alt="arrow" />`,
-            iconSize: [36, 36],
-            iconAnchor: [18, 18],
-            popupAnchor: [0, -18]
-        });
+     if (isSelected(m.id)) {
+         if (m.isMoving) {
+             return L.divIcon({
+                className: 'arrow-marker-icon',
+                html: `<img src="/images/markers/arrow.svg" style="transform: rotate(${m.course}deg); width: 36px; height: 36px; display: block;" alt="arrow" />`,
+                iconSize: [36, 36],
+                iconAnchor: [18, 18],
+                popupAnchor: [0, -18]
+            });
+         }
+         return focusIcon;
      }
-     if (isSelected(m.id)) return focusIcon;
      return carIcon;
  }
 
@@ -880,8 +923,14 @@ async function fetchVehicles() {
 }
 
 function focusVehicle(v) {
-    const { lat, lon } = getPosition(v);
     const id = deviceKey(v);
+    // Use displayed position (interpolated) if available to ensure map centers on the marker,
+    // not the future target position which the marker hasn't reached yet.
+    const disp = displayPositions[id];
+    const rawPos = getPosition(v);
+    const lat = typeof disp?.lat === 'number' ? disp.lat : rawPos.lat;
+    const lon = typeof disp?.lon === 'number' ? disp.lon : rawPos.lon;
+
     if (typeof id !== 'undefined' && id !== null) selectedId.value = id;
     if (typeof lat === 'number' && typeof lon === 'number') {
         fitDone.value = true;
@@ -898,11 +947,19 @@ function focusVehicle(v) {
         if (mapProvider.value === 'leaflet' && map.value) {
             try {
                 if (typeof map.value.setView === 'function') {
-                    map.value.setView([lat, lon], z, { animate: true });
+                    // Disable animation to prevent race conditions with popup auto-pan
+                    map.value.setView([lat, lon], z, { animate: false });
                 }
             } catch {}
             const mk = markerRefs.get(id);
             try { mk?.openPopup?.(); } catch {}
+        } else if (mapProvider.value === 'google' && googleMap.value) {
+            try {
+                googleMap.value.setCenter({ lat, lng: lon });
+                if (typeof googleMap.value.setZoom === 'function') {
+                    googleMap.value.setZoom(z);
+                }
+            } catch {}
         }
     }
 }
