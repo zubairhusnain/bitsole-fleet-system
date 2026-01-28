@@ -156,7 +156,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
 import { getCurrentUser, clearAuthCache } from '../../auth';
 import { LMap, LTileLayer, LMarker, LPopup, LCircle } from '@vue-leaflet/vue-leaflet';
@@ -174,6 +174,7 @@ const googleMapComponent = ref(null);
 const markerRefs = new Map();
 
 const router = useRouter();
+const route = useRoute();
 const isTestingMode = inject('isTestingMode', ref(false));
 
 // Computed Attributes (Developer Feature)
