@@ -41,7 +41,12 @@
                     </div>
                     <div class="vehicle-info">
                       <div class="vehicle-name-row">
-                        <div class="vehicle-name">{{ deviceName(v) }}</div>
+                        <div class="d-flex align-items-center">
+                            <div class="vehicle-name">{{ deviceName(v) }}</div>
+                            <button v-if="isDevMode" class="btn btn-sm btn-link p-0 ms-1" title="Computed Attributes" @click.stop="openComputedAttributes(v)">
+                                <i class="bi bi-cpu text-muted" style="font-size: 1rem;"></i>
+                            </button>
+                        </div>
                         <img :src="getIcon(v)" class="status-icon" alt="" />
                       </div>
                       <div class="vehicle-meta-lines">
@@ -127,7 +132,12 @@
                         </div>
                         <div class="vehicle-info">
                           <div class="vehicle-name-row">
-                            <div class="vehicle-name">{{ deviceName(v) }}</div>
+                            <div class="d-flex align-items-center">
+                                <div class="vehicle-name">{{ deviceName(v) }}</div>
+                                <button v-if="isDevMode" class="btn btn-sm btn-link p-0 ms-1" title="Computed Attributes" @click.stop="openComputedAttributes(v)">
+                                    <i class="bi bi-cpu text-muted" style="font-size: 1rem;"></i>
+                                </button>
+                            </div>
                         <img :src="getIcon(v)" class="status-icon" alt="" />
                           </div>
                           <div class="vehicle-meta-lines">
