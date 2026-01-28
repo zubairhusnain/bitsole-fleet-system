@@ -366,6 +366,11 @@ function animateMarkerTo(id, toLat, toLon, toCourse, duration = ANIM_MS) {
     let dCourse = (targetCourse || 0) - startCourse;
     dCourse = (dCourse + 540) % 360 - 180;
 
+    // Dampen small course changes or if distance is very small (prevent jitter)
+    if (Math.abs(dCourse) < 5 || dist < 10) {
+        dCourse = 0;
+    }
+
     const startTime = performance?.now ? performance.now() : Date.now();
     const prev = animations.get(id);
     if (prev?.raf) {

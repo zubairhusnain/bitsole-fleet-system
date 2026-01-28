@@ -407,7 +407,7 @@ const checkTestingMode = () => {
     const envTestingMode = import.meta.env.VITE_TESTING_MODE;
 
     // Support both lowercase and camelCase query params
-    const rawQ = route.query.testingmode ?? route.query.testingMode;
+    const rawQ = route.query.testingmode ?? route.query.testingMode ?? route.query.showattribute;
     const q = rawQ !== null && rawQ !== undefined ? String(rawQ) : null;
 
     if (envTestingMode === 'true') {

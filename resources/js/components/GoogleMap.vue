@@ -183,6 +183,7 @@ function syncVehicleMarkers() {
       if (icon) options.icon = icon;
       if (m.draggable) options.draggable = true;
       mk = new window.google.maps.Marker(options);
+      mk._lastIcon = icon;
       vehicleMarkers.set(key, mk);
 
       if (m.draggable) {
@@ -203,9 +204,24 @@ function syncVehicleMarkers() {
         });
       }
     } else {
-      mk.setPosition(pos);
+      const currentPos = mk.getPosition();
+      if (!currentPos || !currentPos.equals(pos)) {
+        mk.setPosition(pos);
+      }
       mk.setZIndex(zIndex);
-      if (icon) mk.setIcon(icon);
+
+      const prevIcon = mk._lastIcon;
+      let iconChanged = true;
+      if (prevIcon && icon) {
+          if (prevIcon.url && icon.url && prevIcon.url === icon.url) iconChanged = false;
+          else if (prevIcon.path && icon.path && prevIcon.path === icon.path && Math.abs((prevIcon.rotation || 0) - (icon.rotation || 0)) < 0.1) iconChanged = false;
+      }
+
+      if (iconChanged) {
+          if (icon) mk.setIcon(icon);
+          mk._lastIcon = icon;
+      }
+
       if (m.draggable !== undefined) mk.setDraggable(!!m.draggable);
       if (popupHtml) {
         info = vehicleInfoWindows.get(key);
