@@ -709,7 +709,9 @@ async function stopImpersonation() {
             showConfirmButton: false,
         });
         router.push('/dashboard');
-        window.location.reload();
+        setTimeout(function(){
+            window.location.reload();
+        },500);
     } catch (e) {
         const status = e?.response?.status;
         const msg = e?.response?.data?.message || 'Failed to switch back to previous user.';
