@@ -1,5 +1,11 @@
 <template>
     <div class="live-tracking-view">
+        <ComputedAttributesModal
+            :show="showComputedAttributesModal"
+            :device-id="selectedDeviceForAttributes?.id"
+            :vehicle-name="selectedDeviceForAttributes?.name"
+            @close="showComputedAttributesModal = false"
+        />
         <!-- Breadcrumbs removed per request -->
         <div class="map-wrap">
             <div v-if="isMobile && showMobileTopbar" class="mobile-topbar">
@@ -159,6 +165,7 @@ import 'leaflet/dist/leaflet.css';
 import { formatTelemetry } from '../../utils/telemetry';
 import { formatDateTime } from '../../utils/datetime';
 import GoogleMap from '../../components/GoogleMap.vue';
+import ComputedAttributesModal from '../../components/ComputedAttributesModal.vue';
 
 
 const map = ref(null);
@@ -1040,6 +1047,11 @@ onMounted(() => {
     // Initialize by viewport: show on desktop, keep hidden on mobile
     updatePanelVisibilityForViewport();
     try { window.addEventListener('resize', updatePanelVisibilityForViewport); } catch {}
+
+    // Check for developer mode
+    if (String(route.query?.showattribute) === '1') {
+        isDevMode.value = true;
+    }
 
     // Start polling only if sockets don’t deliver updates shortly
     armPollingFallback();

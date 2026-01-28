@@ -43,7 +43,7 @@ class VehicleController extends Controller
                 $updated = true;
                 break;
             }
-        } 
+        }
 
         if ($updated) {
             $model->attributes = $modelAttrs;
@@ -1461,16 +1461,16 @@ class VehicleController extends Controller
     {
         $sessionId = $request->user()->traccarSession ?? session('cookie');
         $headers = ['Content-Type: application/json', 'Accept: application/json'];
-        
+
         $data = json_encode(['deviceId' => $deviceId, 'attributeId' => $attributeId]);
-        
+
         $resp = static::curl('/api/permissions', 'DELETE', $sessionId, $data, $headers);
         $code = (int)($resp->responseCode ?? 0);
-        
+
         if ($code >= 200 && $code < 300) {
             return response()->json(['message' => 'Attribute removed']);
         }
-        
+
         return response()->json(['message' => 'Failed to remove attribute'], 400);
     }
 

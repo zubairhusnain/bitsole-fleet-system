@@ -84,6 +84,9 @@
                                         <button v-if="!row.blocked && hasPerm('vehicles','update')" class="btn btn-outline-secondary" :class="{ 'd-testingmode': !isTestingMode }" title="Settings" @click="toSettings(row)">
                                             <i class="bi bi-gear"></i>
                                         </button>
+                                        <button v-if="isDevMode" class="btn btn-outline-secondary" title="Computed Attributes" @click="openComputedAttributes(row)">
+                                            <i class="bi bi-cpu"></i>
+                                        </button>
                                         <button v-if="(hasPerm('vehicles','read') || hasPerm('vehicles.overview','read')) && !row.blocked && hasLocation(row)" class="btn btn-outline-primary" title="View" @click="toDetail(row)">
                                             <i class="bi bi-eye"></i>
                                         </button>
@@ -322,6 +325,12 @@ onMounted(() => {
         // Clear query to prevent persistent banner on later navigations
         router.replace('/vehicles');
     }
+
+    // Check for developer mode
+    if (String(route.query?.showattribute) === '1') {
+        isDevMode.value = true;
+    }
+
     fetchPage(1);
 });
 
