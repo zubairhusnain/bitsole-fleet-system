@@ -21,7 +21,7 @@
                      <h3 class="panel-title mb-0">Search Vehicle</h3>
                      <button v-if="selectedId || query" class="btn btn-sm btn-outline-danger" @click="resetView" title="Reset View">
                         <i class="bi bi-x-circle"></i> Reset
-                     </button> 
+                     </button>
                  </div>
                  <label class="form-label small">Vehicle Name</label>
                  <input v-model="query" type="text" class="form-control panel-input" placeholder="eg. Transit Van" />
@@ -122,7 +122,7 @@
                         <div class="vehicle-info">
                           <div class="vehicle-name-row">
                             <div class="vehicle-name">{{ deviceName(v) }}</div>
-                            <img :src="getIcon(v)" class="status-icon" alt="" />
+                        <img :src="getIcon(v)" class="status-icon" alt="" />
                           </div>
                           <div class="vehicle-meta-lines">
                             <div class="meta-line">
@@ -168,6 +168,16 @@ const markerRefs = new Map();
 
 const router = useRouter();
 const isTestingMode = inject('isTestingMode', ref(false));
+
+// Computed Attributes (Developer Feature)
+const showComputedAttributesModal = ref(false);
+const selectedDeviceForAttributes = ref(null);
+const isDevMode = ref(false);
+
+function openComputedAttributes(v) {
+    selectedDeviceForAttributes.value = v;
+    showComputedAttributesModal.value = true;
+}
 
 async function logout() {
     try { await axios.post('/web/auth/logout'); } catch {}
@@ -605,7 +615,8 @@ watch(
     { flush: 'post' }
 );
 
-// Keep selected vehicle centered while it moves
+// Keep selected vehicle centered while it moves - REMOVED per user request to allow map scrolling
+/*
 watch(
     selectedMarker,
     (m) => {
@@ -622,6 +633,7 @@ watch(
         zoom.value = Math.max(current || 0, 17);
     }
 );
+*/
 
 function getImage(v) {
     // Merge attributes: Traccar Device attributes < Vehicle attributes

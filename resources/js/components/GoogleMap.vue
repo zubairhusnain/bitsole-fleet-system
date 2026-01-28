@@ -272,7 +272,7 @@ function updateZonesAndRoutes() {
         try {
           info.open({ map: map.value, anchor: zoneMarker });
         } catch {}
-      }); 
+      });
     }
     zoneMarkers.push(zoneMarker);
   });
@@ -345,6 +345,7 @@ function initMap() {
   const options = {
     center: { lat, lng },
     zoom: Number(props.zoom) || 13,
+    maxZoom: Number(props.maxZoom) || 17,
     mapTypeId: props.mapTypeId || 'roadmap',
     disableDefaultUI: true,
     zoomControl: true,

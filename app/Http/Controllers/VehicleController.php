@@ -1443,6 +1443,38 @@ class VehicleController extends Controller
     }
 
     /**
+     * Get computed attributes assigned to this vehicle.
+     */
+    public function computedAttributes(Request $request, int $deviceId)
+    {
+        $sessionId = $request->user()->traccarSession ?? session('cookie');
+        $headers = ['Content-Type: application/json', 'Accept: application/json'];
+        $resp = static::curl("/api/attributes/computed?deviceId={$deviceId}", 'GET', $sessionId, '', $headers);
+        $attrs = json_decode($resp->response ?? '[]', true) ?? [];
+        return response()->json(['attributes' => $attrs]);
+    }
+
+    /**
+     * Remove (unlink) a computed attribute from this vehicle.
+     */
+    public function removeComputedAttribute(Request $request, int $deviceId, int $attributeId)
+    {
+        $sessionId = $request->user()->traccarSession ?? session('cookie');
+        $headers = ['Content-Type: application/json', 'Accept: application/json'];
+        
+        $data = json_encode(['deviceId' => $deviceId, 'attributeId' => $attributeId]);
+        
+        $resp = static::curl('/api/permissions', 'DELETE', $sessionId, $data, $headers);
+        $code = (int)($resp->responseCode ?? 0);
+        
+        if ($code >= 200 && $code < 300) {
+            return response()->json(['message' => 'Attribute removed']);
+        }
+        
+        return response()->json(['message' => 'Failed to remove attribute'], 400);
+    }
+
+    /**
      * Restore (activate) a soft-deleted vehicle.
      */
     public function restore(Request $request, int $deviceId)

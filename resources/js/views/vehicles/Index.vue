@@ -126,6 +126,13 @@
                     </ul>
                 </nav>
             </div>
+            <!-- Computed Attributes Modal -->
+            <ComputedAttributesModal
+                :show="showComputedAttributesModal"
+                :device-id="selectedDeviceForAttributes?.device_id"
+                :vehicle-name="selectedDeviceForAttributes?.name"
+                @close="showComputedAttributesModal = false"
+            />
             <!-- Whole Data Modal -->
             <div v-if="jsonModalVisible" class="modal d-block" tabindex="-1" role="dialog" aria-modal="true">
                 <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -153,6 +160,7 @@ import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
 import Swal from 'sweetalert2';
 import UiAlert from '../../components/UiAlert.vue';
+import ComputedAttributesModal from '../../components/ComputedAttributesModal.vue';
 import { formatTelemetry } from '../../utils/telemetry';
 import { hasPermission as _hasPermission } from '../../auth';
 
@@ -180,6 +188,16 @@ const showWholeDataButton = computed(() => String(route.query?.wholedata || '') 
 const jsonModalVisible = ref(false);
 const wholeJson = ref('');
 const jsonModalFuelKey = ref('');
+
+// Computed Attributes (Developer Feature)
+const showComputedAttributesModal = ref(false);
+const selectedDeviceForAttributes = ref(null);
+const isDevMode = ref(false);
+
+function openComputedAttributes(v) {
+    selectedDeviceForAttributes.value = v;
+    showComputedAttributesModal.value = true;
+}
 
 function closeJsonModal() { jsonModalVisible.value = false; wholeJson.value = ''; }
 function openWholeData(row) {

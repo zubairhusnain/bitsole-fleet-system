@@ -187,7 +187,7 @@
                                 </div>
                             </div>
 
-                            <LMap v-if="mapReady && mapProvider === 'leaflet'" :zoom="zoom" :center="mapCenter" :options="{ zoomControl: false }" @ready="onMapReady" style="height: 100%; width: 100%;">
+                            <LMap v-if="mapReady && mapProvider === 'leaflet'" :zoom="zoom" :max-zoom="17" :center="mapCenter" :options="{ zoomControl: false }" @ready="onMapReady" style="height: 100%; width: 100%;">
                                 <LTileLayer :url="tileUrl" :attribution="tileAttribution" />
                                 <LMarker :lat-lng="currentLatLng || mapCenter" ref="markerRef" />
 
@@ -787,7 +787,6 @@ import axios from 'axios';
 import { LMap, LTileLayer, LMarker, LPolyline, LPopup, LCircle, LPolygon } from '@vue-leaflet/vue-leaflet';
 import { formatDateTime, formatDate } from '../../utils/datetime';
 import 'leaflet/dist/leaflet.css';
-import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import L from 'leaflet';
 import { formatTelemetry } from '../../utils/telemetry';
 import { getCurrentUser } from '../../auth';
@@ -1638,12 +1637,14 @@ onBeforeUnmount(() => {
     if (typeof unsubEcho === 'function') { try { unsubEcho(); } catch (e) { } }
 });
 
-// Keep map centered on latest position updates
+// Keep map centered on latest position updates - REMOVED per user request to allow map scrolling
+/*
 watch(currentLatLng, (ll) => {
     if (Array.isArray(ll) && typeof ll[0] === 'number' && typeof ll[1] === 'number') {
         mapCenter.value = ll;
     }
 });
+*/
 
 // React to preset changes (non-custom) by reloading trips
 watch(tripRangePreset, (val) => {
