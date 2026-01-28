@@ -17,7 +17,12 @@
             <!-- Panel outside map for desktop -->
              <div v-if="!isMobile && panelVisible" class="panel-floating is-visible">
                <div class="panel-header">
-                 <h3 class="panel-title">Search Vehicle</h3>
+                 <div class="d-flex justify-content-between align-items-center mb-2">
+                     <h3 class="panel-title mb-0">Search Vehicle</h3>
+                     <button v-if="selectedId || query" class="btn btn-sm btn-outline-danger" @click="resetView" title="Reset View">
+                        <i class="bi bi-x-circle"></i> Reset
+                     </button> 
+                 </div>
                  <label class="form-label small">Vehicle Name</label>
                  <input v-model="query" type="text" class="form-control panel-input" placeholder="eg. Transit Van" />
                </div>
@@ -74,6 +79,7 @@
               </l-map>
               <GoogleMap
                 v-else
+                ref="googleMapComponent"
                 :center="center"
                 :zoom="zoom"
                 :markers="markerItems"
@@ -84,7 +90,12 @@
               <transition name="mobile-panel">
                 <div v-if="isMobile && panelVisible" class="panel-floating">
                   <div class="panel-header">
-                    <h3 class="panel-title">Search Vehicle</h3>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h3 class="panel-title mb-0">Search Vehicle</h3>
+                        <button v-if="selectedId || query" class="btn btn-sm btn-outline-danger" @click="resetView" title="Reset View">
+                            <i class="bi bi-x-circle"></i> Reset
+                        </button>
+                    </div>
                     <label class="form-label small">Vehicle Name</label>
                     <input v-model="query" type="text" class="form-control panel-input" placeholder="eg. Transit Van" />
                   </div>
@@ -152,6 +163,7 @@ import GoogleMap from '../../components/GoogleMap.vue';
 
 const map = ref(null);
 const googleMap = ref(null);
+const googleMapComponent = ref(null);
 const markerRefs = new Map();
 
 const router = useRouter();
@@ -587,22 +599,7 @@ watch(
     markerItems,
     (list) => {
         if (!fitDone.value && list.length && !selectedId.value) {
-            if (mapProvider.value === 'leaflet' && map.value) {
-                const bounds = L.latLngBounds(list.map(m => [m.lat, m.lon]));
-                try { map.value.fitBounds(bounds.pad(0.2)); } catch { map.value.fitBounds(bounds); }
-                fitDone.value = true;
-            } else if (mapProvider.value === 'google' && googleMap.value && window.google && window.google.maps && window.google.maps.LatLngBounds) {
-                const bounds = new window.google.maps.LatLngBounds();
-                list.forEach(m => {
-                    const lat = Number(m.lat);
-                    const lon = Number(m.lon);
-                    if (Number.isFinite(lat) && Number.isFinite(lon)) {
-                        bounds.extend({ lat, lng: lon });
-                    }
-                });
-                try { googleMap.value.fitBounds(bounds); } catch {}
-                fitDone.value = true;
-            }
+            fitBoundsToAll();
         }
     },
     { flush: 'post' }
@@ -920,6 +917,43 @@ async function fetchVehicles() {
         // Trigger initial fit once markers are ready
         fitDone.value = false;
     }
+}
+
+function fitBoundsToAll() {
+    const list = markerItems.value;
+    if (!list.length) return;
+
+    if (mapProvider.value === 'leaflet' && map.value) {
+        const bounds = L.latLngBounds(list.map(m => [m.lat, m.lon]));
+        try { map.value.fitBounds(bounds.pad(0.2)); } catch { map.value.fitBounds(bounds); }
+        fitDone.value = true;
+    } else if (mapProvider.value === 'google' && googleMap.value && window.google && window.google.maps && window.google.maps.LatLngBounds) {
+        const bounds = new window.google.maps.LatLngBounds();
+        list.forEach(m => {
+            const lat = Number(m.lat);
+            const lon = Number(m.lon);
+            if (Number.isFinite(lat) && Number.isFinite(lon)) {
+                bounds.extend({ lat, lng: lon });
+            }
+        });
+        try { googleMap.value.fitBounds(bounds); } catch {}
+        fitDone.value = true;
+    }
+}
+
+function resetView() {
+    selectedId.value = null;
+    query.value = '';
+    fitDone.value = false;
+
+    // Close popups
+    if (mapProvider.value === 'leaflet' && map.value) {
+        try { map.value.closePopup(); } catch {}
+    } else if (mapProvider.value === 'google' && googleMapComponent.value) {
+        try { googleMapComponent.value.closeAllInfoWindows(); } catch {}
+    }
+
+    fitBoundsToAll();
 }
 
 function focusVehicle(v) {

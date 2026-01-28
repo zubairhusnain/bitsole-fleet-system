@@ -198,6 +198,19 @@
                                             <div class="small text-muted" v-if="zone.description">{{ zone.description }}</div>
                                         </LPopup>
                                     </LMarker>
+                                    <LPolygon v-if="(zone.type === 'polygon' || zone.type === 'rectangle') && zone.coordinates"
+                                        :lat-lngs="zone.coordinates"
+                                        :color="zone.color"
+                                        :fill-color="zone.color"
+                                        :fill-opacity="0.2"
+                                    />
+                                    <LCircle v-else-if="zone.type === 'circle' && zone.radius"
+                                        :lat-lng="zone.center"
+                                        :radius="zone.radius"
+                                        :color="zone.color"
+                                        :fill-color="zone.color"
+                                        :fill-opacity="0.2"
+                                    />
                                 </template>
 
                             </LMap>
@@ -206,6 +219,8 @@
                                 :center="currentLatLng || mapCenter"
                                 :zoom="zoom"
                                 :zones="visibleZones"
+                                :polygons="visiblePolygons"
+                                :circles="visibleCircles"
                                 @error="mapProvider = 'leaflet'"
                             />
                             <div v-else class="placeholder-glow" style="height: 100%">
@@ -880,16 +895,23 @@ const visibleZones = computed(() => {
         }
 
         let center = null;
+        let type = 'unknown';
+        let coordinates = null;
+        let radius = 0;
 
         // Try to get center from circle attributes
         if (attr.type === 'circle' && attr.lat && attr.long) {
             center = [parseFloat(attr.lat), parseFloat(attr.long)];
+            type = 'circle';
+            radius = parseFloat(attr.radius || 0);
         }
         // Or calculate centroid for polygon/rectangle
         else if (attr.coordinates && (attr.type === 'polygon' || attr.type === 'rectangle')) {
             const lats = attr.coordinates.map(p => p[0]);
             const lngs = attr.coordinates.map(p => p[1]);
             center = [(Math.min(...lats) + Math.max(...lats)) / 2, (Math.min(...lngs) + Math.max(...lngs)) / 2];
+            type = attr.type;
+            coordinates = attr.coordinates; // [[lat, lng], ...]
         }
         // Fallback to WKT parsing
         else if (z.area && z.area.startsWith('POLYGON')) {
@@ -902,6 +924,8 @@ const visibleZones = computed(() => {
                  const lats = points.map(p => p[0]);
                  const lngs = points.map(p => p[1]);
                  center = [(Math.min(...lats) + Math.max(...lats)) / 2, (Math.min(...lngs) + Math.max(...lngs)) / 2];
+                 type = 'polygon';
+                 coordinates = points;
              } catch(e) {}
         }
 
@@ -912,12 +936,43 @@ const visibleZones = computed(() => {
                     id: z.id,
                     center: center,
                     name: z.name,
-                    description: z.description
+                    description: z.description,
+                    type,
+                    coordinates,
+                    radius,
+                    color: attr.color || '#ff0000'
                 };
             }
         }
         return null;
     }).filter(z => z);
+});
+
+const visiblePolygons = computed(() => {
+    return visibleZones.value.filter(z => (z.type === 'polygon' || z.type === 'rectangle') && z.coordinates && z.coordinates.length)
+        .map(z => ({
+            id: z.id,
+            paths: z.coordinates.map(pt => ({ lat: pt[0], lng: pt[1] })),
+            options: {
+                color: z.color,
+                fillColor: z.color,
+                fillOpacity: 0.2
+            }
+        }));
+});
+
+const visibleCircles = computed(() => {
+    return visibleZones.value.filter(z => z.type === 'circle' && z.radius > 0)
+        .map(z => ({
+            id: z.id,
+            center: { lat: z.center[0], lng: z.center[1] },
+            radius: z.radius,
+            options: {
+                color: z.color,
+                fillColor: z.color,
+                fillOpacity: 0.2
+            }
+        }));
 });
 
 const polyline = computed(() => positions.value.map(p => [p.latitude, p.longitude]));
