@@ -84,6 +84,9 @@
                                         <button v-if="!row.blocked && hasPerm('vehicles','update')" class="btn btn-outline-secondary" :class="{ 'd-testingmode': !isTestingMode }" title="Settings" @click="toSettings(row)">
                                             <i class="bi bi-gear"></i>
                                         </button>
+                                        <button v-if="isDevMode" class="btn btn-outline-secondary" title="Computed Attributes" @click="openComputedAttributes(row)">
+                                            <i class="bi bi-cpu"></i>
+                                        </button>
                                         <button v-if="(hasPerm('vehicles','read') || hasPerm('vehicles.overview','read')) && !row.blocked && hasLocation(row)" class="btn btn-outline-primary" title="View" @click="toDetail(row)">
                                             <i class="bi bi-eye"></i>
                                         </button>
@@ -126,6 +129,13 @@
                     </ul>
                 </nav>
             </div>
+            <!-- Computed Attributes Modal -->
+            <ComputedAttributesModal
+                :show="showComputedAttributesModal"
+                :device-id="selectedDeviceForAttributes?.device_id"
+                :vehicle-name="selectedDeviceForAttributes?.name"
+                @close="showComputedAttributesModal = false"
+            />
             <!-- Whole Data Modal -->
             <div v-if="jsonModalVisible" class="modal d-block" tabindex="-1" role="dialog" aria-modal="true">
                 <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -153,6 +163,7 @@ import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
 import Swal from 'sweetalert2';
 import UiAlert from '../../components/UiAlert.vue';
+import ComputedAttributesModal from '../../components/ComputedAttributesModal.vue';
 import { formatTelemetry } from '../../utils/telemetry';
 import { hasPermission as _hasPermission } from '../../auth';
 
@@ -176,10 +187,21 @@ const showDeviceDetailLink = !import.meta.env.PROD;
 
 
 const hasPerm = (k, a) => _hasPermission(k, a);
-const showWholeDataButton = computed(() => String(route.query?.wholedata || '') === '1');
+const wholeDataEnabled = ref(false);
+const showWholeDataButton = computed(() => wholeDataEnabled.value === true);
 const jsonModalVisible = ref(false);
 const wholeJson = ref('');
 const jsonModalFuelKey = ref('');
+
+// Computed Attributes (Developer Feature)
+const showComputedAttributesModal = ref(false);
+const selectedDeviceForAttributes = ref(null);
+const isDevMode = ref(false);
+
+function openComputedAttributes(v) {
+    selectedDeviceForAttributes.value = v;
+    showComputedAttributesModal.value = true;
+}
 
 function closeJsonModal() { jsonModalVisible.value = false; wholeJson.value = ''; }
 function openWholeData(row) {
@@ -304,6 +326,23 @@ onMounted(() => {
         // Clear query to prevent persistent banner on later navigations
         router.replace('/vehicles');
     }
+
+    // Check for developer mode
+    if (String(route.query?.showattribute) === '1') {
+        isDevMode.value = true;
+    }
+
+    const wd = String(route.query?.wholedata || '');
+    if (wd === '1') {
+        try { localStorage.setItem('wholedata', '1'); } catch {}
+        wholeDataEnabled.value = true;
+        const q = { ...(route.query || {}) };
+        delete q.wholedata;
+        router.replace({ path: route.path, query: q });
+    } else {
+        try { wholeDataEnabled.value = String(localStorage.getItem('wholedata') || '') === '1'; } catch { wholeDataEnabled.value = false; }
+    }
+
     fetchPage(1);
 });
 
@@ -386,8 +425,13 @@ function deriveRow(r) {
     const location = pos.address ?? (r.location ?? pickAttr(attrs, ['address', 'location'])) ?? coords;
     let fuel = null;
     const capacity = hasFuelKey(posAttrs) ? capacityRaw : null;
+
+    // Extract configured attributes
+    const configuredOdometerAttr = vehicleAttrs.odometerAttr || vehicleAttrs.odometer_attribute || attrs.odometerAttr || attrs.odometer_attribute || null;
+    const configuredFuelAttr = vehicleAttrs.fuelAttr || vehicleAttrs.fuel_attribute || attrs.fuelAttr || attrs.fuel_attribute || null;
+
     // Align with Detail/LiveTracking: prioritize named odometer, disable protocol-based meter assumption
-    const tel = formatTelemetry(mergedAttrs, { protocol: null, model, capacity, preferNamedOdometer: true });
+    const tel = formatTelemetry(mergedAttrs, { protocol: null, model, capacity, preferNamedOdometer: true, odometerAttr: configuredOdometerAttr, fuelAttr: configuredFuelAttr });
     if (tel?.fuel) {
         const liters = tel.fuel.liters;
         const percent = tel.fuel.percent;

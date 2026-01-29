@@ -291,38 +291,6 @@ function updateZonesAndRoutes() {
       });
     }
     zoneMarkers.push(zoneMarker);
-
-    // Draw route using Directions Service
-    const directionsService = new window.google.maps.DirectionsService();
-    directionsService.route(
-      {
-        origin: deviceLatLng,
-        destination: zoneLatLng,
-        travelMode: window.google.maps.TravelMode.DRIVING,
-      },
-      (result, status) => {
-        if (status === window.google.maps.DirectionsStatus.OK) {
-          const polyline = new window.google.maps.Polyline({
-            path: result.routes[0].overview_path,
-            strokeColor: '#6610f2',
-            strokeOpacity: 0.7,
-            strokeWeight: 4,
-          });
-          polyline.setMap(map.value);
-          routeLines.push(polyline);
-        } else {
-           // Fallback to straight line if routing fails
-            const polyline = new window.google.maps.Polyline({
-              path: [deviceLatLng, zoneLatLng],
-              strokeColor: '#6610f2',
-              strokeOpacity: 0.7,
-              strokeWeight: 4,
-            });
-            polyline.setMap(map.value);
-            routeLines.push(polyline);
-        }
-      }
-    );
   });
 
   // Draw Polygons
@@ -393,6 +361,7 @@ function initMap() {
   const options = {
     center: { lat, lng },
     zoom: Number(props.zoom) || 13,
+    maxZoom: Number(props.maxZoom) || 17,
     mapTypeId: props.mapTypeId || 'roadmap',
     disableDefaultUI: true,
     zoomControl: true,
@@ -446,7 +415,6 @@ watch(
     const pos = { lat, lng };
     map.value.setCenter(pos);
     if (marker.value) marker.value.setPosition(pos);
-    updateZonesAndRoutes();
   },
   { deep: true }
 );
@@ -583,5 +551,15 @@ function fitBounds(bounds) {
   }
 }
 
-defineExpose({ map, fitBounds, vehicleMarkers, vehicleInfoWindows });
+function closeAllInfoWindows() {
+  if (selectedInfoWindow) {
+    try { selectedInfoWindow.close(); } catch {}
+    selectedInfoWindow = null;
+  }
+  vehicleInfoWindows.forEach((info) => {
+      try { info.close(); } catch {}
+  });
+}
+
+defineExpose({ map, fitBounds, vehicleMarkers, vehicleInfoWindows, closeAllInfoWindows });
 </script>

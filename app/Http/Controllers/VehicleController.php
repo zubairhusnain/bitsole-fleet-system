@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Drivers;
 use App\Models\TcGeofence;
+use App\Models\TcDevice;
+use App\Models\TcPosition;
+use Illuminate\Support\Facades\DB;
 
 class VehicleController extends Controller
 {
@@ -43,7 +46,7 @@ class VehicleController extends Controller
                 $updated = true;
                 break;
             }
-        } 
+        }
 
         if ($updated) {
             $model->attributes = $modelAttrs;
@@ -1440,6 +1443,76 @@ class VehicleController extends Controller
             'scheduleName' => $picked['name'] ?? null,
             'type' => $picked['type'] ?? null,
         ];
+    }
+
+    /**
+     * Get computed attributes assigned to this vehicle.
+     */
+    public function computedAttributes(Request $request, int $deviceId)
+    {
+        $sessionId = $request->user()->traccarSession ?? session('cookie');
+        $headers = ['Content-Type: application/json', 'Accept: application/json'];
+        $resp = static::curl("/api/attributes/computed?deviceId={$deviceId}", 'GET', $sessionId, '', $headers);
+        $attrs = json_decode($resp->response ?? '[]', true) ?? [];
+        return response()->json(['attributes' => $attrs]);
+    }
+
+    /**
+     * Remove (unlink) a computed attribute from this vehicle.
+     */
+    public function removeComputedAttribute(Request $request, int $deviceId, int $attributeId)
+    {
+        $sessionId = $request->user()->traccarSession ?? session('cookie');
+        $headers = ['Content-Type: application/json', 'Accept: application/json'];
+
+        // Get attribute key before deletion
+        $attributeKey = DB::connection('pgsql')
+            ->table('tc_attributes')
+            ->where('id', $attributeId)
+            ->value('attribute');
+
+        $data = json_encode(['deviceId' => $deviceId, 'attributeId' => $attributeId]);
+
+        $resp = static::curl('/api/permissions', 'DELETE', $sessionId, $data, $headers);
+        $code = (int)($resp->responseCode ?? 0);
+
+        if ($code >= 200 && $code < 300) {
+            if ($attributeKey) {
+                // Remove from device attributes (last position cache)
+                $tcDevice = TcDevice::find($deviceId);
+                if ($tcDevice) {
+                    $attrs = $tcDevice->attributes;
+                    if (is_string($attrs)) $attrs = json_decode($attrs, true);
+                    if (!is_array($attrs)) $attrs = [];
+
+                    if (isset($attrs[$attributeKey])) {
+                        unset($attrs[$attributeKey]);
+                        $tcDevice->attributes = json_encode($attrs);
+                        $tcDevice->save();
+                    }
+
+                    // Remove from actual last position
+                    if ($tcDevice->positionid) {
+                        $tcPosition = TcPosition::find($tcDevice->positionid);
+                        if ($tcPosition) {
+                            $pAttrs = $tcPosition->attributes;
+                            if (is_string($pAttrs)) $pAttrs = json_decode($pAttrs, true);
+                            if (!is_array($pAttrs)) $pAttrs = [];
+
+                            if (isset($pAttrs[$attributeKey])) {
+                                unset($pAttrs[$attributeKey]);
+                                $tcPosition->attributes = json_encode($pAttrs);
+                                $tcPosition->save();
+                            }
+                        }
+                    }
+                }
+            }
+
+            return response()->json(['message' => 'Attribute removed']);
+        }
+
+        return response()->json(['message' => 'Failed to remove attribute'], 400);
     }
 
     /**

@@ -447,17 +447,58 @@ const overallRatingPercent = computed(() => `${Math.min(100, Math.max(0, Number(
 
 const tracking = computed(() => {
   if (vehicle.value?.tracking) return vehicle.value.tracking;
-  const tc = vehicle.value?.tcDevice || vehicle.value?.tc_device || vehicle.value || {};
-  const pos = tc?.position || tc?.lastPosition || null;
-  const attrsDev = parseAttrsMaybe(tc?.attributes);
+
+  const v = vehicle.value || {};
+  const tc = v.tcDevice || v.tc_device || v || {}; // Fallback to v if tcDevice missing
+  const pos = tc.position || tc.lastPosition || {};
+
+  const deviceAttrs = parseAttrsMaybe(tc.attributes);
+  const vehicleAttrs = parseAttrsMaybe(v.attributes);
+  const posAttrs = parseAttrsMaybe(pos.attributes);
+
+  // Merge attributes: Device < Vehicle < Position (Standard)
+  // Actually, standard in other files (LiveTracking/Index) is Tracker < Vehicle < Position
+  // where Tracker is device attributes.
+  const mergedAttrs = { ...deviceAttrs, ...vehicleAttrs, ...posAttrs };
+
+  // Get Configured Attributes
+  const configuredOdometerAttr = vehicleAttrs.odometerAttr || vehicleAttrs.odometer_attribute || deviceAttrs.odometerAttr || deviceAttrs.odometer_attribute || null;
+  const configuredFuelAttr = vehicleAttrs.fuelAttr || vehicleAttrs.fuel_attribute || deviceAttrs.fuelAttr || deviceAttrs.fuel_attribute || null;
+
+  // Format Telemetry
+  const capacityRaw = vehicleAttrs.fuelTankCapacity || vehicleAttrs.fuel_capacity || deviceAttrs.fuelTankCapacity || deviceAttrs.fuel_capacity;
+  const capacity = (typeof capacityRaw === 'string' ? parseFloat(capacityRaw) : capacityRaw) || null;
+
+  const tel = formatTelemetry(mergedAttrs, {
+    protocol: pos.protocol,
+    model: v.model || tc.model,
+    capacity,
+    preferNamedOdometer: true,
+    odometerAttr: configuredOdometerAttr,
+    fuelAttr: configuredFuelAttr
+  });
+
   return {
-    ignition: attrsDev?.ignition ?? (pos?.attributes?.ignition ?? null),
-    speedKmh: pos?.speed ?? null,
-    odometerKm: attrsDev?.odometer ?? null,
-    fuelLiters: attrsDev?.fuel ?? null,
-    location: pos?.address ?? attrsDev?.address ?? null,
-    lastReport: tc?.lastUpdate || tc?.deviceTime || null,
+    ignition: mergedAttrs.ignition ?? (String(mergedAttrs.ignition).toLowerCase() === 'true'),
+    speedKmh: pos.speed != null ? (typeof pos.speed === 'number' ? Math.round(pos.speed * 1.852) : pos.speed) : null,
+    odometerKm: tel.odometer?.value ?? null,
+    fuelLiters: tel.fuel?.liters ?? null,
+    fuelPercent: tel.fuel?.percent ?? null,
+    fuelDisplay: tel.fuel?.display ?? null,
+    location: pos.address ?? mergedAttrs.address ?? null,
+    lastReport: tc.lastUpdate || tc.deviceTime || null,
   };
+});
+
+const fuelDisplayCombined = computed(() => {
+  const t = tracking.value;
+  if (t.fuelLiters != null && t.fuelPercent != null)
+    return `${Math.round(t.fuelLiters*10)/10} L (${Math.round(t.fuelPercent)}%)`;
+  if (t.fuelLiters != null)
+    return `${Math.round(t.fuelLiters*10)/10} L`;
+  if (t.fuelPercent != null)
+    return `${Math.round(t.fuelPercent)}%`;
+  return t.fuelDisplay || '—';
 });
 
 function badgeClass() {
@@ -538,20 +579,3 @@ const vehicleChipDate = computed(() => {
 .section-list dd { overflow-wrap: break-word; word-break: normal; }
 .section-list .row { align-items: flex-start !important; }
 </style>
-const fuelDisplayCombined = computed(() => {
-  const liters = tracking.value?.fuelLiters;
-  const percent = tracking.value?.fuelPercent;
-  if (liters != null && percent != null) return `${Math.round(liters*10)/10} L (${Math.round(percent)}%)`;
-  const attrs = tracking.value?.positionAttributes || tracking.value?.attributes || null;
-  const capacity = tracking.value?.fuelTankCapacity || tracking.value?.fuel_capacity || null;
-  if (attrs) {
-    const tel = formatTelemetry(attrs, { capacity });
-    const f = tel?.fuel;
-    if (f) {
-      if (f.liters != null && f.percent != null) return `${f.liters} L (${f.percent}%)`;
-      if (f.liters != null) return `${f.liters} L`;
-      if (f.percent != null) return `${f.percent}%`;
-    }
-  }
-  return typeof liters === 'number' ? `${Math.round(liters*10)/10} L` : '—';
-});

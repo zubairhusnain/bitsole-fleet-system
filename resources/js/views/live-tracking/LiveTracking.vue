@@ -1,5 +1,11 @@
 <template>
     <div class="live-tracking-view">
+        <ComputedAttributesModal
+            :show="showComputedAttributesModal"
+            :device-id="selectedDeviceForAttributes?.id"
+            :vehicle-name="selectedDeviceForAttributes?.name"
+            @close="showComputedAttributesModal = false"
+        />
         <!-- Breadcrumbs removed per request -->
         <div class="map-wrap">
             <div v-if="isMobile && showMobileTopbar" class="mobile-topbar">
@@ -17,7 +23,12 @@
             <!-- Panel outside map for desktop -->
              <div v-if="!isMobile && panelVisible" class="panel-floating is-visible">
                <div class="panel-header">
-                 <h3 class="panel-title">Search Vehicle</h3>
+                 <div class="d-flex justify-content-between align-items-center mb-2">
+                     <h3 class="panel-title mb-0">Search Vehicle</h3>
+                     <button v-if="selectedId || query" class="btn btn-sm btn-outline-danger" @click="resetView" title="Reset View">
+                        <i class="bi bi-x-circle"></i> Reset
+                     </button>
+                 </div>
                  <label class="form-label small">Vehicle Name</label>
                  <input v-model="query" type="text" class="form-control panel-input" placeholder="eg. Transit Van" />
                </div>
@@ -74,6 +85,7 @@
               </l-map>
               <GoogleMap
                 v-else
+                ref="googleMapComponent"
                 :center="center"
                 :zoom="zoom"
                 :markers="markerItems"
@@ -84,7 +96,12 @@
               <transition name="mobile-panel">
                 <div v-if="isMobile && panelVisible" class="panel-floating">
                   <div class="panel-header">
-                    <h3 class="panel-title">Search Vehicle</h3>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h3 class="panel-title mb-0">Search Vehicle</h3>
+                        <button v-if="selectedId || query" class="btn btn-sm btn-outline-danger" @click="resetView" title="Reset View">
+                            <i class="bi bi-x-circle"></i> Reset
+                        </button>
+                    </div>
                     <label class="form-label small">Vehicle Name</label>
                     <input v-model="query" type="text" class="form-control panel-input" placeholder="eg. Transit Van" />
                   </div>
@@ -111,7 +128,7 @@
                         <div class="vehicle-info">
                           <div class="vehicle-name-row">
                             <div class="vehicle-name">{{ deviceName(v) }}</div>
-                            <img :src="getIcon(v)" class="status-icon" alt="" />
+                        <img :src="getIcon(v)" class="status-icon" alt="" />
                           </div>
                           <div class="vehicle-meta-lines">
                             <div class="meta-line">
@@ -139,7 +156,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
 import { getCurrentUser, clearAuthCache } from '../../auth';
 import { LMap, LTileLayer, LMarker, LPopup, LCircle } from '@vue-leaflet/vue-leaflet';
@@ -148,14 +165,27 @@ import 'leaflet/dist/leaflet.css';
 import { formatTelemetry } from '../../utils/telemetry';
 import { formatDateTime } from '../../utils/datetime';
 import GoogleMap from '../../components/GoogleMap.vue';
+import ComputedAttributesModal from '../../components/ComputedAttributesModal.vue';
 
 
 const map = ref(null);
 const googleMap = ref(null);
+const googleMapComponent = ref(null);
 const markerRefs = new Map();
 
 const router = useRouter();
+const route = useRoute();
 const isTestingMode = inject('isTestingMode', ref(false));
+
+// Computed Attributes (Developer Feature)
+const showComputedAttributesModal = ref(false);
+const selectedDeviceForAttributes = ref(null);
+const isDevMode = ref(false);
+
+function openComputedAttributes(v) {
+    selectedDeviceForAttributes.value = v;
+    showComputedAttributesModal.value = true;
+}
 
 async function logout() {
     try { await axios.post('/web/auth/logout'); } catch {}
@@ -592,28 +622,14 @@ watch(
     markerItems,
     (list) => {
         if (!fitDone.value && list.length && !selectedId.value) {
-            if (mapProvider.value === 'leaflet' && map.value) {
-                const bounds = L.latLngBounds(list.map(m => [m.lat, m.lon]));
-                try { map.value.fitBounds(bounds.pad(0.2)); } catch { map.value.fitBounds(bounds); }
-                fitDone.value = true;
-            } else if (mapProvider.value === 'google' && googleMap.value && window.google && window.google.maps && window.google.maps.LatLngBounds) {
-                const bounds = new window.google.maps.LatLngBounds();
-                list.forEach(m => {
-                    const lat = Number(m.lat);
-                    const lon = Number(m.lon);
-                    if (Number.isFinite(lat) && Number.isFinite(lon)) {
-                        bounds.extend({ lat, lng: lon });
-                    }
-                });
-                try { googleMap.value.fitBounds(bounds); } catch {}
-                fitDone.value = true;
-            }
+            fitBoundsToAll();
         }
     },
     { flush: 'post' }
 );
 
-// Keep selected vehicle centered while it moves
+// Keep selected vehicle centered while it moves - REMOVED per user request to allow map scrolling
+/*
 watch(
     selectedMarker,
     (m) => {
@@ -630,6 +646,7 @@ watch(
         zoom.value = Math.max(current || 0, 17);
     }
 );
+*/
 
 function getImage(v) {
     // Merge attributes: Traccar Device attributes < Vehicle attributes
@@ -772,22 +789,26 @@ function statusLabel(v) {
 function fuelDisplay(v) {
     const pos = getPosition(v).raw || {};
     const model = v.model || (v.tc_device?.model ?? v.tcDevice?.model) || null;
-  const devRaw = (v.tc_device?.attributes ?? v.tcDevice?.attributes ?? v.attributes) || {};
-  const devAttrs = parseAttrs(devRaw);
-  const configuredFuelAttr = devAttrs?.fuelAttr || devAttrs?.fuel_attribute || null;
-  const capKeys = ['fuelTankCapacity','FuelTankCapacity','fueltankcapacity','fuel_capacity','fuelCapacity','tankCapacity','fuel_tank_capacity'];
-  let cap = null;
-  for (const k of capKeys) {
-    const val = devAttrs?.[k];
-    if (val !== undefined && val !== null && val !== '') { cap = val; break; }
-  }
-  const capNum = (typeof cap === 'string') ? parseFloat(cap) : (typeof cap === 'number' ? cap : null);
-  const posAttrs = parseAttrs(pos.attributes);
-  const mergedAttrs = { ...devAttrs, ...posAttrs };
-  const keys = ['fuelLevel','fuel_percent','fuelpercentage','fuelPercent','fuelPercent','fuelLiter','fuelLiters','FuelLiters','fuel','io89','89','io48','48','io84','84','io67','67','io68','68','io69','69','io240','240','io241','241','io242','242','io243','243','fuelRaw','analog1','analog2','analog3','adc1','adc2','adc3'];
-  let has = false;
-  for (const k of keys) { const v = posAttrs?.[k]; if (v !== undefined && v !== null && v !== '') { has = true; break; } }
-  const tel = formatTelemetry(posAttrs, { protocol: pos.protocol, model, capacity: (has ? capNum : null), preferNamedOdometer: true, fuelAttr: configuredFuelAttr });
+    
+    // Merge attributes: Tracker < Vehicle < Position
+    const trackerAttrs = parseAttrs(v.tc_device?.attributes ?? v.tcDevice?.attributes);
+    const vehicleAttrs = parseAttrs(v.attributes);
+    const posAttrs = parseAttrs(pos.attributes);
+    const mergedAttrs = { ...trackerAttrs, ...vehicleAttrs, ...posAttrs };
+
+    // Get configuration from vehicle or device
+    const configuredFuelAttr = vehicleAttrs.fuelAttr || vehicleAttrs.fuel_attribute || trackerAttrs.fuelAttr || trackerAttrs.fuel_attribute || null;
+    
+    // Determine capacity
+    const capKeys = ['fuelTankCapacity','FuelTankCapacity','fueltankcapacity','fuel_capacity','fuelCapacity','tankCapacity','fuel_tank_capacity'];
+    let cap = null;
+    for (const k of capKeys) {
+        const val = vehicleAttrs[k] ?? trackerAttrs[k];
+        if (val !== undefined && val !== null && val !== '') { cap = val; break; }
+    }
+    const capNum = (typeof cap === 'string') ? parseFloat(cap) : (typeof cap === 'number' ? cap : null);
+    
+    const tel = formatTelemetry(mergedAttrs, { protocol: pos.protocol, model, capacity: capNum, preferNamedOdometer: true, fuelAttr: configuredFuelAttr });
     if (!tel.fuel) return null;
     const liters = tel.fuel.liters;
     const percent = tel.fuel.percent;
@@ -927,6 +948,43 @@ async function fetchVehicles() {
     }
 }
 
+function fitBoundsToAll() {
+    const list = markerItems.value;
+    if (!list.length) return;
+
+    if (mapProvider.value === 'leaflet' && map.value) {
+        const bounds = L.latLngBounds(list.map(m => [m.lat, m.lon]));
+        try { map.value.fitBounds(bounds.pad(0.2)); } catch { map.value.fitBounds(bounds); }
+        fitDone.value = true;
+    } else if (mapProvider.value === 'google' && googleMap.value && window.google && window.google.maps && window.google.maps.LatLngBounds) {
+        const bounds = new window.google.maps.LatLngBounds();
+        list.forEach(m => {
+            const lat = Number(m.lat);
+            const lon = Number(m.lon);
+            if (Number.isFinite(lat) && Number.isFinite(lon)) {
+                bounds.extend({ lat, lng: lon });
+            }
+        });
+        try { googleMap.value.fitBounds(bounds); } catch {}
+        fitDone.value = true;
+    }
+}
+
+function resetView() {
+    selectedId.value = null;
+    query.value = '';
+    fitDone.value = false;
+
+    // Close popups
+    if (mapProvider.value === 'leaflet' && map.value) {
+        try { map.value.closePopup(); } catch {}
+    } else if (mapProvider.value === 'google' && googleMapComponent.value) {
+        try { googleMapComponent.value.closeAllInfoWindows(); } catch {}
+    }
+
+    fitBoundsToAll();
+}
+
 function focusVehicle(v) {
     const id = deviceKey(v);
     // Use displayed position (interpolated) if available to ensure map centers on the marker,
@@ -999,6 +1057,11 @@ onMounted(() => {
     // Initialize by viewport: show on desktop, keep hidden on mobile
     updatePanelVisibilityForViewport();
     try { window.addEventListener('resize', updatePanelVisibilityForViewport); } catch {}
+
+    // Check for developer mode
+    if (String(route.query?.showattribute) === '1') {
+        isDevMode.value = true;
+    }
 
     // Start polling only if sockets don’t deliver updates shortly
     armPollingFallback();

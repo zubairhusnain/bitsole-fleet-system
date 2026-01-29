@@ -160,6 +160,10 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/{deviceId}/notifications', [\App\Http\Controllers\VehicleController::class, 'notificationsDevice']);
     Route::post('/{deviceId}/notifications/assign', [\App\Http\Controllers\VehicleController::class, 'notificationsAssign']);
 
+    // Computed Attributes (Developer only)
+    Route::get('/{deviceId}/computed-attributes', [\App\Http\Controllers\VehicleController::class, 'computedAttributes']);
+    Route::delete('/{deviceId}/computed-attributes/{attributeId}', [\App\Http\Controllers\VehicleController::class, 'removeComputedAttribute']);
+
 });
 
 
