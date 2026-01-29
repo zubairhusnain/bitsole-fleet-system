@@ -58,11 +58,12 @@ export function formatOdometer(rawAttrs, ctx = {}) {
       ? attrs[preferredOdoName]
       : attrsLower[lowerName];
     const nPreferred = toNumber(valPreferred);
-    if (valPreferred != null && valPreferred !== '' && nPreferred !== null && nPreferred > -1) {
-      let kmPreferred = nPreferred / 1000;
+    if (valPreferred != null && valPreferred !== '' && nPreferred !== null && nPreferred >= -1) {
+      const effectiveVal = nPreferred === -1 ? 0 : nPreferred;
+      let kmPreferred = effectiveVal / 1000;
       return {
         key: preferredOdoName,
-        raw: valPreferred,
+        raw: effectiveVal,
         km: kmPreferred,
         display: formatNumberKm(kmPreferred),
       };
@@ -182,15 +183,16 @@ export function formatFuel(rawAttrs, ctx = {}) {
       ? attrs[preferredFuelName]
       : lower[lowerName];
     const nPreferred = toNumber(valPreferred);
-    if (valPreferred != null && valPreferred !== '' && nPreferred !== null && nPreferred > -1) {
+    if (valPreferred != null && valPreferred !== '' && nPreferred !== null && nPreferred >= -1) {
+      const effectiveVal = nPreferred === -1 ? 0 : nPreferred;
       const capNumCfg = Number.isFinite(parseFloat(capacity)) ? parseFloat(capacity) : null;
       let percentCfg = null;
       let litersCfg = null;
-      if (capNumCfg !== null && nPreferred >= 0 && nPreferred <= 100) {
-        percentCfg = Math.round(nPreferred);
+      if (capNumCfg !== null && effectiveVal >= 0 && effectiveVal <= 100) {
+        percentCfg = Math.round(effectiveVal);
         litersCfg = Math.round((capNumCfg * percentCfg / 100) * 10) / 10;
       } else {
-        litersCfg = Math.round(nPreferred * 10) / 10;
+        litersCfg = Math.round(effectiveVal * 10) / 10;
       }
       const badgeVariantCfg = percentCfg == null ? null : (percentCfg >= 60 ? 'success' : (percentCfg >= 30 ? 'warning' : 'danger'));
       let displayCfg = null;
@@ -208,7 +210,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
           liters: litersCfg,
           capacity: capNumCfg,
           variant: badgeVariantCfg,
-          raw: nPreferred,
+          raw: effectiveVal,
           key: preferredFuelName,
           source: 'configured',
           display: displayCfg,

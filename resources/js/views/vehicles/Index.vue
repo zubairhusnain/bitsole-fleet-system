@@ -413,8 +413,13 @@ function deriveRow(r) {
     const location = pos.address ?? (r.location ?? pickAttr(attrs, ['address', 'location'])) ?? coords;
     let fuel = null;
     const capacity = hasFuelKey(posAttrs) ? capacityRaw : null;
+    
+    // Extract configured attributes
+    const configuredOdometerAttr = vehicleAttrs.odometerAttr || vehicleAttrs.odometer_attribute || attrs.odometerAttr || attrs.odometer_attribute || null;
+    const configuredFuelAttr = vehicleAttrs.fuelAttr || vehicleAttrs.fuel_attribute || attrs.fuelAttr || attrs.fuel_attribute || null;
+
     // Align with Detail/LiveTracking: prioritize named odometer, disable protocol-based meter assumption
-    const tel = formatTelemetry(mergedAttrs, { protocol: null, model, capacity, preferNamedOdometer: true });
+    const tel = formatTelemetry(mergedAttrs, { protocol: null, model, capacity, preferNamedOdometer: true, odometerAttr: configuredOdometerAttr, fuelAttr: configuredFuelAttr });
     if (tel?.fuel) {
         const liters = tel.fuel.liters;
         const percent = tel.fuel.percent;

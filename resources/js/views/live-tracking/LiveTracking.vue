@@ -784,22 +784,26 @@ function statusLabel(v) {
 function fuelDisplay(v) {
     const pos = getPosition(v).raw || {};
     const model = v.model || (v.tc_device?.model ?? v.tcDevice?.model) || null;
-  const devRaw = (v.tc_device?.attributes ?? v.tcDevice?.attributes ?? v.attributes) || {};
-  const devAttrs = parseAttrs(devRaw);
-  const configuredFuelAttr = devAttrs?.fuelAttr || devAttrs?.fuel_attribute || null;
-  const capKeys = ['fuelTankCapacity','FuelTankCapacity','fueltankcapacity','fuel_capacity','fuelCapacity','tankCapacity','fuel_tank_capacity'];
-  let cap = null;
-  for (const k of capKeys) {
-    const val = devAttrs?.[k];
-    if (val !== undefined && val !== null && val !== '') { cap = val; break; }
-  }
-  const capNum = (typeof cap === 'string') ? parseFloat(cap) : (typeof cap === 'number' ? cap : null);
-  const posAttrs = parseAttrs(pos.attributes);
-  const mergedAttrs = { ...devAttrs, ...posAttrs };
-  const keys = ['fuelLevel','fuel_percent','fuelpercentage','fuelPercent','fuelPercent','fuelLiter','fuelLiters','FuelLiters','fuel','io89','89','io48','48','io84','84','io67','67','io68','68','io69','69','io240','240','io241','241','io242','242','io243','243','fuelRaw','analog1','analog2','analog3','adc1','adc2','adc3'];
-  let has = false;
-  for (const k of keys) { const v = posAttrs?.[k]; if (v !== undefined && v !== null && v !== '') { has = true; break; } }
-  const tel = formatTelemetry(posAttrs, { protocol: pos.protocol, model, capacity: (has ? capNum : null), preferNamedOdometer: true, fuelAttr: configuredFuelAttr });
+    
+    // Merge attributes: Tracker < Vehicle < Position
+    const trackerAttrs = parseAttrs(v.tc_device?.attributes ?? v.tcDevice?.attributes);
+    const vehicleAttrs = parseAttrs(v.attributes);
+    const posAttrs = parseAttrs(pos.attributes);
+    const mergedAttrs = { ...trackerAttrs, ...vehicleAttrs, ...posAttrs };
+
+    // Get configuration from vehicle or device
+    const configuredFuelAttr = vehicleAttrs.fuelAttr || vehicleAttrs.fuel_attribute || trackerAttrs.fuelAttr || trackerAttrs.fuel_attribute || null;
+    
+    // Determine capacity
+    const capKeys = ['fuelTankCapacity','FuelTankCapacity','fueltankcapacity','fuel_capacity','fuelCapacity','tankCapacity','fuel_tank_capacity'];
+    let cap = null;
+    for (const k of capKeys) {
+        const val = vehicleAttrs[k] ?? trackerAttrs[k];
+        if (val !== undefined && val !== null && val !== '') { cap = val; break; }
+    }
+    const capNum = (typeof cap === 'string') ? parseFloat(cap) : (typeof cap === 'number' ? cap : null);
+    
+    const tel = formatTelemetry(mergedAttrs, { protocol: pos.protocol, model, capacity: capNum, preferNamedOdometer: true, fuelAttr: configuredFuelAttr });
     if (!tel.fuel) return null;
     const liters = tel.fuel.liters;
     const percent = tel.fuel.percent;

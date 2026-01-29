@@ -254,7 +254,6 @@ const processVehicleData = (list) => {
 
         // Merge: Device < Vehicle < Position (Standard Traccar/Laravel precedence)
         const mergedAttrs = { ...deviceAttrs, ...vehicleAttrs, ...attrs };
-        const tel = formatTelemetry(mergedAttrs, { protocol: null, model: tc.model, preferNamedOdometer: true });
         const deviceModelAttr = pickAttr(deviceAttrs, ['trackerModel']);
 
         const vehicleId = deviceAttrs.vehicleNo || deviceAttrs.vehicle_id || deviceAttrs.vehicleId || deviceAttrs.vehicleID || null;
@@ -282,6 +281,13 @@ const processVehicleData = (list) => {
         // Ignition logic
         const ignRaw = mergedAttrs.ignition ?? v.ignition;
         const ignition = ignRaw === true || ignRaw === 1 || String(ignRaw).toLowerCase() === 'on';
+
+        // Extract configured attributes for telemetry
+        const configuredOdometerAttr = vehicleAttrs.odometerAttr || vehicleAttrs.odometer_attribute || deviceAttrs.odometerAttr || deviceAttrs.odometer_attribute || null;
+        const configuredFuelAttr = vehicleAttrs.fuelAttr || vehicleAttrs.fuel_attribute || deviceAttrs.fuelAttr || deviceAttrs.fuel_attribute || null;
+
+        // Use formatTelemetry with merged attributes and configuration
+        const tel = formatTelemetry(mergedAttrs, { protocol: null, model: tc.model, preferNamedOdometer: true, odometerAttr: configuredOdometerAttr, fuelAttr: configuredFuelAttr });
 
         let odometer = null;
         if (tel?.odometer?.display) {

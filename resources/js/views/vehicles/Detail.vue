@@ -1757,7 +1757,7 @@ const fuelInfo = computed(() => {
     let has = false;
     for (const k of keys) { const v = posAttrs?.[k]; if (v !== undefined && v !== null && v !== '') { has = true; break; } }
     const capacity = has ? capacityRaw : null;
-    return formatTelemetry(posAttrs, { protocol: pos?.protocol, model: model.value, capacity, fuelAttr: configuredFuelAttr.value });
+    return formatTelemetry(mergedAttrs, { protocol: pos?.protocol, model: model.value, capacity, fuelAttr: configuredFuelAttr.value });
 });
 const fuelLevelDisplay = computed(() => {
     const f = fuelInfo.value?.fuel;
