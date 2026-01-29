@@ -187,7 +187,8 @@ const showDeviceDetailLink = !import.meta.env.PROD;
 
 
 const hasPerm = (k, a) => _hasPermission(k, a);
-const showWholeDataButton = computed(() => String(route.query?.wholedata || '') === '1');
+const wholeDataEnabled = ref(false);
+const showWholeDataButton = computed(() => wholeDataEnabled.value === true);
 const jsonModalVisible = ref(false);
 const wholeJson = ref('');
 const jsonModalFuelKey = ref('');
@@ -331,6 +332,17 @@ onMounted(() => {
         isDevMode.value = true;
     }
 
+    const wd = String(route.query?.wholedata || '');
+    if (wd === '1') {
+        try { localStorage.setItem('wholedata', '1'); } catch {}
+        wholeDataEnabled.value = true;
+        const q = { ...(route.query || {}) };
+        delete q.wholedata;
+        router.replace({ path: route.path, query: q });
+    } else {
+        try { wholeDataEnabled.value = String(localStorage.getItem('wholedata') || '') === '1'; } catch { wholeDataEnabled.value = false; }
+    }
+
     fetchPage(1);
 });
 
@@ -413,7 +425,7 @@ function deriveRow(r) {
     const location = pos.address ?? (r.location ?? pickAttr(attrs, ['address', 'location'])) ?? coords;
     let fuel = null;
     const capacity = hasFuelKey(posAttrs) ? capacityRaw : null;
-    
+
     // Extract configured attributes
     const configuredOdometerAttr = vehicleAttrs.odometerAttr || vehicleAttrs.odometer_attribute || attrs.odometerAttr || attrs.odometer_attribute || null;
     const configuredFuelAttr = vehicleAttrs.fuelAttr || vehicleAttrs.fuel_attribute || attrs.fuelAttr || attrs.fuel_attribute || null;
