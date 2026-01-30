@@ -30,6 +30,7 @@ function formatNumberKm(km) {
 
 export function formatOdometer(rawAttrs, ctx = {}) {
   const attrs = parseAttrs(rawAttrs);
+  console.log('device attr ',attrs);
   const preferredOdoNameRaw = ctx?.odometerAttr;
   const userPriorityKeys = ['CAN_Total_Mileage_87', 'OBD_Total_Mileage_389', 'GNSS_Total_Odometer_16'];
   const distanceKeys = ['totalDistance', 'distance', 'tripDistance'];
@@ -52,14 +53,57 @@ export function formatOdometer(rawAttrs, ctx = {}) {
   const attrsLower = toLowerMap(attrs);
 
   const preferredOdoName = typeof preferredOdoNameRaw === 'string' ? preferredOdoNameRaw.trim() : '';
+
   if (preferredOdoName) {
     const lowerName = preferredOdoName.toLowerCase();
     const valPreferred = Object.prototype.hasOwnProperty.call(attrs, preferredOdoName)
       ? attrs[preferredOdoName]
       : attrsLower[lowerName];
     const nPreferred = toNumber(valPreferred);
-    if (valPreferred != null && valPreferred !== '' && nPreferred !== null && nPreferred >= -1) {
-      const effectiveVal = nPreferred === -1 ? 0 : nPreferred;
+
+    // Logic:
+    // 1. If preferred name exists and is VALID (not -1), use it.
+    // 2. If preferred name exists but is -1, try resolved odometerKey.
+    // 3. If preferred name is -1 and resolved key is also -1 or missing, show 0.
+
+    let shouldUsePreferred = false;
+    let shouldUseResolved = false;
+
+    if (valPreferred != null && valPreferred !== '' && nPreferred !== null) {
+        if (nPreferred !== -1) {
+            shouldUsePreferred = true;
+        } else {
+            // Preferred is -1, try resolved
+            if (attrs.odometerKey) {
+                const resolvedKey = attrs.odometerKey;
+                const resolvedVal = attrs[resolvedKey] ?? attrsLower[resolvedKey.toLowerCase()];
+                const nResolved = toNumber(resolvedVal);
+
+                if (resolvedVal != null && resolvedVal !== '' && nResolved !== null && nResolved !== -1) {
+                    shouldUseResolved = true;
+                } else {
+                    // Resolved is also -1 or invalid, fallback to 0 because primary was -1
+                    return {
+                        key: preferredOdoName, // Use primary key name
+                        raw: 0,
+                        km: 0,
+                        display: formatNumberKm(0),
+                    };
+                }
+            } else {
+                // No resolved key, but primary was -1. Return 0.
+                return {
+                    key: preferredOdoName,
+                    raw: 0,
+                    km: 0,
+                    display: formatNumberKm(0),
+                };
+            }
+        }
+    }
+
+    if (shouldUsePreferred) {
+      const effectiveVal = nPreferred === -1 ? 0 : nPreferred; // nPreferred != -1 here
       let kmPreferred = effectiveVal / 1000;
       return {
         key: preferredOdoName,
@@ -67,6 +111,20 @@ export function formatOdometer(rawAttrs, ctx = {}) {
         km: kmPreferred,
         display: formatNumberKm(kmPreferred),
       };
+    }
+
+    if (shouldUseResolved) {
+       const resolvedKey = attrs.odometerKey;
+       const resolvedVal = attrs[resolvedKey] ?? attrsLower[resolvedKey.toLowerCase()];
+       const nResolved = toNumber(resolvedVal);
+       const effectiveVal = nResolved === -1 ? 0 : nResolved;
+       let kmPreferred = effectiveVal / 1000;
+       return {
+         key: resolvedKey,
+         raw: effectiveVal,
+         km: kmPreferred,
+         display: formatNumberKm(kmPreferred),
+       };
     }
   }
 
@@ -177,45 +235,85 @@ export function formatFuel(rawAttrs, ctx = {}) {
   const analogKeyName = null;
 
   const preferredFuelName = typeof preferredFuelNameRaw === 'string' ? preferredFuelNameRaw.trim() : '';
+
   if (preferredFuelName) {
     const lowerName = preferredFuelName.toLowerCase();
     const valPreferred = Object.prototype.hasOwnProperty.call(attrs, preferredFuelName)
       ? attrs[preferredFuelName]
       : lower[lowerName];
     const nPreferred = toNumber(valPreferred);
-    if (valPreferred != null && valPreferred !== '' && nPreferred !== null && nPreferred >= -1) {
-      const effectiveVal = nPreferred === -1 ? 0 : nPreferred;
-      const capNumCfg = Number.isFinite(parseFloat(capacity)) ? parseFloat(capacity) : null;
-      let percentCfg = null;
-      let litersCfg = null;
-      if (capNumCfg !== null && effectiveVal >= 0 && effectiveVal <= 100) {
-        percentCfg = Math.round(effectiveVal);
-        litersCfg = Math.round((capNumCfg * percentCfg / 100) * 10) / 10;
-      } else {
-        litersCfg = Math.round(effectiveVal * 10) / 10;
-      }
-      const badgeVariantCfg = percentCfg == null ? null : (percentCfg >= 60 ? 'success' : (percentCfg >= 30 ? 'warning' : 'danger'));
-      let displayCfg = null;
-      if (litersCfg != null && percentCfg != null) {
-        displayCfg = `${litersCfg} L (${percentCfg}%)`;
-      } else if (litersCfg != null) {
-        displayCfg = `${litersCfg} L`;
-      } else if (percentCfg != null) {
-        displayCfg = `${percentCfg}%`;
-      }
-      if (displayCfg != null) {
+
+    let shouldUsePreferred = false;
+    let shouldUseResolved = false;
+
+    if (valPreferred != null && valPreferred !== '' && nPreferred !== null) {
+        if (nPreferred !== -1) {
+            shouldUsePreferred = true;
+        } else {
+             // Preferred is -1, try resolved
+             if (attrs.fuelKey) {
+                 const resolvedKey = attrs.fuelKey;
+                 const resolvedVal = attrs[resolvedKey] ?? lower[resolvedKey.toLowerCase()];
+                 const nResolved = toNumber(resolvedVal);
+
+                 if (resolvedVal != null && resolvedVal !== '' && nResolved !== null && nResolved >= -1 && nResolved !== -1) {
+                     shouldUseResolved = true;
+                 } else {
+                    // Resolved is also -1 or invalid, fallback to 0% because primary was -1
+                    return {
+                        key: preferredFuelName,
+                        liters: 0,
+                        percent: 0,
+                        display: '0%',
+                        badgeVariant: 'danger'
+                    };
+                 }
+             } else {
+                 // No resolved key, but primary was -1. Return 0.
+                 return {
+                    key: preferredFuelName,
+                    liters: 0,
+                    percent: 0,
+                    display: '0%',
+                    badgeVariant: 'danger'
+                 };
+             }
+        }
+    }
+
+    if (shouldUsePreferred || shouldUseResolved) {
+        const keyToUse = shouldUsePreferred ? preferredFuelName : attrs.fuelKey;
+        const valToUse = shouldUsePreferred ? valPreferred : (attrs[keyToUse] ?? lower[keyToUse.toLowerCase()]);
+        const nToUse = toNumber(valToUse);
+        const effectiveVal = nToUse === -1 ? 0 : nToUse;
+
+        const capNumCfg = Number.isFinite(parseFloat(capacity)) ? parseFloat(capacity) : null;
+        let percentCfg = null;
+        let litersCfg = null;
+
+        if (capNumCfg !== null && effectiveVal >= 0 && effectiveVal <= 100) {
+          percentCfg = Math.round(effectiveVal);
+          litersCfg = Math.round((capNumCfg * percentCfg / 100) * 10) / 10;
+        } else {
+          litersCfg = Math.round(effectiveVal * 10) / 10;
+        }
+
+        const badgeVariantCfg = percentCfg == null ? null : (percentCfg >= 60 ? 'success' : (percentCfg >= 30 ? 'warning' : 'danger'));
+        let displayCfg = null;
+        if (litersCfg != null && percentCfg != null) {
+           displayCfg = `${litersCfg} L (${percentCfg}%)`;
+        } else if (litersCfg != null) {
+           displayCfg = `${litersCfg} L`;
+        } else {
+           displayCfg = `${percentCfg}%`;
+        }
         return {
-          isPercent: percentCfg != null && litersCfg == null,
-          percent: percentCfg,
-          liters: litersCfg,
-          capacity: capNumCfg,
-          variant: badgeVariantCfg,
-          raw: effectiveVal,
-          key: preferredFuelName,
-          source: 'configured',
-          display: displayCfg,
+           key: keyToUse,
+           liters: litersCfg,
+           percent: percentCfg,
+           display: displayCfg,
+           badgeVariant: badgeVariantCfg
         };
-      }
     }
   }
 
