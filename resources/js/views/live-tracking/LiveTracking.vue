@@ -225,7 +225,9 @@ function setMarkerRef(id, el) {
             markerRefs.set(id, mk);
             if (mapProvider.value === 'leaflet' && String(id) === String(selectedId.value)) {
                 setTimeout(() => {
-                    try { mk.openPopup(); } catch {}
+                    if (String(id) === String(selectedId.value)) {
+                        try { mk.openPopup(); } catch {}
+                    }
                 }, 200);
             }
         }
@@ -789,7 +791,7 @@ function statusLabel(v) {
 function fuelDisplay(v) {
     const pos = getPosition(v).raw || {};
     const model = v.model || (v.tc_device?.model ?? v.tcDevice?.model) || null;
-    
+
     // Merge attributes: Tracker < Vehicle < Position
     const trackerAttrs = parseAttrs(v.tc_device?.attributes ?? v.tcDevice?.attributes);
     const vehicleAttrs = parseAttrs(v.attributes);
@@ -798,7 +800,7 @@ function fuelDisplay(v) {
 
     // Get configuration from vehicle or device
     const configuredFuelAttr = vehicleAttrs.fuelAttr || vehicleAttrs.fuel_attribute || trackerAttrs.fuelAttr || trackerAttrs.fuel_attribute || null;
-    
+
     // Determine capacity
     const capKeys = ['fuelTankCapacity','FuelTankCapacity','fueltankcapacity','fuel_capacity','fuelCapacity','tankCapacity','fuel_tank_capacity'];
     let cap = null;
@@ -807,7 +809,7 @@ function fuelDisplay(v) {
         if (val !== undefined && val !== null && val !== '') { cap = val; break; }
     }
     const capNum = (typeof cap === 'string') ? parseFloat(cap) : (typeof cap === 'number' ? cap : null);
-    
+
     const tel = formatTelemetry(mergedAttrs, { protocol: pos.protocol, model, capacity: capNum, preferNamedOdometer: true, fuelAttr: configuredFuelAttr });
     if (!tel.fuel) return null;
     const liters = tel.fuel.liters;
@@ -971,16 +973,28 @@ function fitBoundsToAll() {
 }
 
 function resetView() {
-    selectedId.value = null;
-    query.value = '';
-    fitDone.value = false;
-
-    // Close popups
-    if (mapProvider.value === 'leaflet' && map.value) {
-        try { map.value.closePopup(); } catch {}
+    // Close popups first
+    if (mapProvider.value === 'leaflet') {
+        if (map.value) {
+             try { map.value.closePopup(); } catch {}
+             try {
+                 map.value.eachLayer((layer) => {
+                     if (typeof layer.closePopup === 'function') {
+                         layer.closePopup();
+                     }
+                 });
+             } catch {}
+        }
+        markerRefs.forEach((mk) => {
+            try { mk.closePopup(); } catch {}
+        });
     } else if (mapProvider.value === 'google' && googleMapComponent.value) {
         try { googleMapComponent.value.closeAllInfoWindows(); } catch {}
     }
+
+    selectedId.value = null;
+    query.value = '';
+    fitDone.value = false;
 
     fitBoundsToAll();
 }
