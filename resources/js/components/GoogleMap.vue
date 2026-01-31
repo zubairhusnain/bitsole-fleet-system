@@ -63,8 +63,6 @@ let selectedInfoWindow = null;
 let googleMapsPromise = null;
 
 function loadGoogleMapsScript() {
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-
   // Helper to check if the loaded Google Maps is likely the real one and not a shim
   const isRealGoogleMaps = () => {
     return window.google &&
@@ -79,29 +77,22 @@ function loadGoogleMapsScript() {
   if (googleMapsPromise) return googleMapsPromise;
 
   googleMapsPromise = new Promise((resolve, reject) => {
-    const id = 'google-maps-api-script';
-    // If the script tag exists, wait for it to load
-    if (document.getElementById(id)) {
-      const check = () => {
-        if (isRealGoogleMaps()) resolve();
-        else setTimeout(check, 200);
-      };
-      check();
-      return;
-    }
-
-    // If window.google exists but fails the "real" check, it might be a shim.
-    // We proceed to load the real script.
-
-    const s = document.createElement('script');
-    s.id = id;
-    const base = 'https://maps.googleapis.com/maps/api/js';
-    s.src = apiKey ? `${base}?key=${apiKey}&libraries=places,drawing` : `${base}?libraries=places,drawing`;
-    s.async = true;
-    s.defer = true;
-    s.onload = () => resolve();
-    s.onerror = (e) => reject(e);
-    document.head.appendChild(s);
+    // We expect the script to be loaded in the head (welcome.blade.php)
+    let attempts = 0;
+    const check = () => {
+      if (isRealGoogleMaps()) {
+        resolve();
+      } else {
+        attempts++;
+        // Stop checking after ~30 seconds (300 * 100ms) to avoid infinite loop if network fails
+        if (attempts > 300) {
+            reject(new Error('Google Maps API failed to load within 30 seconds.'));
+            return;
+        }
+        setTimeout(check, 100);
+      }
+    };
+    check();
   });
   return googleMapsPromise;
 }

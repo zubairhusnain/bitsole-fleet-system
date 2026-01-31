@@ -358,23 +358,20 @@ function loadGooglePlacesScript() {
 
   if (googlePlacesPromise) return googlePlacesPromise;
   googlePlacesPromise = new Promise((resolve, reject) => {
-    const id = 'google-maps-api-script';
-    if (document.getElementById(id)) {
-      const check = () => {
-        if (isRealGoogleMaps()) resolve();
-        else setTimeout(check, 200);
-      };
-      check();
-      return;
-    }
-    const s = document.createElement('script');
-    s.id = id;
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,drawing`;
-    s.async = true;
-    s.defer = true;
-    s.onload = () => resolve();
-    s.onerror = (e) => reject(e);
-    document.head.appendChild(s);
+    let attempts = 0;
+    const check = () => {
+      if (isRealGoogleMaps()) {
+        resolve();
+      } else {
+        attempts++;
+        if (attempts > 300) {
+          reject(new Error('Google Maps API failed to load within 30 seconds.'));
+          return;
+        }
+        setTimeout(check, 100);
+      }
+    };
+    check();
   });
   return googlePlacesPromise;
 }

@@ -29,6 +29,9 @@
         'resources/js/app.js',
       ]) 
     @endif
+
+    <!-- Google Maps API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ env('VITE_GOOGLE_MAPS_API_KEY') }}&libraries=places,drawing&loading=async" async defer></script>
   </head>
   <body class="layout-fixed sidebar-expand-lg sidebar-mini sidebar-open bg-body-tertiary">
     <div id="app"></div>
