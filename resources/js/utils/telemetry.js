@@ -30,7 +30,6 @@ function formatNumberKm(km) {
 
 export function formatOdometer(rawAttrs, ctx = {}) {
   const attrs = parseAttrs(rawAttrs);
-  console.log('device attr ',attrs);
   const preferredOdoNameRaw = ctx?.odometerAttr;
   const userPriorityKeys = ['CAN_Total_Mileage_87', 'OBD_Total_Mileage_389', 'GNSS_Total_Odometer_16'];
   const distanceKeys = ['totalDistance', 'distance', 'tripDistance'];
