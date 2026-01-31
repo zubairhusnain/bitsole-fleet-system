@@ -169,8 +169,10 @@
                   <input v-model="form.attributes.fuelMax" type="number" step="any" class="form-control" placeholder="e.g. 100" />
                 </div>
                 <div class="col-12 col-md-4">
-                  <label class="form-label small">Reverse</label>
-                  <input v-model="form.attributes.fuelReverse" type="number" step="any" class="form-control" placeholder="e.g. 1" />
+                  <div class="form-check form-switch mt-4">
+                    <input class="form-check-input" type="checkbox" id="fuelReverse" v-model="form.attributes.fuelReverse">
+                    <label class="form-check-label" for="fuelReverse">Reverse</label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -452,7 +454,10 @@ function hydrateFormFromTc(tc) {
   form.attributes.speedAttr = attrs.speedAttr || attrs.speed_attribute || '';
   form.attributes.fuelMin = attrs.fuelMin || attrs.speedMin || '';
   form.attributes.fuelMax = attrs.fuelMax || attrs.speedMax || '';
-  form.attributes.fuelReverse = attrs.fuelReverse || attrs.speedReverse || '';
+
+  const rev = attrs.fuelReverse ?? attrs.speedReverse;
+  form.attributes.fuelReverse = (rev === true || rev === 'true' || rev === 1 || rev === '1');
+
   form.attributes.cameraModel = attrs.cameraModel || '';
   form.attributes.cameraImi = attrs.cameraImi || '';
 
