@@ -168,8 +168,8 @@
                   <label class="form-label small">Maximum Value</label>
                   <input v-model="form.attributes.fuelMax" type="number" step="any" class="form-control" placeholder="e.g. 100" />
                 </div>
-                <div class="col-12 col-md-4">
-                  <div class="form-check form-switch mt-4">
+                <div class="col-12 col-md-4 d-flex align-items-center">
+                  <div class="form-check mt-4 form-switch">
                     <input class="form-check-input" type="checkbox" id="fuelReverse" v-model="form.attributes.fuelReverse">
                     <label class="form-check-label" for="fuelReverse">Reverse</label>
                   </div>
