@@ -179,11 +179,15 @@ const isTestingMode = inject('isTestingMode', ref(false));
 
 onMounted(() => {
     window.copyMapLink = (url, btn) => {
-        if (!url) return;
+            if (!url) return;
 
-        // Helper to show visual feedback
-        const showFeedback = () => {
-            if (btn) {
+            // Helper to show visual feedback
+            const showFeedback = () => {
+              if (btn) {
+                // Clear any existing timeouts to prevent flashing/hiding prematurely
+                if (btn._feedbackTimeout) clearTimeout(btn._feedbackTimeout);
+                if (btn._colorTimeout) clearTimeout(btn._colorTimeout);
+
                 // Try to find the feedback element safely
                 let feedback = btn.nextElementSibling;
                 if (!feedback || !feedback.classList.contains('copy-feedback')) {
@@ -192,77 +196,66 @@ onMounted(() => {
                 }
 
                 if (feedback) {
-                    feedback.style.display = 'inline';
-                    setTimeout(() => {
-                        feedback.style.display = 'none';
-                    }, 2000);
+                  feedback.style.display = 'inline';
+                  btn._feedbackTimeout = setTimeout(() => {
+                    feedback.style.display = 'none';
+                    btn._feedbackTimeout = null;
+                  }, 2000);
                 }
 
                 const originalColor = btn.style.color;
                 btn.style.color = '#0d6efd';
-                setTimeout(() => {
-                    btn.style.color = originalColor;
+                btn._colorTimeout = setTimeout(() => {
+                  btn.style.color = originalColor;
+                  btn._colorTimeout = null;
                 }, 2000);
-            }
-        };
-  
+              }
+            };
+
+        let copyTextArea = null;
         const fallbackCopy = (text) => {
-            // Force cleanup of any previous selections
             const selection = window.getSelection();
             if (selection) selection.removeAllRanges();
 
-            let textArea = null;
-            try {
-                textArea = document.createElement("textarea");
-                textArea.value = text;
-
-                // Styles to make it invisible but functional
-                textArea.style.position = "fixed";
-                textArea.style.left = "0";
-                textArea.style.top = "0";
-                textArea.style.opacity = "0";
-                textArea.style.zIndex = "-100";
-                textArea.style.width = "1px";
-                textArea.style.height = "1px";
-                textArea.style.padding = "0";
-                textArea.style.border = "none";
-                textArea.style.outline = "none";
-                textArea.style.boxShadow = "none";
-                textArea.style.background = "transparent";
-
-                // Avoid readonly as it can block copy in some contexts
-                // textArea.setAttribute('readonly', '');
-
-                document.body.appendChild(textArea);
-
-                // Save current focus to restore later
-                const previousFocus = document.activeElement;
-
-                textArea.focus();
-                textArea.select();
-                textArea.setSelectionRange(0, 99999); // iOS fix
-
-                const successful = document.execCommand('copy');
-
-                if (successful) {
-                    showFeedback();
-                } else {
-                    console.error('Fallback copy command failed');
+            // Introduce a small delay to allow the browser to clear selection state completely
+            setTimeout(() => {
+                if (!copyTextArea || !document.body.contains(copyTextArea)) {
+                    copyTextArea = document.createElement("textarea");
+                    copyTextArea.style.position = "fixed";
+                    copyTextArea.style.left = "0";
+                    copyTextArea.style.top = "0";
+                    copyTextArea.style.opacity = "0";
+                    copyTextArea.style.zIndex = "-100";
+                    copyTextArea.style.width = "1px";
+                    copyTextArea.style.height = "1px";
+                    copyTextArea.style.padding = "0";
+                    copyTextArea.style.border = "none";
+                    copyTextArea.style.outline = "none";
+                    copyTextArea.style.boxShadow = "none";
+                    copyTextArea.style.background = "transparent";
+                    document.body.appendChild(copyTextArea);
                 }
 
-                // Restore focus
-                if (previousFocus && typeof previousFocus.focus === 'function') {
-                    previousFocus.focus();
+                try {
+                    copyTextArea.value = text;
+                    copyTextArea.focus();
+                    copyTextArea.select();
+                    copyTextArea.setSelectionRange(0, 99999); // iOS fix
+
+                    const successful = document.execCommand('copy');
+
+                    if (successful) {
+                        showFeedback();
+                    } else {
+                        console.error('Fallback copy command failed');
+                    }
+                } catch (err) {
+                    console.error('Fallback copy exception:', err);
+                } finally {
+                    // We keep the textarea for reuse, but clear selection
+                    if (selection) selection.removeAllRanges();
                 }
-            } catch (err) {
-                console.error('Fallback copy exception:', err);
-            } finally {
-                if (textArea && textArea.parentNode) {
-                    document.body.removeChild(textArea);
-                }
-                // Clean up selection again
-                if (selection) selection.removeAllRanges();
-            }
+            }, 50); // 50ms delay
         };
 
         // Prefer Clipboard API if secure and available
