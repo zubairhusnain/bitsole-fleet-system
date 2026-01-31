@@ -177,6 +177,108 @@ const router = useRouter();
 const route = useRoute();
 const isTestingMode = inject('isTestingMode', ref(false));
 
+onMounted(() => {
+    window.copyMapLink = (url, btn) => {
+        if (!url) return;
+
+        // Helper to show visual feedback
+        const showFeedback = () => {
+            if (btn) {
+                // Try to find the feedback element safely
+                let feedback = btn.nextElementSibling;
+                if (!feedback || !feedback.classList.contains('copy-feedback')) {
+                     // Fallback: look in parent
+                     feedback = btn.parentElement ? btn.parentElement.querySelector('.copy-feedback') : null;
+                }
+
+                if (feedback) {
+                    feedback.style.display = 'inline';
+                    setTimeout(() => {
+                        feedback.style.display = 'none';
+                    }, 2000);
+                }
+
+                const originalColor = btn.style.color;
+                btn.style.color = '#0d6efd';
+                setTimeout(() => {
+                    btn.style.color = originalColor;
+                }, 2000);
+            }
+        };
+  
+        const fallbackCopy = (text) => {
+            // Force cleanup of any previous selections
+            const selection = window.getSelection();
+            if (selection) selection.removeAllRanges();
+
+            let textArea = null;
+            try {
+                textArea = document.createElement("textarea");
+                textArea.value = text;
+
+                // Styles to make it invisible but functional
+                textArea.style.position = "fixed";
+                textArea.style.left = "0";
+                textArea.style.top = "0";
+                textArea.style.opacity = "0";
+                textArea.style.zIndex = "-100";
+                textArea.style.width = "1px";
+                textArea.style.height = "1px";
+                textArea.style.padding = "0";
+                textArea.style.border = "none";
+                textArea.style.outline = "none";
+                textArea.style.boxShadow = "none";
+                textArea.style.background = "transparent";
+
+                // Avoid readonly as it can block copy in some contexts
+                // textArea.setAttribute('readonly', '');
+
+                document.body.appendChild(textArea);
+
+                // Save current focus to restore later
+                const previousFocus = document.activeElement;
+
+                textArea.focus();
+                textArea.select();
+                textArea.setSelectionRange(0, 99999); // iOS fix
+
+                const successful = document.execCommand('copy');
+
+                if (successful) {
+                    showFeedback();
+                } else {
+                    console.error('Fallback copy command failed');
+                }
+
+                // Restore focus
+                if (previousFocus && typeof previousFocus.focus === 'function') {
+                    previousFocus.focus();
+                }
+            } catch (err) {
+                console.error('Fallback copy exception:', err);
+            } finally {
+                if (textArea && textArea.parentNode) {
+                    document.body.removeChild(textArea);
+                }
+                // Clean up selection again
+                if (selection) selection.removeAllRanges();
+            }
+        };
+
+        // Prefer Clipboard API if secure and available
+        if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+            navigator.clipboard.writeText(url)
+                .then(showFeedback)
+                .catch((err) => {
+                    console.warn('Clipboard API failed, retrying with fallback:', err);
+                    fallbackCopy(url);
+                 });
+        } else {
+            fallbackCopy(url);
+        }
+    };
+});
+
 // Computed Attributes (Developer Feature)
 const showComputedAttributesModal = ref(false);
 const selectedDeviceForAttributes = ref(null);
@@ -889,7 +991,25 @@ function popupHtml(v) {
     const sp = speedKmh(speed);
     const ign = ignition === null ? 'Unknown' : ignition ? 'On' : 'Off';
     const hasCoords = typeof lat === 'number' && typeof lon === 'number';
-    const locText = address || (hasCoords ? `<a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" class="text-primary text-decoration-underline">Live Tracking</a>` : 'Coordinates available');
+    const mapUrl = hasCoords ? `https://www.google.com/maps?q=${lat},${lon}` : '';
+    let locText = address;
+
+    if (!locText && hasCoords) {
+      locText = `
+        <div style="display:inline-flex; align-items:center; gap:4px;">
+          <a href="${mapUrl}" target="_blank" class="text-primary text-decoration-underline">Live Tracking</a>
+          <div style="position:relative; display:inline-block; line-height:1;">
+            <button type="button" onclick="window.copyMapLink('${mapUrl}', this)" title="Copy Link" style="border:none; background:none; padding:0 2px; color:#6c757d; cursor:pointer;">
+              <i class="bi bi-copy" style="font-size:12px;"></i>
+            </button>
+            <span class="copy-feedback" style="display:none; position:absolute; left:50%; top:-24px; transform:translateX(-50%); background:#212529; color:#fff; padding:2px 6px; border-radius:4px; font-size:10px; z-index:100; white-space:nowrap;">Copied!</span>
+          </div>
+        </div>
+      `;
+    } else if (!locText) {
+      locText = 'Coordinates available';
+    }
+
     const uniq = uniqueId(v) || '—';
     const lu = formatTime(lastUpdate(v));
     const sClass = statusClass(v);
@@ -914,8 +1034,8 @@ function popupHtml(v) {
       <div class="popup-row" style="display:flex;gap:6px;"><span>Speed:</span> <strong>${sp ?? '-'} km/h</strong></div>
       <div class="popup-row" style="display:flex;gap:6px;"><span>Odometer:</span> <strong>${odo ?? '—'}</strong></div>
       <div class="popup-row" style="display:flex;gap:6px;"><span>Fuel:</span> <strong>${fuel ?? '—'}</strong></div>
-      <div class="popup-row" style="display:flex;gap:6px;"><span>Location:</span> <span>${locText}</span></div>
-      ${detailUrl ? `<div class="popup-row"><a href="${detailUrl}" class="text-primary text-decoration-underline">View Details</a></div>` : ''}
+      <div class="popup-row" style="display:flex;gap:6px; align-items:center;"><span>Location:</span> <span>${locText}</span></div>
+      ${detailUrl ? `<div class="popup-row" style="margin-top:10px; text-align:center;"><a href="${detailUrl}" class="text-primary text-decoration-underline">View Details</a></div>` : ''}
     </div>
   `;
 }
