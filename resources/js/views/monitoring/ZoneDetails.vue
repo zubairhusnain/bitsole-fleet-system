@@ -15,7 +15,7 @@
     </div>
 
     <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="error = ''" />
- 
+
     <!-- Map Section -->
     <div class="card border rounded-4 shadow-0 bg-white mb-4 overflow-hidden">
       <div class="card-body p-0 position-relative" style="height: 500px;">
@@ -516,7 +516,7 @@ const pageSize = 10;
 const tileUrl = computed(() => {
     return mapType.value === 'satellite'
         ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 });
 const tileAttribution = computed(() => {
     return mapType.value === 'satellite'
