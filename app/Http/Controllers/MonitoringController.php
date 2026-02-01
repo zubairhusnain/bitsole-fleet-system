@@ -365,9 +365,16 @@ class MonitoringController extends Controller
             // Group by device and count types
             $alertCounts = [];
             $maintenanceCounts = [];
+            $frequentIgnitionCounts = [];
 
             foreach ($events as $event) {
                 $dId = $event->deviceid;
+                
+                if ($event->type === 'frequentIgnition') {
+                    if (!isset($frequentIgnitionCounts[$dId])) $frequentIgnitionCounts[$dId] = 0;
+                    $frequentIgnitionCounts[$dId]++;
+                }
+
                 if ($event->type === 'maintenance') {
                     if (!isset($maintenanceCounts[$dId])) $maintenanceCounts[$dId] = 0;
                     $maintenanceCounts[$dId]++;
@@ -377,9 +384,10 @@ class MonitoringController extends Controller
                 }
             }
 
-            $devices->getCollection()->transform(function ($device) use ($alertCounts, $maintenanceCounts) {
+            $devices->getCollection()->transform(function ($device) use ($alertCounts, $maintenanceCounts, $frequentIgnitionCounts) {
                 $dId = $device->device_id;
                 $device->alert_count = $alertCounts[$dId] ?? 0;
+                $device->frequent_ignition_count = $frequentIgnitionCounts[$dId] ?? 0;
                 $mCount = $maintenanceCounts[$dId] ?? 0;
                 $device->maintenance_count = $mCount;
 

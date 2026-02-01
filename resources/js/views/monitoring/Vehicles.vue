@@ -155,6 +155,7 @@
                             <th class="py-2">Owner</th>
                             <th class="py-2">Last Report</th>
                             <th class="py-2 text-center">Engine</th>
+                            <th class="py-2 text-center">Frequent Ignition</th>
                             <th class="py-2 text-center">Maintenance</th>
                             <th class="py-2 text-center">Alert</th>
                             <th class="py-2 text-end pe-4">Action</th>
@@ -162,14 +163,14 @@
                     </thead>
                     <tbody>
                         <tr v-if="loading">
-                            <td colspan="8" class="text-center py-4">
+                            <td colspan="9" class="text-center py-4">
                                 <div class="spinner-border text-primary" role="status">
                                     <span class="visually-hidden">Loading...</span>
                                 </div>
                             </td>
                         </tr>
                         <tr v-else-if="paginatedVehicles.length === 0">
-                            <td colspan="8" class="text-center py-4">No vehicles found</td>
+                            <td colspan="9" class="text-center py-4">No vehicles found</td>
                         </tr>
                         <tr v-else v-for="vehicle in paginatedVehicles" :key="vehicle.id">
                             <td class="ps-4 fw-medium">{{ vehicle.uniqueid }} - {{ vehicle.name }}</td>
@@ -180,6 +181,12 @@
                                 <span class="badge rounded-pill px-3 py-2" :class="vehicle.ignition ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'">
                                     {{ vehicle.ignition ? 'Ignition On' : 'Ignition Off' }}
                                 </span>
+                            </td>
+                            <td class="text-center">
+                                <span v-if="vehicle.frequent_ignition_count > 0" class="badge bg-danger rounded-pill px-3 cursor-pointer" @click="showAlerts(vehicle)">
+                                    <i class="bi bi-lightning-fill me-1"></i> {{ vehicle.frequent_ignition_count }}
+                                </span>
+                                <span v-else class="text-muted">N/A</span>
                             </td>
                             <td class="text-center">
                                 <span v-if="vehicle.maintenance_count > 0" class="badge bg-warning text-dark rounded-pill px-3">
@@ -594,6 +601,7 @@ const fetchVehicles = async () => {
                 owner: v.manager ? v.manager.name : (v.group || 'N/A'),
                 maintenance: v.maintenance_display || 'N/A',
                 maintenance_count: v.maintenance_count || 0,
+                frequent_ignition_count: v.frequent_ignition_count || 0,
                 alert_count: v.alert_count || 0,
                 blocked: v.blocked,
                 alert_status: deviceAttrs.alert_status || '',

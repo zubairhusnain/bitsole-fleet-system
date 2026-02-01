@@ -76,6 +76,11 @@ class PollAlertsCommand extends Command
                         if ($event->id > $maxId) {
                             $maxId = $event->id;
                         }
+
+                        // Check for frequent ignition
+                        if ($event->type === 'ignitionOn') {
+                            $this->checkFrequentIgnition($event);
+                        }
                     }
 
                     // Broadcast to affected users
@@ -99,6 +104,72 @@ class PollAlertsCommand extends Command
                 $this->error("Error polling alerts: " . $e->getMessage());
                 sleep(5); // Sleep longer on error
             }
+        }
+    }
+
+    protected function checkFrequentIgnition($event)
+    {
+        $deviceId = $event->deviceid;
+        $key = "device_ignition_log:{$deviceId}";
+        $lockKey = "device_frequent_ignition_alerted:{$deviceId}";
+
+        // 1. Get history
+        $history = Cache::get($key, []);
+
+        // 2. Add current time (use eventtime from event to be accurate)
+        $eventTime = $event->eventtime;
+        if (!$eventTime) {
+            $eventTime = now();
+        }
+
+        $history[] = $eventTime->timestamp;
+
+        // 3. Prune old (e.g., older than 5 mins)
+        // User said "preventing the driver start for a while and off repeatedly for air-conditioning use"
+        // This implies rapid cycling. 5 minutes seems reasonable.
+        $windowSeconds = 10 * 60;
+        $threshold = 4; // 4 times in 5 mins
+
+        $history = array_filter($history, function ($ts) use ($eventTime, $windowSeconds) {
+            return ($eventTime->timestamp - $ts) <= $windowSeconds;
+        });
+
+        // Re-index array
+        $history = array_values($history);
+
+        Cache::put($key, $history, now()->addMinutes(30));
+
+        // 4. Check Threshold
+        if (count($history) >= $threshold) {
+            // Check if we recently alerted
+            if (!Cache::has($lockKey)) {
+                // TRIGGER ALERT
+                $this->createFrequentIgnitionEvent($event);
+
+                // Set cooldown (e.g., 30 mins)
+                Cache::put($lockKey, true, now()->addMinutes(30));
+            }
+        }
+    }
+
+    protected function createFrequentIgnitionEvent($triggerEvent)
+    {
+        try {
+            $alert = new \App\Models\TcEvent();
+            $alert->type = 'frequentIgnition';
+            $alert->servertime = now();
+            $alert->eventtime = now();
+            $alert->deviceid = $triggerEvent->deviceid;
+            $alert->positionid = $triggerEvent->positionid;
+            $alert->geofenceid = null;
+            // Use attributes JSON field
+            $alert->attributes = ['message' => 'Frequent ignition detected: Driver is cycling ignition repeatedly.'];
+            $alert->maintenanceid = null;
+            $alert->save();
+
+            $this->info("Generated frequentIgnition event for device {$triggerEvent->deviceid}");
+        } catch (\Exception $e) {
+            $this->error("Failed to create frequentIgnition event: " . $e->getMessage());
         }
     }
 }

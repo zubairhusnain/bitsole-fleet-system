@@ -370,6 +370,87 @@ import timezoneFlagMap from '../data/timezone-flags.json';
 const unreadCount = ref(0);
 const myDeviceIds = ref([]);
 let echoChannel = null;
+const processedAlertIds = new Set();
+ 
+const Toast = Swal.mixin({
+    toast: true,
+    position: 'top',
+    showConfirmButton: false,
+    timer: 5000,
+    timerProgressBar: true,
+    didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer);
+        toast.addEventListener('mouseleave', Swal.resumeTimer);
+    }
+});
+
+function parseEventDate(dateStr) {
+    if (!dateStr) return new Date();
+    // Logic from datetime.js: treat SQL string as UTC
+    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/.test(dateStr)) {
+        if (/[Z\+\-]\d{2}:?\d{2}$/.test(dateStr) || dateStr.endsWith('Z')) {
+            return new Date(dateStr);
+        }
+        return new Date(dateStr.replace(' ', 'T') + 'Z');
+    }
+    return new Date(dateStr);
+}
+
+const titleMap = {
+  geofenceEnter: 'Geofence Entered',
+  geofenceExit: 'Geofence Exited',
+  deviceOverspeed: 'Speed Limit Exceeded',
+  alarm: 'Alarm Triggered',
+  ignitionOn: 'Engine Started',
+  ignitionOff: 'Engine Stopped',
+  sos: 'SOS Alert',
+  powerCut: 'Power Disconnected',
+  lowBattery: 'Low Battery Warning',
+  motion: 'Motion Detected',
+  deviceOnline: 'Device Online',
+  deviceOffline: 'Device Offline',
+  deviceUnknown: 'Device Status Unknown',
+  deviceMoving: 'Device Moving',
+  deviceStopped: 'Device Stopped',
+  deviceInactive: 'Device Inactive',
+  maintenance: 'Maintenance Required',
+  textMessage: 'Text Message Received',
+  driverChanged: 'Driver Changed',
+  frequentIgnition: 'Frequent Ignition'
+};
+
+function getAlertTitle(type) {
+    if (titleMap[type]) return titleMap[type];
+    return type
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/_/g, ' ')
+        .replace(/^./, (str) => str.toUpperCase())
+        .trim();
+}
+
+function getAlertDescription(event) {
+    let desc = `Device: ${event.device_name || event.deviceid}`;
+    if (event.attributes) {
+        try {
+            const attrs = typeof event.attributes === 'string' ? JSON.parse(event.attributes) : event.attributes;
+            if (attrs.alarm) desc += ` - Alarm: ${attrs.alarm}`;
+            if (attrs.message) desc += ` - ${attrs.message}`;
+        } catch (e) {}
+    }
+    return desc;
+}
+
+function showToast(alert) {
+    const title = getAlertTitle(alert.type);
+    const text = getAlertDescription(alert);
+    const icon = alert.type === 'frequentIgnition' || alert.type === 'sos' || alert.type === 'alarm' ? 'warning' : 'info';
+
+    Toast.fire({
+        icon: icon,
+        title: title,
+        text: text
+    });
+}
 
 function timezoneFlag(tz) {
     if (timezoneFlagMap[tz]) return timezoneFlagMap[tz];
@@ -494,6 +575,28 @@ const listenForAlerts = () => {
     echoChannel = window.echo.private(`alerts.${userId}`)
         .listen('.alerts.updated', (payload) => {
             console.log('[App] Alerts Update Received', payload);
+
+            if (Array.isArray(payload?.alerts)) {
+                const now = new Date();
+                // Process alerts for Toasts
+                payload.alerts.forEach(alert => {
+                    if (!alert || !alert.id) return;
+
+                    // Deduplicate
+                    if (processedAlertIds.has(alert.id)) return;
+
+                    // Time check: only show if alert is recent (< 2 mins) or in future (clock skew)
+                    // If server time is perfectly synced, diff is ~0.
+                    const eventDate = parseEventDate(alert.eventtime);
+                    const diff = now - eventDate; // ms
+
+                    // Allow 2 minutes lag, or future times
+                    if (diff < 2 * 60 * 1000) {
+                        showToast(alert);
+                        processedAlertIds.add(alert.id);
+                    }
+                });
+            }
 
             // If user is on /alerts page, keep count at 0
             if (route.path === '/alerts') {

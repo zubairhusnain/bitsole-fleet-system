@@ -25,17 +25,21 @@ export function setTimezonePreference(tz) {
 export function getActiveTimezone() {
     const stored = getStoredTimezone();
     if (stored) return stored;
+
+    // Prioritize browser timezone if available
+    try {
+        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (browserTz) return browserTz;
+    } catch {}
+
     let timeZone = null;
     try {
         if (typeof window !== 'undefined' && window.AppConfig && window.AppConfig.timezone) {
             timeZone = window.AppConfig.timezone;
         }
     } catch {}
-    if (!timeZone || timeZone === 'UTC') {
-        try {
-            const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            if (browserTz) return browserTz;
-        } catch {}
+
+    if (!timeZone) {
         return 'UTC';
     }
     return timeZone;
@@ -47,9 +51,21 @@ export function formatDateTime(date) {
         let d;
         // Handle SQL timestamps (often UTC but missing Z)
         // Matches "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD HH:MM:SS.sss"
-        if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(date)) {
-            // Replace space with T to comply with ISO format and append Z for UTC
-            d = new Date(date.replace(' ', 'T') + 'Z');
+        // Also matches "YYYY-MM-DDTHH:MM:SS..." (ISO-like)
+        if (typeof date === 'string') {
+            // Check for basic date pattern
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/.test(date)) {
+                // If it explicitly has a timezone indicator (Z or +HH:MM or -HH:MM), rely on standard parsing
+                if (/[Z\+\-]\d{2}:?\d{2}$/.test(date) || date.endsWith('Z')) {
+                    d = new Date(date);
+                } else {
+                    // Assume UTC if no timezone info is present
+                    // Normalize space to T and append Z
+                    d = new Date(date.replace(' ', 'T') + 'Z');
+                }
+            } else {
+                d = new Date(date);
+            }
         } else {
             d = new Date(date);
         }
@@ -85,8 +101,16 @@ export function formatDate(date) {
     if (!date) return '-';
     try {
         let d;
-        if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(date)) {
-            d = new Date(date.replace(' ', 'T') + 'Z');
+        if (typeof date === 'string') {
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/.test(date)) {
+                if (/[Z\+\-]\d{2}:?\d{2}$/.test(date) || date.endsWith('Z')) {
+                    d = new Date(date);
+                } else {
+                    d = new Date(date.replace(' ', 'T') + 'Z');
+                }
+            } else {
+                d = new Date(date);
+            }
         } else {
             d = new Date(date);
         }
@@ -118,8 +142,16 @@ export function formatTime(date) {
     if (!date) return '-';
     try {
         let d;
-        if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(date)) {
-            d = new Date(date.replace(' ', 'T') + 'Z');
+        if (typeof date === 'string') {
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/.test(date)) {
+                if (/[Z\+\-]\d{2}:?\d{2}$/.test(date) || date.endsWith('Z')) {
+                    d = new Date(date);
+                } else {
+                    d = new Date(date.replace(' ', 'T') + 'Z');
+                }
+            } else {
+                d = new Date(date);
+            }
         } else {
             d = new Date(date);
         }
