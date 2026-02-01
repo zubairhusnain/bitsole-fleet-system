@@ -997,98 +997,11 @@ const redIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-let mapInstance = null;
-let routingControl = null;
-function routingErrorMessage(e) {
-    const status = e?.error?.status ?? e?.error?.target?.status ?? null;
-    if (status === 400) return 'Unable to draw route lines between vehicle and zones.';
-    if (status === 429) return 'Route service is busy. Please try again in a moment.';
-    if (status === 0 || status === -1) return 'Network error while drawing route. Please check your connection.';
-    const msgRaw = e?.error?.message ?? e?.message ?? '';
-    if (typeof msgRaw === 'string' && msgRaw.toLowerCase().includes('failed')) return 'Unable to draw route lines between vehicle and zones.';
-    return 'Unable to draw route lines between vehicle and zones.';
-}
-
- function initRouting() {
-     if (!mapInstance || typeof L === 'undefined' || !L.Routing || routingControl) return;
-
-     try {
-        routingControl = L.Routing.control({
-            waypoints: [],
-            routeWhileDragging: false,
-            showAlternatives: false,
-            fitSelectedRoutes: false,
-            serviceUrl: 'https://router.project-osrm.org/route/v1',
-            lineOptions: {
-                styles: [{ color: '#6610f2', weight: 4, opacity: 0.7 }]
-            },
-            createMarker: function() { return null; }
-        }).addTo(mapInstance);
-
-         const container = routingControl.getContainer();
-         if (container) container.style.display = 'none';
-
-         // Listen for routing errors
-         routingControl.on('routingerror', (e) => {
-            error.value = routingErrorMessage(e);
-         });
-
-         updateRouting();
-     } catch (e) {
-        error.value = 'Unable to draw route lines between vehicle and zones.';
-     }
- }
-
 function onMapReady(map) {
-    mapInstance = map;
-    if (routingControl) {
-        try { routingControl.remove(); } catch (e) {}
-        routingControl = null;
-    }
     L.control.zoom({ position: 'bottomright' }).addTo(map);
-    initRouting();
 }
 
-function updateRouting() {
-    if (!routingControl || !currentLatLng.value) return;
 
-    // Validate current position
-    const cur = currentLatLng.value;
-    if (!Array.isArray(cur) || !Number.isFinite(cur[0]) || !Number.isFinite(cur[1])) return;
-
-    const waypoints = [];
-    if (showZones.value && visibleZones.value.length > 0) {
-        const deviceLoc = L.latLng(cur[0], cur[1]);
-
-        // Star pattern: Device -> Zone 1 -> Device -> Zone 2...
-        waypoints.push(deviceLoc);
-
-        let validZoneCount = 0;
-        visibleZones.value.forEach(zone => {
-            if (zone.center && Number.isFinite(zone.center[0]) && Number.isFinite(zone.center[1])) {
-                waypoints.push(L.latLng(zone.center[0], zone.center[1]));
-                waypoints.push(deviceLoc);
-                validZoneCount++;
-            }
-        });
-
-         if (validZoneCount > 0) {
-             try {
-                 routingControl.setWaypoints(waypoints);
-             } catch(e) {
-                error.value = routingErrorMessage(e);
-             }
-         } else {
-              routingControl.setWaypoints([]);
-         }
-     } else {
-        routingControl.setWaypoints([]);
-    }
-}
-
-watch([visibleZones, currentLatLng, showZones], () => {
-    updateRouting();
-}, { deep: true });
 
 const mapContainer = ref(null);
 const mapReady = ref(false);
