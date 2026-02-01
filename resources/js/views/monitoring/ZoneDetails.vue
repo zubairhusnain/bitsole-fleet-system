@@ -15,11 +15,11 @@
     </div>
 
     <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="error = ''" />
-
+ 
     <!-- Map Section -->
     <div class="card border rounded-4 shadow-0 bg-white mb-4 overflow-hidden">
       <div class="card-body p-0 position-relative" style="height: 500px;">
-        <l-map :key="mapKey" ref="mapRef" v-if="mapReady && mapType !== 'google'" :zoom="zoom" :center="center" :options="{ zoomControl: false }" @ready="onMapReady">
+        <l-map :key="mapKey" ref="mapRef" v-if="mapReady && mapType !== 'google'" :zoom="zoom" :center="center" :options="{ zoomControl: false, attributionControl: false }" @ready="onMapReady">
           <l-tile-layer :url="tileUrl" :attribution="tileAttribution" />
           <l-control-zoom position="bottomright" />
 
@@ -520,8 +520,8 @@ const tileUrl = computed(() => {
 });
 const tileAttribution = computed(() => {
     return mapType.value === 'satellite'
-        ? 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-        : '&copy; OpenStreetMap contributors';
+        ? ''
+        : '';
 });
 
 // Helpers

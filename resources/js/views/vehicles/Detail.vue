@@ -187,7 +187,7 @@
                                 </div>
                             </div>
 
-                            <LMap v-if="mapReady && mapProvider === 'leaflet'" :zoom="zoom" :max-zoom="17" :center="mapCenter" :options="{ zoomControl: false }" @ready="onMapReady" style="height: 100%; width: 100%;">
+                            <LMap v-if="mapReady && mapProvider === 'leaflet'" :zoom="zoom" :max-zoom="17" :center="mapCenter" :options="{ zoomControl: false, attributionControl: false }" @ready="onMapReady" style="height: 100%; width: 100%;">
                                 <LTileLayer :url="tileUrl" :attribution="tileAttribution" />
                                 <LMarker :lat-lng="currentLatLng || mapCenter" ref="markerRef" />
 
@@ -458,7 +458,7 @@
                     </div>
                     <div class="card-body p-0">
                         <div ref="mapContainer" style="height: calc(60vh - 16px); min-height: 320px;">
-                            <LMap v-if="mapReady" :zoom="zoom" :center="mapCenter" style="height: 100%; width: 100%;">
+                            <LMap v-if="mapReady" :zoom="zoom" :center="mapCenter" :options="{ attributionControl: false }" style="height: 100%; width: 100%;">
                                 <LTileLayer :url="tileUrl" :attribution="tileAttribution" />
                                 <!-- Waypoints polyline -->
                                 <LPolyline v-if="polyline && polyline.length" :lat-lngs="polyline"
@@ -1009,7 +1009,7 @@ const zoom = ref(13);
 const mapCenter = ref([3.139, 101.6869]); // default center (Kuala Lumpur)
 const markerRef = ref(null);
 const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const tileAttribution = '&copy; OpenStreetMap contributors';
+const tileAttribution = '';
 const polylineColor = '#007bff';
 const mapProvider = ref('leaflet');
 
