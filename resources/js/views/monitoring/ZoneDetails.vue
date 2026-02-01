@@ -516,7 +516,7 @@ const pageSize = 10;
 const tileUrl = computed(() => {
     return mapType.value === 'satellite'
         ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 });
 const tileAttribution = computed(() => {
     return mapType.value === 'satellite'
