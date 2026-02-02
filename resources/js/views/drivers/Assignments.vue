@@ -104,14 +104,16 @@
                     <th>Vehicle</th>
                     <th>Start Time</th>
                     <th>End Time</th>
+                    <th>Duration</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="trip in driverHistory" :key="trip.id">
-                    <td>{{ trip.vehicle?.name || trip.vehicle_id }}</td>
-                    <td>{{ trip.start_time }}</td>
-                    <td>{{ trip.end_time || '-' }}</td>
+                  <tr v-for="(trip, index) in driverHistory" :key="index">
+                    <td>{{ trip.deviceName }}</td>
+                    <td>{{ formatTime(trip.startTime) }}</td>
+                    <td>{{ formatTime(trip.endTime) }}</td>
+                    <td>{{ trip.duration || '-' }}</td>
                     <td>
                       <span class="badge" :class="{
                         'bg-success': trip.status === 'active',
@@ -121,7 +123,7 @@
                     </td>
                   </tr>
                   <tr v-if="driverHistory.length === 0">
-                    <td colspan="4" class="text-center text-muted py-3">No history found.</td>
+                    <td colspan="5" class="text-center text-muted py-3">No history found.</td>
                   </tr>
                 </tbody>
               </table>
@@ -291,7 +293,7 @@ async function submitAssignment() {
 console.log('selectedDriver ',selectedDriver);
   try {
     await axios.post('/web/drivers/assignments', {
-      driver_id: selectedDriver.value.id,
+      driver_id: selectedDriver.value.localId,
       vehicle_id: assignmentForm.value.vehicleId,
       start_time: assignmentForm.value.startTime,
       end_time: assignmentForm.value.endTime || null

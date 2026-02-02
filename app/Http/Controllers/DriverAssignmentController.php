@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class DriverAssignmentController extends Controller{
+    protected DeviceService $deviceService;
 
     public function __construct(DeviceService $deviceService)
     {
@@ -128,41 +129,38 @@ class DriverAssignmentController extends Controller{
         ]);
 
         $driverId = $request->driver_id;
-        $assignments = DriverAssignment::where('driver_id', $driverId)->get();
+        $assignments = DriverAssignment::with('vehicle')
+            ->where('driver_id', $driverId)
+            ->orderByDesc('start_time')
+            ->get();
 
-        $allTrips = collect();
+        // Format as trips to match frontend expectations
+        $trips = $assignments->map(function ($a) {
+            $deviceName = $a->vehicle->name ?? 'Unknown Vehicle';
 
-        foreach ($assignments as $assignment) {
-            $from = $assignment->start_time;
-            $to = $assignment->end_time ?? now();
-
-            // Fetch trips for this assignment window
-            // fetchTripsDb returns an array or collection of trips
-            try {
-                $trips = $this->deviceService->fetchTripsDb(
-                    $assignment->vehicle_id,
-                    $from,
-                    $to
-                );
-
-                // Add assignment context to trips if needed, or just merge
-                // We might want to tag them with the assignment ID
-                foreach ($trips as $trip) {
-                    if (is_array($trip)) {
-                        $trip['assignment_id'] = $assignment->id;
-                        $allTrips->push($trip);
-                    }
-                }
-            } catch (\Exception $e) {
-                // Ignore errors for individual vehicle trip fetches
-                Log::error("Failed to fetch trips for assignment {$assignment->id}: " . $e->getMessage());
+            // Calculate distance/duration if available (placeholders for now as local assignment doesn't track distance)
+            $duration = '';
+            if ($a->start_time && $a->end_time) {
+                $duration = $a->start_time->diffForHumans($a->end_time, true);
             }
-        }
 
-        // Sort by start time descending
-        $sortedTrips = $allTrips->sortByDesc('startTime')->values();
+            return [
+                'deviceId' => $a->vehicle_id,
+                'deviceName' => $deviceName,
+                'startTime' => $a->start_time->toIso8601String(),
+                'endTime' => $a->end_time ? $a->end_time->toIso8601String() : null,
+                'startAddress' => 'Assigned', // Local history doesn't have addresses
+                'endAddress' => $a->status === 'completed' ? 'Completed' : $a->status,
+                'status' => $a->status,
+                'distance' => 0, // Not tracked in assignment
+                'averageSpeed' => 0,
+                'maxSpeed' => 0,
+                'duration' => $duration,
+                'spentFuel' => 0,
+            ];
+        });
 
-        return response()->json($sortedTrips);
+        return response()->json($trips);
     }
 
     protected function createEvent($deviceId, $type, $attributes = [])
