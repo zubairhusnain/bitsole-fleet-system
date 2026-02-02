@@ -66,6 +66,7 @@ const routes = [
   { path: '/monitoring/zones/:zoneId(\\d+)', name: 'monitoring-zone-details', component: () => import('../views/monitoring/ZoneDetails.vue'), meta: { requiresAuth: true, title: 'Zone Vehicles', moduleKey: 'monitoring.zones', action: 'read' } },
   { path: '/live-tracking', name: 'live-tracking', component: LiveTracking, meta: { requiresAuth: true, title: 'Live Tracking', roles: [0, 1] } },
   { path: '/drivers', name: 'drivers', component: Drivers, meta: { requiresAuth: true, title: 'Driver Management', moduleKey: 'drivers', action: 'read' } },
+  { path: '/drivers/assignments', name: 'drivers-assignments', component: () => import('../views/drivers/Assignments.vue'), meta: { requiresAuth: true, title: 'Driver Assignments', moduleKey: 'drivers', action: 'read' } },
   { path: '/vehicles/:deviceId(\\d+)/settings', name: 'vehicle-settings', component: VehicleSettings, meta: { requiresAuth: true, title: 'Vehicle Settings', moduleKey: 'vehicles', action: 'read' } },
   // Add Driver route
   { path: '/drivers/new', name: 'drivers-new', component: () => import('../views/drivers/AddDriver.vue'), meta: { requiresAuth: true, title: 'Add New Driver', moduleKey: 'drivers', action: 'create' } },

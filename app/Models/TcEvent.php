@@ -57,7 +57,8 @@ class TcEvent extends Model
                             });
                     });
                 });
-            })->orWhere('tc_events.type', 'frequentIgnition');
+            })->orWhere('tc_events.type', 'frequentIgnition')
+              ->orWhere('tc_events.type', 'driverChanged');
         });
     }
 }

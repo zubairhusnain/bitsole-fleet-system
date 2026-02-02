@@ -1,0 +1,248 @@
+<template>
+  <div class="assignments-view">
+    <div class="app-content-header mb-2">
+      <ol class="breadcrumb mb-0 small text-muted">
+        <li class="breadcrumb-item"><RouterLink to="/">Dashboard</RouterLink></li>
+        <li class="breadcrumb-item"><RouterLink to="/drivers">Driver Management</RouterLink></li>
+        <li class="breadcrumb-item active" aria-current="page">Client Driver Assignments</li>
+      </ol>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-12"><h4 class="mb-0 fw-semibold">Client Driver Assignments</h4></div>
+    </div>
+
+    <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="error = ''" />
+    <UiAlert :show="!!successMessage" :message="successMessage" variant="success" dismissible @dismiss="successMessage = ''" />
+
+    <div class="card border rounded-3 shadow-0">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover table-sm align-middle mb-0 table-grid-lines table-nowrap">
+            <thead class="thead-app-dark">
+              <tr>
+                <th class="fw-semibold py-2">Driver Name</th>
+                <th class="fw-semibold py-2">Current Vehicle</th>
+                <th class="fw-semibold py-2">Status</th>
+                <th class="fw-semibold py-2 text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="driver in clientDrivers" :key="driver.id">
+                <td>{{ driver.name }}</td>
+                <td>{{ driver.vehicleName || 'None' }}</td>
+                <td><span class="badge" :class="driver.vehicleName ? 'bg-success' : 'bg-secondary'">{{ driver.vehicleName ? 'Assigned' : 'Available' }}</span></td>
+                <td class="text-end">
+                  <button class="btn btn-sm btn-outline-primary" @click="openAssignmentModal(driver)">
+                    Assign Vehicle
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="clientDrivers.length === 0">
+                <td colspan="4" class="text-center text-muted py-3">No client drivers found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assignment Modal -->
+    <div v-if="showModal" class="modal fade show d-block" tabindex="-1" role="dialog" style="background: rgba(0,0,0,0.5)">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Assign Vehicle to {{ selectedDriver?.name }}</h5>
+            <button type="button" class="btn-close" @click="closeModal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Select Vehicle</label>
+              <select v-model="assignmentForm.vehicleId" class="form-select">
+                <option value="">-- Select Vehicle --</option>
+                <option v-for="v in vehicles" :key="v.id" :value="v.id">{{ v.label || v.name }}</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Start Time</label>
+              <input v-model="assignmentForm.startTime" type="datetime-local" class="form-control">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">End Time (Optional)</label>
+              <input v-model="assignmentForm.endTime" type="datetime-local" class="form-control">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="closeModal">Cancel</button>
+            <button type="button" class="btn btn-primary" @click="submitAssignment" :disabled="submitting">
+              {{ submitting ? 'Assigning...' : 'Assign' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History Modal -->
+    <div v-if="showHistoryModal" class="modal fade show d-block" tabindex="-1" role="dialog" style="background: rgba(0,0,0,0.5)">
+      <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Trip History: {{ selectedDriver?.name }}</h5>
+            <button type="button" class="btn-close" @click="closeHistoryModal"></button>
+          </div>
+          <div class="modal-body p-0">
+            <div class="table-responsive">
+              <table class="table table-sm table-striped mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Vehicle</th>
+                    <th>Start Time</th>
+                    <th>End Time</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="trip in driverHistory" :key="trip.id">
+                    <td>{{ trip.vehicle?.name || trip.vehicle_id }}</td>
+                    <td>{{ trip.start_time }}</td>
+                    <td>{{ trip.end_time || '-' }}</td>
+                    <td>
+                      <span class="badge" :class="{
+                        'bg-success': trip.status === 'active',
+                        'bg-secondary': trip.status === 'completed',
+                        'bg-warning text-dark': trip.status === 'scheduled'
+                      }">{{ trip.status }}</span>
+                    </td>
+                  </tr>
+                  <tr v-if="driverHistory.length === 0">
+                    <td colspan="4" class="text-center text-muted py-3">No history found.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="closeHistoryModal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+import axios from 'axios';
+import UiAlert from '../../components/UiAlert.vue';
+
+const clientDrivers = ref([]);
+const vehicles = ref([]);
+const error = ref('');
+const successMessage = ref('');
+const showModal = ref(false);
+const showHistoryModal = ref(false);
+const selectedDriver = ref(null);
+const submitting = ref(false);
+const driverHistory = ref([]);
+
+const assignmentForm = ref({
+  vehicleId: '',
+  startTime: '',
+  endTime: ''
+});
+
+async function fetchData() {
+  try {
+    const [driversRes, vehiclesRes] = await Promise.all([
+      axios.get('/web/drivers'),
+      axios.get('/web/vehicles/options')
+    ]);
+    
+    const allDrivers = driversRes.data.drivers || [];
+    // Filter only client drivers and format
+    clientDrivers.value = allDrivers
+      .filter(d => d.is_client_driver || d.isClientDriver)
+      .map(d => ({
+        ...d,
+        vehicleName: d.deviceName || d.deviceUniqueId || d.attributes?.assignedVehicle
+      }));
+    
+    vehicles.value = vehiclesRes.data.options || [];
+  } catch (e) {
+    error.value = 'Failed to load data';
+  }
+}
+
+function openAssignmentModal(driver) {
+  selectedDriver.value = driver;
+  const now = new Date();
+  // Adjust to local ISO string for datetime-local input
+  const localIso = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+  
+  assignmentForm.value = {
+    vehicleId: '',
+    startTime: localIso,
+    endTime: ''
+  };
+  showModal.value = true;
+}
+
+function closeModal() {
+  showModal.value = false;
+  selectedDriver.value = null;
+}
+
+async function openHistoryModal(driver) {
+  selectedDriver.value = driver;
+  showHistoryModal.value = true;
+  driverHistory.value = [];
+  
+  try {
+    const res = await axios.get('/web/drivers/assignments', {
+      params: { driver_id: driver.id }
+    });
+    driverHistory.value = res.data;
+  } catch (e) {
+    console.error('Failed to fetch history', e);
+  }
+}
+
+function closeHistoryModal() {
+  showHistoryModal.value = false;
+  selectedDriver.value = null;
+  driverHistory.value = [];
+}
+
+async function submitAssignment() {
+  if (!assignmentForm.value.vehicleId || !assignmentForm.value.startTime) {
+    error.value = 'Vehicle and Start Time are required';
+    return;
+  }
+  
+  submitting.value = true;
+  error.value = '';
+  
+  try {
+    await axios.post('/web/drivers/assignments', {
+      driver_id: selectedDriver.value.id,
+      vehicle_id: assignmentForm.value.vehicleId,
+      start_time: assignmentForm.value.startTime,
+      end_time: assignmentForm.value.endTime || null
+    });
+    
+    successMessage.value = 'Vehicle assigned successfully';
+    closeModal();
+    fetchData(); // Refresh list
+  } catch (e) {
+    error.value = e.response?.data?.message || 'Assignment failed';
+  } finally {
+    submitting.value = false;
+  }
+}
+
+onMounted(fetchData);
+</script>
+
+<style scoped>
+.btn-app-dark { background-color: #0b0f28; color: #fff; border-radius: 12px; padding: .5rem .75rem; }
+</style>

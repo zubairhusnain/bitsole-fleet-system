@@ -178,6 +178,13 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::patch('/{driverId}/restore', [\App\Http\Controllers\DriverController::class, 'restore']);
     Route::delete('/{driverId}', [\App\Http\Controllers\DriverController::class, 'destroy']);
 
+    // Driver Assignments
+    Route::prefix('assignments')->group(function () {
+        Route::get('/', [\App\Http\Controllers\DriverAssignmentController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\DriverAssignmentController::class, 'store']);
+        Route::put('/{id}', [\App\Http\Controllers\DriverAssignmentController::class, 'update']);
+        Route::delete('/{id}', [\App\Http\Controllers\DriverAssignmentController::class, 'destroy']);
+    });
 });
 
 // Live Tracking: trigger a broadcast of current positions

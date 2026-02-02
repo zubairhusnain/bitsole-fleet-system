@@ -14,6 +14,7 @@ class Drivers extends Model
         'distributor_id',
         'driver_id',
         'device_id',
+        'is_client_driver',
     ];
 
     protected $casts = [
@@ -21,6 +22,7 @@ class Drivers extends Model
         'device_id' => 'integer',
         'user_id' => 'integer',
         'distributor_id' => 'integer',
+        'is_client_driver' => 'boolean',
     ];
 
     public function tcDriver()
@@ -31,5 +33,10 @@ class Drivers extends Model
     public function tcDevice()
     {
         return $this->belongsTo(TcDevice::class, 'device_id', 'id');
+    }
+
+    public function assignments()
+    {
+        return $this->hasMany(DriverAssignment::class, 'driver_id');
     }
 }

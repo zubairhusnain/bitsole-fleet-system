@@ -64,6 +64,12 @@
                   This Person do not have any medical condition and fit to drive safely.
                 </label>
               </div>
+              <div class="form-check mt-2">
+                <input v-model="form.isClientDriver" class="form-check-input" type="checkbox" id="isClientDriver">
+                <label class="form-check-label small" for="isClientDriver">
+                  Is Client Driver (Available for temporary assignments)
+                </label>
+              </div>
             </div>
           </div>
         </div>
@@ -180,6 +186,7 @@ const form = reactive({
   idCard: '',
   passport: '',
   healthOk: false,
+  isClientDriver: false,
   email: '',
   phone: '',
   address: '',
@@ -258,6 +265,7 @@ async function fetchDriver() {
     form.idCard = attrs?.idCard || '';
     form.passport = attrs?.passport || '';
     form.healthOk = Boolean(attrs?.healthOk);
+    form.isClientDriver = Boolean(data?.isClientDriver);
     form.address = attrs?.address || '';
     form.telephone = attrs?.telephone || '';
     form.licence = attrs?.licence || attrs?.license || '';
@@ -377,6 +385,7 @@ async function submit() {
     fd.append('_method', 'PUT');
     fd.append('name', form.fullName);
     fd.append('uniqueId', (form.driverId || '').toString().trim());
+    fd.append('is_client_driver', form.isClientDriver ? '1' : '0');
     fd.append('attributes', JSON.stringify(attrs));
     if (form.licenceImage) fd.append('licenceImage', form.licenceImage);
     if (form.avatar) fd.append('avatar', form.avatar);

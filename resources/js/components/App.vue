@@ -115,12 +115,30 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('drivers','read')">
-                            <RouterLink to="/drivers" class="nav-link"
-                                :class="{ active: route.path.startsWith('/drivers') }">
+                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/drivers') }" v-if="!isAdminOrDistributor && hasPerm('drivers','read')">
+                            <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/drivers') }">
                                 <i class="nav-icon bi bi-people"></i>
-                                <p>Driver Management</p>
-                            </RouterLink>
+                                <p>
+                                    Driver Management
+                                    <i class="bi bi-chevron-right right"></i>
+                                </p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <RouterLink to="/drivers" class="nav-link"
+                                        :class="{ active: route.path === '/drivers' || route.path.startsWith('/drivers/add') || route.path.startsWith('/drivers/edit') }">
+                                        <i class="nav-icon bi bi-person-lines-fill"></i>
+                                        <p>All Drivers</p>
+                                    </RouterLink>
+                                </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/drivers/assignments" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/drivers/assignments') }">
+                                        <i class="nav-icon bi bi-clipboard-check"></i>
+                                        <p>Assignments</p>
+                                    </RouterLink>
+                                </li>
+                            </ul>
                         </li>
 
                         <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/vehicles') }" v-if="!isAdminOrDistributor && (hasPerm('vehicles','read') || hasPerm('vehicles.overview','read') || hasPerm('vehicles.maintenance','read'))">

@@ -69,6 +69,7 @@ class DriverController extends Controller
                 'avatarImage' => $avatarImagePath,
                 'licenseImageUrl' => $licenseImageUrl,
                 'avatarImageUrl' => $avatarImageUrl,
+                'isClientDriver' => (bool) $row->is_client_driver,
                 'deletedAt' => $row->deleted_at ? $row->deleted_at->format('c') : null,
                 'blocked' => method_exists($row, 'trashed') ? $row->trashed() : false,
             ];
@@ -308,6 +309,7 @@ class DriverController extends Controller
             'device_id' => null,
             'user_id' => $userIdLocal,
             'distributor_id' => $distributorIdLocal,
+            'is_client_driver' => $request->boolean('is_client_driver'),
         ]);
 
         // Handle initial assignment if provided
@@ -501,6 +503,14 @@ class DriverController extends Controller
 
         $payload = json_decode($resp->response, false);
 
+        // Update local record
+        $local = \App\Models\Drivers::where('driver_id', $driverId)->first();
+        if ($local) {
+            $local->update([
+                'is_client_driver' => $request->boolean('is_client_driver'),
+            ]);
+        }
+
         // Handle assignment changes
         try {
             // Incoming desired device assignment
@@ -509,7 +519,6 @@ class DriverController extends Controller
 
             // Only act when a target device is provided
             if ($newDeviceId > 0) {
-                $local = \App\Models\Drivers::where('driver_id', $driverId)->first();
                 $currentDeviceId = $local ? (int) ($local->device_id ?? 0) : 0;
 
                 // Revoke previous if different, then apply new assignment
