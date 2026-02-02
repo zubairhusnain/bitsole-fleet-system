@@ -56,6 +56,7 @@ class DriverController extends Controller
             $deviceUniqueId = $device->uniqueId ?? ($device->uniqueid ?? null);
             return [
                 'id' => $tc->id ?? null,
+                'localId' => $row->id,
                 'uniqueId' => $tc->uniqueId ?? ($tc->uniqueid ?? null),
                 'name' => $tc->name ?? null,
                 'email' => $tc->email ?? null,

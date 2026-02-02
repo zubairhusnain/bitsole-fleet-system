@@ -167,7 +167,7 @@ async function fetchData() {
 
     const allDrivers = driversRes.data.drivers || [];
     const activeAssignments = assignmentsRes.data || [];
-    
+
     // Create map of driver_id -> active assignment
     const assignmentMap = {};
     activeAssignments.forEach(a => {
@@ -178,7 +178,7 @@ async function fetchData() {
     clientDrivers.value = allDrivers
       .filter(d => d.is_client_driver || d.isClientDriver)
       .map(d => {
-        const assignment = assignmentMap[d.id];
+        const assignment = assignmentMap[d.localId]; // Use localId to match assignment
         return {
           ...d,
           activeAssignment: assignment,
@@ -194,7 +194,7 @@ async function fetchData() {
 
 async function endTrip(driver) {
   if (!driver.activeAssignment) return;
-  
+
   if (!confirm(`End trip for ${driver.name}? This will mark the assignment as completed.`)) {
     return;
   }
@@ -208,7 +208,7 @@ async function endTrip(driver) {
       end_time: localIso,
       status: 'completed'
     });
-    
+
     successMessage.value = 'Trip ended successfully';
     fetchData();
   } catch (e) {
@@ -288,7 +288,7 @@ async function submitAssignment() {
 
   submitting.value = true;
   error.value = '';
-
+console.log('selectedDriver ',selectedDriver);
   try {
     await axios.post('/web/drivers/assignments', {
       driver_id: selectedDriver.value.id,
