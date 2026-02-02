@@ -170,14 +170,6 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
 
 // NEW: Auth-protected Drivers CRUD & assignment
 Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/drivers')->group(function () {
-    Route::get('/', [\App\Http\Controllers\DriverController::class, 'index']);
-    Route::get('/{driverId}', [\App\Http\Controllers\DriverController::class, 'show']);
-    Route::post('/', [\App\Http\Controllers\DriverController::class, 'store']);
-    Route::put('/{driverId}', [\App\Http\Controllers\DriverController::class, 'update']);
-    // Restore a soft-deleted (blocked) driver
-    Route::patch('/{driverId}/restore', [\App\Http\Controllers\DriverController::class, 'restore']);
-    Route::delete('/{driverId}', [\App\Http\Controllers\DriverController::class, 'destroy']);
-
     // Driver Assignments
     Route::prefix('assignments')->group(function () {
         Route::get('/', [\App\Http\Controllers\DriverAssignmentController::class, 'index']);
@@ -186,6 +178,14 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
         Route::put('/{id}', [\App\Http\Controllers\DriverAssignmentController::class, 'update']);
         Route::delete('/{id}', [\App\Http\Controllers\DriverAssignmentController::class, 'destroy']);
     });
+
+    Route::get('/', [\App\Http\Controllers\DriverController::class, 'index']);
+    Route::get('/{driverId}', [\App\Http\Controllers\DriverController::class, 'show']);
+    Route::post('/', [\App\Http\Controllers\DriverController::class, 'store']);
+    Route::put('/{driverId}', [\App\Http\Controllers\DriverController::class, 'update']);
+    // Restore a soft-deleted (blocked) driver
+    Route::patch('/{driverId}/restore', [\App\Http\Controllers\DriverController::class, 'restore']);
+    Route::delete('/{driverId}', [\App\Http\Controllers\DriverController::class, 'destroy']);
 });
 
 // Live Tracking: trigger a broadcast of current positions

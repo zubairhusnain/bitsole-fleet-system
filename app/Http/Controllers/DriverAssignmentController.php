@@ -11,7 +11,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class DriverAssignmentController extends Controller{
-    protected $deviceService;
 
     public function __construct(DeviceService $deviceService)
     {
