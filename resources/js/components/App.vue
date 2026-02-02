@@ -371,7 +371,7 @@ const unreadCount = ref(0);
 const myDeviceIds = ref([]);
 let echoChannel = null;
 const processedAlertIds = new Set();
- 
+
 const Toast = Swal.mixin({
     toast: true,
     position: 'top',
@@ -383,6 +383,50 @@ const Toast = Swal.mixin({
         toast.addEventListener('mouseleave', Swal.resumeTimer);
     }
 });
+
+// Force z-index for SweetAlert2 container to be above everything (including bootstrap modals/navbars)
+const style = document.createElement('style');
+style.innerHTML = `
+    div:where(.swal2-container) {
+        z-index: 2147483647 !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        pointer-events: none !important;
+    }
+    div:where(.swal2-popup) {
+        pointer-events: auto !important;
+    }
+    div:where(.swal2-container.swal2-top) {
+        align-items: flex-start !important;
+        justify-content: center !important;
+        padding-top: 20px !important;
+    }
+    /* Customize Toast Size */
+    div:where(.swal2-popup.swal2-toast) {
+        font-size: 1.1rem !important;
+        min-width: 400px !important;
+        max-width: 800px !important;
+        padding: 1rem 1.5rem !important;
+        display: flex !important;
+        background: #fff !important;
+        color: #333 !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    }
+    div:where(.swal2-title) {
+        font-size: 1.2rem !important;
+        margin: 0 0.5rem !important;
+        color: #333 !important;
+    }
+    div:where(.swal2-html-container) {
+        font-size: 1.1rem !important;
+        margin: 0 0.5rem !important;
+        color: #555 !important;
+    }
+`;
+document.head.appendChild(style);
 
 function parseEventDate(dateStr) {
     if (!dateStr) return new Date();
@@ -590,8 +634,8 @@ const listenForAlerts = () => {
                     const eventDate = parseEventDate(alert.eventtime);
                     const diff = now - eventDate; // ms
 
-                    // Allow 2 minutes lag, or future times
-                    if (diff < 2 * 60 * 1000) {
+                    // Allow 60 minutes lag for testing, or future times
+                    if (diff < 60 * 60 * 1000) {
                         showToast(alert);
                         processedAlertIds.add(alert.id);
                     }
