@@ -30,6 +30,10 @@ class DriverAssignmentController extends Controller{
             $query->where('vehicle_id', $request->vehicle_id);
         }
 
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
         return response()->json($query->orderByDesc('start_time')->get());
     }
 
@@ -58,8 +62,13 @@ class DriverAssignmentController extends Controller{
 
         // Notification for changing vehicle driver (Assignment created)
         // Create Traccar event so it shows up in Alerts
+        $startTimeStr = \Carbon\Carbon::parse($validated['start_time'])->format('Y-m-d H:i');
+        $endTimeStr = !empty($validated['end_time'])
+            ? " to " . \Carbon\Carbon::parse($validated['end_time'])->format('Y-m-d H:i')
+            : "";
+
         $this->createEvent($validated['vehicle_id'], 'driverChanged', [
-            'message' => "Driver assigned: " . $assignment->driver->name,
+            'message' => "Driver assigned: " . $assignment->driver->name . " (Start: {$startTimeStr}{$endTimeStr})",
             'driver_id' => $assignment->driver_id,
             'assignment_id' => $assignment->id
         ]);
@@ -84,8 +93,14 @@ class DriverAssignmentController extends Controller{
 
         // Check if trip ended
         if ($request->filled('end_time') || ($request->input('status') === 'completed')) {
+             $duration = '';
+             if ($assignment->start_time && $assignment->end_time) {
+                 $diff = \Carbon\Carbon::parse($assignment->start_time)->diffForHumans(\Carbon\Carbon::parse($assignment->end_time), true);
+                 $duration = " Duration: {$diff}.";
+             }
+
              $this->createEvent($assignment->vehicle_id, 'driverChanged', [
-                'message' => "Trip ended for driver: " . $assignment->driver->name,
+                'message' => "Trip ended for driver: " . $assignment->driver->name . "." . $duration,
                 'driver_id' => $assignment->driver_id,
                 'status' => 'completed'
              ]);

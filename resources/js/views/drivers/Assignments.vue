@@ -30,13 +30,16 @@
             <tbody>
               <tr v-for="driver in clientDrivers" :key="driver.id">
                 <td>{{ driver.name }}</td>
-                <td>{{ driver.vehicleName || 'None' }}</td>
-                <td><span class="badge" :class="driver.vehicleName ? 'bg-success' : 'bg-secondary'">{{ driver.vehicleName ? 'Assigned' : 'Available' }}</span></td>
+                <td>{{ driver.activeVehicle || 'None' }}</td>
+                <td><span class="badge" :class="driver.activeAssignment ? 'bg-success' : 'bg-secondary'">{{ driver.activeAssignment ? 'Assigned' : 'Available' }}</span></td>
                 <td class="text-end">
                   <button class="btn btn-sm btn-outline-info me-2" @click="openHistoryModal(driver)">
                     History
                   </button>
-                  <button class="btn btn-sm btn-outline-primary" @click="openAssignmentModal(driver)">
+                  <button v-if="driver.activeAssignment" class="btn btn-sm btn-outline-danger" @click="endTrip(driver)">
+                    End Trip
+                  </button>
+                  <button v-else class="btn btn-sm btn-outline-primary" @click="openAssignmentModal(driver)">
                     Assign Vehicle
                   </button>
                 </td>
@@ -156,23 +159,60 @@ const assignmentForm = ref({
 
 async function fetchData() {
   try {
-    const [driversRes, vehiclesRes] = await Promise.all([
+    const [driversRes, vehiclesRes, assignmentsRes] = await Promise.all([
       axios.get('/web/drivers'),
-      axios.get('/web/vehicles/options')
+      axios.get('/web/vehicles/options'),
+      axios.get('/web/drivers/assignments?status=active')
     ]);
 
     const allDrivers = driversRes.data.drivers || [];
+    const activeAssignments = assignmentsRes.data || [];
+    
+    // Create map of driver_id -> active assignment
+    const assignmentMap = {};
+    activeAssignments.forEach(a => {
+      assignmentMap[a.driver_id] = a;
+    });
+
     // Filter only client drivers and format
     clientDrivers.value = allDrivers
       .filter(d => d.is_client_driver || d.isClientDriver)
-      .map(d => ({
-        ...d,
-        vehicleName: d.deviceName || d.deviceUniqueId || d.attributes?.assignedVehicle
-      }));
+      .map(d => {
+        const assignment = assignmentMap[d.id];
+        return {
+          ...d,
+          activeAssignment: assignment,
+          activeVehicle: assignment?.vehicle?.name || assignment?.vehicle?.name || null
+        };
+      });
 
     vehicles.value = vehiclesRes.data.options || [];
   } catch (e) {
     error.value = 'Failed to load data';
+  }
+}
+
+async function endTrip(driver) {
+  if (!driver.activeAssignment) return;
+  
+  if (!confirm(`End trip for ${driver.name}? This will mark the assignment as completed.`)) {
+    return;
+  }
+
+  try {
+    const now = new Date();
+    // Adjust to local ISO string
+    const localIso = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+
+    await axios.put(`/web/drivers/assignments/${driver.activeAssignment.id}`, {
+      end_time: localIso,
+      status: 'completed'
+    });
+    
+    successMessage.value = 'Trip ended successfully';
+    fetchData();
+  } catch (e) {
+    error.value = 'Failed to end trip';
   }
 }
 
