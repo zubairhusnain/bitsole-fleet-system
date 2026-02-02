@@ -33,6 +33,9 @@
                 <td>{{ driver.vehicleName || 'None' }}</td>
                 <td><span class="badge" :class="driver.vehicleName ? 'bg-success' : 'bg-secondary'">{{ driver.vehicleName ? 'Assigned' : 'Available' }}</span></td>
                 <td class="text-end">
+                  <button class="btn btn-sm btn-outline-info me-2" @click="openHistoryModal(driver)">
+                    History
+                  </button>
                   <button class="btn btn-sm btn-outline-primary" @click="openAssignmentModal(driver)">
                     Assign Vehicle
                   </button>
@@ -157,7 +160,7 @@ async function fetchData() {
       axios.get('/web/drivers'),
       axios.get('/web/vehicles/options')
     ]);
-    
+
     const allDrivers = driversRes.data.drivers || [];
     // Filter only client drivers and format
     clientDrivers.value = allDrivers
@@ -166,7 +169,7 @@ async function fetchData() {
         ...d,
         vehicleName: d.deviceName || d.deviceUniqueId || d.attributes?.assignedVehicle
       }));
-    
+
     vehicles.value = vehiclesRes.data.options || [];
   } catch (e) {
     error.value = 'Failed to load data';
@@ -178,7 +181,7 @@ function openAssignmentModal(driver) {
   const now = new Date();
   // Adjust to local ISO string for datetime-local input
   const localIso = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-  
+
   assignmentForm.value = {
     vehicleId: '',
     startTime: localIso,
@@ -196,15 +199,39 @@ async function openHistoryModal(driver) {
   selectedDriver.value = driver;
   showHistoryModal.value = true;
   driverHistory.value = [];
-  
+
   try {
-    const res = await axios.get('/web/drivers/assignments', {
+    const res = await axios.get('/web/drivers/assignments/history', {
       params: { driver_id: driver.id }
     });
     driverHistory.value = res.data;
   } catch (e) {
     console.error('Failed to fetch history', e);
   }
+}
+
+function formatTime(iso) {
+  if (!iso) return '-';
+  return new Date(iso).toLocaleString();
+}
+
+function formatDistance(meters) {
+  if (!meters) return '0 km';
+  return (meters / 1000).toFixed(2) + ' km';
+}
+
+function formatDuration(ms) {
+  if (!ms) return '0m';
+  const min = Math.floor(ms / 60000);
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function formatSpeed(knots) {
+  if (!knots) return '0 km/h';
+  return (knots * 1.852).toFixed(0) + ' km/h';
 }
 
 function closeHistoryModal() {
@@ -218,10 +245,10 @@ async function submitAssignment() {
     error.value = 'Vehicle and Start Time are required';
     return;
   }
-  
+
   submitting.value = true;
   error.value = '';
-  
+
   try {
     await axios.post('/web/drivers/assignments', {
       driver_id: selectedDriver.value.id,
@@ -229,7 +256,7 @@ async function submitAssignment() {
       start_time: assignmentForm.value.startTime,
       end_time: assignmentForm.value.endTime || null
     });
-    
+
     successMessage.value = 'Vehicle assigned successfully';
     closeModal();
     fetchData(); // Refresh list

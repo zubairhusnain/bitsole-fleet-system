@@ -6,10 +6,18 @@ use App\Models\DriverAssignment;
 use App\Models\Drivers;
 use App\Models\TcEvent;
 use App\Events\AlertsUpdated;
+use App\Services\DeviceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class DriverAssignmentController extends Controller{
+    protected $deviceService;
+
+    public function __construct(DeviceService $deviceService)
+    {
+        $this->deviceService = $deviceService;
+    }
+
     public function index(Request $request)
     {
         $query = DriverAssignment::with(['driver.tcDriver', 'vehicle']);
@@ -92,6 +100,50 @@ class DriverAssignmentController extends Controller{
     {
         DriverAssignment::destroy($id);
         return response()->json(['message' => 'Assignment deleted']);
+    }
+
+    public function history(Request $request)
+    {
+        $request->validate([
+            'driver_id' => 'required|exists:drivers,id'
+        ]);
+
+        $driverId = $request->driver_id;
+        $assignments = DriverAssignment::where('driver_id', $driverId)->get();
+
+        $allTrips = collect();
+
+        foreach ($assignments as $assignment) {
+            $from = $assignment->start_time;
+            $to = $assignment->end_time ?? now();
+
+            // Fetch trips for this assignment window
+            // fetchTripsDb returns an array or collection of trips
+            try {
+                $trips = $this->deviceService->fetchTripsDb(
+                    $assignment->vehicle_id,
+                    $from,
+                    $to
+                );
+
+                // Add assignment context to trips if needed, or just merge
+                // We might want to tag them with the assignment ID
+                foreach ($trips as $trip) {
+                    if (is_array($trip)) {
+                        $trip['assignment_id'] = $assignment->id;
+                        $allTrips->push($trip);
+                    }
+                }
+            } catch (\Exception $e) {
+                // Ignore errors for individual vehicle trip fetches
+                Log::error("Failed to fetch trips for assignment {$assignment->id}: " . $e->getMessage());
+            }
+        }
+
+        // Sort by start time descending
+        $sortedTrips = $allTrips->sortByDesc('startTime')->values();
+
+        return response()->json($sortedTrips);
     }
 
     protected function createEvent($deviceId, $type, $attributes = [])

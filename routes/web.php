@@ -181,6 +181,7 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     // Driver Assignments
     Route::prefix('assignments')->group(function () {
         Route::get('/', [\App\Http\Controllers\DriverAssignmentController::class, 'index']);
+        Route::get('/history', [\App\Http\Controllers\DriverAssignmentController::class, 'history']);
         Route::post('/', [\App\Http\Controllers\DriverAssignmentController::class, 'store']);
         Route::put('/{id}', [\App\Http\Controllers\DriverAssignmentController::class, 'update']);
         Route::delete('/{id}', [\App\Http\Controllers\DriverAssignmentController::class, 'destroy']);

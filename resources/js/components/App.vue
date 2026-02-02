@@ -128,14 +128,14 @@
                                     <RouterLink to="/drivers" class="nav-link"
                                         :class="{ active: route.path === '/drivers' || route.path.startsWith('/drivers/add') || route.path.startsWith('/drivers/edit') }">
                                         <i class="nav-icon bi bi-person-lines-fill"></i>
-                                        <p>All Drivers</p>
+                                        <p>Driver List</p>
                                     </RouterLink>
                                 </li>
                                 <li class="nav-item">
                                     <RouterLink to="/drivers/assignments" class="nav-link"
                                         :class="{ active: route.path.startsWith('/drivers/assignments') }">
                                         <i class="nav-icon bi bi-clipboard-check"></i>
-                                        <p>Assignments</p>
+                                        <p>Client Driver</p>
                                     </RouterLink>
                                 </li>
                             </ul>
