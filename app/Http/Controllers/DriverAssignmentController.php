@@ -20,21 +20,26 @@ class DriverAssignmentController extends Controller{
 
     public function index(Request $request)
     {
-        $query = DriverAssignment::with(['driver.tcDriver', 'vehicle']);
+        try {
+            $query = DriverAssignment::with(['driver.tcDriver', 'vehicle']);
 
-        if ($request->has('driver_id')) {
-            $query->where('driver_id', $request->driver_id);
+            if ($request->has('driver_id')) {
+                $query->where('driver_assignments.driver_id', $request->driver_id);
+            }
+
+            if ($request->has('vehicle_id')) {
+                $query->where('driver_assignments.vehicle_id', $request->vehicle_id);
+            }
+
+            if ($request->has('status')) {
+                $query->where('driver_assignments.status', $request->status);
+            }
+
+            return response()->json($query->orderByDesc('driver_assignments.start_time')->get());
+        } catch (\Exception $e) {
+            Log::error("DriverAssignment Index Error: " . $e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 500);
         }
-
-        if ($request->has('vehicle_id')) {
-            $query->where('vehicle_id', $request->vehicle_id);
-        }
-
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
-
-        return response()->json($query->orderByDesc('start_time')->get());
     }
 
     public function store(Request $request)
