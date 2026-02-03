@@ -228,21 +228,63 @@ class MonitoringController extends Controller
             ->whereIn('id', $deviceIds->all())
             ->get();
 
-        foreach ($devicesWithPos as $dev) {
-            if (!$dev->position || empty($dev->position->geofenceids)) continue;
-
-            // geofenceids is comma-separated string in Traccar (e.g. "1, 2")
-            $gids = explode(',', $dev->position->geofenceids);
-            $inAllowed = false;
-
-            foreach ($gids as $gidStr) {
-                $gid = (int) trim($gidStr);
-                if ($gid > 0 && in_array($gid, $allowedIds->all())) {
-                    if (!isset($insideCounts[$gid])) $insideCounts[$gid] = 0;
-                    $insideCounts[$gid]++;
-                    $inAllowed = true;
+        // Pre-fetch zones and parse polygons for fallback check
+        $zoneRows = TcGeofence::query()->whereIn('id', $allowedIds->all())->get()->keyBy('id');
+        $zonePolygons = [];
+        foreach ($zoneRows as $z) {
+            if (!empty($z->area) && str_starts_with($z->area, 'POLYGON')) {
+                // Parse WKT: POLYGON((lon lat, lon lat, ...))
+                if (preg_match('/\(\((.*?)\)\)/', $z->area, $matches)) {
+                    $pointsStr = explode(',', $matches[1]);
+                    $polygon = [];
+                    foreach ($pointsStr as $pStr) {
+                        $coords = preg_split('/\s+/', trim($pStr));
+                        if (count($coords) >= 2) {
+                            // WKT is usually LON LAT
+                            $polygon[] = ['lat' => (float)$coords[1], 'lon' => (float)$coords[0]];
+                        }
+                    }
+                    $zonePolygons[$z->id] = $polygon;
                 }
             }
+        }
+
+        foreach ($devicesWithPos as $dev) {
+            if (!$dev->position) continue;
+
+            $detectedForDevice = [];
+
+            // 1. Check Traccar-provided geofenceids
+            if (!empty($dev->position->geofenceids)) {
+                $gids = explode(',', $dev->position->geofenceids);
+                foreach ($gids as $gidStr) {
+                    $gid = (int) trim($gidStr);
+                    if ($gid > 0 && in_array($gid, $allowedIds->all())) {
+                        $detectedForDevice[$gid] = true;
+                    }
+                }
+            }
+
+            // 2. Fallback: Check Point-In-Polygon for zones not yet detected
+            // This handles cases where Traccar hasn't computed the geofence entry yet
+            if ($dev->position->latitude && $dev->position->longitude) {
+                foreach ($zonePolygons as $zid => $poly) {
+                    if (isset($detectedForDevice[$zid])) continue;
+
+                    if ($this->isPointInPolygon($dev->position->latitude, $dev->position->longitude, $poly)) {
+                        $detectedForDevice[$zid] = true;
+                    }
+                }
+            }
+
+            // Update counts based on combined results
+            $inAllowed = false;
+            foreach ($detectedForDevice as $gid => $_) {
+                if (!isset($insideCounts[$gid])) $insideCounts[$gid] = 0;
+                $insideCounts[$gid]++;
+                $inAllowed = true;
+            }
+
             if ($inAllowed) {
                 $devicesInsideAny[] = $dev->id;
             }
@@ -250,7 +292,6 @@ class MonitoringController extends Controller
 
         $vehiclesInAnyZone = count(array_unique($devicesInsideAny));
 
-        $zoneRows = TcGeofence::query()->whereIn('id', $allowedIds->all())->get()->keyBy('id');
         $localZones = Zones::whereIn('geofence_id', $allowedIds->all())->get()->keyBy('geofence_id');
 
         $zones = $allowedIds->map(function ($gid) use ($zoneRows, $assignedCounts, $insideCounts, $totalDevices, $localZones) {
@@ -261,7 +302,7 @@ class MonitoringController extends Controller
             $assigned = $assignedCounts[(int) $gid] ?? 0;
             $inside = $insideCounts[(int) $gid] ?? 0;
             $percent = $totalDevices > 0 ? (int) floor(($assigned / $totalDevices) * 100) : 0;
-
+ 
             return [
                 'id' => (int) $gid,
                 'name' => $gf->name ?? ('Zone ' . $gid),
@@ -691,5 +732,32 @@ class MonitoringController extends Controller
         }
 
         return response()->json(['alert_status' => $alert, 'maintenance_status' => $maint]);
+    }
+
+    /**
+     * Check if a point is inside a polygon using Ray Casting algorithm.
+     *
+     * @param float $lat
+     * @param float $lon
+     * @param array $polygon Array of ['lat' => float, 'lon' => float]
+     * @return bool
+     */
+    private function isPointInPolygon($lat, $lon, $polygon)
+    {
+        $inside = false;
+        $count = count($polygon);
+        for ($i = 0, $j = $count - 1; $i < $count; $j = $i++) {
+            $xi = $polygon[$i]['lat'];
+            $yi = $polygon[$i]['lon'];
+            $xj = $polygon[$j]['lat'];
+            $yj = $polygon[$j]['lon'];
+
+            $intersect = (($xi > $lat) != ($xj > $lat))
+                && ($lon < ($yj - $yi) * ($lat - $xi) / ($xj - $xi) + $yi);
+            if ($intersect) {
+                $inside = !$inside;
+            }
+        }
+        return $inside;
     }
 }
