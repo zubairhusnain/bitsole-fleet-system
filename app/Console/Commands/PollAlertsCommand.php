@@ -62,7 +62,7 @@ class PollAlertsCommand extends Command
                     $maxId = $lastId;
 
                     foreach ($newEvents as $event) {
-                        $this->info("Processing event ID: {$event->id} - Type: {$event->type}");
+                        $this->info("Processing event ID: {$event->id} - Type: {$event->type} - DeviceId : {$event->deviceid}");
 
                         // Find user linked to this device
                         // using Devices model to find the owner/manager
