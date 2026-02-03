@@ -141,6 +141,8 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
 import UiAlert from '../../components/UiAlert.vue';
 
 const clientDrivers = ref([]);
@@ -193,16 +195,25 @@ async function fetchData() {
     const allVehicles = vehiclesRes.data.options || [];
     vehicles.value = allVehicles.filter(v => !assignedVehicleIds.has(v.id));
   } catch (e) {
-    error.value = 'Failed to load data';
+    console.error(e);
+    error.value = e.response?.data?.message || 'Failed to load data';
   }
 }
 
 async function endTrip(driver) {
   if (!driver.activeAssignment) return;
 
-  if (!confirm(`End trip for ${driver.name}? This will mark the assignment as completed.`)) {
-    return;
-  }
+  const result = await Swal.fire({
+    title: 'End Trip?',
+    text: `End trip for ${driver.name}? This will mark the assignment as completed.`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Yes, end trip!'
+  });
+
+  if (!result.isConfirmed) return;
 
   try {
     const now = new Date();
@@ -214,10 +225,20 @@ async function endTrip(driver) {
       status: 'completed'
     });
 
-    successMessage.value = 'Trip ended successfully';
+    Swal.fire(
+      'Ended!',
+      'Trip has been ended successfully.',
+      'success'
+    );
+
     fetchData();
   } catch (e) {
-    error.value = 'Failed to end trip';
+    console.error(e);
+    Swal.fire(
+      'Error!',
+      e.response?.data?.message || 'Failed to end trip.',
+      'error'
+    );
   }
 }
 
@@ -252,6 +273,7 @@ async function openHistoryModal(driver) {
     driverHistory.value = res.data;
   } catch (e) {
     console.error('Failed to fetch history', e);
+    Swal.fire('Error', e.response?.data?.message || 'Failed to fetch history', 'error');
   }
 }
 
@@ -302,11 +324,12 @@ console.log('selectedDriver ',selectedDriver);
       end_time: assignmentForm.value.endTime || null
     });
 
-    successMessage.value = 'Vehicle assigned successfully';
     closeModal();
+    Swal.fire('Success', 'Vehicle assigned successfully', 'success');
     fetchData(); // Refresh list
   } catch (e) {
-    error.value = e.response?.data?.message || 'Assignment failed';
+    console.error(e);
+    Swal.fire('Error', e.response?.data?.message || 'Assignment failed', 'error');
   } finally {
     submitting.value = false;
   }

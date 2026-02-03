@@ -61,7 +61,7 @@ Trait Curl
             $res->response = '';
         }
 
-        if (preg_match('/^Set-Cookie:\\s*([^;]*)/mi', substr($data, 0, $size), $c) == 1){
+        if ($data !== false && preg_match('/^Set-Cookie:\\s*([^;]*)/mi', substr($data, 0, $size), $c) == 1){
             $res->cookieData = $c[1];
             session(['cookie'=>$c[1]]);
         }

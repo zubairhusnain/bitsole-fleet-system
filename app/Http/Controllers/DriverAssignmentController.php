@@ -40,9 +40,9 @@ class DriverAssignmentController extends Controller
             }
 
             return response()->json($query->orderByDesc('driver_assignments.start_time')->get());
-        } catch (\Exception $e) {
-            Log::error("DriverAssignment Index Error: " . $e->getMessage());
-            return response()->json(['error' => $e->getMessage()], 500);
+        } catch (\Throwable $e) {
+            Log::error("DriverAssignment Index Error", ['error' => $e->getMessage()]);
+            return response()->json(['message' => $e->getMessage()], 500);
         }
     }
 
@@ -75,8 +75,9 @@ class DriverAssignmentController extends Controller
             if ($driver && $driver->driver_id) {
                 $this->permissionService->assignDriver($request, $validated['vehicle_id'], $driver->driver_id);
             }
-        } catch (\Exception $e) {
-            Log::error("Failed to assign Traccar permission: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            Log::warning("Failed to assign Traccar permission", ['error' => $e->getMessage()]);
+            return response()->json(['message' => $e->getMessage()], 500);
         }
 
         // Notification for changing vehicle driver (Assignment created)
@@ -128,8 +129,9 @@ class DriverAssignmentController extends Controller
                      $this->permissionService->assignDriver($request, $request->vehicle_id, $driver->driver_id);
                 }
             }
-        } catch (\Exception $e) {
-            Log::error("Failed to sync Traccar permission on update: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            Log::warning("Failed to sync Traccar permission on update", ['error' => $e->getMessage()]);
+            return response()->json(['message' => $e->getMessage()], 500);
         }
 
         // Check if trip ended
@@ -160,8 +162,9 @@ class DriverAssignmentController extends Controller
                 if ($assignment->driver && $assignment->driver->driver_id) {
                     $this->permissionService->unassignDriver($request, $assignment->vehicle_id, $assignment->driver->driver_id);
                 }
-             } catch (\Exception $e) {
-                Log::error("Failed to unassign Traccar permission on destroy: " . $e->getMessage());
+             } catch (\Throwable $e) {
+                Log::warning("Failed to unassign Traccar permission on destroy", ['error' => $e->getMessage()]);
+                return response()->json(['message' => 'Traccar Error: ' . $e->getMessage()], 500);
              }
              $assignment->delete();
         }
@@ -223,8 +226,9 @@ class DriverAssignmentController extends Controller
                 'maintenanceid' => 0,
                 'is_read' => false,
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error("Failed to create event: " . $e->getMessage());
+            return response()->json(['message' => "Failed to create event: " .$e->getMessage()], 500);
         }
     }
 }
