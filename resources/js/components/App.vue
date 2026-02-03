@@ -390,65 +390,9 @@ const myDeviceIds = ref([]);
 let echoChannel = null;
 const processedAlertIds = new Set();
 
-const Toast = Swal.mixin({
-    toast: true,
-    position: 'top-end',
-    showConfirmButton: false,
-    timer: 5000,
-    timerProgressBar: true,
-    customClass: {
-        popup: 'notification-toast'
-    },
-    didOpen: (toast) => {
-        toast.addEventListener('mouseenter', Swal.stopTimer);
-        toast.addEventListener('mouseleave', Swal.resumeTimer);
-    }
-});
+// Toast removed
 
-// Force z-index for SweetAlert2 container to be above everything (including bootstrap modals/navbars)
-const style = document.createElement('style');
-style.innerHTML = `
-    div:where(.swal2-container) {
-        z-index: 2147483647 !important;
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        pointer-events: none !important;
-    }
-    div:where(.swal2-popup) {
-        pointer-events: auto !important;
-    }
-    div:where(.swal2-container.swal2-top) {
-        align-items: flex-start !important;
-        justify-content: center !important;
-        padding-top: 20px !important;
-    }
-    /* Customize Notification Toast Size - Only affects specific alerts */
-    div:where(.swal2-popup.notification-toast) {
-        font-size: 0.8rem !important;
-        width: auto !important;
-        min-width: 200px !important;
-        max-width: 350px !important;
-        padding: 0.5rem 0.75rem !important;
-        display: flex !important;
-        background: #fff !important;
-        color: #333 !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
-    }
-    div:where(.swal2-popup.notification-toast) .swal2-title {
-        font-size: 0.85rem !important;
-        margin: 0 0.5rem !important;
-        color: #333 !important;
-    }
-    div:where(.swal2-popup.notification-toast) .swal2-html-container {
-        font-size: 0.8rem !important;
-        margin: 0 0.5rem !important;
-        color: #555 !important;
-    }
-`;
-document.head.appendChild(style);
+
 
 function parseEventDate(dateStr) {
     if (!dateStr) return new Date();
