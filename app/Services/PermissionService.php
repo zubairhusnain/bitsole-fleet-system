@@ -15,6 +15,13 @@ class PermissionService
             $userId = session('tc_user_id');
             $data='{"deviceId":"'.$device_id.'","driverId":"'.$driver_id.'"}';
             $devices = static::curl('/api/permissions', 'POST',$sessionId,$data,array('Content-Type: application/json', 'Accept: application/json'));
+
+            if (isset($devices->responseCode) && ($devices->responseCode < 200 || $devices->responseCode >= 300)) {
+                 $errorMsg = $devices->response ?: $devices->error ?: 'Unknown Traccar Error';
+                 Log::error("Traccar assignDriver failed", ['code' => $devices->responseCode, 'error' => $errorMsg]);
+                 throw new \Exception("Traccar Error: " . $errorMsg);
+            }
+
             return $devices->response;
         }
 
@@ -69,6 +76,13 @@ class PermissionService
             $sessionId = $request->user()->traccarSession ?? session('cookie');
             $data='{"deviceId":"'.$device_id.'","driverId":"'.$driver_id.'"}';
             $devices = static::curl('/api/permissions', 'DELETE',$sessionId,$data,array('Content-Type: application/json', 'Accept: application/json'));
+
+            if (isset($devices->responseCode) && ($devices->responseCode < 200 || $devices->responseCode >= 300)) {
+                 $errorMsg = $devices->response ?: $devices->error ?: 'Unknown Traccar Error';
+                 Log::error("Traccar unassignDriver failed", ['code' => $devices->responseCode, 'error' => $errorMsg]);
+                 throw new \Exception("Traccar Error: " . $errorMsg);
+            }
+
             return $devices->response;
         }
 
@@ -167,7 +181,7 @@ class PermissionService
             if (empty($attrs)) {
                 return;
             }
- 
+
             $deleteAttrIds = [];
             if (!empty($deleteNamesMap)) {
                 foreach ($attrs as $a) {
