@@ -7,15 +7,19 @@ use App\Models\Drivers;
 use App\Models\TcEvent;
 use App\Events\AlertsUpdated;
 use App\Services\DeviceService;
+use App\Services\PermissionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
-class DriverAssignmentController extends Controller{
+class DriverAssignmentController extends Controller
+{
     protected DeviceService $deviceService;
+    protected PermissionService $permissionService;
 
-    public function __construct(DeviceService $deviceService)
+    public function __construct(DeviceService $deviceService, PermissionService $permissionService)
     {
         $this->deviceService = $deviceService;
+        $this->permissionService = $permissionService;
     }
 
     public function index(Request $request)
@@ -65,6 +69,16 @@ class DriverAssignmentController extends Controller{
             'status' => $status,
         ]);
 
+        // Sync with Traccar Permissions
+        try {
+            $driver = Drivers::find($validated['driver_id']);
+            if ($driver && $driver->driver_id) {
+                $this->permissionService->assignDriver($request, $validated['vehicle_id'], $driver->driver_id);
+            }
+        } catch (\Exception $e) {
+            Log::error("Failed to assign Traccar permission: " . $e->getMessage());
+        }
+
         // Notification for changing vehicle driver (Assignment created)
         // Create Traccar event so it shows up in Alerts
         $startTimeStr = \Carbon\Carbon::parse($validated['start_time'])->format('Y-m-d H:i');
@@ -77,6 +91,7 @@ class DriverAssignmentController extends Controller{
             'driver_id' => $assignment->driver_id,
             'assignment_id' => $assignment->id
         ]);
+        broadcast(new AlertsUpdated($request->user()));
 
         Log::info("Driver Assigned: Driver {$validated['driver_id']} to Vehicle {$validated['vehicle_id']}");
 
@@ -94,7 +109,28 @@ class DriverAssignmentController extends Controller{
             'status' => 'string',
         ]);
 
+        $oldVehicleId = $assignment->vehicle_id;
         $assignment->update($validated);
+
+        // Sync Traccar Permissions
+        try {
+            $driver = $assignment->driver;
+            if ($driver && $driver->driver_id) {
+                // If trip ended
+                if ($request->filled('end_time') || ($request->input('status') === 'completed')) {
+                    $this->permissionService->unassignDriver($request, $assignment->vehicle_id, $driver->driver_id);
+                }
+                // If vehicle changed (and not ended)
+                elseif ($request->has('vehicle_id') && $oldVehicleId != $request->vehicle_id) {
+                     // Unassign old
+                     $this->permissionService->unassignDriver($request, $oldVehicleId, $driver->driver_id);
+                     // Assign new
+                     $this->permissionService->assignDriver($request, $request->vehicle_id, $driver->driver_id);
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error("Failed to sync Traccar permission on update: " . $e->getMessage());
+        }
 
         // Check if trip ended
         if ($request->filled('end_time') || ($request->input('status') === 'completed')) {
@@ -116,9 +152,19 @@ class DriverAssignmentController extends Controller{
         return response()->json($assignment);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        DriverAssignment::destroy($id);
+        $assignment = DriverAssignment::with('driver')->find($id);
+        if ($assignment) {
+             try {
+                if ($assignment->driver && $assignment->driver->driver_id) {
+                    $this->permissionService->unassignDriver($request, $assignment->vehicle_id, $assignment->driver->driver_id);
+                }
+             } catch (\Exception $e) {
+                Log::error("Failed to unassign Traccar permission on destroy: " . $e->getMessage());
+             }
+             $assignment->delete();
+        }
         return response()->json(['message' => 'Assignment deleted']);
     }
 

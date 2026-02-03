@@ -240,9 +240,27 @@ async function fetchVehicleOptions() {
   loadingVehicles.value = true;
   vehiclesError.value = '';
   try {
-    const { data } = await axios.get('/web/vehicles/options');
-    const list = Array.isArray(data?.options) ? data.options : [];
-    vehiclesOptions.value = list;
+    const [optionsRes, assignmentsRes] = await Promise.all([
+       axios.get('/web/drivers/options'),
+       axios.get('/web/drivers/assignments?status=active')
+     ]);
+
+    const list = Array.isArray(optionsRes.data?.options) ? optionsRes.data.options : [];
+    const activeAssignments = assignmentsRes.data || [];
+
+    // Filter out vehicles assigned to *other* drivers
+    // Keep the vehicle if it is assigned to *this* driver
+    const currentDriverId = Number(route.params.driverId);
+    const assignedVehicleIds = new Set();
+
+    activeAssignments.forEach(a => {
+      // a.driver_id is the local ID of the driver who has this assignment
+      if (Number(a.driver_id) !== currentDriverId) {
+        assignedVehicleIds.add(a.vehicle_id);
+      }
+    });
+
+    vehiclesOptions.value = list.filter(v => !assignedVehicleIds.has(v.id));
   } catch (e) {
     vehiclesError.value = e?.response?.data?.message || 'Failed to load vehicles';
   } finally {

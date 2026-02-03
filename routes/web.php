@@ -179,6 +179,7 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
         Route::delete('/{id}', [\App\Http\Controllers\DriverAssignmentController::class, 'destroy']);
     });
 
+    Route::get('/options', [\App\Http\Controllers\VehicleController::class, 'options']);
     Route::get('/', [\App\Http\Controllers\DriverController::class, 'index']);
     Route::get('/{driverId}', [\App\Http\Controllers\DriverController::class, 'show']);
     Route::post('/', [\App\Http\Controllers\DriverController::class, 'store']);

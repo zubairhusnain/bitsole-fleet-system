@@ -28,7 +28,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="driver in clientDrivers" :key="driver.id">
+              <tr v-for="driver in clientDrivers" :key="driver.localId">
                 <td>{{ driver.name }}</td>
                 <td>{{ driver.activeVehicle || 'None' }}</td>
                 <td><span class="badge" :class="driver.activeAssignment ? 'bg-success' : 'bg-secondary'">{{ driver.activeAssignment ? 'Assigned' : 'Available' }}</span></td>
@@ -163,7 +163,7 @@ async function fetchData() {
   try {
     const [driversRes, vehiclesRes, assignmentsRes] = await Promise.all([
       axios.get('/web/drivers'),
-      axios.get('/web/vehicles/options'),
+      axios.get('/web/drivers/options'),
       axios.get('/web/drivers/assignments?status=active')
     ]);
 
@@ -172,8 +172,10 @@ async function fetchData() {
 
     // Create map of driver_id -> active assignment
     const assignmentMap = {};
+    const assignedVehicleIds = new Set();
     activeAssignments.forEach(a => {
       assignmentMap[a.driver_id] = a;
+      if (a.vehicle_id) assignedVehicleIds.add(a.vehicle_id);
     });
 
     // Filter only client drivers and format
@@ -188,7 +190,8 @@ async function fetchData() {
         };
       });
 
-    vehicles.value = vehiclesRes.data.options || [];
+    const allVehicles = vehiclesRes.data.options || [];
+    vehicles.value = allVehicles.filter(v => !assignedVehicleIds.has(v.id));
   } catch (e) {
     error.value = 'Failed to load data';
   }
@@ -244,7 +247,7 @@ async function openHistoryModal(driver) {
 
   try {
     const res = await axios.get('/web/drivers/assignments/history', {
-      params: { driver_id: driver.id }
+      params: { driver_id: driver.localId }
     });
     driverHistory.value = res.data;
   } catch (e) {
