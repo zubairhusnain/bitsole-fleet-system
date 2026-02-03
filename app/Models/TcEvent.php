@@ -15,7 +15,6 @@ class TcEvent extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'servertime' => 'datetime',
         'eventtime' => 'datetime',
         'attributes' => 'array',
         'is_read' => 'boolean',

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DriverAssignment;
 use App\Models\Drivers;
 use App\Models\TcEvent;
+use App\Models\TcDevice;
 use App\Events\AlertsUpdated;
 use App\Services\DeviceService;
 use App\Services\PermissionService;
@@ -13,9 +14,6 @@ use Illuminate\Support\Facades\Log;
 
 class DriverAssignmentController extends Controller
 {
-    protected DeviceService $deviceService;
-    protected PermissionService $permissionService;
-
     public function __construct(DeviceService $deviceService, PermissionService $permissionService)
     {
         $this->deviceService = $deviceService;
@@ -69,19 +67,19 @@ class DriverAssignmentController extends Controller
             'status' => $status,
         ]);
 
-        // Sync with Traccar Permissions
+        // Sync with Server Permissions
         try {
             $driver = Drivers::find($validated['driver_id']);
             if ($driver && $driver->driver_id) {
                 $this->permissionService->assignDriver($request, $validated['vehicle_id'], $driver->driver_id);
             }
         } catch (\Throwable $e) {
-            Log::warning("Failed to assign Traccar permission", ['error' => $e->getMessage()]);
+            Log::warning("Failed to assign Server permission", ['error' => $e->getMessage()]);
             return response()->json(['message' => $e->getMessage()], 500);
         }
 
         // Notification for changing vehicle driver (Assignment created)
-        // Create Traccar event so it shows up in Alerts
+        // Create Server event so it shows up in Alerts
         $startTimeStr = \Carbon\Carbon::parse($validated['start_time'])->format('Y-m-d H:i');
         $endTimeStr = !empty($validated['end_time'])
             ? " to " . \Carbon\Carbon::parse($validated['end_time'])->format('Y-m-d H:i')
@@ -113,7 +111,7 @@ class DriverAssignmentController extends Controller
         $oldVehicleId = $assignment->vehicle_id;
         $assignment->update($validated);
 
-        // Sync Traccar Permissions
+        // Sync Server Permissions
         try {
             $driver = $assignment->driver;
             if ($driver && $driver->driver_id) {
@@ -130,7 +128,7 @@ class DriverAssignmentController extends Controller
                 }
             }
         } catch (\Throwable $e) {
-            Log::warning("Failed to sync Traccar permission on update", ['error' => $e->getMessage()]);
+            Log::warning("Failed to sync Server permission on update", ['error' => $e->getMessage()]);
             return response()->json(['message' => $e->getMessage()], 500);
         }
 
@@ -163,8 +161,8 @@ class DriverAssignmentController extends Controller
                     $this->permissionService->unassignDriver($request, $assignment->vehicle_id, $assignment->driver->driver_id);
                 }
              } catch (\Throwable $e) {
-                Log::warning("Failed to unassign Traccar permission on destroy", ['error' => $e->getMessage()]);
-                return response()->json(['message' => 'Traccar Error: ' . $e->getMessage()], 500);
+                Log::warning("Failed to unassign Server permission on destroy", ['error' => $e->getMessage()]);
+                return response()->json(['message' => 'Server Error: ' . $e->getMessage()], 500);
              }
              $assignment->delete();
         }
@@ -215,20 +213,24 @@ class DriverAssignmentController extends Controller
     protected function createEvent($deviceId, $type, $attributes = [])
     {
         try {
+            $positionId = 0;
+            $device = TcDevice::find($deviceId);
+            if ($device && $device->positionid) {
+                $positionId = $device->positionid;
+            }
+
             TcEvent::create([
                 'type' => $type,
-                'servertime' => now(),
                 'eventtime' => now(),
                 'deviceid' => $deviceId,
-                'positionid' => 0,
+                'positionid' => $positionId,
                 'geofenceid' => 0,
-                'attributes' => json_encode($attributes),
+                'attributes' => $attributes,
                 'maintenanceid' => 0,
                 'is_read' => false,
             ]);
         } catch (\Throwable $e) {
             Log::error("Failed to create event: " . $e->getMessage());
-            return response()->json(['message' => "Failed to create event: " .$e->getMessage()], 500);
         }
     }
 }
