@@ -157,7 +157,6 @@ class PollAlertsCommand extends Command
         try {
             $alert = new \App\Models\TcEvent();
             $alert->type = 'frequentIgnition';
-            $alert->servertime = now();
             $alert->eventtime = now();
             $alert->deviceid = $triggerEvent->deviceid;
             $alert->positionid = $triggerEvent->positionid;
