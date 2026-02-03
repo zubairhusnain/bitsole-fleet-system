@@ -90,7 +90,11 @@ class DriverAssignmentController extends Controller
             'driver_id' => $assignment->driver_id,
             'assignment_id' => $assignment->id
         ]);
-        broadcast(new AlertsUpdated($request->user()));
+        try {
+            broadcast(new AlertsUpdated($request->user()));
+        } catch (\Throwable $e) {
+            Log::error("Broadcast failed: " . $e->getMessage());
+        }
 
         Log::info("Driver Assigned: Driver {$validated['driver_id']} to Vehicle {$validated['vehicle_id']}");
 
@@ -145,7 +149,11 @@ class DriverAssignmentController extends Controller
                 'driver_id' => $assignment->driver_id,
                 'status' => 'completed'
              ]);
-             broadcast(new AlertsUpdated($request->user()));
+             try {
+                broadcast(new AlertsUpdated($request->user()));
+             } catch (\Throwable $e) {
+                Log::error("Broadcast failed: " . $e->getMessage());
+             }
              Log::info("Trip Ended: Assignment {$id}");
         }
 
