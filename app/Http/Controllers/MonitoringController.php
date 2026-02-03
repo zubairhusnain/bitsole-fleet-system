@@ -302,7 +302,7 @@ class MonitoringController extends Controller
             $assigned = $assignedCounts[(int) $gid] ?? 0;
             $inside = $insideCounts[(int) $gid] ?? 0;
             $percent = $totalDevices > 0 ? (int) floor(($assigned / $totalDevices) * 100) : 0;
- 
+
             return [
                 'id' => (int) $gid,
                 'name' => $gf->name ?? ('Zone ' . $gid),
@@ -312,7 +312,7 @@ class MonitoringController extends Controller
                 'status' => $localZone ? $localZone->status : 'active',
                 'count' => $assigned, // Backward compatibility (Assign Vehicles)
                 'assigned_count' => $assigned,
-                'inside_count' => $inside,
+                'inside_count' => ($assigned > 0) ? $inside : 0,
                 'percent' => $percent,
                 'vehicles' => [], // Empty to improve performance
             ];
@@ -410,7 +410,7 @@ class MonitoringController extends Controller
 
             foreach ($events as $event) {
                 $dId = $event->deviceid;
-                
+
                 if ($event->type === 'frequentIgnition') {
                     if (!isset($frequentIgnitionCounts[$dId])) $frequentIgnitionCounts[$dId] = 0;
                     $frequentIgnitionCounts[$dId]++;
