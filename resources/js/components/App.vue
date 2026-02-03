@@ -392,10 +392,13 @@ const processedAlertIds = new Set();
 
 const Toast = Swal.mixin({
     toast: true,
-    position: 'top',
+    position: 'top-end',
     showConfirmButton: false,
     timer: 5000,
     timerProgressBar: true,
+    customClass: {
+        popup: 'notification-toast'
+    },
     didOpen: (toast) => {
         toast.addEventListener('mouseenter', Swal.stopTimer);
         toast.addEventListener('mouseleave', Swal.resumeTimer);
@@ -422,24 +425,25 @@ style.innerHTML = `
         justify-content: center !important;
         padding-top: 20px !important;
     }
-    /* Customize Toast Size */
-    div:where(.swal2-popup.swal2-toast) {
-        font-size: 1.1rem !important;
-        min-width: 400px !important;
-        max-width: 800px !important;
-        padding: 1rem 1.5rem !important;
+    /* Customize Notification Toast Size - Only affects specific alerts */
+    div:where(.swal2-popup.notification-toast) {
+        font-size: 0.8rem !important;
+        width: auto !important;
+        min-width: 200px !important;
+        max-width: 350px !important;
+        padding: 0.5rem 0.75rem !important;
         display: flex !important;
         background: #fff !important;
         color: #333 !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
     }
-    div:where(.swal2-title) {
-        font-size: 1.2rem !important;
+    div:where(.swal2-popup.notification-toast) .swal2-title {
+        font-size: 0.85rem !important;
         margin: 0 0.5rem !important;
         color: #333 !important;
     }
-    div:where(.swal2-html-container) {
-        font-size: 1.1rem !important;
+    div:where(.swal2-popup.notification-toast) .swal2-html-container {
+        font-size: 0.8rem !important;
         margin: 0 0.5rem !important;
         color: #555 !important;
     }

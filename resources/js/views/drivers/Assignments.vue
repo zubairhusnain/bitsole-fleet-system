@@ -142,7 +142,6 @@
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import Swal from 'sweetalert2';
-import 'sweetalert2/dist/sweetalert2.min.css';
 import UiAlert from '../../components/UiAlert.vue';
 
 const clientDrivers = ref([]);
@@ -225,20 +224,30 @@ async function endTrip(driver) {
       status: 'completed'
     });
 
-    Swal.fire(
-      'Ended!',
-      'Trip has been ended successfully.',
-      'success'
-    );
+    Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true
+    }).fire({
+      icon: 'success',
+      title: 'Trip has been ended successfully.'
+    });
 
     fetchData();
   } catch (e) {
     console.error(e);
-    Swal.fire(
-      'Error!',
-      e.response?.data?.message || 'Failed to end trip.',
-      'error'
-    );
+    Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true
+    }).fire({
+      icon: 'error',
+      title: e.response?.data?.message || 'Failed to end trip.'
+    });
   }
 }
 
@@ -273,7 +282,16 @@ async function openHistoryModal(driver) {
     driverHistory.value = res.data;
   } catch (e) {
     console.error('Failed to fetch history', e);
-    Swal.fire('Error', e.response?.data?.message || 'Failed to fetch history', 'error');
+    Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true
+    }).fire({
+      icon: 'error',
+      title: e.response?.data?.message || 'Failed to fetch history'
+    });
   }
 }
 
@@ -309,13 +327,21 @@ function closeHistoryModal() {
 
 async function submitAssignment() {
   if (!assignmentForm.value.vehicleId || !assignmentForm.value.startTime) {
-    error.value = 'Vehicle and Start Time are required';
+    Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true
+    }).fire({
+      icon: 'error',
+      title: 'Vehicle and Start Time are required'
+    });
     return;
   }
 
   submitting.value = true;
-  error.value = '';
-console.log('selectedDriver ',selectedDriver);
+  console.log('selectedDriver ',selectedDriver);
   try {
     await axios.post('/web/drivers/assignments', {
       driver_id: selectedDriver.value.localId,
@@ -325,11 +351,29 @@ console.log('selectedDriver ',selectedDriver);
     });
 
     closeModal();
-    Swal.fire('Success', 'Vehicle assigned successfully', 'success');
+    Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true
+    }).fire({
+      icon: 'success',
+      title: 'Vehicle assigned successfully'
+    });
     fetchData(); // Refresh list
   } catch (e) {
     console.error(e);
-    Swal.fire('Error', e.response?.data?.message || 'Assignment failed', 'error');
+    Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true
+    }).fire({
+      icon: 'error',
+      title: e.response?.data?.message || 'Assignment failed'
+    });
   } finally {
     submitting.value = false;
   }
