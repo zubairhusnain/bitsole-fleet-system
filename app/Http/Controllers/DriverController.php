@@ -130,6 +130,7 @@ class DriverController extends Controller
             'avatarImage' => $avatarImagePath,
             'licenseImageUrl' => $licenseImageUrl,
             'avatarImageUrl' => $avatarImageUrl,
+            'isClientDriver' => (bool) $row->is_client_driver,
         ]);
     }
 

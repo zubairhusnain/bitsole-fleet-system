@@ -58,13 +58,13 @@
             </div>
 
             <div class="col-12">
-              <div class="form-check mt-2">
+              <div class="form-check form-switch mt-2">
                 <input v-model="form.healthOk" class="form-check-input" type="checkbox" id="healthOk">
                 <label class="form-check-label small" for="healthOk">
                   This Person do not have any medical condition and fit to drive safely.
                 </label>
               </div>
-              <div class="form-check mt-2">
+              <div class="form-check form-switch mt-2">
                 <input v-model="form.isClientDriver" class="form-check-input" type="checkbox" id="isClientDriver">
                 <label class="form-check-label small" for="isClientDriver">
                   Is Client Driver (Available for temporary assignments)
