@@ -514,6 +514,7 @@ const checkTestingMode = () => {
     } else {
         isTestingMode.value = localStorage.getItem('testingMode') === '1';
     }
+    isTestingMode.value = true;
 };
 
 watch(() => route.query, checkTestingMode, { immediate: true });
