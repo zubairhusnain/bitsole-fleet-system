@@ -183,7 +183,7 @@
                                 </span>
                             </td>
                             <td class="text-center">
-                                <span v-if="vehicle.frequent_ignition_count > 0" class="badge bg-danger rounded-pill px-3 cursor-pointer" @click="showAlerts(vehicle)">
+                                <span v-if="vehicle.frequent_ignition_count > 0" class="badge bg-danger rounded-pill px-3 cursor-pointer" @click="showAlerts(vehicle, 'frequentIgnition')">
                                     <i class="bi bi-lightning-fill me-1"></i> {{ vehicle.frequent_ignition_count }}
                                 </span>
                                 <span v-else class="text-muted">N/A</span>
@@ -768,7 +768,7 @@ const editVehicle = (vehicle) => {
     }
 };
 
-const showAlerts = async (vehicle) => {
+const showAlerts = async (vehicle, type = null) => {
     vehicleAlerts.value = [];
     selectedAlert.value = null;
     alertRemarks.value = '';
@@ -778,7 +778,9 @@ const showAlerts = async (vehicle) => {
     try {
         // Use device_id (Traccar ID) if available, otherwise id
         const id = vehicle.id;
-        const { data } = await axios.get(`/web/monitoring/vehicles/${id}/events`);
+        const { data } = await axios.get(`/web/monitoring/vehicles/${id}/events`, {
+            params: { type }
+        });
         vehicleAlerts.value = data;
     } catch (e) {
         console.error("Failed to fetch alerts", e);

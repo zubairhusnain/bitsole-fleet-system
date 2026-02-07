@@ -154,6 +154,13 @@ class NotificationController extends Controller
 
     public function index(Request $request)
     {
+        $user = $request->user();
+        if ($user && ($user->isAdmin() || $user->isDistributor())) {
+            // Return empty structure matching what the frontend expects from allnotification
+            // allnotification returns ['alarmType' => [], 'notificationType' => []]
+            return response()->json(['alarmType' => [], 'notificationType' => []]);
+        }
+
         $payload = $this->notificationService->allnotification($request);
         return response()->json($payload);
     }

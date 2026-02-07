@@ -618,17 +618,26 @@ class MonitoringController extends Controller
     /**
      * Get unread alert events for a specific device.
      */
-    public function getDeviceEvents($id)
+    public function getDeviceEvents(Request $request, $id)
     {
         // Resolve device ID (Traccar ID)
         $device = Devices::where('device_id', $id)->orWhere('id', $id)->firstOrFail();
 
-        $events = \App\Models\TcEvent::where('deviceid', $device->device_id)
-            ->where('type', '!=', 'maintenance')
+        $query = \App\Models\TcEvent::where('deviceid', $device->device_id)
             ->where('is_read', 0)
             ->withEnabledNotifications()
-            ->orderBy('eventtime', 'desc')
-            ->get();
+            ->orderBy('eventtime', 'desc');
+ 
+        // Filter by specific alert type if requested
+        $type = $request->input('type');
+        if ($type === 'frequentIgnition') {
+            $query->where('type', 'frequentIgnition');
+        } else {
+            // Default: All non-maintenance alerts
+            $query->where('type', '!=', 'maintenance');
+        }
+
+        $events = $query->get();
 
         return response()->json($events);
     }
