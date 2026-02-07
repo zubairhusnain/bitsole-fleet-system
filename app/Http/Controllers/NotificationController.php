@@ -24,6 +24,10 @@ class NotificationController extends Controller
     {
         $user = $request->user();
 
+        if ($user && ($user->isAdmin() || $user->isDistributor())) {
+            return response()->json([]);
+        }
+
         // Scope devices for this user
         $query = Devices::accessibleByUser($user);
         $deviceIds = $query->pluck('device_id')->toArray();
@@ -59,6 +63,10 @@ class NotificationController extends Controller
     {
         $user = $request->user();
 
+        if ($user && ($user->isAdmin() || $user->isDistributor())) {
+            return response()->json(['count' => 0]);
+        }
+
         // Scope devices for this user
         $query = Devices::accessibleByUser($user);
         $deviceIds = $query->pluck('device_id')->toArray();
@@ -74,6 +82,10 @@ class NotificationController extends Controller
     public function markAllRead(Request $request)
     {
         $user = $request->user();
+
+        if ($user && ($user->isAdmin() || $user->isDistributor())) {
+            return response()->json(['success' => true]);
+        }
 
         // Scope devices for this user
         $query = Devices::accessibleByUser($user);
@@ -92,6 +104,10 @@ class NotificationController extends Controller
     {
         $user = $request->user();
 
+        if ($user && ($user->isAdmin() || $user->isDistributor())) {
+            return response()->json([]);
+        }
+
         $query = Devices::accessibleByUser($user);
         $deviceIds = $query->pluck('device_id')->toArray();
 
@@ -101,6 +117,10 @@ class NotificationController extends Controller
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
+
+        if ($user && ($user->isAdmin() || $user->isDistributor())) {
+            return response()->json(['message' => 'Notification deleted']);
+        }
 
         // Check if event exists using Eloquent
         $event = \App\Models\TcEvent::find($id);

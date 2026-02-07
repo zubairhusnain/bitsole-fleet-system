@@ -724,9 +724,9 @@ const markerItems = computed(() => {
             const dlon = typeof disp?.lon === 'number' ? disp.lon : lon;
             const dCourse = typeof disp?.course === 'number' ? disp.course : (course || 0);
             const spRounded = speedKmh(speed);
-            const isMoving = (motion === true) || (typeof spRounded === 'number' && spRounded > 0);
+            const isMoving = (motion === true) && (typeof spRounded === 'number' && spRounded > 0);
             const iconUrl = isSelected(id) ? '/images/markers/focus-marker.svg' : '/images/markers/device-pin.png';
-            return { id, lat: dlat, lon: dlon, popup: popupHtml(v), iconUrl, course: dCourse, isMoving };
+            return { id, lat: dlat, lon: dlon, popup: popupHtml(v), iconUrl, course: dCourse, isMoving, speed:spRounded };
         })
         .filter(m => typeof m.lat === 'number' && typeof m.lon === 'number')
         .sort((a, b) => String(a.id).localeCompare(String(b.id)));
@@ -734,6 +734,7 @@ const markerItems = computed(() => {
 
 function getLeafletIcon(m) {
      if (isSelected(m.id)) {
+        console.log('selected devices ',m);
          if (m.isMoving) {
              return L.divIcon({
                 className: 'arrow-marker-icon',
@@ -856,7 +857,7 @@ function getImage(v) {
 
     const uniq = Array.from(new Set(out.filter(v => typeof v === 'string' && v.trim() !== '')));
     return uniq.length > 0 ? photoUrl(uniq[0]) : '';
-} 
+}
 
 function statusText(v) {
     const pos = getPosition(v);
@@ -1167,7 +1168,7 @@ function resetView() {
 
 function focusVehicle(v) {
     const id = deviceKey(v);
-    
+
     // Always enable auto-centering (disable Decenter Mode) when selecting a vehicle
     autoCenter.value = true;
 
