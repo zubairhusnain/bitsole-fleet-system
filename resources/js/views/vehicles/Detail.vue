@@ -1078,16 +1078,19 @@ function hasLocation(v) {
 const statusLabel = computed(() => {
     const raw = detailPayload.value?.device?.status;
     if (raw) {
-        const s = String(raw).toLowerCase();
-        if (s === 'online' || s === 'offline') return s.toUpperCase();
+        const s = String(raw).trim().toLowerCase();
+        if (s === 'online') return 'ONLINE';
+        if (s === 'offline') return 'OFFLINE';
     }
-    const t = detailPayload.value?.position?.serverTime || detailPayload.value?.position?.servertime || null;
-    if (t) {
-        const dt = new Date(t);
-        const online = (Date.now() - dt.getTime()) < 3600 * 1000; // within 1 hour
-        return online ? 'ONLINE' : 'OFFLINE';
+    
+    // Check 'online' attribute from position
+    const p = positions.value.length ? positions.value[positions.value.length - 1] : null;
+    const onlineAttr = p?.attributes?.online;
+    if (typeof onlineAttr === 'boolean') {
+        return onlineAttr ? 'ONLINE' : 'OFFLINE';
     }
-    return 'UNKNOWN';
+
+    return 'OFFLINE';
 });
 const statusBadgeClass = computed(() => {
     const s = statusLabel.value.toLowerCase();
