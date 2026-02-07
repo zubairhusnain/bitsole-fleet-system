@@ -62,6 +62,12 @@
                </div>
              </div>
             <div v-if="showMap" class="map-inner" style="height: 100%; width: 100%; position: relative;">
+              <div class="map-controls-top-right" style="position: absolute; top: 10px; right: 60px; z-index: 1000; background: white; padding: 6px 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="autoCenterToggle" :checked="!autoCenter" @change="autoCenter = !autoCenter">
+                    <label class="form-check-label small fw-bold" for="autoCenterToggle">Decenter Map</label>
+                </div>
+              </div>
               <div v-if="isTestingMode" class="map-provider-switcher" style="position: absolute; bottom: 30px !important; right: 70px !important; z-index: 3000; background: white; padding: 6px 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
                 <div class="btn-group btn-group-sm" role="group" aria-label="Map provider">
                   <button type="button" class="btn btn-outline-primary" :class="{ active: mapProvider === 'leaflet' }" @click="mapProvider = 'leaflet'">Leaflet</button>
@@ -90,6 +96,7 @@
                 :zoom="zoom"
                 :markers="markerItems"
                 :selected-id="selectedId"
+                :auto-center="autoCenter"
                 @ready="onGoogleMapReady"
                 @error="onGoogleMapError"
               />
@@ -333,6 +340,7 @@ function setMarkerRef(id, el) {
 
 const showMap = ref(true);
 const mapProvider = ref('leaflet');
+const autoCenter = ref(true);
 const zoom = ref(4);
 const center = ref([39.8283, -98.5795]);
 const selectedId = ref(null);
@@ -617,6 +625,36 @@ function applyRealtimePositions(list) {
             }
         }
         animateMarkerTo(id, toLat, toLon, toCourse);
+
+        // Auto-center on position update if enabled (debounced by update frequency)
+        if (autoCenter.value && String(id) === String(selectedId.value)) {
+             let current;
+             if (mapProvider.value === 'leaflet') {
+                 current = typeof map.value?.getZoom === 'function' ? map.value.getZoom() : zoom.value;
+             } else if (mapProvider.value === 'google') {
+                 current = typeof googleMap.value?.getZoom === 'function' ? googleMap.value.getZoom() : zoom.value;
+             } else {
+                 current = zoom.value;
+             }
+             const z = Math.max(current || 0, 17);
+             zoom.value = z;
+             center.value = [toLat, toLon];
+
+             if (mapProvider.value === 'leaflet' && map.value) {
+                 try {
+                     if (typeof map.value.setView === 'function') {
+                         map.value.setView([toLat, toLon], z, { animate: true });
+                     }
+                 } catch {}
+             } else if (mapProvider.value === 'google' && googleMap.value) {
+                 try {
+                     googleMap.value.setCenter({ lat: toLat, lng: toLon });
+                     if (typeof googleMap.value.setZoom === 'function') {
+                         googleMap.value.setZoom(z);
+                     }
+                 } catch {}
+             }
+        }
     });
 }
 
@@ -725,12 +763,12 @@ watch(
     { flush: 'post' }
 );
 
-// Keep selected vehicle centered while it moves - REMOVED per user request to allow map scrolling
-/*
+// Snap to vehicle when Auto Center is toggled ON
 watch(
-    selectedMarker,
-    (m) => {
-        if (!m) return;
+    autoCenter,
+    (active) => {
+        if (!active || !selectedMarker.value) return;
+        const m = selectedMarker.value;
         center.value = [m.lat, m.lon];
         let current;
         if (mapProvider.value === 'leaflet') {
@@ -740,10 +778,25 @@ watch(
         } else {
             current = zoom.value;
         }
-        zoom.value = Math.max(current || 0, 17);
+        const z = Math.max(current || 0, 17);
+        zoom.value = z;
+
+        if (mapProvider.value === 'leaflet' && map.value) {
+            try {
+                if (typeof map.value.setView === 'function') {
+                    map.value.setView([m.lat, m.lon], z, { animate: true });
+                }
+            } catch {}
+        } else if (mapProvider.value === 'google' && googleMap.value) {
+            try {
+                googleMap.value.setCenter({ lat: m.lat, lng: m.lon });
+                if (typeof googleMap.value.setZoom === 'function') {
+                    googleMap.value.setZoom(z);
+                }
+            } catch {}
+        }
     }
 );
-*/
 
 function getImage(v) {
     // Merge attributes: Traccar Device attributes < Vehicle attributes
@@ -803,7 +856,7 @@ function getImage(v) {
 
     const uniq = Array.from(new Set(out.filter(v => typeof v === 'string' && v.trim() !== '')));
     return uniq.length > 0 ? photoUrl(uniq[0]) : '';
-}
+} 
 
 function statusText(v) {
     const pos = getPosition(v);
@@ -1114,6 +1167,10 @@ function resetView() {
 
 function focusVehicle(v) {
     const id = deviceKey(v);
+    
+    // Always enable auto-centering (disable Decenter Mode) when selecting a vehicle
+    autoCenter.value = true;
+
     // Use displayed position (interpolated) if available to ensure map centers on the marker,
     // not the future target position which the marker hasn't reached yet.
     const disp = displayPositions[id];
@@ -1132,8 +1189,11 @@ function focusVehicle(v) {
             currentZoom = googleMap.value.getZoom();
         }
         const z = Math.max(currentZoom || 0, desiredZoom);
+
+        // Always center since we just forced autoCenter = true
         center.value = [lat, lon];
         zoom.value = z;
+
         if (mapProvider.value === 'leaflet' && map.value) {
             try {
                 if (typeof map.value.setView === 'function') {

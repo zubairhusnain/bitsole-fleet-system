@@ -38,6 +38,10 @@ const props = defineProps({
     type: [String, Number, null],
     default: null,
   },
+  autoCenter: {
+    type: Boolean,
+    default: true,
+  },
   polygons: {
     type: Array,
     default: () => [],
@@ -458,10 +462,14 @@ watch(
     const key = String(id);
     const mk = vehicleMarkers.get(key);
     if (!mk) return;
-    const pos = mk.getPosition();
-    if (pos) {
-      try { map.value.setCenter(pos); } catch {}
+
+    if (props.autoCenter) {
+      const pos = mk.getPosition();
+      if (pos) {
+        try { map.value.setCenter(pos); } catch {}
+      }
     }
+
     const info = vehicleInfoWindows.get(key);
     if (info) {
       if (selectedInfoWindow && selectedInfoWindow !== info) {
