@@ -628,29 +628,127 @@ function applyRealtimePositions(list) {
 
         // Auto-center on position update if enabled (debounced by update frequency)
         if (autoCenter.value && String(id) === String(selectedId.value)) {
-             let current;
+             let currentZoom;
              if (mapProvider.value === 'leaflet') {
-                 current = typeof map.value?.getZoom === 'function' ? map.value.getZoom() : zoom.value;
+                 currentZoom = typeof map.value?.getZoom === 'function' ? map.value.getZoom() : zoom.value;
              } else if (mapProvider.value === 'google') {
-                 current = typeof googleMap.value?.getZoom === 'function' ? googleMap.value.getZoom() : zoom.value;
+                 currentZoom = typeof googleMap.value?.getZoom === 'function' ? googleMap.value.getZoom() : zoom.value;
              } else {
-                 current = zoom.value;
+                 currentZoom = zoom.value;
              }
-             const z = Math.max(current || 0, 17);
+             const z = Math.max(currentZoom || 0, 17);
              zoom.value = z;
-             center.value = [toLat, toLon];
+
+             // Buffer ratio (0.15 = 15% padding from edges)
+             const bufferRatio = 0.15;
 
              if (mapProvider.value === 'leaflet' && map.value) {
                  try {
-                     if (typeof map.value.setView === 'function') {
-                         map.value.setView([toLat, toLon], z, { animate: true });
+                     const m = map.value;
+                     if (typeof m.getBounds === 'function' && typeof m.setView === 'function') {
+                         const bounds = m.getBounds();
+                         const ne = bounds.getNorthEast();
+                         const sw = bounds.getSouthWest();
+
+                         // Check if zoom level is different
+                         const zoomChanged = Math.abs(m.getZoom() - z) > 0.1;
+
+                         if (zoomChanged) {
+                             m.setView([toLat, toLon], z, { animate: true });
+                             center.value = [toLat, toLon];
+                         } else {
+                             // Check bounds with buffer
+                             const latSpan = Math.abs(ne.lat - sw.lat);
+                             const lngSpan = Math.abs(ne.lng - sw.lng);
+                             const latBuffer = latSpan * bufferRatio;
+                             const lngBuffer = lngSpan * bufferRatio;
+
+                             let newCenterLat = m.getCenter().lat;
+                             let newCenterLon = m.getCenter().lng;
+                             let needsPan = false;
+
+                             // If vehicle goes north of safe zone
+                             if (toLat > (ne.lat - latBuffer)) {
+                                 newCenterLat += (toLat - (ne.lat - latBuffer));
+                                 needsPan = true;
+                             }
+                             // If vehicle goes south of safe zone
+                             else if (toLat < (sw.lat + latBuffer)) {
+                                 newCenterLat -= ((sw.lat + latBuffer) - toLat);
+                                 needsPan = true;
+                             }
+
+                             // If vehicle goes east of safe zone
+                             if (toLon > (ne.lng - lngBuffer)) {
+                                 newCenterLon += (toLon - (ne.lng - lngBuffer));
+                                 needsPan = true;
+                             }
+                             // If vehicle goes west of safe zone
+                             else if (toLon < (sw.lng + lngBuffer)) {
+                                 newCenterLon -= ((sw.lng + lngBuffer) - toLon);
+                                 needsPan = true;
+                             }
+
+                             if (needsPan) {
+                                 // Use panTo with default smooth animation
+                                 m.panTo([newCenterLat, newCenterLon], { animate: true });
+                                 center.value = [newCenterLat, newCenterLon];
+                             }
+                         }
                      }
                  } catch {}
              } else if (mapProvider.value === 'google' && googleMap.value) {
                  try {
-                     googleMap.value.setCenter({ lat: toLat, lng: toLon });
-                     if (typeof googleMap.value.setZoom === 'function') {
-                         googleMap.value.setZoom(z);
+                     const gm = googleMap.value;
+                     if (typeof gm.getBounds === 'function') {
+                         const bounds = gm.getBounds();
+                         const currentZ = gm.getZoom();
+                         const zoomChanged = Math.abs(currentZ - z) > 0;
+
+                         if (zoomChanged || !bounds) {
+                             gm.setCenter({ lat: toLat, lng: toLon });
+                             gm.setZoom(z);
+                             center.value = [toLat, toLon];
+                         } else {
+                             const ne = bounds.getNorthEast();
+                             const sw = bounds.getSouthWest();
+                             const latSpan = Math.abs(ne.lat() - sw.lat());
+                             const lngSpan = Math.abs(ne.lng() - sw.lng());
+
+                             const latBuffer = latSpan * bufferRatio;
+                             const lngBuffer = lngSpan * bufferRatio;
+
+                             let newCenterLat = gm.getCenter().lat();
+                             let newCenterLon = gm.getCenter().lng();
+                             let needsPan = false;
+
+                             // Google Maps bounds are functions
+                             const neLat = ne.lat();
+                             const neLng = ne.lng();
+                             const swLat = sw.lat();
+                             const swLng = sw.lng();
+
+                             if (toLat > (neLat - latBuffer)) {
+                                 newCenterLat += (toLat - (neLat - latBuffer));
+                                 needsPan = true;
+                             } else if (toLat < (swLat + latBuffer)) {
+                                 newCenterLat -= ((swLat + latBuffer) - toLat);
+                                 needsPan = true;
+                             }
+
+                             if (toLon > (neLng - lngBuffer)) {
+                                 newCenterLon += (toLon - (neLng - lngBuffer));
+                                 needsPan = true;
+                             } else if (toLon < (swLng + lngBuffer)) {
+                                 newCenterLon -= ((swLng + lngBuffer) - toLon);
+                                 needsPan = true;
+                             }
+
+                             if (needsPan) {
+                                 gm.panTo({ lat: newCenterLat, lng: newCenterLon });
+                                 center.value = [newCenterLat, newCenterLon];
+                             }
+                         }
                      }
                  } catch {}
              }
@@ -923,12 +1021,9 @@ function statusDotClass(v) {
 }
 
 function statusValue(v) {
-    const rawStatus = typeof v.status === 'string' ? v.status.trim().toLowerCase() : '';
-    if (['online','offline','unknown'].includes(rawStatus)) return rawStatus;
-    const { raw } = getPosition(v);
-    const online = raw?.attributes?.online;
-    if (typeof online === 'boolean') return online ? 'online' : 'offline';
-    return 'unknown';
+    const rawStatus = typeof v.tc_device.status === 'string' ? v.tc_device.status.trim().toLowerCase() : '';
+    if (rawStatus === 'online') return 'online';
+    return 'offline';
 }
 
 function statusLabel(v) {

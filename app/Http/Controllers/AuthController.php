@@ -183,6 +183,40 @@ class AuthController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
+        // Authenticate with tracking server (mirroring login logic)
+        $data = 'email=' . Config::get('constants.Constants.adminEmail') . '&password=' . Config::get('constants.Constants.adminPassword');
+        $response = static::curl('/api/session', 'POST', '', $data, [Config::get('constants.Constants.urlEncoded')]);
+        $payload = json_decode($response->response ?? '');
+
+        if ($response->responseCode == 200 && $payload) {
+            $cookie = $request->session()->get('cookie', '');
+
+            // Persist session data and cookie
+            Session::put([
+                'name' => $payload->name ?? null,
+                'email' => $payload->email ?? $target->email,
+                'tc_user_id' => $payload->id ?? null,
+                'admin' => $payload->administrator ?? false,
+                'readonly' => $payload->readonly ?? false,
+                'cookieData' => $cookie,
+                'deviceReadonly' => $payload->deviceReadonly ?? false,
+            ]);
+
+            if ($cookie !== '') {
+                $target->update(['traccarSession' => $cookie]);
+            }
+        } else {
+            // Block impersonation when tracking credentials fail
+            $msg = 'Unable to authenticate with tracking server';
+            if ($response->responseCode == 401) {
+                $msg = 'Invalid Email Or Password';
+            } elseif ($response->responseCode == 400) {
+                $response_error = substr($response->response ?? '', 0, 19);
+                $msg = $response_error === 'Account is disabled' ? 'User Blocked' : 'Server Not Responding';
+            }
+            return response()->json(['message' => $msg], $response->responseCode == 401 ? 422 : 500);
+        }
+
         $stack = session('impersonator_stack', []);
         if (!is_array($stack)) {
             $stack = [];
