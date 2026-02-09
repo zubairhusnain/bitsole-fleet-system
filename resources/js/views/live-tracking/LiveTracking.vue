@@ -628,6 +628,10 @@ function applyRealtimePositions(list) {
 
         // Auto-center on position update if enabled (debounced by update frequency)
         if (autoCenter.value && String(id) === String(selectedId.value)) {
+             const pSpeed = typeof p.speed === 'string' ? parseFloat(p.speed) : (p.speed || 0);
+             // Consider moving if speed > 0.1 knots (approx 0.2 km/h) to avoid jitter when stopped
+             const isMoving = pSpeed > 0.1;
+
              let currentZoom;
              if (mapProvider.value === 'leaflet') {
                  currentZoom = typeof map.value?.getZoom === 'function' ? map.value.getZoom() : zoom.value;
@@ -653,7 +657,7 @@ function applyRealtimePositions(list) {
                          // Check if zoom level is different
                          const zoomChanged = Math.abs(m.getZoom() - z) > 0.1;
 
-                         if (zoomChanged) {
+                         if (zoomChanged || !isMoving) {
                              m.setView([toLat, toLon], z, { animate: true });
                              center.value = [toLat, toLon];
                          } else {
@@ -705,7 +709,7 @@ function applyRealtimePositions(list) {
                          const currentZ = gm.getZoom();
                          const zoomChanged = Math.abs(currentZ - z) > 0;
 
-                         if (zoomChanged || !bounds) {
+                         if (zoomChanged || !bounds || !isMoving) {
                              gm.setCenter({ lat: toLat, lng: toLon });
                              gm.setZoom(z);
                              center.value = [toLat, toLon];
