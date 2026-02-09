@@ -4,7 +4,7 @@ export function parseAttrs(raw) {
 
 const num = (v) => {
   const n = typeof v === 'string' ? parseFloat(v) : v;
-  return Number.isFinite(n) ? n : null; 
+  return Number.isFinite(n) ? n : null;
 };
 
 const fmtKm = (k) => {
@@ -74,7 +74,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
   };
 
   // 1. Preferred/Resolved
-  const pref = ctx?.fuelAttr || attrs.fuelKey || ctx?.fuelKey;
+  const pref = attrs.fuelKey || ctx?.fuelKey;
   if (pref) {
     let val = getV(pref);
     if (val !== null && val !== -1) {
@@ -84,9 +84,9 @@ export function formatFuel(rawAttrs, ctx = {}) {
       else { l = Math.round(val * 10) / 10; }
       return mkFuel(pref, l, p);
     }
-    if (ctx?.fuelAttr) return mkFuel(pref, 0, 0, null, 'zero');
+    if (ctx?.fuelKey) return mkFuel(pref, 0, 0, null, 'zero');
   }
- 
+
   // 2. Percent
   const pKeys = ['CAN_FuelPercentage_89', 'fuelPercent', 'fuelLevel', 'fuel_percent', 'fuelpercentage', 'io89', '89', 'io48', '48'];
   let pRes = null;
@@ -144,12 +144,12 @@ export function formatFuel(rawAttrs, ctx = {}) {
     // If we have capacity and percent, prioritize calculation over fallback liters
     // especially if there's a discrepancy or no liters found.
     const calcL = Math.round((cap * pRes.v / 100) * 10) / 10;
-    
+
     // Only overwrite if we didn't have liters OR we have capacity and percent (user config priority)
     // Actually, always overwrite if capacity is present and we have percent, as capacity is a user override.
     // Except if percent is 0? No, even then.
     // However, keeping !lRes check was the old behavior. We want to CHANGE it.
-    
+
     lRes = { k: pRes.k, v: calcL };
   }
 
