@@ -1267,7 +1267,6 @@ function resetView() {
 
 function focusVehicle(v) {
     const id = deviceKey(v);
-
     // Always enable auto-centering (disable Decenter Mode) when selecting a vehicle
     autoCenter.value = true;
 
