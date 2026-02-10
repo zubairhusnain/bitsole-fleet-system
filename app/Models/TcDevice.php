@@ -37,12 +37,13 @@ class TcDevice extends Model
             return $value;
         }
         if(isset($attributes['odometerAttr'])){
-            $attributes['odometerKey']="";
+            $attributes['odometerAttr_key']="";
         }
 
         if(isset($attributes['fuelAttr'])){
-            $attributes['fuelKey']="";
+            $attributes['fuelAttr_key']="";
         }
+
         $trackerModelName = $attributes['trackerModel'] ?? null;
 
         if ($trackerModelName) {
@@ -73,18 +74,19 @@ class TcDevice extends Model
                 if ($odoAttr && !empty($vmAttrs['odometer']) && is_array($vmAttrs['odometer'])) {
                     foreach ($vmAttrs['odometer'] as $item) {
                         if (($item['name'] ?? '') === $odoAttr) {
-                            $attributes['odometerKey'] = $item['key'] ?? null;
+                            $attributes['odometerAttr_key'] = $item['key'] ?? null;
                             break;
                         }
                     }
                 }
+
 
                 // Merge Fuel Key
                 $fuelAttr = $attributes['fuelAttr'] ?? null;
                 if ($fuelAttr && !empty($vmAttrs['fuel']) && is_array($vmAttrs['fuel'])) {
                     foreach ($vmAttrs['fuel'] as $item) {
                         if (($item['name'] ?? '') === $fuelAttr) {
-                            $attributes['fuelKey'] = $item['key'] ?? null;
+                            $attributes['fuelAttr_key'] = $item['key'] ?? null;
                             break;
                         }
                     }

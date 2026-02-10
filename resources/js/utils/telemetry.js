@@ -33,7 +33,7 @@ export function formatOdometer(raw, ctx = {}) {
   ];
 
   // Build priority list: Context Pref -> Attr Key -> Defaults
-  const keys = [ctx?.odometerAttr, attrs.odometerKey, ctx?.odometerKey, ...defaults]
+  const keys = [ctx?.odometerAttr, attrs.odometerAttr_key, ctx?.odometerAttr_key, ...defaults]
     .filter(k => k && typeof k === 'string')
     .flatMap(k => {
       // Expand IO keys if applicable
@@ -74,7 +74,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
   };
 
   // 1. Preferred/Resolved
-  const pref = attrs.fuelKey || ctx?.fuelKey;
+  const pref = attrs.fuelAttr_key || ctx?.fuelAttr_key;
   if (pref) {
     let val = getV(pref);
     if (val !== null && val !== -1) {
@@ -84,7 +84,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
       else { l = Math.round(val * 10) / 10; }
       return mkFuel(pref, l, p);
     }
-    if (ctx?.fuelKey) return mkFuel(pref, 0, 0, null, 'zero');
+    if (ctx?.fuelAttr_key) return mkFuel(pref, 0, 0, null, 'zero');
   }
 
   // 2. Percent
