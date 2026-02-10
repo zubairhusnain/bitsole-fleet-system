@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VehicleModelController;
 use App\Http\Controllers\MaintenanceController;
+use App\Http\Controllers\SystemActivityLogController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -91,6 +92,11 @@ Route::middleware(['auth'])->prefix('/web/backups')->group(function () {
     Route::get('/', [\App\Http\Controllers\BackupController::class, 'index']);
     Route::get('/download', [\App\Http\Controllers\BackupController::class, 'download']);
     Route::delete('/delete', [\App\Http\Controllers\BackupController::class, 'delete']);
+});
+
+// System Activity Logs (Fleet Manager/Admin)
+Route::middleware(['auth'])->prefix('/web/system-logs')->group(function () {
+    Route::get('/', [SystemActivityLogController::class, 'index']);
 });
 
 // Monitoring Routes
@@ -187,101 +193,4 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     // Restore a soft-deleted (blocked) driver
     Route::patch('/{driverId}/restore', [\App\Http\Controllers\DriverController::class, 'restore']);
     Route::delete('/{driverId}', [\App\Http\Controllers\DriverController::class, 'destroy']);
-});
-
-// Live Tracking: trigger a broadcast of current positions
-Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('/web/live/positions/broadcast', [\App\Http\Controllers\LiveTrackingController::class, 'broadcast']);
-// Live Tracking: HTTP fallback to fetch current positions (auth-protected)
-Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('/web/live/positions/current', [\App\Http\Controllers\LiveTrackingController::class, 'current']);
-
-// NEW: Auth-protected Users CRUD
-Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/users')->group(function () {
-    Route::get('/', [UserController::class, 'index']);
-    Route::get('/options', [UserController::class, 'options']);
-    Route::get('/device-options', [\App\Http\Controllers\VehicleController::class, 'options']); // Reused options for users
-    Route::get('/{userId}', [UserController::class, 'show']);
-    Route::get('/{userId}/permissions', [UserController::class, 'permissions']);
-    Route::put('/{userId}/permissions', [UserController::class, 'updatePermissions']);
-    Route::post('/', [UserController::class, 'store']);
-    Route::put('/{userId}', [UserController::class, 'update']);
-    // Restore a soft-deleted (blocked) user
-    Route::patch('/{userId}/restore', [UserController::class, 'restore']);
-    Route::delete('/{userId}', [UserController::class, 'destroy']);
-});
-
-// Admin-only Settings: Vehicle Models IOIDs
-Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/settings')->group(function () {
-    Route::get('/vehicle-models', [VehicleModelController::class, 'index']);
-    Route::post('/vehicle-models', [VehicleModelController::class, 'store']);
-    Route::put('/vehicle-models/{id}', [VehicleModelController::class, 'update']);
-    Route::delete('/vehicle-models/{id}', [VehicleModelController::class, 'destroy']);
-});
-
-// NEW: Auth-protected Zones CRUD
-Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/zones')->group(function () {
-    Route::get('/', [\App\Http\Controllers\ZoneController::class, 'index']);
-    Route::get('/{zoneId}', [\App\Http\Controllers\ZoneController::class, 'show']);
-    Route::post('/', [\App\Http\Controllers\ZoneController::class, 'store']);
-    Route::put('/{zoneId}', [\App\Http\Controllers\ZoneController::class, 'update']);
-    // Restore a soft-deleted (blocked) zone
-    Route::patch('/{zoneId}/restore', [\App\Http\Controllers\ZoneController::class, 'restore']);
-    Route::delete('/{zoneId}', [\App\Http\Controllers\ZoneController::class, 'destroy']);
-});
-
-// Auth-protected Fuel Management
-Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/fuel')->group(function () {
-    Route::get('/', [\App\Http\Controllers\FuelController::class, 'index']);
-    Route::get('/summary', [\App\Http\Controllers\FuelController::class, 'summary']);
-    Route::get('/vehicles', [\App\Http\Controllers\FuelController::class, 'vehicleOptions']);
-    Route::post('/', [\App\Http\Controllers\FuelController::class, 'store']);
-    Route::get('/{id}', [\App\Http\Controllers\FuelController::class, 'show']);
-    Route::put('/{id}', [\App\Http\Controllers\FuelController::class, 'update']);
-    Route::patch('/{id}/restore', [\App\Http\Controllers\FuelController::class, 'restore']);
-    Route::delete('/{id}', [\App\Http\Controllers\FuelController::class, 'destroy']);
-});
-
-// NEW: Auth-protected Geofence listing from Traccar DB (testing/util)
-Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('/web/traccar/geofences', [\App\Http\Controllers\ZoneController::class, 'geofencesDb']);
-
-Route::middleware('auth')->get('/web/traccar/assign-computed-attributes', function (\Illuminate\Http\Request $request) {
-    $summary = app(\App\Services\PermissionService::class)->assignComputedAttributesToAllDevices($request);
-    return response()->json($summary);
-});
-
-// Auth-protected Notifications APIs (publicly accessible to all roles)
-Route::middleware(['auth'])->prefix('/web/notifications')->group(function () {
-    Route::get('/broadcast', [\App\Http\Controllers\NotificationController::class, 'broadcast']);
-    Route::get('/events', [\App\Http\Controllers\NotificationController::class, 'events']);
-    Route::get('/unread-count', [\App\Http\Controllers\NotificationController::class, 'unreadCount']);
-    Route::post('/mark-read', [\App\Http\Controllers\NotificationController::class, 'markAllRead']);
-    Route::get('/my-device-ids', [\App\Http\Controllers\NotificationController::class, 'myDeviceIds']);
-    Route::delete('/events/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy']);
-    Route::get('/', [\App\Http\Controllers\NotificationController::class, 'index']);
-    Route::get('/device/{deviceId}', [\App\Http\Controllers\NotificationController::class, 'device']);
-    Route::post('/', [\App\Http\Controllers\NotificationController::class, 'store']);
-    Route::post('/assign', [\App\Http\Controllers\NotificationController::class, 'assign']);
-});
-
-// Reports
-Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/reports')->group(function () {
-    Route::get('/trip-summary', [\App\Http\Controllers\ReportController::class, 'tripSummary']);
-    Route::get('/daily-trips', [\App\Http\Controllers\ReportController::class, 'dailyTrips']);
-    Route::get('/daily-summary', [\App\Http\Controllers\ReportController::class, 'dailySummary']);
-    Route::get('/monthly-summary', [\App\Http\Controllers\ReportController::class, 'monthlySummary']);
-    Route::get('/asset-activity', [\App\Http\Controllers\ReportController::class, 'assetActivity']);
-    Route::get('/vehicle-activity', [\App\Http\Controllers\ReportController::class, 'vehicleActivity']);
-    Route::get('/idling', [\App\Http\Controllers\ReportController::class, 'idling']);
-    Route::get('/utilisation', [\App\Http\Controllers\ReportController::class, 'utilisation']);
-    Route::get('/utilisation-db', [\App\Http\Controllers\ReportController::class, 'utilisationDb']);
-    Route::get('/daily-breakdown-map', [\App\Http\Controllers\ReportController::class, 'dailyBreakdownMap']);
-    Route::get('/vehicle-status', [\App\Http\Controllers\ReportController::class, 'vehicleStatus']);
-    Route::get('/vehicle-status/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportVehicleStatusPdf']);
-    Route::get('/device-options', [\App\Http\Controllers\ReportController::class, 'deviceOptions']);
-    Route::get('/group-options', [\App\Http\Controllers\ReportController::class, 'groupOptions']);
-    // Incident Analysis
-    Route::get('/incidents', [\App\Http\Controllers\ReportController::class, 'incidents']);
-    Route::post('/incidents', [\App\Http\Controllers\ReportController::class, 'storeIncident']);
-    Route::get('/incidents/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportIncidentsPdf']);
-    Route::get('/incidents/export-excel', [\App\Http\Controllers\ReportController::class, 'exportIncidentsExcel']);
-    Route::get('/vehicle-ranking', [\App\Http\Controllers\ReportController::class, 'vehicleRanking']);
 });
