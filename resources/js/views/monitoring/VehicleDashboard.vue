@@ -236,7 +236,8 @@ import axios from 'axios';
 import { hasPermission } from '../../auth';
 import VehicleDetailModal from '../../components/VehicleDetailModal.vue';
 import { formatDateTime } from '../../utils/datetime';
- 
+import { formatTelemetry, formatSpeed } from '../../utils/telemetry';
+
 // State
 const vehicles = ref([]);
 const loading = ref(true);
@@ -281,7 +282,12 @@ const fetchVehicles = async () => {
             const deviceAttrs = parseAttrs(tc.attributes);
 
             const vehicleId = deviceAttrs.vehicleNo || deviceAttrs.vehicle_id || deviceAttrs.vehicleId || deviceAttrs.vehicleID || null;
-            const speedKmh = pos && pos.speed != null ? Number((parseFloat(pos.speed) * 1.852).toFixed(1)) : 0;
+
+            // Speed Logic
+            const spObj = formatSpeed(tc.attributes, pos);
+            const speedDisplay = spObj.display || '0 km/h';
+            
+            const speedKmh = typeof spObj.value === 'number' ? Number((spObj.value * 1.852).toFixed(1)) : 0;
             const ign = attrs.ignition || false;
             const status = tc.status ? String(tc.status).charAt(0).toUpperCase() + String(tc.status).slice(1) : undefined;
             const imgAttr = deviceAttrs.vehicleImage || deviceAttrs.image || deviceAttrs.photo || (Array.isArray(deviceAttrs.photos) ? deviceAttrs.photos[0] : null) || v.photo || null;
@@ -295,6 +301,7 @@ const fetchVehicles = async () => {
                 type: deviceAttrs.type || 'Unknown',
                 model: tc.model || v.model || 'Unknown',
                 speed: speedKmh,
+                speed_display: speedDisplay,
                 ignition: ign,
                 last_ignition_on: v.last_ignition_on ? formatDate(v.last_ignition_on) : 'N/A',
                 last_ignition_off: v.last_ignition_off ? formatDate(v.last_ignition_off) : 'N/A',

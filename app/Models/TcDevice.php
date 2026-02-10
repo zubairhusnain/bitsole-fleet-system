@@ -44,6 +44,10 @@ class TcDevice extends Model
             $attributes['fuelAttr_key']="";
         }
 
+        if(isset($attributes['speedAttr'])){
+            $attributes['speedAttr_key']="";
+        }
+
         $trackerModelName = $attributes['trackerModel'] ?? null;
 
         if ($trackerModelName) {
@@ -87,6 +91,17 @@ class TcDevice extends Model
                     foreach ($vmAttrs['fuel'] as $item) {
                         if (($item['name'] ?? '') === $fuelAttr) {
                             $attributes['fuelAttr_key'] = $item['key'] ?? null;
+                            break;
+                        }
+                    }
+                }
+
+                // Merge Speed Key
+                $speedAttr = $attributes['speedAttr'] ?? null;
+                if ($speedAttr && !empty($vmAttrs['speed']) && is_array($vmAttrs['speed'])) {
+                    foreach ($vmAttrs['speed'] as $item) {
+                        if (($item['name'] ?? '') === $speedAttr) {
+                            $attributes['speedAttr_key'] = $item['key'] ?? null;
                             break;
                         }
                     }

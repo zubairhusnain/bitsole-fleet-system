@@ -58,7 +58,7 @@
             </div>
             <div class="col-6 col-md-3">
               <div class="fw-bold mb-1 text-dark">Speed</div>
-              <div class="text-muted small">{{ vehicle.speed }} km/h</div>
+              <div class="text-muted small">{{ vehicle.speed_display || vehicle.speed + ' km/h' }}</div>
             </div>
 
             <!-- Row 3 -->

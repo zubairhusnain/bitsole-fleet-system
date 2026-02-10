@@ -742,7 +742,7 @@
                                         <td class="small">{{ formatDateTime(t.endTime || t.end_time) }}</td>
                                         <td class="small">{{ formatDistanceKm(t.distance) }}</td>
                                         <td class="small">{{ formatDuration(t.duration) }}</td>
-                                        <td class="small">{{ formatSpeedKmh(t.averageSpeed ?? t.average_speed) }}</td>
+                                        <td class="small">{{ formatTripAvgSpeed(t.averageSpeed ?? t.average_speed) }}</td>
                                         <td class="small" style="max-width: 200px; white-space: normal;">{{ t.startAddress || t.start_address || '-' }}</td>
                                         <td class="small" style="max-width: 200px; white-space: normal;">{{ t.endAddress || t.end_address || '-' }}</td>
                                     </tr>
@@ -788,7 +788,7 @@ import { LMap, LTileLayer, LMarker, LPolyline, LPopup, LCircle, LPolygon } from 
 import { formatDateTime, formatDate } from '../../utils/datetime';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { formatTelemetry } from '../../utils/telemetry';
+import { formatTelemetry, parseAttrs, formatSpeed } from '../../utils/telemetry';
 import { getCurrentUser } from '../../auth';
 import UiAlert from '../../components/UiAlert.vue';
 import GoogleMap from '../../components/GoogleMap.vue';
@@ -1082,7 +1082,7 @@ const statusLabel = computed(() => {
         if (s === 'online') return 'ONLINE';
         if (s === 'offline') return 'OFFLINE';
     }
-    
+
     // Check 'online' attribute from position
     const p = positions.value.length ? positions.value[positions.value.length - 1] : null;
     const onlineAttr = p?.attributes?.online;
@@ -1130,16 +1130,13 @@ const ignitionIconClass = computed(() => {
 });
 const speedDisplay = computed(() => {
     const s = getSpeed();
-    if (s == null) return '-';
-    // Traccar speed is in knots; convert to km/h
-    const kmh = Math.round(Number(s) * 1.852);
-    return `${kmh} km/h`;
+    return s?.display ?? '-';
 });
 
 const motionLabel = computed(() => {
     const ign = getIgnition();
     const s = getSpeed();
-    const n = Number(s);
+    const n = s?.value;
     if (ign === true) {
         return Number.isFinite(n) && n > 0 ? 'Moving' : 'Idle';
     }
@@ -1163,8 +1160,9 @@ function getIgnition() {
 }
 function getSpeed() {
     const p = positions.value.length ? positions.value[positions.value.length - 1] : null;
-    console.log('speed or motion ',p);
-    return p?.speed ?? null;
+    if (!p) return null;
+    const tc = device.value?.tcDevice || device.value?.tc_device || {};
+    return formatSpeed(tc.attributes, p);
 }
 
 async function fetchDevice() {
@@ -2170,7 +2168,7 @@ function formatDuration(d) {
     const ss = String(seconds).padStart(2, '0');
     return `${hh}:${mm}:${ss}`;
 }
-function formatSpeedKmh(s) {
+function formatTripAvgSpeed(s) {
     const n = Number(s);
     if (!Number.isFinite(n)) return '-';
     // Trips often report averageSpeed in knots; convert to km/h if reasonable

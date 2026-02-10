@@ -164,7 +164,7 @@ import { useRouter, useRoute } from 'vue-router';
 import Swal from 'sweetalert2';
 import UiAlert from '../../components/UiAlert.vue';
 import ComputedAttributesModal from '../../components/ComputedAttributesModal.vue';
-import { formatTelemetry } from '../../utils/telemetry';
+import { formatTelemetry, formatSpeed } from '../../utils/telemetry';
 import { hasPermission as _hasPermission } from '../../auth';
 
 const isTestingMode = inject('isTestingMode', ref(false));
@@ -402,18 +402,9 @@ function deriveRow(r) {
         ? 'on'
         : (ignRaw === false || ignRaw === 0 || String(ignRaw).toLowerCase() === 'off' ? 'off' : null);
 
-    // speed: prefer tc.position.speed (knots -> km/h), fallback to attributes
-    const speedAttr = pickAttr(attrs, ['speedKmh', 'speed_kmh', 'speedKmH', 'speed', 'speedKMH']);
-    const speedVal = (typeof pos.speed === 'number' ? Math.round(pos.speed * 1.852) : pos.speed) ?? r.speed ?? speedAttr;
-    let speed = null;
-    if (speedVal != null) {
-        if (typeof speedVal === 'string' && /km\/h/i.test(speedVal)) {
-            speed = speedVal;
-        } else {
-            const n = Number(speedVal);
-            speed = Number.isFinite(n) ? `${Math.round(n)} km/h` : String(speedVal);
-        }
-    }
+    // speed: Check custom speedAttr first via generic function
+    const spObj = formatSpeed(attrs, pos);
+    const speed = spObj.display || null;
 
     // location: prefer tc.position.address; fallback to attributes; then coords if available
     let coords = null;

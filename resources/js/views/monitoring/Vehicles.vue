@@ -360,7 +360,7 @@
                     </div>
                     <div class="col-6 col-md-3">
                         <div class="fw-bold mb-1 text-dark">Speed</div>
-                        <div class="text-muted small">{{ selectedVehicle.speed }} km/h</div>
+                        <div class="text-muted small">{{ selectedVehicle.speed_display }}</div>
                     </div>
 
                     <!-- Row 3 -->
@@ -448,6 +448,7 @@ import { useRouter } from 'vue-router';
 import { hasPermission } from '../../auth';
 import UiAlert from '../../components/UiAlert.vue';
 import { formatDateTime } from '../../utils/datetime';
+import { formatSpeed } from '../../utils/telemetry';
 
 const router = useRouter();
 
@@ -669,6 +670,9 @@ const showDetails = async (vehicle) => {
         const deviceAttrs = parseAttrs(tc.attributes);
         const allAttrs = { ...deviceAttrs, ...attrs };
 
+        // Speed Logic
+        const { display: speedDisplay } = formatSpeed(tc.attributes, pos);
+
         // Helper to extract photos (logic from Detail.vue)
         const getPhotos = () => {
             const out = [];
@@ -722,6 +726,7 @@ const showDetails = async (vehicle) => {
             lat: parseFloat(pos.latitude) || 0,
             lng: parseFloat(pos.longitude) || 0,
             speed: pos.speed != null ? Number((parseFloat(pos.speed) * 1.852).toFixed(1)) : 0,
+            speed_display: speedDisplay,
             driver_name: data.driver_name || tc.driverUniqueId || 'N/A',
             last_update: formatDate(pos.servertime || pos.fixtime),
             fuel: attrs.fuel || 0,

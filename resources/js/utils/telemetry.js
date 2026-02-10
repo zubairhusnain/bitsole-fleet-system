@@ -26,14 +26,31 @@ export function formatOdometer(raw, ctx = {}) {
     return ['389', 'io389', 'obd_total_mileage_389'].some(x => s.includes(x)) || s.endsWith('km') || s.includes('-km');
   };
 
+  // 1. Strict Priority: odometerAttr_key
+  const pref = attrs.odometerAttr_key || ctx?.odometerAttr_key;
+  if (pref) {
+    const val = getV(pref);
+    if (val !== null && val > -1) {
+      // Validation: Ignore 0 for IO keys
+      const isIo = ['87', '389', '16', '50'].some(x => pref.includes(x));
+      if (!((isIo && val === 0))) {
+        const km = isKm(pref) ? val : val / 1000;
+        return mkOdo(pref, val, km);
+      }
+    }
+    // Explicitly configured but missing/invalid -> Return 0/Null (Skip defaults)
+    return mkOdo(pref, 0, 0);
+  }
+
+  // 2. Defaults
   const defaults = [
     'CAN_Total_Mileage_87', 'OBD_Total_Mileage_389', 'GNSS_Total_Odometer_16',
     '87', '389', '16', '50', 'odometer', 'mileage', 'odometerKm', 'odometer_km',
     'totalDistance', 'distance', 'tripDistance'
   ];
 
-  // Build priority list: Context Pref -> Attr Key -> Defaults
-  const keys = [ctx?.odometerAttr, attrs.odometerAttr_key, ctx?.odometerAttr_key, ...defaults]
+  // Include legacy ctx.odometerAttr in fallback search if not caught above
+  const keys = [ctx?.odometerAttr, ...defaults]
     .filter(k => k && typeof k === 'string')
     .flatMap(k => {
       // Expand IO keys if applicable
@@ -84,7 +101,8 @@ export function formatFuel(rawAttrs, ctx = {}) {
       else { l = Math.round(val * 10) / 10; }
       return mkFuel(pref, l, p);
     }
-    if (ctx?.fuelAttr_key) return mkFuel(pref, 0, 0, null, 'zero');
+    // Explicitly configured but missing/invalid -> Return empty/zero (Skip defaults)
+    return mkFuel(pref, 0, 0, null, 'zero');
   }
 
   // 2. Percent
@@ -161,4 +179,50 @@ export function formatFuel(rawAttrs, ctx = {}) {
 
 export function formatTelemetry(raw, ctx = {}) {
   return { odometer: formatOdometer(raw, ctx), fuel: formatFuel(raw, ctx) };
+}
+
+export function formatSpeed(deviceAttributes, position) {
+  const attrs = parseAttrs(deviceAttributes);
+  const pAttrs = position?.attributes || {};
+  const defaultSpeed = position?.speed;
+
+  // 1. Resolve Value
+  let val = null;
+  const speedAttrKey = attrs.speedAttr_key;
+
+  if (speedAttrKey) {
+    // Strict Priority: Use configured key exclusively.
+    // If missing in attributes, default to 0 (do NOT fallback to GPS speed).
+    const v = pAttrs[speedAttrKey];
+    val = (v !== undefined && v !== null) ? v : 0;
+  } else {
+    const speedAttr = attrs.speedAttr;
+    if (speedAttr) {
+      const key = Object.keys(pAttrs).find(k => k.toLowerCase() === speedAttr.toLowerCase());
+      if (key) val = pAttrs[key];
+    }
+
+    // Fallback to GPS Speed (only if no strict key configured)
+    if (val === null || val === undefined) {
+      val = defaultSpeed;
+    }
+  }
+
+  // 2. Format Value
+  if (val == null) return { value: null, display: '-', unit: '' };
+
+  if (typeof val === 'string' && /[a-z]/i.test(val)) {
+    return { value: val, display: val, unit: '' };
+  }
+
+  const n = parseFloat(val);
+  if (!Number.isFinite(n)) return { value: val, display: String(val), unit: '' };
+
+  // Conversion (Knots to km/h) - Standard logic for this project
+  const kmh = n * 1.852;
+  return {
+    value: n,
+    display: `${kmh.toFixed(1)} km/h`,
+    unit: 'km/h'
+  };
 }

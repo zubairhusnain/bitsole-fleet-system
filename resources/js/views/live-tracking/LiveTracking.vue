@@ -169,7 +169,7 @@ import { getCurrentUser, clearAuthCache } from '../../auth';
 import { LMap, LTileLayer, LMarker, LPopup, LCircle } from '@vue-leaflet/vue-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { formatTelemetry } from '../../utils/telemetry';
+import { formatTelemetry, formatSpeed } from '../../utils/telemetry';
 import { formatDateTime } from '../../utils/datetime';
 import GoogleMap from '../../components/GoogleMap.vue';
 import ComputedAttributesModal from '../../components/ComputedAttributesModal.vue';
@@ -777,8 +777,12 @@ function getPosition(v) {
         ignition = s === 'on' || s === 'true' || s === '1' || ignRaw === true || ignRaw === 1 ? true
             : (s === 'off' || s === 'false' || s === '0' || ignRaw === false || ignRaw === 0 ? false : null);
     }
-    const speedRaw = pos.speed ?? null;
-    const speed = typeof speedRaw === 'string' ? parseFloat(speedRaw) : speedRaw; // Traccar speed usually in knots
+
+    // Custom speed attribute logic
+    const tc = v.tc_device || v.tcDevice || {};
+    const spObj = formatSpeed(tc.attributes, pos);
+    const speed = spObj.value;
+
     const courseRaw =
         pos.course
         ?? pos.attributes?.course
@@ -1109,8 +1113,10 @@ function uniqueId(v) {
 }
 
 function speedKmh(speed) {
-    if (typeof speed !== 'number') return null;
-    return Math.round(speed * 1.852);
+    if (typeof speed === 'string' && /[a-z]/i.test(speed)) return speed;
+    const n = parseFloat(speed);
+    if (!Number.isFinite(n)) return null;
+    return Math.round(n * 1.852);
 }
 
 const carIcon = L.icon({
@@ -1135,6 +1141,7 @@ function popupHtml(v) {
     const { ignition, speed, address, lat, lon } = getPosition(v);
     const name = deviceName(v);
     const sp = speedKmh(speed);
+    const spDisplay = (typeof sp === 'number') ? `${sp} km/h` : (sp ?? '-');
     const ign = ignition === null ? 'Unknown' : ignition ? 'On' : 'Off';
     const hasCoords = typeof lat === 'number' && typeof lon === 'number';
     const mapUrl = hasCoords ? `https://www.google.com/maps?q=${lat},${lon}` : '';
@@ -1177,7 +1184,7 @@ function popupHtml(v) {
       <div class="popup-row" style="display:flex;gap:6px;"><span>Unique ID:</span> <strong>${uniq}</strong></div>
       <div class="popup-row" style="display:flex;gap:6px;"><span>Last Update:</span> <strong>${lu}</strong></div>
       <div class="popup-row" style="display:flex;gap:6px;"><span>Ignition:</span> <strong>${ign}</strong></div>
-      <div class="popup-row" style="display:flex;gap:6px;"><span>Speed:</span> <strong>${sp ?? '-'} km/h</strong></div>
+      <div class="popup-row" style="display:flex;gap:6px;"><span>Speed:</span> <strong>${spDisplay}</strong></div>
       <div class="popup-row" style="display:flex;gap:6px;"><span>Odometer:</span> <strong>${odo ?? '—'}</strong></div>
       <div class="popup-row" style="display:flex;gap:6px;"><span>Fuel:</span> <strong>${fuel ?? '—'}</strong></div>
       <div class="popup-row" style="display:flex;gap:6px; align-items:center;"><span>Location:</span> <span>${locText}</span></div>
