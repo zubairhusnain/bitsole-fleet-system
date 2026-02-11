@@ -150,7 +150,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
-import { Modal } from 'bootstrap';
+// import { Modal } from 'bootstrap';
 
 const logs = ref({ data: [], current_page: 1, last_page: 1 });
 const loading = ref(false);
