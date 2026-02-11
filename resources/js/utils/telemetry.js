@@ -44,7 +44,6 @@ export function formatOdometer(raw, ctx = {}) {
 
   // 2. Defaults
   const defaults = [
-    'CAN_Total_Mileage_87', 'OBD_Total_Mileage_389', 'GNSS_Total_Odometer_16',
     '87', '389', '16', '50', 'odometer', 'mileage', 'odometerKm', 'odometer_km',
     'totalDistance', 'distance', 'tripDistance'
   ];
@@ -106,7 +105,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
   }
 
   // 2. Percent
-  const pKeys = ['CAN_FuelPercentage_89', 'fuelPercent', 'fuelLevel', 'fuel_percent', 'fuelpercentage', 'io89', '89', 'io48', '48'];
+  const pKeys = ['fuelPercent', 'fuelLevel', 'fuel_percent', 'fuelpercentage', 'io89', '89', 'io48', '48'];
   let pRes = null;
   for (const k of pKeys) {
     const v = getV(k);
@@ -114,7 +113,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
   }
 
   // 3. Liters
-  const lKeys = ['CAN_FuelLeter_84', 'OBD_FuelLeter_48', 'fuelLiter', 'fuelLiters', 'fuel', 'io84', '84'];
+  const lKeys = ['fuelLiter', 'fuelLiters', 'fuel', 'io84', '84'];
   let lRes = null;
   let wasMinusOne = false;
   for (const k of lKeys) {
