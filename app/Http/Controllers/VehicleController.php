@@ -1454,6 +1454,41 @@ class VehicleController extends Controller
         $headers = ['Content-Type: application/json', 'Accept: application/json'];
         $resp = static::curl("/api/attributes/computed?deviceId={$deviceId}", 'GET', $sessionId, '', $headers);
         $attrs = json_decode($resp->response ?? '[]', true) ?? [];
+
+        // Filter out attributes that exist in tc_device attributes
+        $tcDevice = TcDevice::find($deviceId);
+        if ($tcDevice && $tcDevice->attributes) {
+            $deviceAttrs = $tcDevice->attributes;
+            if (is_string($deviceAttrs)) {
+                $deviceAttrs = json_decode($deviceAttrs, true);
+            }
+
+            if (is_array($deviceAttrs)) {
+                $attrs = array_filter($attrs, function ($attr) use ($deviceAttrs) {
+                    $attrKey = $attr['attribute'] ?? null;
+                    // Check if raw attribute key exists in device attributes
+                    if ($attrKey && array_key_exists($attrKey, $deviceAttrs)) {
+                        return false;
+                    }
+
+                    // Check if attribute belongs to the device's trackerModel
+                    // Attributes created by VehicleModelController have description "ModelName - AttributeName"
+                    if (!empty($deviceAttrs['trackerModel'])) {
+                        $modelName = $deviceAttrs['trackerModel'];
+                        $desc = $attr['description'] ?? '';
+                        $prefix = $modelName . ' - ';
+                        if (strpos($desc, $prefix) === 0) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                });
+                // Re-index array
+                $attrs = array_values($attrs);
+            }
+        }
+
         return response()->json(['attributes' => $attrs]);
     }
 
@@ -1485,11 +1520,11 @@ class VehicleController extends Controller
                     if (is_string($attrs)) $attrs = json_decode($attrs, true);
                     if (!is_array($attrs)) $attrs = [];
 
-                    if (isset($attrs[$attributeKey])) {
-                        unset($attrs[$attributeKey]);
-                        $tcDevice->attributes = json_encode($attrs);
-                        $tcDevice->save();
-                    }
+                    // if (isset($attrs[$attributeKey])) {
+                    //     unset($attrs[$attributeKey]);
+                    //     $tcDevice->attributes = json_encode($attrs);
+                    //     $tcDevice->save();
+                    // }
 
                     // Remove from actual last position
                     if ($tcDevice->positionid) {
