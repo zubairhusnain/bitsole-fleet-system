@@ -20,6 +20,9 @@ class LogSystemActivity
     {
         // 1. Capture Old Data (before processing)
         // Only for PUT/PATCH/DELETE
+        if (!config('app.system_log_enabled')) {
+            return $next($request);
+        }
         $method = $request->method();
         $oldData = null;
         $modelName = null;
