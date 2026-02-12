@@ -58,7 +58,7 @@ const routes = [
   { path: '/dashboard', name: 'dashboard', component: Dashboard, meta: { requiresAuth: true, title: 'Dashboard', roles: [2, 3] } },
   { path: '/tasks', name: 'tasks', component: TasksView, meta: { requiresAuth: true, title: 'Tasks', moduleKey: 'tasks', action: 'read' } },
   { path: '/settings', name: 'settings', component: SettingsView, meta: { requiresAuth: true, title: 'Settings', roles: [3], moduleKey: 'settings', action: 'read' } },
-  { path: '/system-logs', name: 'system-logs', component: () => import('../views/system-logs/Index.vue'), meta: { requiresAuth: true, title: 'System Activity Logs', roles: [1, 3] } },
+  { path: '/system-logs', name: 'system-logs', component: () => import('../views/system-logs/Index.vue'), meta: { requiresAuth: true, title: 'System Activity Logs', roles: [1, 2, 3] } },
   { path: '/profile', name: 'profile', component: Profile, meta: { requiresAuth: true, title: 'Profile' } },
   // Feature screens
   { path: '/monitoring/vehicles', name: 'monitoring-vehicles', component: MonitoringVehicles, meta: { requiresAuth: true, title: 'Vehicles Monitoring', moduleKey: 'monitoring.vehicles', action: 'read' } },
