@@ -303,14 +303,12 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item d-none" v-if="isAuthed && (roleToNumber(authState?.user?.role ?? 0) === 1 || roleToNumber(authState?.user?.role ?? 0) === 3)">
+                        <li class="nav-item" v-if="isAuthed && (roleToNumber(authState?.user?.role ?? 0) === 1 || roleToNumber(authState?.user?.role ?? 0) === 3)">
                             <RouterLink to="/system-logs" class="nav-link" :class="{ active: route.name === 'system-logs' }">
                                 <i class="nav-icon bi bi-journal-text"></i>
                                 <p>System Logs</p>
                             </RouterLink>
                         </li>
-
-
 
                         <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/users') }" v-if="hasPerm('users','read')">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/users') }">

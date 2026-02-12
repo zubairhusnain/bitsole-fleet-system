@@ -241,4 +241,36 @@ class VehicleModelController extends Controller
         }
         return null;
     }
+
+    private function getTraccarDuplicateAttributeName($attrs, $modelName)
+    {
+        $sessionId = $this->getTraccarSession();
+        if (!$sessionId) return null;
+
+        $headers = ['Content-Type: application/json', 'Accept: application/json'];
+        $resp = static::curl('/api/attributes/computed', 'GET', $sessionId, '', $headers);
+        $existing = json_decode($resp->response ?? '[]', true) ?? [];
+
+        if (is_string($attrs)) {
+            $attrs = json_decode($attrs, true);
+        }
+        if (!is_array($attrs)) return null;
+
+        $groups = ['odometer', 'fuel', 'speed'];
+        foreach ($groups as $group) {
+            if (!isset($attrs[$group]) || !is_array($attrs[$group])) continue;
+            foreach ($attrs[$group] as $item) {
+                $name = trim($item['name'] ?? '');
+                if (!$name) continue;
+                $description = $modelName . ' - ' . $name;
+                
+                foreach ($existing as $ex) {
+                    if (($ex['description'] ?? '') === $description) {
+                        return $name;
+                    }
+                }
+            }
+        }
+        return null;
+    }
 }
