@@ -13,8 +13,8 @@ class SystemActivityLogController extends Controller
     {
         $user = Auth::user();
 
-        // Access Control: Fleet Manager (1), Distributor (2), and Admin (3)
-        if (!$user || !in_array($user->role, [User::ROLE_FLEET_MANAGER, User::ROLE_DISTRIBUTOR, User::ROLE_ADMIN])) {
+        // Access Control: Fleet Manager (1) and Admin (3)
+        if (!$user || !in_array($user->role, [User::ROLE_FLEET_MANAGER, User::ROLE_ADMIN])) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -23,11 +23,6 @@ class SystemActivityLogController extends Controller
         // Data Isolation for Fleet Manager
         if ($user->role === User::ROLE_FLEET_MANAGER) {
             $managedUserIds = User::where('manager_id', $user->id)->pluck('id')->toArray();
-            $allowedUserIds = array_merge([$user->id], $managedUserIds);
-            $query->whereIn('user_id', $allowedUserIds);
-        } elseif ($user->role === User::ROLE_DISTRIBUTOR) {
-            // Distributors see their own logs and logs of users/managers under them
-            $managedUserIds = User::where('distributor_id', $user->id)->pluck('id')->toArray();
             $allowedUserIds = array_merge([$user->id], $managedUserIds);
             $query->whereIn('user_id', $allowedUserIds);
         }
@@ -58,7 +53,7 @@ class SystemActivityLogController extends Controller
     public function getFiltersData()
     {
         $user = Auth::user();
-        if (!$user || !in_array($user->role, [User::ROLE_FLEET_MANAGER, User::ROLE_DISTRIBUTOR, User::ROLE_ADMIN])) {
+        if (!$user || !in_array($user->role, [User::ROLE_FLEET_MANAGER, User::ROLE_ADMIN])) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -67,10 +62,6 @@ class SystemActivityLogController extends Controller
         // Data Isolation logic
         if ($user->role === User::ROLE_FLEET_MANAGER) {
             $managedUserIds = User::where('manager_id', $user->id)->pluck('id')->toArray();
-            $allowedUserIds = array_merge([$user->id], $managedUserIds);
-            $baseQuery->whereIn('user_id', $allowedUserIds);
-        } elseif ($user->role === User::ROLE_DISTRIBUTOR) {
-            $managedUserIds = User::where('distributor_id', $user->id)->pluck('id')->toArray();
             $allowedUserIds = array_merge([$user->id], $managedUserIds);
             $baseQuery->whereIn('user_id', $allowedUserIds);
         }

@@ -8,6 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\Auth;
 use App\Models\SystemActivityLog;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class LogSystemActivity
 {
@@ -16,19 +17,27 @@ class LogSystemActivity
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
+    protected static $isLogged = false;
+
     public function handle(Request $request, Closure $next): Response
     {
-        // Skip GET/HEAD/OPTIONS and common background status checks
+        // Skip GET/HEAD/OPTIONS and common background/internal paths
         $method = $request->method();
         $path = $request->path();
-        if (in_array($method, ['GET', 'HEAD', 'OPTIONS']) || str_contains($path, 'status') || str_contains($path, 'me')) {
+        if (in_array($method, ['GET', 'HEAD', 'OPTIONS']) ||
+            str_contains($path, 'status') ||
+            str_contains($path, 'me') ||
+            str_contains($path, 'broadcasting/auth') ||
+            str_contains($path, 'csrf-token')) {
             return $next($request);
         }
 
         // Check if logging is enabled in config
-        if (!config('app.system_log_enabled')) {
+        if (!config('app.system_log_enabled') || static::$isLogged) {
             return $next($request);
         }
+
+        static::$isLogged = true;
 
         // Pre-capture old data for UPDATE/DELETE
         $oldData = null;
@@ -136,8 +145,30 @@ class LogSystemActivity
             }
         }
 
-        if ($module === 'Auth') {
-            $module = 'Login';
+        $path = $request->path();
+        if ($module === 'Auth' || $module === 'Login') {
+            if (str_contains($path, 'login')) {
+                $module = 'Login';
+            } elseif (str_contains($path, 'logout')) {
+                $module = 'Logout';
+            } elseif (str_contains($path, 'impersonate')) {
+                $module = 'Impersonate';
+            } else {
+                $module = 'Login';
+            }
+        }
+
+        // Prevent duplicate Login/Logout/Impersonate logs within 5 seconds for same user
+        if (in_array($module, ['Login', 'Logout', 'Impersonate'])) {
+            $cacheKey = "log_cooldown_{$user->id}_{$module}";
+            try {
+                if (Cache::has($cacheKey)) {
+                    return;
+                }
+                Cache::put($cacheKey, true, 5);
+            } catch (\Throwable $e) {
+                // If cache is broken (e.g. permissions), ignore and continue to avoid crashing the app
+            }
         }
 
         // Determine New Data

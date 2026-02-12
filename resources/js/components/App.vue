@@ -303,7 +303,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" v-if="isAuthed && (roleToNumber(authState?.user?.role ?? 0) === 1 || roleToNumber(authState?.user?.role ?? 0) === 2 || roleToNumber(authState?.user?.role ?? 0) === 3)">
+                        <li class="nav-item" v-if="isAuthed && (roleToNumber(authState?.user?.role ?? 0) === 1 || roleToNumber(authState?.user?.role ?? 0) === 3)">
                             <RouterLink to="/system-logs" class="nav-link" :class="{ active: route.name === 'system-logs' }">
                                 <i class="nav-icon bi bi-journal-text"></i>
                                 <p>System Logs</p>
