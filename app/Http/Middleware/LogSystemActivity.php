@@ -39,6 +39,9 @@ class LogSystemActivity
 
         static::$isLogged = true;
 
+        // Capture user before request (crucial for logout)
+        $userBefore = Auth::user();
+
         // Pre-capture old data for UPDATE/DELETE
         $oldData = null;
         $resolvedModelInstance = null;
@@ -60,7 +63,12 @@ class LogSystemActivity
 
         // Only log successful requests (2xx)
         if ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
-            $this->logActivity($request, $method, $oldData, $modelNameFromRoute, $resolvedModelInstance);
+            $userAfter = Auth::user();
+            $userToLog = $userBefore ?? $userAfter;
+
+            if ($userToLog) {
+                $this->logActivity($request, $method, $oldData, $modelNameFromRoute, $userToLog, $resolvedModelInstance);
+            }
         }
 
         return $response;
@@ -111,14 +119,8 @@ class LogSystemActivity
         };
     }
 
-    protected function logActivity(Request $request, $method, $oldData, $modelNameFromRoute, $resolvedModelInstance = null)
+    protected function logActivity(Request $request, $method, $oldData, $modelNameFromRoute, $user, $resolvedModelInstance = null)
     {
-        $user = Auth::user();
-
-        if (!$user) {
-            return;
-        }
-
         // Determine Action
         $action = match ($method) {
             'POST' => 'CREATE',
@@ -149,12 +151,15 @@ class LogSystemActivity
         if ($module === 'Auth' || $module === 'Login') {
             if (str_contains($path, 'login')) {
                 $module = 'Login';
+                $action = 'LOGIN';
             } elseif (str_contains($path, 'logout')) {
                 $module = 'Logout';
+                $action = 'LOGOUT';
             } elseif (str_contains($path, 'impersonate')) {
                 $module = 'Impersonate';
             } else {
                 $module = 'Login';
+                $action = 'LOGIN';
             }
         }
 
