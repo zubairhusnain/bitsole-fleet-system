@@ -13,20 +13,17 @@ class SystemActivityLogController extends Controller
     {
         $user = Auth::user();
 
-        // Access Control: Fleet Manager (1) and Admin (3)
-        if (!$user || !in_array($user->role, [User::ROLE_FLEET_MANAGER, User::ROLE_ADMIN])) {
+        // Access Control: Fleet Manager (1) ONLY
+        if (!$user || $user->role !== User::ROLE_FLEET_MANAGER) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $query = SystemActivityLog::query()->orderBy('created_at', 'desc');
 
         // Data Isolation for Fleet Manager
-        if ($user->role === User::ROLE_FLEET_MANAGER) {
-            $managedUserIds = User::where('manager_id', $user->id)->pluck('id')->toArray();
-            $allowedUserIds = array_merge([$user->id], $managedUserIds);
-            $query->whereIn('user_id', $allowedUserIds);
-        }
-        // Admin (3) sees everything, no extra where clause needed
+        $managedUserIds = User::where('manager_id', $user->id)->pluck('id')->toArray();
+        $allowedUserIds = array_merge([$user->id], $managedUserIds);
+        $query->whereIn('user_id', $allowedUserIds);
 
         // Filters
         if ($request->filled('module')) {
@@ -53,18 +50,16 @@ class SystemActivityLogController extends Controller
     public function getFiltersData()
     {
         $user = Auth::user();
-        if (!$user || !in_array($user->role, [User::ROLE_FLEET_MANAGER, User::ROLE_ADMIN])) {
+        if (!$user || $user->role !== User::ROLE_FLEET_MANAGER) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $baseQuery = SystemActivityLog::query();
 
         // Data Isolation logic
-        if ($user->role === User::ROLE_FLEET_MANAGER) {
-            $managedUserIds = User::where('manager_id', $user->id)->pluck('id')->toArray();
-            $allowedUserIds = array_merge([$user->id], $managedUserIds);
-            $baseQuery->whereIn('user_id', $allowedUserIds);
-        }
+        $managedUserIds = User::where('manager_id', $user->id)->pluck('id')->toArray();
+        $allowedUserIds = array_merge([$user->id], $managedUserIds);
+        $baseQuery->whereIn('user_id', $allowedUserIds);
 
         // Get unique modules from logs within scope
         $modules = (clone $baseQuery)->distinct()->pluck('module')->filter()->values();
