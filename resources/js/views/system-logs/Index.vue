@@ -62,7 +62,6 @@
           <table class="table table-hover table-sm align-middle mb-0 table-grid-lines table-nowrap">
             <thead class="thead-app-dark">
               <tr>
-                <th class="fw-semibold py-2">ID</th>
                 <th class="fw-semibold py-2">User</th>
                 <th class="fw-semibold py-2">Role</th>
                 <th class="fw-semibold py-2">Action</th>
@@ -74,20 +73,18 @@
             </thead>
             <tbody>
               <tr v-if="logs.data.length === 0 && !loading">
-                <td colspan="8" class="text-center text-muted py-3">No logs found.</td>
+                <td colspan="7" class="text-center text-muted py-3">No logs found.</td>
               </tr>
               <tr v-for="log in logs.data" :key="log.id" class="border-bottom">
-                <td class="text-muted text-nowrap">#{{ log.id }}</td>
                 <td class="text-nowrap">
                   <div class="fw-medium">{{ log.user_name }}</div>
-                  <small class="text-muted">ID: {{ log.user_id }}</small>
                 </td>
                 <td class="text-muted text-nowrap">
                   <span class="badge rounded-pill badge-app bg-secondary">{{ getRoleLabel(log.user_role) }}</span>
                 </td>
                 <td class="text-nowrap">
                   <span :class="getActionBadge(log.action)">{{ log.action }}</span>
-                </td>
+                </td> 
                 <td class="text-muted text-nowrap">{{ log.module }}</td>
                 <td class="text-wrap" style="min-width: 200px;">{{ log.description }}</td>
                 <td class="text-muted text-nowrap">{{ formatDate(log.created_at) }}</td>
@@ -146,11 +143,17 @@
             <div class="row">
               <div class="col-md-6">
                 <h6 class="fw-semibold mb-2">Old Data</h6>
-                <pre class="bg-light p-3 border rounded small" style="max-height: 400px; overflow: auto;">{{ formatJson(selectedLog.old_data) }}</pre>
+                <div class="bg-light p-3 border rounded overflow-auto" style="max-height: 400px;">
+                  <JsonTreeView v-if="selectedLog.old_data" :data="selectedLog.old_data" />
+                  <span v-else class="text-muted small">No data</span>
+                </div>
               </div>
               <div class="col-md-6">
                 <h6 class="fw-semibold mb-2">New Data</h6>
-                <pre class="bg-light p-3 border rounded small" style="max-height: 400px; overflow: auto;">{{ formatJson(selectedLog.new_data) }}</pre>
+                <div class="bg-light p-3 border rounded overflow-auto" style="max-height: 400px;">
+                  <JsonTreeView v-if="selectedLog.new_data" :data="selectedLog.new_data" />
+                  <span v-else class="text-muted small">No data</span>
+                </div>
               </div>
             </div>
           </div>
@@ -167,6 +170,7 @@
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
+import JsonTreeView from '../../components/JsonTreeView.vue';
 
 const logs = ref({ data: [], current_page: 1, last_page: 1, total: 0, from: 0, to: 0 });
 const loading = ref(false);
@@ -236,16 +240,6 @@ const getActionBadge = (action) => {
 const formatDate = (dateString) => {
   if (!dateString) return '—';
   return new Date(dateString).toLocaleString();
-};
-
-const formatJson = (data) => {
-  if (!data) return 'No data';
-  try {
-    const obj = typeof data === 'string' ? JSON.parse(data) : data;
-    return JSON.stringify(obj, null, 2);
-  } catch (e) {
-    return data;
-  }
 };
 
 const viewDetails = (log) => {

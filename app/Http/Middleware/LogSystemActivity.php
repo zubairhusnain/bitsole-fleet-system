@@ -18,9 +18,10 @@ class LogSystemActivity
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Skip GET/HEAD/OPTIONS
+        // Skip GET/HEAD/OPTIONS and common background status checks
         $method = $request->method();
-        if (in_array($method, ['GET', 'HEAD', 'OPTIONS'])) {
+        $path = $request->path();
+        if (in_array($method, ['GET', 'HEAD', 'OPTIONS']) || str_contains($path, 'status') || str_contains($path, 'me')) {
             return $next($request);
         }
 
@@ -133,6 +134,10 @@ class LogSystemActivity
             } else {
                 $module = 'System';
             }
+        }
+
+        if ($module === 'Auth') {
+            $module = 'Login';
         }
 
         // Determine New Data
