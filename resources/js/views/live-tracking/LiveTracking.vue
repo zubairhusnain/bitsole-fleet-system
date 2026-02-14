@@ -83,8 +83,10 @@
                   :icon="getLeafletIcon(m)"
                   :ref="el => setMarkerRef(m.id, el)"
                   :z-index-offset="isSelected(m.id) ? 2000 : (m.isMoving ? 1000 : 0)"
+                  @click="onMarkerClick(m)"
+                  @popupclose="onPopupClose(m)"
                 >
-                  <l-popup :options="{ autoPan: false }">
+                  <l-popup :options="{ autoPan: false }" @close="onPopupClose(m)">
                     <div class="popup-card" v-html="m.popup"></div>
                   </l-popup>
                 </l-marker>
@@ -96,9 +98,12 @@
                 :zoom="zoom"
                 :markers="markerItems"
                 :selected-id="selectedId"
+                :is-popup-manually-closed="isPopupManuallyClosed"
                 :auto-center="autoCenter"
                 @ready="onGoogleMapReady"
                 @error="onGoogleMapError"
+                @marker-click="onMarkerClick"
+                @popup-close="onPopupClose"
               />
               <transition name="mobile-panel">
                 <div v-if="isMobile && panelVisible" class="panel-floating">
@@ -277,6 +282,19 @@ onMounted(() => {
             fallbackCopy(url);
         }
     };
+
+    window.viewVehicleDetails = (url, btn) => {
+        if (!url) return;
+        // Prevent multiple clicks
+        if (btn) {
+            if (btn._clicked) return;
+            btn._clicked = true;
+            btn.style.opacity = '0.5';
+            btn.style.pointerEvents = 'none';
+        }
+        // Use router to navigate to avoid full page reload and multiple redirects
+        router.push(url);
+    };
 });
 
 // Computed Attributes (Developer Feature)
@@ -325,10 +343,15 @@ function setMarkerRef(id, el) {
         const mk = el?.leafletObject ?? el;
         if (mk) {
             markerRefs.set(id, mk);
-            if (mapProvider.value === 'leaflet' && String(id) === String(selectedId.value)) {
+            // Only auto-open if it's the selected ID AND hasn't been manually closed
+            if (mapProvider.value === 'leaflet' && String(id) === String(selectedId.value) && !isPopupManuallyClosed.value) {
                 setTimeout(() => {
-                    if (String(id) === String(selectedId.value)) {
-                        try { mk.openPopup(); } catch {}
+                    if (String(id) === String(selectedId.value) && !isPopupManuallyClosed.value) {
+                        try {
+                            if (!mk.isPopupOpen()) {
+                                mk.openPopup();
+                            }
+                        } catch {}
                     }
                 }, 200);
             }
@@ -344,6 +367,28 @@ const autoCenter = ref(true);
 const zoom = ref(4);
 const center = ref([39.8283, -98.5795]);
 const selectedId = ref(null);
+const isPopupManuallyClosed = ref(false);
+
+function onMarkerClick(m) {
+    isPopupManuallyClosed.value = false;
+    selectedId.value = m.id;
+
+    // Explicitly open for Leaflet if already focused
+    if (mapProvider.value === 'leaflet') {
+        setTimeout(() => {
+            const mk = markerRefs.get(m.id);
+            if (mk && !mk.isPopupOpen()) {
+                mk.openPopup();
+            }
+        }, 50);
+    }
+}
+
+function onPopupClose(m) {
+    if (String(m.id) === String(selectedId.value)) {
+        isPopupManuallyClosed.value = true;
+    }
+}
 const mapOptions = { zoomControl: true, preferCanvas: true, attributionControl: false };
 const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const tileAttribution = '';
@@ -715,7 +760,14 @@ const filtered = computed(() => {
     if (!q) return list;
     return list.filter(v => {
         const name = deviceName(v).toLowerCase();
-        return name.includes(q) || String(uniqueId(v) || '').toLowerCase().includes(q);
+        const meta = getVehicleMeta(v);
+        const model = (meta.model || '').toLowerCase();
+        const plate = (meta.plate || '').toLowerCase();
+
+        return name.includes(q)
+            || String(uniqueId(v) || '').toLowerCase().includes(q)
+            || model.includes(q)
+            || plate.includes(q);
     });
 });
 
@@ -1044,7 +1096,7 @@ function popupHtml(v) {
     const ign = ignition === null ? 'Unknown' : ignition ? 'On' : 'Off';
     const hasCoords = typeof lat === 'number' && typeof lon === 'number';
     const mapUrl = hasCoords ? `https://www.google.com/maps?q=${lat},${lon}` : '';
-    let locText = address;
+    let locText = null;
 
     if (!locText && hasCoords) {
       locText = `
@@ -1087,7 +1139,7 @@ function popupHtml(v) {
       <div class="popup-row" style="display:flex;gap:6px;"><span>Odometer:</span> <strong>${odo ?? '—'}</strong></div>
       <div class="popup-row" style="display:flex;gap:6px;"><span>Fuel:</span> <strong>${fuel ?? '—'}</strong></div>
       <div class="popup-row" style="display:flex;gap:6px; align-items:center;"><span>Location:</span> <span>${locText}</span></div>
-      ${detailUrl ? `<div class="popup-row" style="margin-top:10px; text-align:center;"><a href="${detailUrl}" class="text-primary text-decoration-underline">View Details</a></div>` : ''}
+      ${detailUrl ? `<div class="popup-row" style="margin-top:10px; text-align:center;"><button type="button" onclick="window.viewVehicleDetails('${detailUrl}', this)" class="btn btn-link p-0 text-primary text-decoration-underline" style="font-size:13px; border:none; background:none;">View Details</button></div>` : ''}
     </div>
   `;
 }
@@ -1165,6 +1217,7 @@ function resetView() {
     }
 
     selectedId.value = null;
+    isPopupManuallyClosed.value = false;
     query.value = '';
     fitDone.value = false;
 
@@ -1175,6 +1228,7 @@ function focusVehicle(v) {
     const id = deviceKey(v);
     // Always enable auto-centering (disable Decenter Mode) when selecting a vehicle
     autoCenter.value = true;
+    isPopupManuallyClosed.value = false; // Reset manual closure state when explicitly focusing from list
 
     // Use displayed position (interpolated) if available to ensure map centers on the marker,
     // not the future target position which the marker hasn't reached yet.

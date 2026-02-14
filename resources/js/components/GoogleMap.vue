@@ -38,6 +38,10 @@ const props = defineProps({
     type: [String, Number, null],
     default: null,
   },
+  isPopupManuallyClosed: {
+    type: Boolean,
+    default: false,
+  },
   autoCenter: {
     type: Boolean,
     default: true,
@@ -52,7 +56,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['ready', 'click', 'error', 'marker-dragend']);
+const emit = defineEmits(['ready', 'click', 'error', 'marker-dragend', 'marker-click', 'popup-close']);
 
 const mapEl = ref(null);
 const map = ref(null);
@@ -190,12 +194,22 @@ function syncVehicleMarkers() {
       if (popupHtml) {
         info = vehicleInfoWindows.get(key) || new window.google.maps.InfoWindow({ content: popupHtml });
         vehicleInfoWindows.set(key, info);
+
+        // Notify parent when popup is closed via cross icon
+        if (!info._hasCloseListener) {
+          info.addListener('closeclick', () => {
+            emit('popup-close', m);
+          });
+          info._hasCloseListener = true;
+        }
+
         mk.addListener('click', () => {
           if (selectedInfoWindow && selectedInfoWindow !== info) {
             try { selectedInfoWindow.close(); } catch {}
           }
           selectedInfoWindow = info;
           try { info.open({ map: map.value, anchor: mk }); } catch {}
+          emit('marker-click', m);
         });
       }
     } else {
@@ -459,6 +473,10 @@ watch(
       }
       return;
     }
+
+    // If it's manually closed, don't auto-open when ID changes (unless explicitly clicking marker which resets it)
+    if (props.isPopupManuallyClosed) return;
+
     const key = String(id);
     const mk = vehicleMarkers.get(key);
     if (!mk) return;
@@ -485,7 +503,7 @@ watch(
 
 function openSelectedIfAny() {
   const id = props.selectedId;
-  if (id === null || id === undefined || !map.value) return;
+  if (id === null || id === undefined || !map.value || props.isPopupManuallyClosed) return;
   const key = String(id);
   const mk = vehicleMarkers.get(key);
   if (!mk) return;
