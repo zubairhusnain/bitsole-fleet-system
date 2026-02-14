@@ -760,7 +760,14 @@ const filtered = computed(() => {
     if (!q) return list;
     return list.filter(v => {
         const name = deviceName(v).toLowerCase();
-        return name.includes(q) || String(uniqueId(v) || '').toLowerCase().includes(q);
+        const meta = getVehicleMeta(v);
+        const model = (meta.model || '').toLowerCase();
+        const plate = (meta.plate || '').toLowerCase();
+
+        return name.includes(q)
+            || String(uniqueId(v) || '').toLowerCase().includes(q)
+            || model.includes(q)
+            || plate.includes(q);
     });
 });
 
