@@ -467,11 +467,12 @@ function parseAttrs(val) {
 }
 
 // Animated marker display positions (decoupled from raw device positions)
-const displayPositions = reactive({}); // { [id]: { lat, lon, course } }
-const animations = new Map(); // { id -> { raf } }
-const ANIM_MS = 5000; // Match polling interval for smooth continuous movement
-const JUMP_CUTOFF_METERS = 1500; // skip animation for large jumps
-
+const displayPositions = reactive({});
+const animations = new Map();
+const ANIM_MS = 5000;
+const SELECTED_ANIM_MS = 2000;
+const JUMP_CUTOFF_METERS = 1500;
+ 
 function setDisplayPos(id, lat, lon, course) {
     if (typeof id === 'undefined' || id === null) return;
     if (typeof lat !== 'number' || typeof lon !== 'number') return;
@@ -507,6 +508,33 @@ function calculateBearing(startLat, startLon, destLat, destLon) {
     let brng = Math.atan2(y, x);
     brng = brng * 180 / Math.PI;
     return (brng + 360) % 360;
+}
+
+function projectPosition(lat, lon, bearingDeg, distanceMeters) {
+    if (typeof lat !== 'number' || typeof lon !== 'number') return null;
+    if (typeof bearingDeg !== 'number' || !Number.isFinite(distanceMeters) || distanceMeters <= 0) return null;
+    const R = 6371000;
+    const brng = bearingDeg * Math.PI / 180;
+    const phi1 = lat * Math.PI / 180;
+    const lambda1 = lon * Math.PI / 180;
+    const delta = distanceMeters / R;
+
+    const sinPhi1 = Math.sin(phi1);
+    const cosPhi1 = Math.cos(phi1);
+    const sinDelta = Math.sin(delta);
+    const cosDelta = Math.cos(delta);
+
+    const sinPhi2 = sinPhi1 * cosDelta + cosPhi1 * sinDelta * Math.cos(brng);
+    const phi2 = Math.asin(Math.max(-1, Math.min(1, sinPhi2)));
+
+    const y = Math.sin(brng) * sinDelta * cosPhi1;
+    const x = cosDelta - sinPhi1 * Math.sin(phi2);
+    const lambda2 = lambda1 + Math.atan2(y, x);
+
+    const lat2 = phi2 * 180 / Math.PI;
+    let lon2 = lambda2 * 180 / Math.PI;
+    lon2 = ((lon2 + 540) % 360) - 180;
+    return { lat: lat2, lon: lon2 };
 }
 
 function animateMarkerTo(id, toLat, toLon, toCourse, duration = ANIM_MS) {
@@ -551,6 +579,10 @@ function animateMarkerTo(id, toLat, toLon, toCourse, duration = ANIM_MS) {
         dCourse = 0;
     }
 
+    const isSelected = String(id) === String(selectedId.value);
+    const baseDuration = typeof duration === 'number' && duration > 0 ? duration : ANIM_MS;
+    const finalDuration = isSelected ? Math.min(baseDuration, SELECTED_ANIM_MS) : baseDuration;
+
     const startTime = performance?.now ? performance.now() : Date.now();
     const prev = animations.get(id);
     if (prev?.raf) {
@@ -558,7 +590,7 @@ function animateMarkerTo(id, toLat, toLon, toCourse, duration = ANIM_MS) {
     }
     const anim = { raf: 0 };
     const step = (now) => {
-        const tRaw = Math.min(1, ((now ?? (performance?.now ? performance.now() : Date.now())) - startTime) / duration);
+        const tRaw = Math.min(1, ((now ?? (performance?.now ? performance.now() : Date.now())) - startTime) / finalDuration);
         const t = tRaw < 0 ? 0 : tRaw;
         // Use linear interpolation for smooth continuous movement between updates
         // const e = easeInOutCubic(t);
@@ -1226,14 +1258,32 @@ function resetView() {
 
 function focusVehicle(v) {
     const id = deviceKey(v);
-    // Always enable auto-centering (disable Decenter Mode) when selecting a vehicle
     autoCenter.value = true;
-    isPopupManuallyClosed.value = false; // Reset manual closure state when explicitly focusing from list
+    isPopupManuallyClosed.value = false;
 
-    // Use displayed position (interpolated) if available to ensure map centers on the marker,
-    // not the future target position which the marker hasn't reached yet.
     const disp = displayPositions[id];
     const rawPos = getPosition(v);
+    if (typeof rawPos.lat === 'number' && typeof rawPos.lon === 'number') {
+        const spKmh = speedKmh(rawPos.speed);
+        let targetLat = rawPos.lat;
+        let targetLon = rawPos.lon;
+        let targetCourse = rawPos.course;
+
+        if (typeof spKmh === 'number' && spKmh > 2 && typeof targetCourse === 'number') {
+            const secondsAhead = 5;
+            const distMeters = (spKmh / 3.6) * secondsAhead;
+            const projected = projectPosition(rawPos.lat, rawPos.lon, targetCourse, distMeters);
+            if (projected) {
+                targetLat = projected.lat;
+                targetLon = projected.lon;
+            }
+        }
+
+        animateMarkerTo(id, targetLat, targetLon, targetCourse, SELECTED_ANIM_MS);
+        if (typeof pollPositionsOnce === 'function') {
+            pollPositionsOnce();
+        }
+    }
     const lat = typeof disp?.lat === 'number' ? disp.lat : rawPos.lat;
     const lon = typeof disp?.lon === 'number' ? disp.lon : rawPos.lon;
 
