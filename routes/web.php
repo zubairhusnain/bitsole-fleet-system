@@ -90,7 +90,8 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
 
 // System Activity Logs (Fleet Manager/Admin)
 Route::middleware(['auth'])->prefix('/web/system-logs')->group(function () {
-    Route::get('/', [SystemActivityLogController::class, 'index']);
+    Route::get('/', 'App\Http\Controllers\SystemActivityLogController@index');
+    Route::get('/filters-data', 'App\Http\Controllers\SystemActivityLogController@getFiltersData');
 });
 
 // Backups (Admin only)

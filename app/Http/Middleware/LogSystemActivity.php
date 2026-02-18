@@ -8,6 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\Auth;
 use App\Models\SystemActivityLog;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class LogSystemActivity
 {
@@ -16,58 +17,110 @@ class LogSystemActivity
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
+    protected static $isLogged = false;
+
     public function handle(Request $request, Closure $next): Response
     {
-        // 1. Capture Old Data (before processing)
-        // Only for PUT/PATCH/DELETE
-        if (!config('app.system_log_enabled')) {
-            return $next($request);
-        }
+        // Skip GET/HEAD/OPTIONS and common background/internal paths
         $method = $request->method();
-        $oldData = null;
-        $modelName = null;
-
-        // Skip GET/HEAD/OPTIONS
-        if (in_array($method, ['GET', 'HEAD', 'OPTIONS'])) {
+        $path = $request->path();
+        if (in_array($method, ['GET', 'HEAD', 'OPTIONS']) ||
+            str_contains($path, 'status') ||
+            str_contains($path, 'me') ||
+            str_contains($path, 'broadcasting/auth') ||
+            str_contains($path, 'csrf-token')) {
             return $next($request);
         }
 
-        // Try to find a bound model in route parameters
+        // Check if logging is enabled in config
+        if (!config('app.system_log_enabled') || static::$isLogged) {
+            return $next($request);
+        }
+
+        static::$isLogged = true;
+
+        // Capture user before request (crucial for logout)
+        $userBefore = Auth::user();
+
+        // Pre-capture old data for UPDATE/DELETE
+        $oldData = null;
+        $resolvedModelInstance = null;
+        $modelNameFromRoute = $this->guessModelFromRoute($request);
+
         if (in_array($method, ['PUT', 'PATCH', 'DELETE'])) {
-            $route = $request->route();
-            if ($route) {
-                foreach ($route->parameters() as $key => $value) {
-                    if ($value instanceof Model) {
-                        $modelName = class_basename($value);
-                        $oldData = $value->toArray();
-                        break; // Assume the first model is the primary resource
-                    }
+            $params = $request->route()->parameters();
+            foreach ($params as $key => $val) {
+                $instance = $this->resolveModelFromParameter($request, $key, $val);
+                if ($instance) {
+                    $oldData = $instance->toArray();
+                    $resolvedModelInstance = $instance;
+                    break;
                 }
             }
         }
 
-        // 2. Process Request
         $response = $next($request);
 
-        // 3. Log (After processing)
-        // We do this after to ensure the request was successful (2xx)
-        if ($response->isSuccessful()) {
-            $this->logActivity($request, $method, $oldData, $modelName);
+        // Only log successful requests (2xx)
+        if ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
+            $userAfter = Auth::user();
+            $userToLog = $userBefore ?? $userAfter;
+
+            if ($userToLog) {
+                $this->logActivity($request, $method, $oldData, $modelNameFromRoute, $userToLog, $resolvedModelInstance);
+            }
         }
 
         return $response;
     }
 
-    protected function logActivity(Request $request, $method, $oldData, $modelNameFromRoute)
+    protected function resolveModelFromParameter(Request $request, $key, $id)
     {
-        $user = Auth::user();
+        $map = [
+            'userId' => \App\Models\User::class,
+            'user' => \App\Models\User::class,
+            'deviceId' => \App\Models\Devices::class,
+            'zoneId' => \App\Models\TcGeofence::class,
+            'driverId' => \App\Models\Drivers::class,
+            'id' => $this->guessModelFromRoute($request),
+        ];
 
-        // If no user, we might skip or log as Guest (user requirements: fleetmanager/distributor/viewer)
-        // For now, only log if user is authenticated.
-        if (!$user) {
-            return;
+        if (isset($map[$key]) && $map[$key]) {
+            try {
+                return $map[$key]::find($id);
+            } catch (\Throwable $e) {
+                return null;
+            }
         }
 
+        return null;
+    }
+
+    protected function guessModelFromRoute(Request $request)
+    {
+        $segments = $request->segments();
+        // web, users, 1 -> users
+        // web, settings, vehicle-models, 1 -> vehicle-models
+        $module = $segments[1] ?? null;
+        if ($module === 'settings' || $module === 'admin') {
+            $module = $segments[2] ?? $module;
+        }
+
+        if (!$module) return null;
+
+        return match ($module) {
+            'users' => \App\Models\User::class,
+            'vehicles' => \App\Models\Devices::class,
+            'zones' => \App\Models\TcGeofence::class,
+            'drivers' => \App\Models\Drivers::class,
+            'fuel' => \App\Models\FuelEntry::class,
+            'vehicle-models' => \App\Models\VehicleModel::class,
+            default => null,
+        };
+    }
+
+    protected function logActivity(Request $request, $method, $oldData, $modelNameFromRoute, $user, $resolvedModelInstance = null)
+    {
         // Determine Action
         $action = match ($method) {
             'POST' => 'CREATE',
@@ -78,8 +131,16 @@ class LogSystemActivity
 
         $segments = $request->segments();
         $module = 'System';
+        $slug = null;
+
         if (isset($segments[1])) {
             $slug = $segments[1];
+            if (in_array($slug, ['settings', 'admin', 'vehicles', 'drivers'], true) && isset($segments[2])) {
+                $slug = $segments[2];
+            }
+        }
+
+        if ($slug !== null) {
             $map = [
                 'fuel' => 'Fuel Management',
                 'vehicles' => 'Vehicle Management',
@@ -92,6 +153,7 @@ class LogSystemActivity
                 'users' => 'User Management',
                 'system-activity-logs' => 'System Activity Logs',
             ];
+
             if (isset($map[$slug])) {
                 $module = $map[$slug];
             } else {
@@ -99,10 +161,51 @@ class LogSystemActivity
             }
         }
 
+        $path = $request->path();
+        if ($module === 'Auth' || $module === 'Login') {
+            if (str_contains($path, 'login')) {
+                $module = 'Login';
+                $action = 'LOGIN';
+            } elseif (str_contains($path, 'logout')) {
+                $module = 'Logout';
+                $action = 'LOGOUT';
+            } elseif (str_contains($path, 'impersonate')) {
+                $module = 'Impersonate';
+            } else {
+                $module = 'Login';
+                $action = 'LOGIN';
+            }
+        }
+
+        // Prevent duplicate Login/Logout/Impersonate logs within 5 seconds for same user
+        if (in_array($module, ['Login', 'Logout', 'Impersonate'])) {
+            $cacheKey = "log_cooldown_{$user->id}_{$module}";
+            try {
+                if (Cache::has($cacheKey)) {
+                    return;
+                }
+                Cache::put($cacheKey, true, 5);
+            } catch (\Throwable $e) {
+                // If cache is broken (e.g. permissions), ignore and continue to avoid crashing the app
+            }
+        }
+
         // Determine New Data
         $newData = null;
-        if ($action === 'CREATE' || $action === 'UPDATE') {
+        if ($action === 'CREATE') {
             $newData = $request->except(['password', 'password_confirmation', '_token']);
+        } elseif ($action === 'UPDATE') {
+            if ($resolvedModelInstance) {
+                // Refresh to get the updated state from DB
+                try {
+                    $resolvedModelInstance->refresh();
+                    $newData = $resolvedModelInstance->toArray();
+                } catch (\Throwable $e) {
+                    $newData = $request->except(['password', 'password_confirmation', '_token']);
+                }
+            } else {
+                $newData = $request->except(['password', 'password_confirmation', '_token']);
+            }
         }
 
         // Description
