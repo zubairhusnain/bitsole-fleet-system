@@ -303,7 +303,7 @@
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" v-if="isAuthed && roleToNumber(authState?.user?.role ?? 0) === 1">
+                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode }" v-if="isAuthed && roleToNumber(authState?.user?.role ?? 0) === 1">
                             <RouterLink to="/system-logs" class="nav-link" :class="{ active: route.name === 'system-logs' }">
                                 <i class="nav-icon bi bi-journal-text"></i>
                                 <p>System Logs</p>
@@ -519,7 +519,6 @@ const checkTestingMode = () => {
     } else {
         isTestingMode.value = localStorage.getItem('testingMode') === '1';
     }
-    isTestingMode.value = true;
 };
 
 watch(() => route.query, checkTestingMode, { immediate: true });
