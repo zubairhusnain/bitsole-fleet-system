@@ -76,18 +76,26 @@ class LogSystemActivity
             default => $method,
         };
 
-        // Determine Module
-        // 1. Use Model Name if found
-        // 2. Or fallback to Route Name or Segment
-        $module = $modelNameFromRoute;
-        if (!$module) {
-            // Try to guess from URL: /web/vehicles/1 -> vehicles
-            $segments = $request->segments();
-            // web, vehicles, 1 -> index 1
-            if (isset($segments[1])) {
-                $module = ucfirst($segments[1]);
+        $segments = $request->segments();
+        $module = 'System';
+        if (isset($segments[1])) {
+            $slug = $segments[1];
+            $map = [
+                'fuel' => 'Fuel Management',
+                'vehicles' => 'Vehicle Management',
+                'drivers' => 'Driver Management',
+                'zones' => 'Zone Management',
+                'monitoring' => 'Monitoring',
+                'maintenance' => 'Maintenance',
+                'reports' => 'Reports',
+                'alerts' => 'Alerts',
+                'users' => 'User Management',
+                'system-activity-logs' => 'System Activity Logs',
+            ];
+            if (isset($map[$slug])) {
+                $module = $map[$slug];
             } else {
-                $module = 'System';
+                $module = ucfirst($slug);
             }
         }
 
