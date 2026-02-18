@@ -505,7 +505,7 @@ const checkTestingMode = () => {
     // Support both lowercase and camelCase query params
     const rawQ = route.query.testingmode ?? route.query.testingMode ?? route.query.showattribute;
     const q = rawQ !== null && rawQ !== undefined ? String(rawQ) : null;
-
+    console.log('envTestingMode Value ',envTestingMode);
     if (envTestingMode === 'true') {
         isTestingMode.value = true;
     } else if (q === '1') {
