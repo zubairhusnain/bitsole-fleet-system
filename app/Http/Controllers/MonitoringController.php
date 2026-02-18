@@ -78,20 +78,23 @@ class MonitoringController extends Controller
                 $canAccess = true;
             }
         } else {
-             // simplified check: if admin or if part of allowed zones
-             // Ideally reusing the query from zoneSummary would be better but expensive.
-             // Let's assume for now if they have the ID and are auth'd, we check basic ownership if not admin.
-             if ($role === User::ROLE_ADMIN) {
-                 $canAccess = true;
-             } elseif ($localZone) {
-                 if ($role === User::ROLE_DISTRIBUTOR && $localZone->distributor_id == $user->id) {
-                     $canAccess = true;
-                 } elseif ($role === User::ROLE_FLEET_MANAGER && $localZone->user_id == $user->id) {
-                     $canAccess = true;
-                 } elseif ($localZone->user_id == $user->manager_id) {
-                     $canAccess = true;
-                 }
-             }
+            if ($role === User::ROLE_ADMIN) {
+                $canAccess = true;
+            } elseif ($localZone) {
+                if ($role === User::ROLE_DISTRIBUTOR && $localZone->distributor_id == $user->id) {
+                    $canAccess = true;
+                } elseif ($role === User::ROLE_FLEET_MANAGER) {
+                    $managedIds = User::query()
+                        ->where('manager_id', $user->id)
+                        ->pluck('id')
+                        ->all();
+                    if (in_array($localZone->user_id, array_merge([$user->id], $managedIds), true)) {
+                        $canAccess = true;
+                    }
+                } elseif ($localZone->user_id == $user->id) {
+                    $canAccess = true;
+                }
+            }
         }
 
         // If not found in local Zones but exists in TcGeofence and user is admin?
@@ -192,9 +195,13 @@ class MonitoringController extends Controller
                 $distId = $user->distributor_id ?? $user->id;
                 $zoneQuery->where('distributor_id', $distId);
                 if ($role === User::ROLE_FLEET_MANAGER) {
-                    $zoneQuery->where('user_id', $user->id);
+                    $managedIds = User::query()
+                        ->where('manager_id', $user->id)
+                        ->pluck('id')
+                        ->all();
+                    $zoneQuery->whereIn('user_id', array_merge([$user->id], $managedIds));
                 } else {
-                    $zoneQuery->where('user_id', $user->manager_id);
+                    $zoneQuery->where('user_id', $user->id);
                 }
             }
         }
@@ -627,7 +634,7 @@ class MonitoringController extends Controller
             ->where('is_read', 0)
             ->withEnabledNotifications()
             ->orderBy('eventtime', 'desc');
- 
+
         // Filter by specific alert type if requested
         $type = $request->input('type');
         if ($type === 'frequentIgnition') {

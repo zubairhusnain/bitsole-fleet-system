@@ -215,35 +215,68 @@ class FuelController extends Controller
     {
         $user = $request->user();
 
-        // Get devices assigned to the user
         $devices = Devices::accessibleByUser($user)
             ->with('tcDevice')
             ->get();
 
         $options = $devices->map(function ($d) {
             $tc = $d->tcDevice;
-            // Handle case where tcDevice might be null (though ideally it shouldn't be)
-            if (!$tc) {
-                 return null;
+            $attrs = [];
+            if ($tc && isset($tc->attributes)) {
+                if (is_string($tc->attributes)) {
+                    $attrs = json_decode($tc->attributes, true) ?? [];
+                } elseif (is_array($tc->attributes)) {
+                    $attrs = $tc->attributes;
+                }
             }
 
-            $unique = $tc->uniqueid ?? $tc->uniqueId;
-            $name = $tc->name;
-            $label = $unique ? "$unique - $name" : $name;
+            $unique = '';
+            if ($tc) {
+                if (isset($tc->uniqueId) && $tc->uniqueId !== null && $tc->uniqueId !== '') {
+                    $unique = $tc->uniqueId;
+                } elseif (isset($tc->uniqueid) && $tc->uniqueid !== null && $tc->uniqueid !== '') {
+                    $unique = $tc->uniqueid;
+                }
+            }
+            if ($unique === '') {
+                if (isset($d->uniqueId) && $d->uniqueId !== null && $d->uniqueId !== '') {
+                    $unique = $d->uniqueId;
+                } elseif (isset($d->uniqueid) && $d->uniqueid !== null && $d->uniqueid !== '') {
+                    $unique = $d->uniqueid;
+                }
+            }
 
-            // Manually decode attributes for frontend if it's a string
-            if (isset($tc->attributes) && is_string($tc->attributes)) {
-                $tc->attributes = json_decode($tc->attributes, true) ?? [];
+            $name = '';
+            if ($tc && isset($tc->name) && $tc->name !== null && $tc->name !== '') {
+                $name = $tc->name;
+            } elseif (isset($d->name) && $d->name !== null && $d->name !== '') {
+                $name = $d->name;
+            }
+
+            $idFallback = isset($d->device_id) ? (int) $d->device_id : 0;
+            $tcId = ($tc && isset($tc->id)) ? (int) $tc->id : 0;
+
+            $labelBase = trim(($unique ? ($unique . ' - ') : '') . $name);
+            $label = $labelBase !== '' ? $labelBase : ('Device #' . ($idFallback ?: $tcId));
+
+            $tcPayload = null;
+            if ($tc) {
+                $tcPayload = [
+                    'id' => $tcId,
+                    'name' => $name,
+                    'uniqueId' => $unique,
+                    'attributes' => $attrs,
+                ];
             }
 
             return [
-                'id' => $tc->id,
+                'id' => $tcId ?: $idFallback,
                 'label' => $label,
                 'name' => $name,
                 'uniqueid' => $unique,
-                'tc_device' => $tc
+                'tc_device' => $tcPayload,
             ];
-        })->filter()->values();
+        })->values();
 
         return response()->json($options);
     }

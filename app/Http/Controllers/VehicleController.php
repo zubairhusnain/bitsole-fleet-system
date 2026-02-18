@@ -955,17 +955,18 @@ class VehicleController extends Controller
                 } else {
                     $distId = $user->distributor_id ?? $user->id;
                     $zoneQuery->where('distributor_id', $distId);
-
                     if ($role === User::ROLE_FLEET_MANAGER) {
-                        $zoneQuery->where('user_id', $user->id);
+                        $managedIds = \App\Models\User::query()
+                            ->where('manager_id', $user->id)
+                            ->pluck('id')
+                            ->all();
+                        $zoneQuery->whereIn('user_id', array_merge([$user->id], $managedIds));
                     } else {
-                        // Fleet Viewer sees manager's zones
-                        $zoneQuery->where('user_id', $user->manager_id);
+                        $zoneQuery->where('user_id', $user->id);
                     }
                 }
             }
             $allowedIds = $zoneQuery->pluck('geofence_id')->filter()->unique();
-            // If user has no assigned zones, return empty immediately
             if ($allowedIds->isEmpty()) {
                 return response()->json(['data' => [], 'current_page' => 1, 'total' => 0]);
             }
