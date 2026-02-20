@@ -68,7 +68,11 @@
                     <label class="form-check-label small fw-bold" for="autoCenterToggle">Decenter Map</label>
                 </div>
               </div>
-              <div class="btn-group btn-group-sm" role="group" style="position: absolute; top: 10px; right: 180px; z-index: 1000;">
+              <div
+                class="btn-group btn-group-sm"
+                role="group"
+                style="position: absolute; bottom: 10px; right: 10px; z-index: 1000;"
+              >
                 <button
                   type="button"
                   class="btn btn-light shadow-sm"
