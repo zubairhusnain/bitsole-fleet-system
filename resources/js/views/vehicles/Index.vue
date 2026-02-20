@@ -81,7 +81,7 @@
                                     <div class="btn-group btn-group-sm">
                                         <button v-if="!row.blocked && hasPerm('vehicles','update')" class="btn btn-outline-secondary" title="Edit" @click="toEdit(row)"><i
                                                 class="bi bi-pencil"></i></button>
-                                        <button v-if="!row.blocked && hasPerm('vehicles','update')" class="btn btn-outline-secondary" :class="{ 'd-testingmode': !isTestingMode }" title="Settings" @click="toSettings(row)">
+                                        <button v-if="!row.blocked && hasPerm('vehicles','update')" class="btn btn-outline-secondary" title="Settings" @click="toSettings(row)">
                                             <i class="bi bi-gear"></i>
                                         </button>
                                         <button v-if="isDevMode" class="btn btn-outline-secondary" title="Computed Attributes" @click="openComputedAttributes(row)">
@@ -158,7 +158,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
 import Swal from 'sweetalert2';
@@ -166,8 +166,6 @@ import UiAlert from '../../components/UiAlert.vue';
 import ComputedAttributesModal from '../../components/ComputedAttributesModal.vue';
 import { formatTelemetry, formatSpeed } from '../../utils/telemetry';
 import { hasPermission as _hasPermission } from '../../auth';
-
-const isTestingMode = inject('isTestingMode', ref(false));
 
 const router = useRouter();
 const route = useRoute();

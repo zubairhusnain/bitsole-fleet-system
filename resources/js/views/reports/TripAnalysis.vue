@@ -13,14 +13,13 @@
         <button
           type="button"
           class="btn btn-link p-0 ms-2 text-muted"
-          :class="{ 'd-testingmode': !isTestingMode }"
           @click="showInfo = !showInfo"
         >
           <i class="bi bi-info-circle"></i>
         </button>
       </div>
     </div>
-    <div v-if="showInfo" class="mb-3" :class="{ 'd-testingmode': !isTestingMode }">
+    <div v-if="showInfo" class="mb-3">
       <div class="card border-0 bg-light">
         <div class="card-header bg-transparent py-2">
           <div class="fw-semibold small">About this report</div>
@@ -104,7 +103,7 @@
 
     <template v-else>
       <ReportSummary
-        v-if="isTestingMode"
+        v-if="activeSummary"
         :summary="activeSummary"
         :vehicle="selectedVehicleInfo"
         :dateRange="dateRange"
@@ -130,7 +129,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, inject } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import DailyBreakdown from './components/trip-analysis/DailyBreakdown.vue';
 import DailyBreakdownMap from './components/trip-analysis/DailyBreakdownMap.vue';
@@ -140,8 +139,6 @@ import MonthlySummary from './components/trip-analysis/MonthlySummary.vue';
 import MonthlySummaryList from './components/trip-analysis/MonthlySummaryList.vue';
 import TripSummary from './components/trip-analysis/TripSummary.vue';
 import ReportSummary from './components/trip-analysis/ReportSummary.vue';
-
-const isTestingMode = inject('isTestingMode', ref(false));
 
 const showInfo = ref(false);
 const startDate = ref('');

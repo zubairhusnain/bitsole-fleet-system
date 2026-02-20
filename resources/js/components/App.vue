@@ -35,14 +35,14 @@
                             </span>
                         </button>
                     </li>
-                    <li class="nav-item d-flex align-items-center" :class="{ 'd-testingmode': !isTestingMode }" v-if="isAuthed">
+                    <li class="nav-item d-flex align-items-center" v-if="isAuthed">
                         <select v-model="timezone" @change="handleTimezoneChange" class="form-select form-select-sm timezone-select">
                             <option v-for="opt in timezoneOptions" :key="opt.value" :value="opt.value">
                                 {{ opt.label }}
                             </option>
                         </select>
                     </li>
-                    <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode }" v-if="isAuthed">
+                    <li class="nav-item" v-if="isAuthed">
                         <RouterLink to="/alerts" class="nav-link position-relative" style="padding-top: 0.5rem;">
                             <i class="bi bi-bell" style="font-size: 1.2rem;"></i>
                             <span v-if="unreadCount > 0" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem; transform: translate(-50%, 50%) !important;">
@@ -181,14 +181,14 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode }" v-if="!isAdminOrDistributor && hasPerm('fuel', 'read')">
+                        <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('fuel', 'read')">
                             <RouterLink to="/fuel" class="nav-link" :class="{ active: route.name === 'fuel' }">
                                 <i class="nav-icon bi bi-fuel-pump"></i>
                                 <p>Fuel Management</p>
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/monitoring'), 'd-testingmode': !isTestingMode }" v-if="!isAdminOrDistributor && (hasPerm('monitoring.vehicles', 'read') || hasPerm('monitoring.zones', 'read'))">
+                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/monitoring') }" v-if="!isAdminOrDistributor && (hasPerm('monitoring.vehicles', 'read') || hasPerm('monitoring.zones', 'read'))">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/monitoring') }">
                                 <i class="nav-icon bi bi-graph-up"></i>
                                 <p>
@@ -221,14 +221,14 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode }" v-if="!isAdminOrDistributor && hasPerm('zones','read')">
+                        <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('zones','read')">
                             <RouterLink to="/zones" class="nav-link" :class="{ active: route.name === 'zones' }">
                                 <i class="nav-icon bi bi-grid-3x3"></i>
                                 <p>Zone Management</p>
                             </RouterLink>
                         </li>
 
-                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode,'menu-open': route.path.startsWith('/reports') }" v-if="!isAdminOrDistributor && hasPerm('reports','read')">
+                        <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/reports') }" v-if="!isAdminOrDistributor && hasPerm('reports','read')">
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/reports') }">
                                 <i class="nav-icon bi bi-bar-chart"></i>
                                 <p>
@@ -296,7 +296,7 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode }" v-if="isAuthed">
+                        <li class="nav-item" v-if="isAuthed">
                             <RouterLink to="/alerts" class="nav-link" :class="{ active: route.name === 'alerts' }">
                                 <i class="nav-icon bi bi-bell"></i>
                                 <p>Alerts & Notifications</p>

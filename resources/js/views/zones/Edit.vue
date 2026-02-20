@@ -78,7 +78,7 @@
 
         <div class="map-frame mt-3" style="position: relative; height: 500px;">
           <!-- Map Provider Toggle -->
-          <div class="btn-group" role="group" style="position: absolute; top: 10px; right: 100px; z-index: 1000;" v-if="isTestingMode">
+          <div class="btn-group" role="group" style="position: absolute; top: 10px; right: 100px; z-index: 1000;">
              <button type="button" class="btn btn-sm shadow-sm" :class="mapProvider === 'leaflet' ? 'btn-primary' : 'btn-light'" @click="mapProvider = 'leaflet'">Leaflet</button>
              <button type="button" class="btn btn-sm shadow-sm" :class="mapProvider === 'google' ? 'btn-primary' : 'btn-light'" @click="mapProvider = 'google'">Google Maps</button>
           </div>
@@ -187,14 +187,13 @@ const zoom = ref(15);
 const center = ref([38.627, -90.199]);
 const basemap = ref('map');
 const mapKey = ref(0);
-const mapProvider = ref('leaflet'); // 'leaflet' or 'google'
+const mapProvider = ref('leaflet');
 const tileAttribution = '';
 const mapOptions = { zoomControl: true, attributionControl: false };
 const mapRef = ref(null);
 const googleMapRef = ref(null);
 const googleMapInternal = ref(null);
 const suppressTypeWatch = ref(false);
-const isTestingMode = ref(false);
 
 const tileUrl = computed(() => {
   return basemap.value === 'sat'

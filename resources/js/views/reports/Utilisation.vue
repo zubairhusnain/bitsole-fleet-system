@@ -13,14 +13,14 @@
         <button
           type="button"
           class="btn btn-link p-0 ms-2 text-muted"
-          :class="{ 'd-testingmode': !isTestingMode }"
+
           @click="showInfo = !showInfo"
         >
           <i class="bi bi-info-circle"></i>
         </button>
       </div>
     </div>
-    <div v-if="showInfo" class="mb-3" :class="{ 'd-testingmode': !isTestingMode }">
+    <div v-if="showInfo" class="mb-3" >
       <div class="card border-0 bg-light">
         <div class="card-header bg-transparent py-2">
           <div class="fw-semibold small">About this report</div>
@@ -81,7 +81,7 @@
       </div>
     </div>
 
-    <div v-if="isTestingMode" class="card border rounded-3 shadow-0 mb-3">
+    <div class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
         <h6 class="mb-0 fw-bold">Utilisation Report Result</h6>
         <div class="d-flex align-items-right gap-3">
@@ -197,7 +197,6 @@ import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
 import { formatDateTime } from '../../utils/datetime';
 
-const isTestingMode = inject('isTestingMode', ref(false));
 const showInfo = ref(false);
 const deviceOptions = ref([]);
 const selectedDeviceId = ref('');

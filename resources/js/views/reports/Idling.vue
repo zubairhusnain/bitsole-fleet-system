@@ -13,14 +13,13 @@
         <button
           type="button"
           class="btn btn-link p-0 ms-2 text-muted"
-          :class="{ 'd-testingmode': !isTestingMode }"
           @click="showInfo = !showInfo"
         >
           <i class="bi bi-info-circle"></i>
         </button>
       </div>
     </div>
-    <div v-if="showInfo" class="mb-3" :class="{ 'd-testingmode': !isTestingMode }">
+    <div v-if="showInfo" class="mb-3">
       <div class="card border-0 bg-light">
         <div class="card-header bg-transparent py-2">
           <div class="fw-semibold small">About this report</div>
@@ -91,7 +90,7 @@
       </div>
     </div>
 
-    <div v-if="isTestingMode && reportData && reportData.length > 0" class="card border rounded-3 shadow-0 mb-3">
+    <div v-if="reportData && reportData.length > 0" class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header"><h6 class="mb-0">Idling Report Result</h6></div>
       <div class="card-body">
         <div class="row g-3">
@@ -197,12 +196,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { formatDate, formatTime, getActiveTimezone } from '../../utils/datetime';
-
-const isTestingMode = inject('isTestingMode', ref(false));
 const showInfo = ref(false);
 const devices = ref([]);
 const selectedDevice = ref('');

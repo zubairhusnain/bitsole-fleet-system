@@ -13,14 +13,13 @@
         <button
           type="button"
           class="btn btn-link p-0 ms-2 text-muted"
-          :class="{ 'd-testingmode': !isTestingMode }"
           @click="showInfo = !showInfo"
         >
           <i class="bi bi-info-circle"></i>
         </button>
       </div>
     </div>
-    <div v-if="showInfo" class="mb-3" :class="{ 'd-testingmode': !isTestingMode }">
+    <div v-if="showInfo" class="mb-3">
       <div class="card border-0 bg-light">
         <div class="card-header bg-transparent py-2">
           <div class="fw-semibold small">About this page</div>
@@ -120,11 +119,10 @@
 </template>
 
 <script setup>
-import { ref, inject } from 'vue';
+import { ref } from 'vue';
 
 const startDate = ref('');
 const endDate = ref('');
-const isTestingMode = inject('isTestingMode', ref(false));
 const showInfo = ref(false);
 </script>
 

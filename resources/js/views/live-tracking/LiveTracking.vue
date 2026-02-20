@@ -68,11 +68,23 @@
                     <label class="form-check-label small fw-bold" for="autoCenterToggle">Decenter Map</label>
                 </div>
               </div>
-              <div v-if="isTestingMode" class="map-provider-switcher" style="position: absolute; bottom: 30px !important; right: 70px !important; z-index: 3000; background: white; padding: 6px 10px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
-                <div class="btn-group btn-group-sm" role="group" aria-label="Map provider">
-                  <button type="button" class="btn btn-outline-primary" :class="{ active: mapProvider === 'leaflet' }" @click="mapProvider = 'leaflet'">Leaflet</button>
-                  <button type="button" class="btn btn-outline-primary" :class="{ active: mapProvider === 'google' }" @click="mapProvider = 'google'">Google</button>
-                </div>
+              <div class="btn-group btn-group-sm" role="group" style="position: absolute; top: 10px; right: 180px; z-index: 1000;">
+                <button
+                  type="button"
+                  class="btn btn-light shadow-sm"
+                  :class="mapProvider === 'leaflet' ? 'btn-primary' : 'btn-light'"
+                  @click="mapProvider = 'leaflet'"
+                >
+                  Leaflet
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-light shadow-sm"
+                  :class="mapProvider === 'google' ? 'btn-primary' : 'btn-light'"
+                  @click="mapProvider = 'google'"
+                >
+                  Google Maps
+                </button>
               </div>
               <l-map v-if="mapProvider === 'leaflet'" id="liveMap" :zoom="zoom" :center="center" :options="mapOptions" @ready="onMapReady">
                 <l-tile-layer :url="tileUrl" :attribution="tileAttribution" />
@@ -167,7 +179,7 @@
 
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
 import { getCurrentUser, clearAuthCache } from '../../auth';
@@ -187,7 +199,6 @@ const markerRefs = new Map();
 
 const router = useRouter();
 const route = useRoute();
-const isTestingMode = inject('isTestingMode', ref(false));
 
 onMounted(() => {
     window.copyMapLink = (url, btn) => {
@@ -472,7 +483,7 @@ const animations = new Map();
 const ANIM_MS = 5000;
 const SELECTED_ANIM_MS = 2000;
 const JUMP_CUTOFF_METERS = 1500;
- 
+
 function setDisplayPos(id, lat, lon, course) {
     if (typeof id === 'undefined' || id === null) return;
     if (typeof lat !== 'number' || typeof lon !== 'number') return;
