@@ -40,3 +40,9 @@ Schedule::command('traccar:backfill-addresses --continuous')
     ->everyMinute()
     ->withoutOverlapping()
     ->runInBackground();
+
+// Stabilize io9 for latest positions using last non-zero ignition-on reading
+Schedule::command('traccar:stabilize-io9')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();

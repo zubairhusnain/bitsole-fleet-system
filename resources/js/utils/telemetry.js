@@ -133,7 +133,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
       break;
     }
   }
-
+ 
   // 4. Analog (For analog-only devices or as fallback)
   let raw = null, rawKey = null;
   if (!pRes && !lRes) {
