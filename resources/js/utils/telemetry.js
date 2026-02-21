@@ -137,7 +137,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
   // 4. Analog (For analog-only devices or as fallback)
   let raw = null, rawKey = null;
   if (!pRes && !lRes) {
-    const rKeys = ['io67', 'io68', 'io69', 'io240', 'io241', 'io242', 'io243', 'fuelRaw', 'analog1', 'analog2', 'analog3'];
+    const rKeys = ['io9', 'io67', 'io68', 'io69', 'io240', 'io241', 'io242', 'io243', 'fuelRaw', 'analog1', 'analog2', 'analog3'];
     let sum = 0, count = 0;
 
     for (const k of rKeys) {
@@ -151,12 +151,10 @@ export function formatFuel(rawAttrs, ctx = {}) {
     }
 
     if (count > 0) {
-      // Calculate average of all present analog inputs
       raw = sum / count;
       if (count > 1) rawKey = 'analog_avg';
     }
 
-    // Calculate from analog average
     if (raw !== null) {
       const min = getV('fuelanalogempty') ?? getV('fuel_empty') ?? getV('analog_empty') ?? getV('fuelMin') ?? getV('fuel_min');
       const max = getV('fuelanalogfull') ?? getV('fuel_full') ?? getV('analog_full') ?? getV('fuelMax') ?? getV('fuel_max');
@@ -165,12 +163,19 @@ export function formatFuel(rawAttrs, ctx = {}) {
 
       const adj = raw * scale + off;
 
-      if (min != null && max != null && max > min) {
-        // Calculate percentage based on min/max range
-        const p = Math.round(((adj - min) / (max - min)) * 100);
+      if (min != null && max != null && min !== max) {
+        let p;
+        if (max > min) {
+          // Sensor increases with fuel: standard interpolation
+          p = ((adj - min) / (max - min)) * 100;
+        } else {
+          // Sensor decreases with fuel: EMPTY > FULL (client formula)
+          // Percentage full = (EMPTY - value) / (EMPTY - FULL) * 100
+          p = ((min - adj) / (min - max)) * 100;
+        }
+        p = Math.round(p);
         pRes = { k: rawKey, v: Math.max(0, Math.min(100, p)) };
       } else {
-        // If no range is given, treat the adjusted average as liters
         lRes = { k: rawKey, v: Math.round(adj * 10) / 10 };
       }
     }
