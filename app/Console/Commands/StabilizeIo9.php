@@ -34,63 +34,68 @@ class StabilizeIo9 extends Command
 
     private function stabilizeDeviceIo9(int $deviceId): int
     {
-        $last = DB::connection('pgsql')
-            ->table('tc_positions')
-            ->where('deviceid', $deviceId)
-            ->orderBy('fixtime', 'desc')
-            ->limit(1)
+        // 1. Get current device position (the one linked to tc_devices.positionid)
+        $current = DB::connection('pgsql')
+            ->table('tc_devices as d')
+            ->join('tc_positions as p', 'p.id', '=', 'd.positionid')
+            ->where('d.id', $deviceId)
+            ->select('p.id', 'p.deviceid', 'p.attributes')
             ->first();
 
-        if (!$last) {
+        if (!$current) {
             return 0;
         }
 
-        $attrs = $this->decodeAttributes($last->attributes ?? null);
+        $attrs = $this->decodeAttributes($current->attributes ?? null);
+        $curIo9 = isset($attrs['io9']) ? (float) $attrs['io9'] : null;
 
-        $lastIo9 = isset($attrs['io9']) ? (float) $attrs['io9'] : null;
-
-        if ($lastIo9 === null || $lastIo9 > 0) {
+        // Only stabilize when the current position has io9 exactly 0
+        if ($curIo9 === null) {
             return 0;
         }
 
-        $prev = DB::connection('pgsql')
-            ->table('tc_positions')
-            ->where('deviceid', $deviceId)
-            ->where('fixtime', '<', $last->fixtime)
-            ->whereRaw("(attributes::jsonb ->> 'io9') IS NOT NULL")
-            ->whereRaw("((attributes::jsonb ->> 'io9')::numeric > 0)")
-            ->whereRaw("COALESCE(attributes::jsonb ->> 'ignition', '') IN ('1','true','TRUE','on','ON')")
-            ->orderBy('fixtime', 'desc')
-            ->limit(1)
-            ->first();
+        if($curIo9==0){
 
-        if (!$prev) {
-            return 0;
+            // 2. Find last position for this device where io9 > 0 (any past record)
+            $prev = DB::connection('pgsql')
+                ->table('tc_positions')
+                ->where('deviceid', $current->deviceid)
+                ->where('id', '<>', $current->id)
+                ->whereRaw("(attributes::jsonb ->> 'io9') IS NOT NULL")
+                ->whereRaw("((attributes::jsonb ->> 'io9')::numeric > 0)")
+                ->orderBy('fixtime', 'desc')
+                ->limit(1)
+                ->first();
+
+            if (!$prev) {
+                return 0;
+            }
+
+            $prevAttrs = $this->decodeAttributes($prev->attributes ?? null);
+            $prevIo9 = isset($prevAttrs['io9']) ? (float) $prevAttrs['io9'] : null;
+
+            if ($prevIo9 === null || $prevIo9 <= 0) {
+                return 0;
+            }
+
+            $this->info("[StabilizeIo9] Device {$deviceId}: current position io9=0, using previous io9={$prevIo9} (pos id {$prev->id}) for current position id {$current->id}");
+
+            $sql = "
+                UPDATE tc_positions
+                SET attributes = jsonb_set(
+                    attributes::jsonb,
+                    '{io9}',
+                    to_jsonb(?::numeric),
+                    true
+                )
+                WHERE id = ?
+            ";
+
+            DB::connection('pgsql')->update($sql, [$prevIo9, $current->id]);
+
+            return 1;
         }
-
-        $prevAttrs = $this->decodeAttributes($prev->attributes ?? null);
-        $prevIo9 = isset($prevAttrs['io9']) ? (float) $prevAttrs['io9'] : null;
-
-        if ($prevIo9 === null || $prevIo9 <= 0) {
-            return 0;
-        }
-
-        $this->info("[StabilizeIo9] Device {$deviceId}: last io9=0, using previous ignition-on io9={$prevIo9} (pos id {$prev->id}) for last position id {$last->id}");
-
-        $sql = "
-            UPDATE tc_positions
-            SET attributes = jsonb_set(
-                attributes::jsonb,
-                '{io9}',
-                to_jsonb(?::numeric),
-                true
-            )
-            WHERE id = ?
-        ";
-
-        DB::connection('pgsql')->update($sql, [$prevIo9, $last->id]);
-
-        return 1;
+        return 0;
     }
 
     private function decodeAttributes($raw): array

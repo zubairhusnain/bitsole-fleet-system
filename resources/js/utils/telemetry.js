@@ -89,22 +89,49 @@ export function formatFuel(rawAttrs, ctx = {}) {
     };
   };
 
+  const calcIo9Fuel = () => {
+    const raw = getV('io9');
+    if (raw === null || raw <= 0) return null;
+    const min = getV('fuelanalogempty') ?? getV('fuel_empty') ?? getV('analog_empty') ?? getV('fuelMin') ?? getV('fuel_min');
+    const max = getV('fuelanalogfull') ?? getV('fuel_full') ?? getV('analog_full') ?? getV('fuelMax') ?? getV('fuel_max');
+    const scale = getV('fuelanalogscale') ?? getV('analog_scale') ?? 1;
+    const off = getV('fuelanalogoffset') ?? getV('analog_offset') ?? 0;
+    if (min == null || max == null || min === max) return null;
+    const adj = raw * scale + off;
+    let p;
+    if (max > min) {
+      p = ((adj - min) / (max - min)) * 100;
+    } else {
+      p = ((min - adj) / (min - max)) * 100;
+    }
+    p = Math.max(0, Math.min(100, Math.round(p)));
+    let l = null;
+    if (cap && cap > 0) {
+      l = Math.round((cap * p / 100) * 10) / 10;
+    }
+    return { raw, p, l };
+  };
+
   // 1. Preferred/Resolved
   const pref = attrs.fuelAttr_key || ctx?.fuelAttr_key;
   const fuelAttr = attrs.fuelAttr || ctx?.fuelAttr;
 
   if (pref && fuelAttr) {
-    let val = getV(pref);
+    if (pref === 'io9') {
+      const res = calcIo9Fuel();
+      if (res) return mkFuel(pref, res.l, res.p, res.raw, 'io9');
+      return mkFuel(pref, 0, 0, null, 'zero');
+    }
+    const val = getV(pref);
     if (val !== null && val !== -1) {
-      // Apply 0.1 multiplier for CAN-based fuel data (e.g., io84 or keys containing 'can')
+      let v = val;
       const isCan = String(pref).toLowerCase().includes('can') || ['io84', '84'].includes(String(pref).toLowerCase());
       const multiplier = isCan ? 0.1 : 1.0;
-      val = val * multiplier;
+      v = v * multiplier;
 
-      // Calculate L/P
       let l = null, p = null;
-      if (cap && val >= 0 && val <= 100) { p = Math.round(val); l = Math.round((cap * p / 100) * 10) / 10; }
-      else { l = Math.round(val * 10) / 10; }
+      if (cap && v >= 0 && v <= 100) { p = Math.round(v); l = Math.round((cap * p / 100) * 10) / 10; }
+      else { l = Math.round(v * 10) / 10; }
       return mkFuel(pref, l, p);
     }
     // Explicitly configured but missing/invalid -> Return empty/zero (Skip defaults)
@@ -133,7 +160,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
       break;
     }
   }
- 
+
   // 4. Analog (For analog-only devices or as fallback)
   let raw = null, rawKey = null;
   if (!pRes && !lRes) {
