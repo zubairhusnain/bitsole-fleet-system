@@ -89,14 +89,25 @@ export function formatFuel(rawAttrs, ctx = {}) {
     };
   };
 
-  const calcIo9Fuel = () => {
-    const raw = getV('io9');
+  const calcAnalogFuel = (key) => {
+    const raw = getV(key);
     if (raw === null || raw <= 0) return null;
-    const min = getV('fuelanalogempty') ?? getV('fuel_empty') ?? getV('analog_empty') ?? getV('fuelMin') ?? getV('fuel_min');
-    const max = getV('fuelanalogfull') ?? getV('fuel_full') ?? getV('analog_full') ?? getV('fuelMax') ?? getV('fuel_max');
+
+    let min = getV('fuelanalogempty') ?? getV('fuel_empty') ?? getV('analog_empty') ?? getV('fuelMin') ?? getV('fuel_min');
+    let max = getV('fuelanalogfull') ?? getV('fuel_full') ?? getV('analog_full') ?? getV('fuelMax') ?? getV('fuel_max');
     const scale = getV('fuelanalogscale') ?? getV('analog_scale') ?? 1;
     const off = getV('fuelanalogoffset') ?? getV('analog_offset') ?? 0;
+
+    const revRaw = get(attrs, 'fuelReverse') ?? ctx?.fuelReverse;
+    const rev = revRaw === true || revRaw === 1 || String(revRaw).toLowerCase() === 'true';
+    if (rev) {
+      const tmp = min;
+      min = max;
+      max = tmp;
+    }
+
     if (min == null || max == null || min === max) return null;
+
     const adj = raw * scale + off;
     let p;
     if (max > min) {
@@ -117,9 +128,9 @@ export function formatFuel(rawAttrs, ctx = {}) {
   const fuelAttr = attrs.fuelAttr || ctx?.fuelAttr;
 
   if (pref && fuelAttr) {
-    if (pref === 'io9') {
-      const res = calcIo9Fuel();
-      if (res) return mkFuel(pref, res.l, res.p, res.raw, 'io9');
+    if (pref === 'io9' || pref === 'io6') {
+      const res = calcAnalogFuel(pref);
+      if (res) return mkFuel(pref, res.l, res.p, res.raw, pref);
       return mkFuel(pref, 0, 0, null, 'zero');
     }
     const val = getV(pref);
@@ -164,7 +175,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
   // 4. Analog (For analog-only devices or as fallback)
   let raw = null, rawKey = null;
   if (!pRes && !lRes) {
-    const rKeys = ['io9', 'io67', 'io68', 'io69', 'io240', 'io241', 'io242', 'io243', 'fuelRaw', 'analog1', 'analog2', 'analog3'];
+    const rKeys = ['io9', 'io6', 'io67', 'io68', 'io69', 'io240', 'io241', 'io242', 'io243', 'fuelRaw', 'analog1', 'analog2', 'analog3'];
     let sum = 0, count = 0;
 
     for (const k of rKeys) {
@@ -183,10 +194,18 @@ export function formatFuel(rawAttrs, ctx = {}) {
     }
 
     if (raw !== null) {
-      const min = getV('fuelanalogempty') ?? getV('fuel_empty') ?? getV('analog_empty') ?? getV('fuelMin') ?? getV('fuel_min');
-      const max = getV('fuelanalogfull') ?? getV('fuel_full') ?? getV('analog_full') ?? getV('fuelMax') ?? getV('fuel_max');
+      let min = getV('fuelanalogempty') ?? getV('fuel_empty') ?? getV('analog_empty') ?? getV('fuelMin') ?? getV('fuel_min');
+      let max = getV('fuelanalogfull') ?? getV('fuel_full') ?? getV('analog_full') ?? getV('fuelMax') ?? getV('fuel_max');
       const scale = getV('fuelanalogscale') ?? getV('analog_scale') ?? 1;
       const off = getV('fuelanalogoffset') ?? getV('analog_offset') ?? 0;
+
+      const revRaw = get(attrs, 'fuelReverse') ?? ctx?.fuelReverse;
+      const rev = revRaw === true || revRaw === 1 || String(revRaw).toLowerCase() === 'true';
+      if (rev) {
+        const tmp = min;
+        min = max;
+        max = tmp;
+      }
 
       const adj = raw * scale + off;
 

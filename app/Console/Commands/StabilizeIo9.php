@@ -60,7 +60,7 @@ class StabilizeIo9 extends Command
             $prev = DB::connection('pgsql')
                 ->table('tc_positions')
                 ->where('deviceid', $current->deviceid)
-                ->where('id', '<>', $current->id)
+                // ->where('id', '<>', $current->id)
                 ->whereRaw("(attributes::jsonb ->> 'io9') IS NOT NULL")
                 ->whereRaw("((attributes::jsonb ->> 'io9')::numeric > 0)")
                 ->orderBy('fixtime', 'desc')
