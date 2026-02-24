@@ -485,9 +485,10 @@ function parseAttrs(val) {
 const displayPositions = reactive({});
 const animations = new Map();
 const ANIM_MS = 5000;
-const SELECTED_ANIM_MS = 2000;
+const SELECTED_ANIM_MS = 5000;
 const JUMP_CUTOFF_METERS = 1500;
-
+const updateIntervals = new Map();
+ 
 function setDisplayPos(id, lat, lon, course) {
     if (typeof id === 'undefined' || id === null) return;
     if (typeof lat !== 'number' || typeof lon !== 'number') return;
@@ -552,10 +553,20 @@ function projectPosition(lat, lon, bearingDeg, distanceMeters) {
     return { lat: lat2, lon: lon2 };
 }
 
-function animateMarkerTo(id, toLat, toLon, toCourse, duration = ANIM_MS) {
+function animateMarkerTo(id, toLat, toLon, toCourse, duration) {
     if (typeof toLat !== 'number' || typeof toLon !== 'number') return;
     const current = displayPositions[id];
     const from = current && typeof current.lat === 'number' && typeof current.lon === 'number' ? current : null;
+
+    // Detect actual update frequency to match animation speed
+    const nowTs = Date.now();
+    const lastUpdate = updateIntervals.get(id) || 0;
+    let detectedInterval = nowTs - lastUpdate;
+    updateIntervals.set(id, nowTs);
+
+    // If updates are stable, use a slightly longer duration to bridge the gap
+    // to the next expected update (adds a tiny bit of latency for extra smoothness)
+    let animDuration = (detectedInterval > 1000 && detectedInterval < 30000) ? (detectedInterval * 1.1) : (duration || ANIM_MS);
 
     // Fallback: Calculate bearing if missing
     let targetCourse = toCourse;
@@ -594,10 +605,6 @@ function animateMarkerTo(id, toLat, toLon, toCourse, duration = ANIM_MS) {
         dCourse = 0;
     }
 
-    const isSelected = String(id) === String(selectedId.value);
-    const baseDuration = typeof duration === 'number' && duration > 0 ? duration : ANIM_MS;
-    const finalDuration = isSelected ? Math.min(baseDuration, SELECTED_ANIM_MS) : baseDuration;
-
     const startTime = performance?.now ? performance.now() : Date.now();
     const prev = animations.get(id);
     if (prev?.raf) {
@@ -605,10 +612,9 @@ function animateMarkerTo(id, toLat, toLon, toCourse, duration = ANIM_MS) {
     }
     const anim = { raf: 0 };
     const step = (now) => {
-        const tRaw = Math.min(1, ((now ?? (performance?.now ? performance.now() : Date.now())) - startTime) / finalDuration);
+        const tRaw = Math.min(1, ((now ?? (performance?.now ? performance.now() : Date.now())) - startTime) / animDuration);
         const t = tRaw < 0 ? 0 : tRaw;
         // Use linear interpolation for smooth continuous movement between updates
-        // const e = easeInOutCubic(t);
         const e = t;
         setDisplayPos(id, startLat + dLat * e, startLon + dLon * e, startCourse + dCourse * e);
         if (t < 1) {
@@ -717,39 +723,38 @@ function applyRealtimePositions(list) {
             }
         }
         animateMarkerTo(id, toLat, toLon, toCourse);
-
-        // Auto-center on position update if enabled (debounced by update frequency)
-        if (autoCenter.value && String(id) === String(selectedId.value)) {
-             let currentZoom;
-             if (mapProvider.value === 'leaflet') {
-                 currentZoom = typeof map.value?.getZoom === 'function' ? map.value.getZoom() : zoom.value;
-             } else if (mapProvider.value === 'google') {
-                 currentZoom = typeof googleMap.value?.getZoom === 'function' ? googleMap.value.getZoom() : zoom.value;
-             } else {
-                 currentZoom = zoom.value;
-             }
-             const z = Math.max(currentZoom || 0, 17);
-             zoom.value = z;
-
-             if (mapProvider.value === 'leaflet' && map.value) {
-                 try {
-                     const m = map.value;
-                     if (typeof m.setView === 'function') {
-                         m.setView([toLat, toLon], z, { animate: true });
-                         center.value = [toLat, toLon];
-                     }
-                 } catch {}
-             } else if (mapProvider.value === 'google' && googleMap.value) {
-                 try {
-                     const gm = googleMap.value;
-                     gm.setCenter({ lat: toLat, lng: toLon });
-                     gm.setZoom(z);
-                     center.value = [toLat, toLon];
-                 } catch {}
-             }
-        }
     });
 }
+
+// Map centering watch logic: ensures the map follows the ANIMATED marker position
+watch(
+    () => (selectedId.value ? displayPositions[selectedId.value] : null),
+    (pos) => {
+        if (!autoCenter.value || !pos || typeof pos.lat !== 'number' || typeof pos.lon !== 'number') return;
+
+        const currentZoom = (mapProvider.value === 'leaflet' && map.value?.getZoom) ? map.value.getZoom() : (googleMap.value?.getZoom ? googleMap.value.getZoom() : zoom.value);
+        const z = Math.max(currentZoom || 0, 17);
+
+        // Center on the animated marker coordinates
+        if (mapProvider.value === 'leaflet' && map.value) {
+            try {
+                // For continuous smooth movement, use setView with animate: false if called frequently,
+                // or animate: true for small increments.
+                map.value.setView([pos.lat, pos.lon], z, { animate: false });
+                center.value = [pos.lat, pos.lon];
+                zoom.value = z;
+            } catch {}
+        } else if (mapProvider.value === 'google' && googleMap.value) {
+            try {
+                googleMap.value.setCenter({ lat: pos.lat, lng: pos.lon });
+                googleMap.value.setZoom(z);
+                center.value = [pos.lat, pos.lon];
+                zoom.value = z;
+            } catch {}
+        }
+    },
+    { deep: true }
+);
 
 function getPosition(v) {
     const pos = v.position || v.positionData || {};
@@ -828,7 +833,8 @@ const markerItems = computed(() => {
             const dlon = typeof disp?.lon === 'number' ? disp.lon : lon;
             const dCourse = typeof disp?.course === 'number' ? disp.course : (course || 0);
             const spRounded = speedKmh(speed);
-            const isMoving = (motion === true) && (typeof spRounded === 'number' && spRounded > 0);
+            // Smoother isMoving check: If speed is > 2km/h, we consider it moving unless motion is explicitly false
+            const isMoving = (motion !== false) && (typeof spRounded === 'number' && spRounded > 2);
             const iconUrl = isSelected(id) ? '/images/markers/focus-marker.svg' : '/images/markers/device-pin.png';
             return { id, lat: dlat, lon: dlon, popup: popupHtml(v), iconUrl, course: dCourse, isMoving, speed:spRounded };
         })
