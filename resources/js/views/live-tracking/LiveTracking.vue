@@ -486,9 +486,9 @@ const displayPositions = reactive({});
 const animations = new Map();
 const ANIM_MS = 5000;
 const SELECTED_ANIM_MS = 5000;
-const JUMP_CUTOFF_METERS = 1500;
+const JUMP_CUTOFF_METERS = 1000;
 const updateIntervals = new Map();
- 
+
 function setDisplayPos(id, lat, lon, course) {
     if (typeof id === 'undefined' || id === null) return;
     if (typeof lat !== 'number' || typeof lon !== 'number') return;
