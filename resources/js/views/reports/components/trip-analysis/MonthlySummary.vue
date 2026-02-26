@@ -1,12 +1,10 @@
 <template>
   <div>
-    <ReportSummary :summary="summary" :vehicle="vehicle" :dateRange="{start: startDate, end: endDate}" viewType="Monthly Summary" />
     <ChartAndKPIs :summary="summary" :precomputedChartData="chartData" :startDate="startDate" :endDate="endDate" />
   </div>
 </template>
 
 <script setup>
-import ReportSummary from './ReportSummary.vue';
 import ChartAndKPIs from './ChartAndKPIs.vue';
 
 defineProps({
@@ -17,7 +15,7 @@ defineProps({
   summary: {
     type: Object,
     default: () => ({})
-  },
+  }, 
   chartData: {
     type: Array,
     default: () => []

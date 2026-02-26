@@ -1,12 +1,10 @@
 <template>
   <div> 
-    <ReportSummary :summary="summaryData" :vehicle="vehicleInfo" :dateRange="{start: startDate, end: endDate}" />
     <ChartAndKPIs :summary="summaryData" :trips="rowsDailyTrips" :stops="rowsDailyStops" :startDate="startDate" :endDate="endDate" />
   </div>
 </template>
 
 <script setup>
-import ReportSummary from './ReportSummary.vue';
 import ChartAndKPIs from './ChartAndKPIs.vue';
 
 defineProps({
