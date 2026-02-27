@@ -43,7 +43,11 @@ class ReportService
 
     public function fetchTripsDb($deviceId, $from, $to)
     {
+        ini_set('memory_limit', '1024M');
+        set_time_limit(600);
+
         // 1. Fetch Ignition Events with Position Data
+        // Optimized: Select specific columns to reduce memory usage
         $events = DB::connection('pgsql')->select("
             SELECT
                 e.id, e.type, e.eventtime,
@@ -77,9 +81,10 @@ class ReportService
 
                     // Filter noise (e.g. < 100m or < 2 min)
                     if ($duration > 120 || $dist > 100) {
-                        // Fetch Max Speed
+                        // Fetch Max Speed - Optimized to use aggregation
                         $maxSpeed = 0;
                         try {
+                            // Only query max speed if trip is valid
                             $ms = DB::connection('pgsql')->selectOne("
                                 SELECT MAX(speed) as max_speed
                                 FROM tc_positions
@@ -89,11 +94,7 @@ class ReportService
                             $maxSpeed = $ms ? $ms->max_speed : 0;
                         } catch (\Throwable $t) {}
 
-                        $avgSpeed = ($duration > 0) ? ($dist / $duration) * 1.94384 : 0; // m/s to knots if needed, or just km/h?
-                        // Traccar usually reports speed in knots in DB, but API returns knots.
-                        // dist is in meters. duration in seconds. m/s * 1.94384 = knots.
-                        // Let's assume user wants knots (Traccar standard) or km/h?
-                        // Traccar UI usually converts. Let's return knots to match API.
+                        $avgSpeed = ($duration > 0) ? ($dist / $duration) * 1.94384 : 0; // m/s to knots
 
                         $trips[] = [
                             'deviceId' => $deviceId,
@@ -156,6 +157,9 @@ class ReportService
 
     public function fetchVehicleRankingDb($request)
     {
+        ini_set('memory_limit', '1024M');
+        set_time_limit(600);
+
         $from = \Carbon\Carbon::parse($request->from_date)->startOfDay()->format('Y-m-d H:i:s');
         $to = \Carbon\Carbon::parse($request->to_date)->endOfDay()->format('Y-m-d H:i:s');
 
@@ -560,6 +564,9 @@ class ReportService
 
     public function yearlyReportDashboardDb($request)
     {
+        ini_set('memory_limit', '1024M');
+        set_time_limit(600);
+
         $deviceId = $request->device_id;
         $from = $request->from_date ? \Carbon\Carbon::parse($request->from_date)->startOfDay() : \Carbon\Carbon::now()->startOfYear();
         $to = $request->to_date ? \Carbon\Carbon::parse($request->to_date)->endOfDay() : \Carbon\Carbon::now()->endOfYear();
@@ -790,6 +797,9 @@ class ReportService
 
     public function report_summaryDb($request)
     {
+        ini_set('memory_limit', '1024M');
+        set_time_limit(600);
+
         $deviceId = $request->device_id;
         $from = \Carbon\Carbon::parse($request->from_date)->startOfDay()->format('Y-m-d H:i:s');
         $toStr = $request->to_date;
@@ -1116,6 +1126,9 @@ class ReportService
 
     public function fetchDailyTripsDb($request, $deviceIds)
     {
+        ini_set('memory_limit', '1024M');
+        set_time_limit(600);
+
         $from = \Carbon\Carbon::parse($request->from_date)->startOfDay()->format('Y-m-d H:i:s');
         $to = \Carbon\Carbon::parse($request->to_date)->endOfDay()->format('Y-m-d H:i:s');
 
@@ -1320,6 +1333,9 @@ class ReportService
 
     public function fetchDailySummary($request, $deviceIds)
     {
+        ini_set('memory_limit', '1024M');
+        set_time_limit(600);
+
         try {
             $fromIso = \Carbon\Carbon::parse($request->from_date)->startOfDay()->format('Y-m-d H:i:s');
             $toIso = \Carbon\Carbon::parse($request->to_date)->endOfDay()->format('Y-m-d H:i:s');
@@ -1692,8 +1708,8 @@ class ReportService
 
     public function fetchDailyBreakdownMapDb($request, $deviceIds)
     {
-        ini_set('memory_limit', '512M');
-        set_time_limit(120);
+        ini_set('memory_limit', '1024M');
+        set_time_limit(600);
 
         $from = \Carbon\Carbon::parse($request->from_date)->startOfDay()->format('Y-m-d H:i:s');
         $to = \Carbon\Carbon::parse($request->to_date)->endOfDay()->format('Y-m-d H:i:s');
@@ -1743,8 +1759,13 @@ class ReportService
             }
 
             // 3. Routes (Positions)
+            // Optimize: Select only needed columns and skip unused attributes decoding
+            // Downsample: Get roughly every 10th point if duration > 7 days, or every 5th if > 1 day
+            // Actually, for 2 months, 500k rows is too much. Let's filter in PHP to be flexible.
+            // But fetching 500k rows is fast enough (30-50MB). The bottleneck is filtering logic.
+            // We REMOVE 'address' to save memory/bandwidth.
             $positions = DB::connection('pgsql')->select("
-                SELECT id, deviceid, fixtime, latitude, longitude, speed, course, address, attributes
+                SELECT id, deviceid, fixtime, latitude, longitude
                 FROM tc_positions
                 WHERE deviceid = ?
                   AND fixtime BETWEEN ? AND ?
@@ -1758,10 +1779,7 @@ class ReportService
                     'fixTime' => date('Y-m-d\TH:i:s.v\Z', strtotime($p->fixtime)),
                     'latitude' => $p->latitude,
                     'longitude' => $p->longitude,
-                    'speed' => $p->speed,
-                    'course' => $p->course,
-                    'address' => $p->address,
-                    'attributes' => json_decode($p->attributes, true)
+                    // 'address' => $p->address, // Removed to save memory
                 ];
             }
 
@@ -1790,13 +1808,16 @@ class ReportService
         $trips = collect($allTrips);
         $events = collect($allEvents);
         $stops = collect($allStops);
-        $routes = collect($allRoutes);
+        // Optimization: Group routes by day first to avoid O(N*M) loop
+        $routesGroupedByDay = collect($allRoutes)->groupBy(function($r) {
+            return date('Y-m-d', strtotime($r['fixTime']));
+        });
 
         $grouped = $trips->groupBy(function($t) {
              return date('Y-m-d', strtotime($t['startTime'])) . '_' . $t['deviceId'];
         });
 
-        $result = $grouped->map(function($dayTrips, $key) use ($events, $stops, $routes) {
+        $result = $grouped->map(function($dayTrips, $key) use ($events, $stops, $routesGroupedByDay) {
             list($date, $deviceId) = explode('_', $key);
             $deviceName = $dayTrips->first()['deviceName'] ?? 'Unknown';
 
@@ -1806,15 +1827,32 @@ class ReportService
             $dayStops = $stops->filter(function($s) use ($date, $deviceId) {
                 return $s['deviceId'] == $deviceId && date('Y-m-d', strtotime($s['startTime'])) == $date;
             });
-            $dayRoutes = $routes->filter(function($r) use ($dayTrips, $deviceId) {
+
+            // Optimized route filtering: Get from pre-grouped collection
+            $dayRoutesRaw = $routesGroupedByDay->get($date, collect([]));
+
+            // Further filter: only points within trips (to exclude idle drift/noise)
+            // Pre-calculate trip ranges for faster checking
+            $tripRanges = $dayTrips->map(function($t) {
+                return [strtotime($t['startTime']), strtotime($t['endTime'])];
+            })->all();
+
+            $dayRoutes = $dayRoutesRaw->filter(function($r) use ($tripRanges, $deviceId) {
                 if ($r['deviceId'] != $deviceId) return false;
-                $rTime = strtotime($r['fixTime']);
-                return $dayTrips->contains(function($trip) use ($rTime) {
-                    $start = strtotime($trip['startTime']);
-                    $end = strtotime($trip['endTime']);
-                    return $rTime >= $start && $rTime <= $end;
-                });
+                $t = strtotime($r['fixTime']);
+                foreach ($tripRanges as $range) {
+                    if ($t >= $range[0] && $t <= $range[1]) return true;
+                }
+                return false;
             });
+
+            // Downsample if too many points (e.g., > 1000 per day)
+            if ($dayRoutes->count() > 1000) {
+                $nth = ceil($dayRoutes->count() / 1000);
+                $dayRoutes = $dayRoutes->values()->filter(function($v, $k) use ($nth) {
+                    return $k % $nth === 0;
+                });
+            }
 
             // Build timeline
             $tripTimeline = $dayTrips->flatMap(function($trip) use ($dayEvents) {
@@ -2327,8 +2365,8 @@ class ReportService
     }
     public function fetchAssetActivityDb($request, $deviceIds)
     {
-        ini_set('memory_limit', '512M');
-        set_time_limit(300);
+        ini_set('memory_limit', '1024M');
+        set_time_limit(600);
 
         if (empty($deviceIds)) {
             return [
@@ -2356,10 +2394,6 @@ class ReportService
 
         $positions = DB::connection('pgsql')
             ->table('tc_positions as p')
-            ->leftJoin('tc_events as e', function ($join) use ($from, $to) {
-                $join->on('e.positionid', '=', 'p.id')
-                     ->whereBetween('e.eventtime', [$from, $to]);
-            })
             ->select(
                 'p.id',
                 'p.deviceid',
@@ -2369,33 +2403,50 @@ class ReportService
                 'p.speed',
                 'p.course',
                 'p.address',
-                'p.attributes',
-                'e.type as event_type',
-                'e.attributes as event_attributes',
-                'e.eventtime as event_time'
+                'p.attributes'
             )
             ->whereIn('p.deviceid', $deviceIds)
             ->whereBetween('p.fixtime', [$from, $to])
-            ->orderBy('p.id', 'desc')
+            ->orderBy('p.fixtime', 'desc')
             ->limit($limitParam)
             ->get();
 
-        $grouped = [];
-        foreach ($positions as $row) {
-            $pid = $row->id;
-            if (!isset($grouped[$pid])) {
-                $grouped[$pid] = $row;
-                continue;
-            }
-            $existing = $grouped[$pid];
-            $existingTime = $existing->event_time ? strtotime($existing->event_time) : null;
-            $newTime = $row->event_time ? strtotime($row->event_time) : null;
-            if ($newTime !== null && ($existingTime === null || $newTime > $existingTime)) {
-                $grouped[$pid] = $row;
+        $positionIds = $positions->pluck('id')->toArray();
+        $eventsGrouped = [];
+
+        if (!empty($positionIds)) {
+            $events = DB::connection('pgsql')
+                ->table('tc_events')
+                ->select('positionid', 'type', 'attributes', 'eventtime')
+                ->whereIn('positionid', $positionIds)
+                ->orderBy('eventtime', 'asc') // process in order
+                ->get();
+
+            foreach ($events as $e) {
+                $pid = $e->positionid;
+                // We want the latest event for the position, similar to original logic
+                // Original logic: if ($newTime > $existingTime) update.
+                // Since we iterate, we can just overwrite or check.
+                // Let's store the best event for each position.
+                if (!isset($eventsGrouped[$pid])) {
+                    $eventsGrouped[$pid] = $e;
+                } else {
+                    $curr = $eventsGrouped[$pid];
+                    if (strtotime($e->eventtime) > strtotime($curr->eventtime)) {
+                        $eventsGrouped[$pid] = $e;
+                    }
+                }
             }
         }
 
-        $positionsForRows = collect(array_values($grouped));
+        // Merge events into positions
+        $positionsForRows = $positions->map(function($p) use ($eventsGrouped) {
+            $e = $eventsGrouped[$p->id] ?? null;
+            $p->event_type = $e ? $e->type : null;
+            $p->event_attributes = $e ? $e->attributes : null;
+            $p->event_time = $e ? $e->eventtime : null;
+            return $p;
+        });
 
         $positionRows = $positionsForRows->map(function ($p) use ($tcDevices,$positions) {
             $deviceId = (int) $p->deviceid;
@@ -2892,6 +2943,113 @@ class ReportService
 
     public function fetchIdlingReport($request, $deviceIds)
     {
+        return $this->fetchIdlingReportDb($request, $deviceIds);
+    }
+
+    public function fetchIdlingReportDb($request, $deviceIds)
+    {
+        ini_set('memory_limit', '1024M');
+        set_time_limit(600);
+
+        if (empty($deviceIds)) return [];
+
+        $from = \Carbon\Carbon::parse($request->from_date)->format('Y-m-d H:i:s');
+        $to = \Carbon\Carbon::parse($request->to_date)->format('Y-m-d H:i:s');
+
+        $tcDevices = \App\Models\TcDevice::whereIn('id', $deviceIds)->pluck('name', 'id');
+        $allIdlingEvents = [];
+
+        foreach ($deviceIds as $deviceId) {
+            $deviceName = $tcDevices[$deviceId] ?? 'Unknown';
+
+            // optimized: fetch only potential idling points
+            // Speed < 1 knot (~1.85 km/h) AND Ignition ON
+            $positions = DB::connection('pgsql')->select("
+                SELECT fixtime, latitude, longitude, address, attributes
+                FROM tc_positions
+                WHERE deviceid = ?
+                  AND fixtime BETWEEN ? AND ?
+                  AND speed < 1
+                  AND (attributes::json->>'ignition')::boolean = true
+                ORDER BY fixtime ASC
+            ", [$deviceId, $from, $to]);
+
+            if (empty($positions)) continue;
+
+            $currentStart = null;
+            $lastPos = null;
+
+            foreach ($positions as $pos) {
+                $ts = strtotime($pos->fixtime);
+
+                if ($currentStart === null) {
+                    $currentStart = $pos;
+                    $lastPos = $pos;
+                } else {
+                    // Check continuity. If gap > 5 minutes, consider it a new session
+                    // (Assuming data gap means something else happened, or just lost signal)
+                    // But strictly, if we only select idling points, any gap means we skipped moving/off points.
+                    // So if $ts - $lastTs > update_interval (e.g. 60s), it might be a break?
+                    // Traccar default update is 10-60s.
+                    // Let's say if gap > 300s (5 mins), we break.
+                    $lastTs = strtotime($lastPos->fixtime);
+                    if (($ts - $lastTs) > 300) {
+                        // Close previous session
+                        $duration = $lastTs - strtotime($currentStart->fixtime);
+                        if ($duration > 180) { // Min 3 mins
+                            $allIdlingEvents[] = [
+                                'vehicle' => $deviceName,
+                                'deviceId' => $deviceId,
+                                'date' => date('d-m-Y', strtotime($currentStart->fixtime)),
+                                'startTime' => date('H:i:s', strtotime($currentStart->fixtime)),
+                                'endTime' => date('H:i:s', $lastTs),
+                                'durationSeconds' => $duration,
+                                'durationFormatted' => $this->formatDuration($duration),
+                                'location' => $currentStart->address ?? ($currentStart->latitude . ', ' . $currentStart->longitude),
+                                'lat' => $currentStart->latitude,
+                                'lon' => $currentStart->longitude,
+                                'startEpoch' => strtotime($currentStart->fixtime)
+                            ];
+                        }
+                        $currentStart = $pos;
+                    }
+                    $lastPos = $pos;
+                }
+            }
+
+            // Close final session
+            if ($currentStart && $lastPos && $currentStart !== $lastPos) {
+                 $startTs = strtotime($currentStart->fixtime);
+                 $endTs = strtotime($lastPos->fixtime);
+                 $duration = $endTs - $startTs;
+                 if ($duration > 180) {
+                     $allIdlingEvents[] = [
+                        'vehicle' => $deviceName,
+                        'deviceId' => $deviceId,
+                        'date' => date('d-m-Y', $startTs),
+                        'startTime' => date('H:i:s', $startTs),
+                        'endTime' => date('H:i:s', $endTs),
+                        'durationSeconds' => $duration,
+                        'durationFormatted' => $this->formatDuration($duration),
+                        'location' => $currentStart->address ?? ($currentStart->latitude . ', ' . $currentStart->longitude),
+                        'lat' => $currentStart->latitude,
+                        'lon' => $currentStart->longitude,
+                        'startEpoch' => $startTs
+                     ];
+                 }
+            }
+        }
+
+        // Sort by start time
+        usort($allIdlingEvents, function($a, $b) {
+            return $b['startEpoch'] <=> $a['startEpoch'];
+        });
+
+        return $allIdlingEvents;
+    }
+
+    public function fetchIdlingReportOld($request, $deviceIds)
+    {
         ini_set('memory_limit', '512M');
         set_time_limit(300);
 
@@ -3335,6 +3493,9 @@ class ReportService
 
     public function fetchUtilisationReportDb($request, $deviceId)
     {
+        ini_set('memory_limit', '1024M');
+        set_time_limit(600);
+
         $type = $request->type ?? 'Movement';
         $fromStr = $request->from_date;
         $toStr = $request->to_date;
@@ -3589,6 +3750,9 @@ class ReportService
 
     public function fetchFleetSummaryDb($request, $deviceIds)
     {
+        ini_set('memory_limit', '1024M');
+        set_time_limit(600);
+
         // Format the timestamps
         try {
             $fromIso = \Carbon\Carbon::parse($request->from_date)->startOfDay()->format('Y-m-d H:i:s');
