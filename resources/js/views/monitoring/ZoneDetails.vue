@@ -4,11 +4,11 @@
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
         <li class="breadcrumb-item">
-          <RouterLink to="/dashboard">Dashboard</RouterLink>
+          <RouterLink to="/dashboard">Overview</RouterLink>
         </li>
         <li class="breadcrumb-item">Monitoring</li>
         <li class="breadcrumb-item">
-          <RouterLink to="/monitoring/zones">Zone Monitoring</RouterLink>
+          <RouterLink to="/monitoring/zones">Zones</RouterLink>
         </li>
         <li class="breadcrumb-item active" aria-current="page">{{ zoneName || 'Zone Details' }}</li>
       </ol>

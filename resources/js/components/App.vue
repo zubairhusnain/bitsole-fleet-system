@@ -103,7 +103,7 @@
                             <RouterLink to="/live-tracking" class="nav-link"
                                 :class="{ active: route.name === 'live-tracking' }">
                                 <i class="nav-icon bi bi-broadcast"></i>
-                                <p>Live Tracking</p>
+                                <p>Realtime Tracking</p>
                             </RouterLink>
                         </li>
 
@@ -111,7 +111,7 @@
                             <RouterLink to="/dashboard" class="nav-link"
                                 :class="{ active: route.name === 'dashboard' }">
                                 <i class="nav-icon bi bi-speedometer"></i>
-                                <p>Dashboard</p>
+                                <p>Overview</p>
                             </RouterLink>
                         </li>
 
@@ -119,7 +119,7 @@
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/drivers') }">
                                 <i class="nav-icon bi bi-people"></i>
                                 <p>
-                                    Driver Management
+                                    Drivers
                                     <i class="bi bi-chevron-right right"></i>
                                 </p>
                             </a>
@@ -128,14 +128,14 @@
                                     <RouterLink to="/drivers" class="nav-link"
                                         :class="{ active: route.path === '/drivers' || route.path.startsWith('/drivers/add') || route.path.startsWith('/drivers/edit') }">
                                         <i class="nav-icon bi bi-person-lines-fill"></i>
-                                        <p>Driver List</p>
+                                        <p>All Drivers</p>
                                     </RouterLink>
                                 </li>
                                 <li class="nav-item">
                                     <RouterLink to="/drivers/assignments" class="nav-link"
                                         :class="{ active: route.path.startsWith('/drivers/assignments') }">
                                         <i class="nav-icon bi bi-clipboard-check"></i>
-                                        <p>Client Driver</p>
+                                        <p>Assignments</p>
                                     </RouterLink>
                                 </li>
                             </ul>
@@ -145,7 +145,7 @@
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/vehicles') }">
                                 <i class="nav-icon bi bi-car-front"></i>
                                 <p>
-                                    Vehicle Management
+                                    Vehicles
                                     <i class="bi bi-chevron-right right"></i>
                                 </p>
                             </a>
@@ -154,38 +154,31 @@
                                     <RouterLink to="/vehicles" class="nav-link"
                                         :class="{ active: route.path === '/vehicles' }">
                                         <i class="nav-icon bi bi-list-ul"></i>
-                                        <p>All Vehicles</p>
+                                        <p>Vehicle List</p>
                                     </RouterLink>
                                 </li>
                                 <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('vehicles.maintenance','read')">
                                     <RouterLink to="/vehicles/maintenance" class="nav-link"
                                         :class="{ active: route.path.startsWith('/vehicles/maintenance') }">
                                         <i class="nav-icon bi bi-tools"></i>
-                                        <p>Vehicle Maintenance</p>
+                                        <p>Maintenance</p>
                                     </RouterLink>
                                 </li>
                                 <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('vehicles.maintenance','read')">
                                     <RouterLink to="/vehicles/alerts" class="nav-link"
                                         :class="{ active: route.path.startsWith('/vehicles/alerts') }">
                                         <i class="nav-icon bi bi-bell"></i>
-                                        <p>Vehicle Alert</p>
+                                        <p>Alerts</p>
                                     </RouterLink>
                                 </li>
                                 <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('vehicles.overview','read')">
                                     <RouterLink to="/vehicles/overview" class="nav-link"
                                         :class="{ active: route.path.startsWith('/vehicles/overview') || route.name === 'vehicles-detail' }">
                                         <i class="nav-icon bi bi-clipboard-data"></i>
-                                        <p>Vehicle Overview</p>
+                                        <p>Details</p>
                                     </RouterLink>
                                 </li>
                             </ul>
-                        </li>
-
-                        <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('fuel', 'read')">
-                            <RouterLink to="/fuel" class="nav-link" :class="{ active: route.name === 'fuel' }">
-                                <i class="nav-icon bi bi-fuel-pump"></i>
-                                <p>Fuel Management</p>
-                            </RouterLink>
                         </li>
 
                         <li class="nav-item" :class="{ 'menu-open': route.path.startsWith('/monitoring') }" v-if="!isAdminOrDistributor && (hasPerm('monitoring.vehicles', 'read') || hasPerm('monitoring.zones', 'read'))">
@@ -201,21 +194,21 @@
                                     <RouterLink to="/monitoring/vehicles" class="nav-link"
                                         :class="{ active: route.path.startsWith('/monitoring/vehicles') }">
                                         <i class="nav-icon bi bi-truck"></i>
-                                        <p>Vehicle Monitoring</p>
+                                        <p>Vehicles</p>
                                     </RouterLink>
                                 </li>
                                 <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('monitoring.zones', 'read')">
                                     <RouterLink to="/monitoring/zones" class="nav-link"
                                         :class="{ active: route.path.startsWith('/monitoring/zones') }">
                                         <i class="nav-icon bi bi-geo-alt"></i>
-                                        <p>Zone Monitoring</p>
+                                        <p>Zones</p>
                                     </RouterLink>
                                 </li>
                                 <li class="nav-item" v-if="hasPerm('monitoring.vehicles', 'read')">
                                     <RouterLink to="/monitoring/dashboard" class="nav-link"
                                         :class="{ active: route.path.startsWith('/monitoring/dashboard') }">
                                         <i class="nav-icon bi bi-speedometer2"></i>
-                                        <p>Vehicle Dashboard</p>
+                                        <p>Dashboard</p>
                                     </RouterLink>
                                 </li>
                             </ul>
@@ -224,7 +217,7 @@
                         <li class="nav-item" v-if="!isAdminOrDistributor && hasPerm('zones','read')">
                             <RouterLink to="/zones" class="nav-link" :class="{ active: route.name === 'zones' }">
                                 <i class="nav-icon bi bi-grid-3x3"></i>
-                                <p>Zone Management</p>
+                                <p>Geozones</p>
                             </RouterLink>
                         </li>
 
@@ -232,7 +225,7 @@
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/reports') }">
                                 <i class="nav-icon bi bi-bar-chart"></i>
                                 <p>
-                                    Reports & Analytics
+                                    Reports
                                     <i class="bi bi-chevron-right right"></i>
                                 </p>
                             </a>
@@ -241,56 +234,56 @@
                                     <RouterLink to="/reports/trip-analysis" class="nav-link"
                                         :class="{ active: route.path.startsWith('/reports/trip-analysis') }">
                                         <i class="nav-icon bi bi-table"></i>
-                                        <p>Trip Analysis Report</p>
+                                        <p>Trip Analysis</p>
                                     </RouterLink>
                                 </li>
                                 <li class="nav-item">
                                     <RouterLink to="/reports/asset-activity" class="nav-link"
                                         :class="{ active: route.path.startsWith('/reports/asset-activity') }">
                                         <i class="nav-icon bi bi-graph-up"></i>
-                                        <p>Asset Activity Report</p>
+                                        <p>Asset Activity</p>
                                     </RouterLink>
                                 </li>
                                 <li class="nav-item">
                                     <RouterLink to="/reports/vehicle-activity" class="nav-link"
                                         :class="{ active: route.path.startsWith('/reports/vehicle-activity') }">
                                         <i class="nav-icon bi bi-list-check"></i>
-                                        <p>Vehicle Activity Report</p>
+                                        <p>Vehicle Activity</p>
                                     </RouterLink>
                                 </li>
                                 <li class="nav-item">
                                     <RouterLink to="/reports/vehicle-status" class="nav-link"
                                         :class="{ active: route.path.startsWith('/reports/vehicle-status') }">
                                         <i class="nav-icon bi bi-info-square"></i>
-                                        <p>Vehicle Status Report</p>
+                                        <p>Vehicle Status</p>
                                     </RouterLink>
                                 </li>
                                 <li class="nav-item">
                                     <RouterLink to="/reports/idling" class="nav-link"
                                         :class="{ active: route.path.startsWith('/reports/idling') }">
                                         <i class="nav-icon bi bi-pause-circle"></i>
-                                        <p>Idling Report</p>
+                                        <p>Idling</p>
                                     </RouterLink>
                                 </li>
                                 <li class="nav-item">
                                     <RouterLink to="/reports/utilisation" class="nav-link"
                                         :class="{ active: route.path.startsWith('/reports/utilisation') }">
                                         <i class="nav-icon bi bi-bar-chart-line"></i>
-                                        <p>Utilisation Report</p>
+                                        <p>Utilization</p>
                                     </RouterLink>
                                 </li>
                                 <li class="nav-item">
                                     <RouterLink to="/reports/incident-analysis" class="nav-link"
                                         :class="{ active: route.path.startsWith('/reports/incident-analysis') }">
                                         <i class="nav-icon bi bi-exclamation-circle"></i>
-                                        <p>Incident Analysis Report</p>
+                                        <p>Incidents</p>
                                     </RouterLink>
                                 </li>
                                 <li class="nav-item">
                                     <RouterLink to="/reports/vehicle-ranking" class="nav-link"
                                         :class="{ active: route.path.startsWith('/reports/vehicle-ranking') }">
                                         <i class="nav-icon bi bi-trophy"></i>
-                                        <p>Vehicle Ranking Report</p>
+                                        <p>Ranking</p>
                                     </RouterLink>
                                 </li>
                             </ul>
@@ -299,14 +292,14 @@
                         <li class="nav-item" v-if="isAuthed">
                             <RouterLink to="/alerts" class="nav-link" :class="{ active: route.name === 'alerts' }">
                                 <i class="nav-icon bi bi-bell"></i>
-                                <p>Alerts & Notifications</p>
+                                <p>Alerts</p>
                             </RouterLink>
                         </li>
 
                         <li class="nav-item" :class="{ 'd-testingmode': !isTestingMode }" v-if="isAuthed && roleToNumber(authState?.user?.role ?? 0) === 1">
                             <RouterLink to="/system-logs" class="nav-link" :class="{ active: route.name === 'system-logs' }">
                                 <i class="nav-icon bi bi-journal-text"></i>
-                                <p>System Logs</p>
+                                <p>Logs</p>
                             </RouterLink>
                         </li>
 
@@ -314,7 +307,7 @@
                             <a href="#" class="nav-link" :class="{ active: route.path.startsWith('/users') }">
                                 <i class="nav-icon bi bi-people-fill"></i>
                                 <p>
-                                    User Management
+                                    Users
                                     <i class="bi bi-chevron-right right"></i>
                                 </p>
                             </a>
@@ -330,7 +323,7 @@
                                     <RouterLink to="/users/permissions" class="nav-link"
                                         :class="{ active: route.path.startsWith('/users/permissions') }">
                                         <i class="nav-icon bi bi-shield-lock"></i>
-                                        <p>User Permission</p>
+                                        <p>Permissions</p>
                                     </RouterLink>
                                 </li>
                             </ul>

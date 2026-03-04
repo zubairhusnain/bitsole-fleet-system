@@ -3,9 +3,9 @@
     <!-- Breadcrumb -->
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
-        <li class="breadcrumb-item"><RouterLink to="/dashboard">Dashboard</RouterLink></li>
-        <li class="breadcrumb-item"><RouterLink to="/vehicles">Vehicle Management</RouterLink></li>
-        <li class="breadcrumb-item active" aria-current="page">Vehicle Alert</li>
+        <li class="breadcrumb-item"><RouterLink to="/dashboard">Overview</RouterLink></li>
+        <li class="breadcrumb-item"><RouterLink to="/vehicles">Vehicles</RouterLink></li>
+        <li class="breadcrumb-item active" aria-current="page">Alerts</li>
       </ol>
     </div>
 
@@ -30,7 +30,7 @@
                     class="form-control"
                     required
                     placeholder="e.g. Overspeed Alert"
-                  > 
+                  >
                 </div>
                 <div class="col-md-6">
                   <label for="type" class="form-label">Type</label>

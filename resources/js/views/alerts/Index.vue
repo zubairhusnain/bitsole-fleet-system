@@ -3,12 +3,12 @@
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
         <li class="breadcrumb-item"><RouterLink to="/">Home</RouterLink></li>
-        <li class="breadcrumb-item active" aria-current="page">Alerts & Notifications</li>
+        <li class="breadcrumb-item active" aria-current="page">Alerts</li>
       </ol>
     </div>
 
     <div class="row mb-3">
-      <div class="col-sm-12"><h4 class="mb-0 fw-semibold">Alerts & Notifications</h4></div>
+      <div class="col-sm-12"><h4 class="mb-0 fw-semibold">Alerts</h4></div>
     </div>
 
     <div class="card">

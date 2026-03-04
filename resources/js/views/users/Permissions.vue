@@ -6,9 +6,9 @@
     <div v-else>
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
-        <li class="breadcrumb-item"><RouterLink to="/">Dashboard</RouterLink></li>
-        <li class="breadcrumb-item"><RouterLink to="/users">User Management</RouterLink></li>
-        <li class="breadcrumb-item active" aria-current="page">User Permissions</li>
+        <li class="breadcrumb-item"><RouterLink to="/">Overview</RouterLink></li>
+        <li class="breadcrumb-item"><RouterLink to="/users">Users</RouterLink></li>
+        <li class="breadcrumb-item active" aria-current="page">Permissions</li>
       </ol>
     </div>
 

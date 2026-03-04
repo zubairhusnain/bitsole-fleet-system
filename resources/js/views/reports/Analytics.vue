@@ -2,8 +2,8 @@
   <div>
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
-        <li class="breadcrumb-item"><RouterLink to="/dashboard">Dashboard</RouterLink></li>
-        <li class="breadcrumb-item">Reports & Analytics</li>
+        <li class="breadcrumb-item"><RouterLink to="/dashboard">Overview</RouterLink></li>
+        <li class="breadcrumb-item">Reports</li>
         <li class="breadcrumb-item active" aria-current="page">Analytics Overview</li>
       </ol>
     </div>

@@ -4,10 +4,10 @@
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
         <li class="breadcrumb-item">
-          <RouterLink to="/dashboard">Dashboard</RouterLink>
+          <RouterLink to="/dashboard">Overview</RouterLink>
         </li>
         <li class="breadcrumb-item">Monitoring</li>
-        <li class="breadcrumb-item active" aria-current="page">Zone Monitoring</li>
+        <li class="breadcrumb-item active" aria-current="page">Zones</li>
       </ol>
     </div>
 
@@ -16,7 +16,7 @@
     <!-- Page Title -->
     <div class="row mb-3">
       <div class="col-sm-12 col-md-12 col-xl-8">
-        <h4 class="mb-0 fw-semibold">Zone Monitoring</h4>
+        <h4 class="mb-0 fw-semibold">Zones</h4>
       </div>
     </div>
 
@@ -153,7 +153,7 @@
                 <td class="text-muted">
                     <div style="white-space: pre-line; max-width: 200px;">
                         {{ zone.description || '—' }}
-                    </div> 
+                    </div>
                 </td>
                 <td class="text-muted text-nowrap">{{ formatDate(zone.created_at) }}</td>
                 <td class="text-muted text-nowrap">{{ formatDate(zone.updated_at) }}</td>

@@ -4,17 +4,17 @@
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
         <li class="breadcrumb-item">
-          <RouterLink to="/dashboard">Dashboard</RouterLink>
+          <RouterLink to="/dashboard">Overview</RouterLink>
         </li>
         <li class="breadcrumb-item">Monitoring</li>
-        <li class="breadcrumb-item active" aria-current="page">Vehicle Dashboard</li>
+        <li class="breadcrumb-item active" aria-current="page">Dashboard</li>
       </ol>
     </div>
 
     <!-- Page Title -->
     <div class="row mb-3">
       <div class="col-12">
-        <h4 class="mb-0 fw-semibold">Vehicle Dashboard</h4>
+        <h4 class="mb-0 fw-semibold">Dashboard</h4>
       </div>
     </div>
 
@@ -286,7 +286,7 @@ const fetchVehicles = async () => {
             // Speed Logic
             const spObj = formatSpeed(tc.attributes, pos);
             const speedDisplay = spObj.display || '0 km/h';
-            
+
             const speedKmh = typeof spObj.value === 'number' ? Number((spObj.value * 1.852).toFixed(1)) : 0;
             const ign = attrs.ignition || false;
             const status = tc.status ? String(tc.status).charAt(0).toUpperCase() + String(tc.status).slice(1) : undefined;

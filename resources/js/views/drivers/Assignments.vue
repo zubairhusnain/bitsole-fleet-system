@@ -2,14 +2,14 @@
   <div class="assignments-view">
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
-        <li class="breadcrumb-item"><RouterLink to="/">Dashboard</RouterLink></li>
-        <li class="breadcrumb-item"><RouterLink to="/drivers">Driver Management</RouterLink></li>
-        <li class="breadcrumb-item active" aria-current="page">Client Driver Assignments</li>
+        <li class="breadcrumb-item"><RouterLink to="/">Overview</RouterLink></li>
+        <li class="breadcrumb-item"><RouterLink to="/drivers">Drivers</RouterLink></li>
+        <li class="breadcrumb-item active" aria-current="page">Assignments</li>
       </ol>
     </div>
 
     <div class="row mb-3">
-      <div class="col-12"><h4 class="mb-0 fw-semibold">Client Driver Assignments</h4></div>
+      <div class="col-12"><h4 class="mb-0 fw-semibold">Assignments</h4></div>
     </div>
 
     <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="error = ''" />

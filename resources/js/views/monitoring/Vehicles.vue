@@ -4,10 +4,10 @@
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
         <li class="breadcrumb-item">
-          <RouterLink to="/dashboard">Dashboard</RouterLink>
+          <RouterLink to="/dashboard">Overview</RouterLink>
         </li>
         <li class="breadcrumb-item">Monitoring</li>
-        <li class="breadcrumb-item active" aria-current="page">Vehicle Monitoring</li>
+        <li class="breadcrumb-item active" aria-current="page">Vehicles</li>
       </ol>
     </div>
 
@@ -16,7 +16,7 @@
     <!-- Page Title -->
     <div class="row mb-3">
       <div class="col-12">
-        <h4 class="mb-0 fw-semibold">Vehicles Monitoring</h4>
+        <h4 class="mb-0 fw-semibold">Vehicles</h4>
       </div>
     </div>
 

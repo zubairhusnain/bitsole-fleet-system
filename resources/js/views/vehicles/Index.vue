@@ -4,9 +4,9 @@
         <div class="app-content-header mb-2">
             <ol class="breadcrumb mb-0 small text-muted">
                 <li class="breadcrumb-item">
-                    <RouterLink to="/dashboard">Dashboard</RouterLink>
+                    <RouterLink to="/dashboard">Overview</RouterLink>
                 </li>
-                <li class="breadcrumb-item active" aria-current="page">Vehicle Management</li>
+                <li class="breadcrumb-item active" aria-current="page">Vehicle List</li>
             </ol>
         </div>
         <UiAlert :show="!!error" :message="error" variant="danger" dismissible @dismiss="dismissError" />
@@ -14,7 +14,7 @@
         <!-- Page Title and Actions -->
         <div class="row mb-3">
             <div class="col-sm-12 col-md-12 col-xl-7">
-                <h4 class="mb-0 fw-semibold">Vehicles Management</h4>
+                <h4 class="mb-0 fw-semibold">Vehicle List</h4>
             </div>
             <div class="col-sm-12 col-md-12 col-xl-5">
                 <div class="row">
@@ -636,7 +636,6 @@ function toSettings(row) {
 }
 </script>
 
-<style scoped>
 <style scoped>
 .input-w-360 { max-width: 360px; width: 100%; }
 </style>

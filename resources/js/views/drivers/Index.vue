@@ -3,14 +3,14 @@
     <!-- Breadcrumb using AdminLTE/Bootstrap -->
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
-        <li class="breadcrumb-item"><RouterLink to="/">Dashboard</RouterLink></li>
-        <li class="breadcrumb-item active" aria-current="page">Driver Management</li>
+        <li class="breadcrumb-item"><RouterLink to="/">Overview</RouterLink></li>
+        <li class="breadcrumb-item active" aria-current="page">All Drivers</li>
       </ol>
     </div>
 
     <!-- Page Title and Actions -->
     <div class="row mb-3">
-      <div class="col-sm-12 col-md-12 col-xl-8"><h4 class="mb-0 fw-semibold">Drivers Directory</h4></div>
+      <div class="col-sm-12 col-md-12 col-xl-8"><h4 class="mb-0 fw-semibold">All Drivers</h4></div>
       <div class="col-sm-12 col-md-12 col-xl-4">
         <div class="row">
           <div class="col-sm-12 col-md-6 col-xl-7">

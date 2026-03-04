@@ -4,16 +4,16 @@
     <div class="app-content-header mb-2">
       <ol class="breadcrumb mb-0 small text-muted">
         <li class="breadcrumb-item">
-          <RouterLink to="/dashboard">Dashboard</RouterLink>
+          <RouterLink to="/dashboard">Overview</RouterLink>
         </li>
-        <li class="breadcrumb-item active" aria-current="page">Fuel Management</li>
+        <li class="breadcrumb-item active" aria-current="page">Fuel</li>
       </ol>
     </div>
 
     <!-- Page Title and Actions -->
     <div class="row mb-3">
       <div class="col-sm-12 col-md-12 col-xl-8">
-        <h4 class="mb-0 fw-semibold">Fuel Management</h4>
+        <h4 class="mb-0 fw-semibold">Fuel</h4>
       </div>
       <div class="col-sm-12 col-md-12 col-xl-4 d-flex justify-content-xl-end" v-if="hasPerm('fuel','create')">
         <RouterLink to="/fuel/new" class="btn btn-app-dark"><i class="bi bi-plus-lg me-1"></i> Add Fuel Entry</RouterLink>
