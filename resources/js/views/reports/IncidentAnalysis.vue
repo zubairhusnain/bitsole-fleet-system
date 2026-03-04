@@ -210,10 +210,10 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; font-weight: 500; font-size: 0.85rem; }
-tbody tr td { font-size: 0.85rem; color: #4b5563; }
-.card-header h6 { font-weight: 600; }
-.table-striped tbody tr:nth-of-type(odd) { --bs-table-accent-bg: #f8f9fb; }
-.btn-info { background-color: #0ea5e9; border-color: #0ea5e9; }
-.btn-info:hover { background-color: #0284c7; border-color: #0284c7; }
+thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; vertical-align: middle; font-weight: 500; font-size: 13px; border-bottom: none; }
+tbody tr td { font-size: 13px; color: #333; }
+.badge { font-weight: 600; font-size: 12px; }
+.form-label { font-size: 0.85rem; }
+.pagination-app .page-item.active .page-link { background-color: var(--brand-primary); border-color: var(--brand-primary); color: white; }
+.pagination-app .page-link { color: #333; }
 </style>

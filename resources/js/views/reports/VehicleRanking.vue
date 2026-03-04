@@ -244,6 +244,6 @@ thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; vert
 tbody tr td { font-size: 13px; color: #333; }
 .badge { font-weight: 600; font-size: 12px; }
 .form-label { font-size: 0.85rem; }
-.pagination-app .page-item.active .page-link { background-color: #0b0f28; border-color: #0b0f28; color: white; }
+.pagination-app .page-item.active .page-link { background-color: var(--brand-primary); border-color: var(--brand-primary); color: white; }
 .pagination-app .page-link { color: #333; }
 </style>
