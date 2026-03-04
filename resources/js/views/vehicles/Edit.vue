@@ -568,7 +568,6 @@ async function submit() {
 
 <style scoped>
 .card-header h6 { font-weight: 600; }
-.btn-app-dark { background-color: #0b0f28; color: #fff; }
 .upload-wrapper { position: relative; }
 .upload-box { border: 2px dashed #cfd6e4; border-radius: .75rem; height: 220px; display:flex; align-items:center; justify-content:center; background:#f8fafc; cursor:pointer; }
 .upload-box.has-image { border-style: solid; background:#fff; }

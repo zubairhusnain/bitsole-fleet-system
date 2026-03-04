@@ -149,8 +149,8 @@
 
       <!-- Actions -->
       <div class="d-flex align-items-center justify-content-end gap-2">
-        <RouterLink to="/drivers" class="btn btn-outline-secondary">Cancel</RouterLink>
-        <button type="submit" class="btn btn-app-dark" :disabled="submitting">{{ submitting ? 'Adding…' : 'Add Driver' }}</button>
+        <RouterLink to="/drivers" class="btn btn-label-secondary">Cancel</RouterLink>
+        <button type="submit" class="btn btn-primary" :disabled="submitting">{{ submitting ? 'Adding…' : 'Add Driver' }}</button>
       </div>
     </form>
   </div>
@@ -365,5 +365,4 @@ async function submit() {
 
 <style scoped>
 .input-w-360 { width: 360px; }
-.btn-app-dark { background-color: #0b0f28; color: #fff; border-radius: 12px; padding: .5rem .75rem; }
 </style>

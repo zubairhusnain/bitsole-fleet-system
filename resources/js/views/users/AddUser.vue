@@ -214,7 +214,6 @@ async function submit() {
 </script>
 
 <style scoped>
-.btn-app-dark { background-color: #0b0f28; color: #fff; border-radius: 12px; padding: .5rem .75rem; }
 
 /* Chip Multiselect Styles */
 .gap-2 { gap: .5rem; }

@@ -30,5 +30,4 @@ const missingName = computed(() => {
 .msg { color: #444; margin-bottom: 6px; font-weight: 600; }
 .detail { margin-bottom: 8px; }
 .spacer { height: 24px; }
-.btn-app-dark { background-color: #0b0f28; color: #fff; border-radius: 12px; padding: .5rem .75rem; }
 </style>

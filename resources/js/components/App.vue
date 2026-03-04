@@ -897,8 +897,9 @@ nav a.router-link-exact-active {
 .app-sidebar .nav-link.active,
 .app-sidebar .nav-link.router-link-active,
 .app-sidebar .nav-link.router-link-exact-active {
-    color: #fff !important;
-    background-color: #0b0f28 !important;
+    background-color: #ee7c0f99 !important;
+    color:#e4501b !important;
+    font-weight: 600;
 }
 
 .app-sidebar .nav-link.active .nav-icon,
@@ -907,7 +908,7 @@ nav a.router-link-exact-active {
 .app-sidebar .nav-link.active p,
 .app-sidebar .nav-link.router-link-active p,
 .app-sidebar .nav-link.router-link-exact-active p {
-    color: #fff !important;
+    color: #e4501b !important;
 }
 
 /* Mobile-only close button (visible when sidebar is open) */

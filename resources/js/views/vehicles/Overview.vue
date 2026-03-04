@@ -61,5 +61,4 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.btn-app-dark { background-color: #0b0f28; color: #fff; border-radius: 12px; padding: .5rem .75rem; }
 </style>

@@ -1462,7 +1462,6 @@ onBeforeUnmount(() => {
 
 /* LiveTracking-only: remove top margin and padding on main app container */
 :global(.live-tracking-route .app-main) {
-    margin-top: 0 !important;
     padding: 0 !important;
 }
 

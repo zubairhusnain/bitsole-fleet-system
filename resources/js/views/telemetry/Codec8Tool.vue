@@ -123,6 +123,5 @@ fetchDeviceOptions()
 </script>
 
 <style scoped>
-.decoded-json { white-space: pre-wrap; background: #0b0f2810; padding: 12px; border-radius: 10px; }
-.btn-app-dark { background-color: #0b0f28; color: #fff; border-radius: 12px; padding: .5rem .75rem; }
+.decoded-json { white-space: pre-wrap; background: rgba(var(--brand-primary-rgb), 0.1); padding: 12px; border-radius: 10px; }
 </style>

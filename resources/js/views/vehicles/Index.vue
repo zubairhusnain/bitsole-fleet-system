@@ -637,6 +637,6 @@ function toSettings(row) {
 </script>
 
 <style scoped>
+<style scoped>
 .input-w-360 { max-width: 360px; width: 100%; }
-.btn-app-dark { background-color: #0b0f28; color: #fff; border-radius: 12px; padding: .5rem .75rem; }
 </style>

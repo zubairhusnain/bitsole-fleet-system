@@ -1491,8 +1491,7 @@ async function searchAddress() {
 .map-tools { position: absolute; top: 8px; right: 8px; z-index: 1000; }
 .map-controls { position: absolute; left: 8px; bottom: 8px; display: flex; align-items: center; z-index: 1000; }
 .map-controls .btn-group .btn { background: #fff; border-color: #ddd; }
-.map-controls .btn-group .btn.active { background: #0b0f28; color: #fff; }
-.btn-app-dark { background-color: #0b0f28; color: #fff; border-radius: 12px; padding: .5rem .75rem; }
+.map-controls .btn-group .btn.active { background: var(--brand-primary); color: #fff; }
 .geocode-suggestions { font-size: 13px; }
 .geocode-suggestion-row { border-bottom: 1px solid #eee; }
 .geocode-suggestion-row:last-child { border-bottom: 0; }
