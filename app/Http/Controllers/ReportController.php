@@ -26,12 +26,6 @@ class ReportController extends Controller
         $this->reportService = $reportService;
     }
 
-    public function effectiveFuel(Request $request)
-    {
-        $rows = $this->reportService->fetchEffectiveFuelDb($request);
-        return response()->json(['rows' => $rows]);
-    }
-
     public function vehicleStatus(Request $request)
     {
         $query = $this->buildVehicleStatusQuery($request);
@@ -207,6 +201,30 @@ class ReportController extends Controller
 
         return $this->reportService->fetchFleetSummaryDb($request, $deviceIds);
     }
+
+    public function fuelDetailed(Request $request)
+    {
+        $request->validate([
+            'from_date' => 'required|date',
+            'to_date' => 'required|date',
+            'device_ids' => 'sometimes|array',
+            'device_ids.*' => 'integer'
+        ]);
+
+        $deviceIds = $this->getDeviceIds($request);
+        if (empty($deviceIds)) {
+            return response()->json([
+                'entries' => [],
+                'yearly' => [],
+            ]);
+        }
+
+        return response()->json(
+            $this->reportService->fetchFuelEntriesDetailed($request, $deviceIds)
+        );
+    }
+
+
      public function dailyTrips(Request $request)
     {
         $request->validate([

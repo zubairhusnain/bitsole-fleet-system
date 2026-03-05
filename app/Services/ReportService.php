@@ -31,98 +31,178 @@ class ReportService
         return $this->fetchTravelHistoryDb($request);
     }
 
-    public function fetchEffectiveFuelDb($request)
+        public function fetchFuelEntriesDetailed($request, $deviceIds)
     {
-        ini_set('memory_limit', '1024M');
-        set_time_limit(600);
-
-        $from = \Carbon\Carbon::parse($request->from_date)->startOfDay()->format('Y-m-d H:i:s');
-        $to = \Carbon\Carbon::parse($request->to_date)->endOfDay()->format('Y-m-d H:i:s');
-
-        $vehicleIds = $request->vehicle_ids ?? [];
-        if (empty($vehicleIds)) {
-             $accessible = Devices::accessibleByUser($request->user())->pluck('device_id')->all();
-             $vehicleIds = $accessible;
-        } elseif (is_string($vehicleIds)) {
-             $vehicleIds = explode(',', $vehicleIds);
-        }
-
-        if (empty($vehicleIds)) return [];
-
-        $idsStr = implode(',', array_map('intval', $vehicleIds));
-
-        // 1. Fetch Total Distance per Vehicle in range
-        $distances = [];
         try {
-            $distData = DB::connection('pgsql')->select("
-                SELECT
-                    deviceid,
-                    SUM(CAST(COALESCE(NULLIF(CAST(attributes AS json)->>'distance', ''), '0') AS FLOAT)) as total_dist
-                FROM tc_positions
-                WHERE deviceid IN ($idsStr)
-                  AND fixtime BETWEEN ? AND ?
-                GROUP BY deviceid
-            ", [$from, $to]);
-            foreach ($distData as $d) {
-                $distances[$d->deviceid] = $d->total_dist; // meters
-            }
-        } catch (\Throwable $e) {
-            Log::error('fetchEffectiveFuelDb distance query failed: ' . $e->getMessage());
-        }
-
-        // 2. Fetch Fuel Entries
-        $fuelData = [];
-        try {
-            $entries = DB::table('fuel_entries')
-                ->whereIn('device_id', $vehicleIds)
-                ->whereBetween('fill_date', [$from, $to])
-                ->select('device_id', DB::raw('SUM(quantity) as total_fuel'), DB::raw('SUM(cost) as total_cost'))
-                ->groupBy('device_id')
-                ->get();
-
-            foreach ($entries as $e) {
-                $fuelData[$e->device_id] = $e;
-            }
-        } catch (\Throwable $e) {
-             Log::error('fetchEffectiveFuelDb fuel query failed: ' . $e->getMessage());
-        }
-
-        // 3. Fetch Device Details
-        $tcDevices = \App\Models\TcDevice::whereIn('id', $vehicleIds)->get()->keyBy('id');
-
-        // 4. Build Report
-        $report = [];
-        foreach ($vehicleIds as $vid) {
-            $dev = $tcDevices->get($vid);
-            if (!$dev) continue;
-
-            $distM = $distances[$vid] ?? 0;
-            $distKm = $distM / 1000;
-
-            $fuel = $fuelData[$vid] ?? null;
-            $totalFuel = $fuel ? $fuel->total_fuel : 0;
-            $totalCost = $fuel ? $fuel->total_cost : 0;
-
-            // Efficiency: KM/L
-            $efficiency = $totalFuel > 0 ? ($distKm / $totalFuel) : 0;
-            // Consumption: L/100KM
-            $consumption = $distKm > 0 ? ($totalFuel / $distKm) * 100 : 0;
-
-            // Cost per KM
-            $costPerKm = $distKm > 0 ? ($totalCost / $distKm) : 0;
-
-            $report[] = [
-                'vehicleId' => $dev->name,
-                'totalDistance' => round($distKm, 2), // km
-                'totalFuel' => round($totalFuel, 2), // liters
-                'totalCost' => round($totalCost, 2), // currency
-                'efficiency' => round($efficiency, 2), // km/l
-                'consumption' => round($consumption, 2), // l/100km
-                'costPerKm' => round($costPerKm, 2),
+            $fromIso = \Carbon\Carbon::parse($request->from_date)->startOfDay()->format('Y-m-d H:i:s');
+            $toIso = \Carbon\Carbon::parse($request->to_date)->endOfDay()->format('Y-m-d H:i:s');
+        } catch (\Exception $e) {
+            Log::error("fetchFuelEntriesDetailed: Date parse error: " . $e->getMessage());
+            return [
+                'entries' => [],
+                'yearly' => [],
             ];
         }
 
-        return $report;
+        $idsStr = implode(',', array_map('intval', $deviceIds));
+        if (empty($idsStr)) {
+            return [
+                'entries' => [],
+                'yearly' => [],
+            ];
+        }
+
+        $devices = \App\Models\TcDevice::whereIn('id', $deviceIds)->get()->keyBy('id');
+
+        $rows = [];
+        try {
+            $rows = DB::connection('pgsql')->select("
+                WITH pos_data AS (
+                    SELECT
+                        deviceid,
+                        fixtime,
+                        COALESCE(
+                            NULLIF(CAST(attributes AS json)->>'io89', ''),
+                            NULLIF(CAST(attributes AS json)->>'CAN_FuelPercentage_89', ''),
+                            NULLIF(CAST(attributes AS json)->>'io48', ''),
+                            NULLIF(CAST(attributes AS json)->>'io16', ''),
+                            NULLIF(CAST(attributes AS json)->>'fuel', ''),
+                            NULLIF(CAST(attributes AS json)->>'fuelLevel', '')
+                        ) AS raw_fuel
+                    FROM tc_positions
+                    WHERE deviceid IN ($idsStr)
+                      AND fixtime BETWEEN ? AND ?
+                ),
+                clean_data AS (
+                    SELECT
+                        deviceid,
+                        fixtime,
+                        CAST(raw_fuel AS FLOAT) as fuel_level
+                    FROM pos_data
+                    WHERE raw_fuel ~ '^[0-9]+(\\.[0-9]+)?$'
+                      AND CAST(raw_fuel AS FLOAT) BETWEEN 0 AND 100
+                ),
+                pos_with_prev AS (
+                    SELECT
+                        deviceid,
+                        fixtime,
+                        fuel_level,
+                        LAG(fuel_level) OVER (PARTITION BY deviceid ORDER BY fixtime) as prev_fuel_level
+                    FROM clean_data
+                )
+                SELECT
+                    deviceid,
+                    fixtime,
+                    prev_fuel_level,
+                    fuel_level,
+                    CASE WHEN prev_fuel_level > fuel_level THEN prev_fuel_level - fuel_level ELSE 0 END AS drop_pct,
+                    CASE WHEN fuel_level > prev_fuel_level + 5 THEN fuel_level - prev_fuel_level ELSE 0 END AS increase_pct
+                FROM pos_with_prev
+                WHERE prev_fuel_level IS NOT NULL
+                  AND (
+                    prev_fuel_level > fuel_level
+                    OR fuel_level > prev_fuel_level + 5
+                  )
+                ORDER BY deviceid, fixtime
+            ", [$fromIso, $toIso]);
+        } catch (\Throwable $e) {
+            Log::error('fetchFuelEntriesDetailed query failed: ' . $e->getMessage());
+            return [
+                'entries' => [],
+                'yearly' => [],
+            ];
+        }
+
+        $entries = [];
+        $yearly = [];
+
+        foreach ($rows as $row) {
+            $deviceId = (int)($row->deviceid ?? 0);
+            $dev = $devices->get($deviceId);
+            $deviceName = $dev->name ?? 'Unknown';
+
+            $attrs = $dev && $dev->attributes ? (is_string($dev->attributes) ? (json_decode($dev->attributes, true) ?: []) : (is_array($dev->attributes) ? $dev->attributes : [])) : [];
+            $tankCapacity = (float)($attrs['fuelTankCapacity'] ?? 50);
+            if ($tankCapacity <= 0) {
+                $tankCapacity = 50;
+            }
+
+            $dropPct = (float)($row->drop_pct ?? 0);
+            $increasePct = (float)($row->increase_pct ?? 0);
+
+            $dropLitres = ($dropPct / 100.0) * $tankCapacity;
+            $increaseLitres = ($increasePct / 100.0) * $tankCapacity;
+
+            try {
+                $ts = \Carbon\Carbon::parse($row->fixtime);
+            } catch (\Exception $e) {
+                continue;
+            }
+
+            $type = 'none';
+            if ($dropPct > 0 && $increasePct <= 0) {
+                $type = 'drop';
+            } elseif ($increasePct > 0 && $dropPct <= 0) {
+                $type = 'refill';
+            } elseif ($dropPct > 0 || $increasePct > 0) {
+                $type = 'mixed';
+            }
+
+            $startPctVal = round((float)($row->prev_fuel_level ?? 0), 1);
+            $endPctVal = round((float)($row->fuel_level ?? 0), 1);
+            $endLitres = ($endPctVal / 100.0) * $tankCapacity;
+
+            $entry = [
+                'deviceId' => $deviceId,
+                'vehicleName' => $deviceName,
+                'time' => $ts->toIso8601String(),
+                'eventDate' => $ts->toDateString(),
+                'eventTime' => $ts->format('H:i:s'),
+                'type' => $type,
+                'startPct' => $startPctVal,
+                'endPct' => $endPctVal,
+                'dropPct' => round($dropPct, 1),
+                'dropLitres' => round($dropLitres, 2),
+                'increasePct' => round($increasePct, 1),
+                'increaseLitres' => round($increaseLitres, 2),
+                'tankCapacity' => round($tankCapacity, 1),
+                'endLitres' => round($endLitres, 2),
+            ];
+
+            $entries[] = $entry;
+
+            $monthKey = $ts->format('Y-m');
+            if (!isset($yearly[$monthKey])) {
+                $yearly[$monthKey] = [
+                    'year' => (int)$ts->format('Y'),
+                    'month' => (int)$ts->format('m'),
+                    'label' => $ts->format('M Y'),
+                    'spentLitres' => 0.0,
+                    'refillLitres' => 0.0,
+                    'events' => 0,
+                ];
+            }
+
+            $yearly[$monthKey]['spentLitres'] += $dropLitres;
+            $yearly[$monthKey]['refillLitres'] += $increaseLitres;
+            $yearly[$monthKey]['events'] += 1;
+        }
+
+        usort($entries, function ($a, $b) {
+            return strcmp($a['time'], $b['time']);
+        });
+
+        usort($yearly, function ($a, $b) {
+            if ($a['year'] === $b['year']) {
+                return $a['month'] <=> $b['month'];
+            }
+            return $a['year'] <=> $b['year'];
+        });
+
+        return [
+            'entries' => $entries,
+            'yearly' => array_values($yearly),
+        ];
     }
 
     public function fetchTravelHistoryDb($request)

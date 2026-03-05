@@ -34,11 +34,6 @@ Route::get('/testing', function () {
     return view('welcome');
 });
 
-// Reports API Routes
-Route::middleware(['auth'])->prefix('/web/reports')->group(function () {
-    Route::get('/effective-fuel', [App\Http\Controllers\ReportController::class, 'effectiveFuel']);
-});
-
 // Simple example web routes
 Route::get('/ping', function () {
     return response('pong', 200);
@@ -281,6 +276,7 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/daily-trips', [\App\Http\Controllers\ReportController::class, 'dailyTrips']);
     Route::get('/daily-summary', [\App\Http\Controllers\ReportController::class, 'dailySummary']);
     Route::get('/monthly-summary', [\App\Http\Controllers\ReportController::class, 'monthlySummary']);
+    Route::get('/fuel-detailed', [\App\Http\Controllers\ReportController::class, 'fuelDetailed']);
     Route::get('/asset-activity', [\App\Http\Controllers\ReportController::class, 'assetActivity']);
     Route::get('/vehicle-activity', [\App\Http\Controllers\ReportController::class, 'vehicleActivity']);
     Route::get('/idling', [\App\Http\Controllers\ReportController::class, 'idling']);
