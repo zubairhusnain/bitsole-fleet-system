@@ -297,11 +297,10 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
 
     Route::get('/effective-fuel', [\App\Http\Controllers\ReportController::class, 'effectiveFuel']);
     Route::get('/route-playback', [\App\Http\Controllers\ReportController::class, 'routePlayback']);
-});
-
 // Command Console
 Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/commands')->group(function () {
     Route::post('/send', [\App\Http\Controllers\CommandController::class, 'send']);
     Route::get('/types', [\App\Http\Controllers\CommandController::class, 'types']);
-    Route::get('/device-options', [\App\Http\Controllers\ReportController::class, 'deviceOptions']);
+    Route::get('/saved', [\App\Http\Controllers\CommandController::class, 'saved']);
+});   Route::get('/device-options', [\App\Http\Controllers\ReportController::class, 'deviceOptions']);
 });

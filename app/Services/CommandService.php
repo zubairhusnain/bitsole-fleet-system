@@ -14,32 +14,30 @@ class CommandService
     /**
      * Send a command to a device via Tracking API
      *
-     * @param int $deviceId The device ID (tc_devices.id)
-     * @param string $type Command type (engineStop, engineResume, custom, etc.)
-     * @param array $attributes Additional attributes (e.g. { "data": "reset" } for custom commands)
+     * @param int $deviceId The device ID
+     * @param array $data Command data (type+attributes OR id)
      * @return array
      */
-    public function sendCommand($deviceId, $type, $attributes = [])
+    public function sendCommand($deviceId, $data)
     {
-        // Follow ReportService pattern: use user session cookie
         $user = Auth::user();
         $sessionId = $user->traccarSession ?? session('cookie');
 
-        // Map friendly types to command types if needed
-        $commandType = $type;
+        // Prepare payload
+        $payloadData = ['deviceId' => (int)$deviceId];
 
-        // Construct payload
-        $payload = json_encode([
-            'deviceId' => (int)$deviceId,
-            'type' => $commandType,
-            'attributes' => (object)$attributes
-        ]);
+        if (isset($data['id'])) {
+            // Sending a saved command
+            $payloadData['id'] = (int)$data['id'];
+        } else {
+            // Sending a new command
+            $payloadData['type'] = $data['type'] ?? 'custom';
+            $payloadData['attributes'] = (object)($data['attributes'] ?? []);
+        }
+
+        $payload = json_encode($payloadData);
 
         try {
-            // Using Curl helper as requested
-            // static::curl($task, $method, $cookie, $data, $header)
-            // Task should start with /api/...
-
             $headers = [
                 'Content-Type: application/json',
                 'Accept: application/json'
@@ -47,7 +45,6 @@ class CommandService
 
             $response = static::curl('/api/commands/send', 'POST', $sessionId, $payload, $headers);
 
-            // Check response code (Curl helper returns object with responseCode, response, error)
             if ($response->responseCode >= 200 && $response->responseCode < 300) {
                 return [
                     'success' => true,
@@ -71,12 +68,52 @@ class CommandService
     }
 
     /**
-     * Get saved commands for a device (optional, if using saved commands feature)
+     * Get available command types for a device
+     */
+    public function getCommandTypes($deviceId)
+    {
+        $user = Auth::user();
+        $sessionId = $user->traccarSession ?? session('cookie');
+
+        try {
+            $headers = ['Accept: application/json'];
+            // Traccar endpoint: /api/commands/types?deviceId={id}
+            $endpoint = '/api/commands/types' . ($deviceId ? '?deviceId=' . $deviceId : '');
+
+            $response = static::curl($endpoint, 'GET', $sessionId, '', $headers);
+
+            if ($response->responseCode >= 200 && $response->responseCode < 300) {
+                return json_decode($response->response, true) ?? [];
+            }
+            return [];
+        } catch (\Exception $e) {
+            Log::error("GetCommandTypes Exception: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get saved commands for a device
      */
     public function getSavedCommands($deviceId)
     {
-        // This could be fetched from /api/commands?deviceId=X
-        // or a local table if we implement saved templates
-        return [];
+        $user = Auth::user();
+        $sessionId = $user->traccarSession ?? session('cookie');
+
+        try {
+            $headers = ['Accept: application/json'];
+            // Traccar endpoint: /api/commands?deviceId={id}
+            $endpoint = '/api/commands' . ($deviceId ? '?deviceId=' . $deviceId : '');
+
+            $response = static::curl($endpoint, 'GET', $sessionId, '', $headers);
+
+            if ($response->responseCode >= 200 && $response->responseCode < 300) {
+                return json_decode($response->response, true) ?? [];
+            }
+            return [];
+        } catch (\Exception $e) {
+            Log::error("GetSavedCommands Exception: " . $e->getMessage());
+            return [];
+        }
     }
 }

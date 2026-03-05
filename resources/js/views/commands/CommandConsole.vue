@@ -21,18 +21,32 @@
             <form @submit.prevent="sendCommand">
               <div class="mb-3">
                 <label class="form-label small fw-semibold text-muted">Select Vehicle</label>
-                <select class="form-select" v-model="selectedDeviceId" required>
+                <select class="form-select" v-model="selectedDeviceId" required @change="onDeviceChange">
                   <option value="" disabled>-- Select a Vehicle --</option>
-                  <option v-for="opt in deviceOptions" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
+                  <option v-for="opt in deviceOptions" :key="opt.id" :value="opt.deviceId || opt.id">{{ opt.label }}</option>
                 </select>
               </div>
 
-              <div class="mb-3">
+              <!-- Mode Selection (New or Saved) -->
+              <div class="mb-3" v-if="selectedDeviceId">
+                <div class="btn-group w-100" role="group">
+                  <input type="radio" class="btn-check" name="cmdMode" id="modeNew" value="new" v-model="commandMode" checked>
+                  <label class="btn btn-outline-secondary" for="modeNew">New Command</label>
+
+                  <input type="radio" class="btn-check" name="cmdMode" id="modeSaved" value="saved" v-model="commandMode" :disabled="!savedCommands.length">
+                  <label class="btn btn-outline-secondary" for="modeSaved">
+                    Saved Commands <span v-if="savedCommands.length" class="badge bg-secondary ms-1">{{ savedCommands.length }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- New Command Type -->
+              <div class="mb-3" v-if="commandMode === 'new'">
                 <label class="form-label small fw-semibold text-muted">Command Type</label>
                 <select class="form-select" v-model="selectedType" required @change="handleTypeChange">
                   <option value="" disabled>-- Select Command --</option>
-                  <option v-for="type in commandTypes" :key="type.value" :value="type.value">
-                    {{ type.label }}
+                  <option v-for="type in commandTypes" :key="type.type" :value="type.type">
+                    {{ type.description || type.type }}
                   </option>
                 </select>
                 <div v-if="selectedTypeDetails?.danger" class="form-text text-danger">
@@ -40,14 +54,25 @@
                 </div>
               </div>
 
+              <!-- Saved Command Selection -->
+              <div class="mb-3" v-if="commandMode === 'saved'">
+                <label class="form-label small fw-semibold text-muted">Saved Command</label>
+                <select class="form-select" v-model="selectedSavedId" required>
+                  <option value="" disabled>-- Select Saved Command --</option>
+                  <option v-for="cmd in savedCommands" :key="cmd.id" :value="cmd.id">
+                    {{ cmd.description }} ({{ cmd.type }})
+                  </option>
+                </select>
+              </div>
+
               <!-- Dynamic Attributes -->
-              <div v-if="selectedType === 'custom'" class="mb-3">
+              <div v-if="commandMode === 'new' && selectedType === 'custom'" class="mb-3">
                 <label class="form-label small fw-semibold text-muted">Custom Command Data</label>
                 <input type="text" class="form-control" v-model="customData" placeholder="e.g. setdigout 1" required>
               </div>
 
               <div class="d-grid gap-2 mt-4">
-                <button type="submit" class="btn btn-primary" :disabled="loading || !selectedDeviceId || !selectedType">
+                <button type="submit" class="btn btn-primary" :disabled="loading || !selectedDeviceId || (commandMode === 'new' && !selectedType) || (commandMode === 'saved' && !selectedSavedId)">
                   <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
                   <i v-else class="bi bi-send me-2"></i>
                   Send Command
@@ -85,37 +110,55 @@ import axios from 'axios';
 
 const deviceOptions = ref([]);
 const commandTypes = ref([]);
+const savedCommands = ref([]);
 const selectedDeviceId = ref('');
+const commandMode = ref('new'); // 'new' or 'saved'
 const selectedType = ref('');
+const selectedSavedId = ref('');
 const customData = ref('');
 const loading = ref(false);
 const responseMessage = ref('');
 const responseSuccess = ref(false);
 
 const selectedTypeDetails = computed(() => {
-  return commandTypes.value.find(t => t.value === selectedType.value);
+  return commandTypes.value.find(t => t.type === selectedType.value);
 });
 
 onMounted(async () => {
   await loadDeviceOptions();
-  await loadCommandTypes();
+  // Types will be loaded when device is selected
 });
 
 const loadDeviceOptions = async () => {
   try {
-    const res = await axios.get('/web/commands/device-options');
+    const res = await axios.get('/web/device-options');
     deviceOptions.value = res.data.options || res.data || [];
   } catch (e) {
     console.error('Failed to load devices', e);
   }
 };
 
-const loadCommandTypes = async () => {
+const onDeviceChange = async () => {
+  selectedType.value = '';
+  selectedSavedId.value = '';
+  commandTypes.value = [];
+  savedCommands.value = [];
+  customData.value = '';
+
+  if (!selectedDeviceId.value) return;
+
   try {
-    const res = await axios.get('/web/commands/types');
-    commandTypes.value = res.data || [];
+    const [typesRes, savedRes] = await Promise.all([
+      axios.get(`/web/commands/types?device_id=${selectedDeviceId.value}`),
+      axios.get(`/web/commands/saved?device_id=${selectedDeviceId.value}`)
+    ]);
+    commandTypes.value = typesRes.data || [];
+    savedCommands.value = savedRes.data || [];
+
+    // Default to 'new' unless only saved commands are available? No, default new.
+    commandMode.value = 'new';
   } catch (e) {
-    console.error('Failed to load command types', e);
+    console.error('Failed to load command data', e);
   }
 };
 
@@ -125,8 +168,8 @@ const handleTypeChange = () => {
 };
 
 const sendCommand = async () => {
-  if (selectedTypeDetails.value?.danger) {
-    if (!confirm(`Are you sure you want to send "${selectedTypeDetails.value.label}" to this vehicle?`)) {
+  if (commandMode.value === 'new' && selectedTypeDetails.value?.danger) {
+    if (!confirm(`Are you sure you want to send "${selectedTypeDetails.value.description}" to this vehicle?`)) {
       return;
     }
   }
@@ -137,12 +180,16 @@ const sendCommand = async () => {
 
   const payload = {
     device_id: selectedDeviceId.value,
-    type: selectedType.value,
-    attributes: {}
   };
 
-  if (selectedType.value === 'custom') {
-    payload.attributes.data = customData.value;
+  if (commandMode.value === 'saved') {
+    payload.command_id = selectedSavedId.value;
+  } else {
+    payload.type = selectedType.value;
+    payload.attributes = {};
+    if (selectedType.value === 'custom') {
+      payload.attributes.data = customData.value;
+    }
   }
 
   try {

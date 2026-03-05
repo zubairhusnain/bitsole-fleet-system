@@ -24,24 +24,30 @@ class CommandController extends Controller
     {
         $request->validate([
             'device_id' => 'required|integer',
-            'type' => 'required|string',
+            'command_id' => 'nullable|integer', // For saved command
+            'type' => 'required_without:command_id|string',
             'attributes' => 'nullable|array'
         ]);
 
         // Fetch device for logging (Access control handled by middleware/scope if applicable)
-        // User suggested removing explicit permission check here
         $device = Devices::where('device_id', $request->device_id)->first();
 
         if (!$device) {
              return response()->json(['message' => 'Device not found'], 404);
         }
 
+        $data = [];
+        if ($request->filled('command_id')) {
+            $data['id'] = $request->command_id;
+            $desc = "Sent saved command #{$request->command_id}";
+        } else {
+            $data['type'] = $request->type;
+            $data['attributes'] = $request->attributes ?? [];
+            $desc = "Sent {$request->type} command";
+        }
+
         // Send command via service
-        $result = $this->commandService->sendCommand(
-            $request->device_id,
-            $request->type,
-            $request->attributes ?? []
-        );
+        $result = $this->commandService->sendCommand($request->device_id, $data);
 
         if ($result['success']) {
             // Log activity
@@ -53,7 +59,7 @@ class CommandController extends Controller
                     'user_role' => $user->role_label ?? 'User',
                     'action' => 'command_sent',
                     'module' => 'commands',
-                    'description' => "Sent {$request->type} to device {$device->name}",
+                    'description' => "$desc to device {$device->name}",
                     'ip_address' => $request->ip()
                 ]);
             } catch (\Exception $e) {
@@ -69,14 +75,46 @@ class CommandController extends Controller
     /**
      * Get available command types
      */
-    public function types()
+    public function types(Request $request)
     {
-        return response()->json([
-            ['value' => 'engineStop', 'label' => 'Stop Engine (Immobilize)', 'danger' => true],
-            ['value' => 'engineResume', 'label' => 'Resume Engine', 'danger' => false],
-            ['value' => 'positionSingle', 'label' => 'Get Single Position', 'danger' => false],
-            ['value' => 'custom', 'label' => 'Custom Command', 'danger' => true],
-            ['value' => 'rebootDevice', 'label' => 'Reboot Device', 'danger' => true],
-        ]);
+        $deviceId = $request->input('device_id');
+        if (!$deviceId) {
+            // Fallback to static list if no device provided
+            return response()->json([
+                ['type' => 'engineStop', 'description' => 'Stop Engine (Immobilize)', 'danger' => true],
+                ['type' => 'engineResume', 'description' => 'Resume Engine', 'danger' => false],
+                ['type' => 'positionSingle', 'description' => 'Get Single Position', 'danger' => false],
+                ['type' => 'custom', 'description' => 'Custom Command', 'danger' => true],
+                ['type' => 'rebootDevice', 'description' => 'Reboot Device', 'danger' => true],
+            ]);
+        }
+
+        $types = $this->commandService->getCommandTypes($deviceId);
+
+        // Format for frontend
+        $formatted = array_map(function($t) {
+            // Traccar returns objects like { "type": "custom" } or strings?
+            // Usually returns list of objects with type property
+            $type = is_array($t) ? ($t['type'] ?? '') : $t;
+            return [
+                'type' => $type,
+                'description' => ucfirst(preg_replace('/(?<!\ )[A-Z]/', ' $0', $type)), // CamelCase to spaced
+                'danger' => in_array($type, ['engineStop', 'custom', 'rebootDevice'])
+            ];
+        }, $types);
+
+        return response()->json($formatted);
+    }
+
+    /**
+     * Get saved commands for a device
+     */
+    public function saved(Request $request)
+    {
+        $deviceId = $request->input('device_id');
+        if (!$deviceId) return response()->json([]);
+
+        $commands = $this->commandService->getSavedCommands($deviceId);
+        return response()->json($commands);
     }
 }
