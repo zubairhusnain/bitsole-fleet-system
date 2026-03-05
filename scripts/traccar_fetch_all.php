@@ -1,5 +1,5 @@
 <?php
-// Fetch all devices and their latest positions from Traccar using the existing cookie jar.
+// Fetch all devices and their latest positions from Tracking Platform using the existing cookie jar.
 // Usage:
 //   php scripts/traccar_fetch_all.php --host=http://52.77.249.227:8082 --cookie=cookies_traccar.txt [--email=admin@example.com --password=secret]
 // If email/password are provided, the script will perform a login and update the cookie jar before fetching.

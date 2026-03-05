@@ -781,7 +781,7 @@ const showAlerts = async (vehicle, type = null) => {
     loadingAlerts.value = true;
 
     try {
-        // Use device_id (Traccar ID) if available, otherwise id
+        // Use device_id (Tracking ID) if available, otherwise id
         const id = vehicle.id;
         const { data } = await axios.get(`/web/monitoring/vehicles/${id}/events`, {
             params: { type }

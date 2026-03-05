@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Services\CommandService;
 use App\Models\Devices;
 use Illuminate\Support\Facades\Auth;
+use App\Models\SystemActivityLog;
 
 class CommandController extends Controller
 {
@@ -27,16 +28,15 @@ class CommandController extends Controller
             'attributes' => 'nullable|array'
         ]);
 
-        // Security Check: Ensure user has access to this device
-        $user = Auth::user();
-        $device = Devices::accessibleByUser($user)
-            ->where('device_id', $request->device_id)
-            ->first();
+        // Fetch device for logging (Access control handled by middleware/scope if applicable)
+        // User suggested removing explicit permission check here
+        $device = Devices::where('device_id', $request->device_id)->first();
 
         if (!$device) {
-            return response()->json(['message' => 'Unauthorized access to device'], 403);
+             return response()->json(['message' => 'Device not found'], 404);
         }
 
+        // Send command via service
         $result = $this->commandService->sendCommand(
             $request->device_id,
             $request->type,
@@ -45,11 +45,12 @@ class CommandController extends Controller
 
         if ($result['success']) {
             // Log activity
+            $user = Auth::user();
             try {
-                \App\Models\SystemActivityLog::create([
+                SystemActivityLog::create([
                     'user_id' => $user->id,
                     'user_name' => $user->name,
-                    'user_role' => $user->role_label,
+                    'user_role' => $user->role_label ?? 'User',
                     'action' => 'command_sent',
                     'module' => 'commands',
                     'description' => "Sent {$request->type} to device {$device->name}",

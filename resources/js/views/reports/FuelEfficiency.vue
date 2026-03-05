@@ -30,7 +30,7 @@
         <div class="card-body pt-2 pb-3 small">
           <p class="mb-2">
             Fuel Report summarises fuel consumption, refuelling and efficiency for each vehicle over the selected period
-            using Traccar core fuel data.
+            using core fuel data.
           </p>
           <p class="mb-2">
             It combines distance, tank capacity and fuel level changes to estimate how much fuel was consumed, how often

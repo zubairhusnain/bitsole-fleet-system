@@ -61,7 +61,7 @@ class AddTrackerModelComputedAttributes extends Command
             $cookie = $resp->cookieData ?? session('cookie');
 
             if ($resp->responseCode < 200 || $resp->responseCode >= 300 || !$cookie) {
-                $this->error('Failed to login to Traccar. Code: ' . ($resp->responseCode ?? 0));
+                $this->error('Failed to login to Tracking Platform. Code: ' . ($resp->responseCode ?? 0));
                 return 1;
             }
 

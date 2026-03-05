@@ -23,7 +23,7 @@ class EnableAllNotifications extends Command
      *
      * @var string
      */
-    protected $description = 'Enable all notifications for all devices via Traccar API';
+    protected $description = 'Enable all notifications for all devices via Tracking API';
 
     /**
      * Execute the console command.
@@ -142,7 +142,7 @@ class EnableAllNotifications extends Command
                 if ($resp->responseCode >= 200 && $resp->responseCode < 300) {
                     $assignedCount++;
                 } else {
-                    // 400 might mean already exists (Traccar usually returns 400 for duplicate permission)
+                    // 400 might mean already exists (Tracking Platform usually returns 400 for duplicate permission)
                     if ($resp->responseCode == 400) {
                         $skippedCount++;
                     } else {

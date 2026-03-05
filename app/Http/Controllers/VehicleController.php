@@ -570,7 +570,7 @@ class VehicleController extends Controller
             return response()->json(['message' => 'Vehicle blocked'], 200);
         }
 
-        // HARD DELETE: delete device on tracking server (Traccar), permanently remove local record,
+        // HARD DELETE: delete device on tracking server (Tracking Platform), permanently remove local record,
         // and clean up any locally stored vehicle photos referenced in attributes
 
         // Load existing photo paths from local attributes
@@ -845,7 +845,7 @@ class VehicleController extends Controller
                 if ($code >= 200 && $code < 300) {
                     $results[] = ['geofenceId' => $geoId, 'ok' => true, 'response' => $resp->response ?? null];
                 } else {
-                    $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $resp->response ?? 'Traccar error', 'code' => $code];
+                    $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $resp->response ?? 'Tracking error', 'code' => $code];
                 }
             } catch (\Throwable $e) {
                 $results[] = ['geofenceId' => $geoId, 'ok' => false, 'error' => $e->getMessage()];
@@ -1133,7 +1133,7 @@ class VehicleController extends Controller
         if (!isset($resp->responseCode) || $resp->responseCode < 200 || $resp->responseCode >= 300) {
             $code = (int) ($resp->responseCode ?? 0);
             $notAvailable = in_array($code, [404, 405, 501]);
-            $msg = $notAvailable ? 'Logs API not available on this Traccar version' : 'Failed to fetch logs from tracking server';
+            $msg = $notAvailable ? 'Logs API not available on this Tracking Platform version' : 'Failed to fetch logs from tracking server';
             return response()->json(['message' => $msg, 'code' => $code, 'error' => $resp->error ?? null], $notAvailable ? 404 : 502);
         }
 

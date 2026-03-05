@@ -249,7 +249,7 @@ const processVehicleData = (list) => {
         const deviceAttrs = parseAttrs(tc.attributes);
         const vehicleAttrs = parseAttrs(v.attributes);
 
-        // Merge: Device < Vehicle < Position (Standard Traccar/Laravel precedence)
+        // Merge: Device < Vehicle < Position (Standard Tracking/Laravel precedence)
         const mergedAttrs = { ...deviceAttrs, ...vehicleAttrs, ...attrs };
         const deviceModelAttr = pickAttr(deviceAttrs, ['trackerModel']);
 

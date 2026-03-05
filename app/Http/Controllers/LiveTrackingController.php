@@ -22,7 +22,7 @@ class LiveTrackingController extends Controller
         $mine = $request->boolean('mine');
         $deviceIdParam = $request->input('deviceId');
 
-        // Fetch live devices directly from Traccar via DeviceService and map positions
+        // Fetch live devices directly from Tracking Platform via DeviceService and map positions
         $positions = app(\App\Services\DeviceService::class)->getLiveDevices($user, [
             'mine' => $mine,
             'source' => 'current',

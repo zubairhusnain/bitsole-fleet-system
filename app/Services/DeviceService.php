@@ -143,12 +143,12 @@ class DeviceService
     // }
 
     /**
-     * Build positions payload using Traccar API via local device mapping.
-     * Mirrors getAllDevices approach (Traccar API), not direct DB joins.
+     * Build positions payload using Tracking API via local device mapping.
+     * Mirrors getAllDevices approach (Tracking API), not direct DB joins.
      *
      * Options:
      * - mine (bool): restrict to user's own devices
-     * - includeRaw (bool): include raw device and position arrays from Traccar
+     * - includeRaw (bool): include raw device and position arrays from Tracking Platform
      * - source (string): payload discriminator (e.g., 'current' or 'updated')
      */
     public function getLiveDevices(User $user, array $options = []): array
@@ -296,7 +296,7 @@ class DeviceService
         $sessionId = $user->traccarSession ?? session('cookie');
         $includeRaw = (bool)($options['includeRaw'] ?? false);
 
-        // Fetch device from Traccar
+        // Fetch device from Tracking Platform
         $deviceResp = static::curl('/api/devices?id=' . $deviceId, 'GET', $sessionId, '', ['Content-Type: application/json', 'Accept: application/json']);
         $devices = json_decode($deviceResp->response, true) ?? [];
         $device = $devices[0] ?? null;
@@ -363,7 +363,7 @@ class DeviceService
     }
 
     /**
-     * Return raw Traccar device for the given deviceId.
+     * Return raw Tracking device for the given deviceId.
      */
     public function getDeviceRaw(User $user, int $deviceId): ?array
     {
@@ -923,7 +923,7 @@ class DeviceService
     {
         $sessionId = $request->user()->traccarSession ?? session('cookie');
 
-        // Build sanitized payload with only supported Traccar fields
+        // Build sanitized payload with only supported Tracking fields
         $allowed = [
             'id', 'name', 'uniqueId', 'phone', 'model', 'category',
             'groupId', 'calendarId', 'contact', 'disabled', 'expirationTime', 'speedLimit', 'attributes'

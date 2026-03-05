@@ -944,7 +944,7 @@ watch(
 );
 
 function getImage(v) {
-    // Merge attributes: Traccar Device attributes < Vehicle attributes
+    // Merge attributes: Tracking Device attributes < Vehicle attributes
     const tcDeviceAttrs = parseAttrs(v.tc_device?.attributes || v.tcDevice?.attributes);
     const vehicleAttrs = parseAttrs(v.attributes);
     const mergedAttrs = { ...tcDeviceAttrs, ...vehicleAttrs };

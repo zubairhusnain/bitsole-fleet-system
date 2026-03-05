@@ -34,7 +34,7 @@ class CleanDeviceComputedAttributes extends Command
             $respLogin = static::curl('/api/session', 'POST', '', $dataLogin, [Config::get('constants.Constants.urlEncoded')]);
             $cookie = $respLogin->cookieData ?? session('cookie');
             if ($respLogin->responseCode < 200 || $respLogin->responseCode >= 300 || !$cookie) {
-                $this->error('Failed to login to Traccar. Code: ' . ($respLogin->responseCode ?? 0));
+                $this->error('Failed to login to Tracking Platform. Code: ' . ($respLogin->responseCode ?? 0));
                 return 1;
             }
 

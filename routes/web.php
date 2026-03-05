@@ -248,10 +248,10 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::delete('/{id}', [\App\Http\Controllers\FuelController::class, 'destroy']);
 });
 
-// NEW: Auth-protected Geofence listing from Traccar DB (testing/util)
-Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('/web/traccar/geofences', [\App\Http\Controllers\ZoneController::class, 'geofencesDb']);
+// NEW: Auth-protected Geofence listing from Tracking DB (testing/util)
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->get('/web/tracking/geofences', [\App\Http\Controllers\ZoneController::class, 'geofencesDb']);
 
-Route::middleware('auth')->get('/web/traccar/assign-computed-attributes', function (\Illuminate\Http\Request $request) {
+Route::middleware('auth')->get('/web/tracking/assign-computed-attributes', function (\Illuminate\Http\Request $request) {
     $summary = app(\App\Services\PermissionService::class)->assignComputedAttributesToAllDevices($request);
     return response()->json($summary);
 });
@@ -300,7 +300,7 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
 });
 
 // Command Console
-Route::middleware(['auth'])->prefix('/web/commands')->group(function () {
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/commands')->group(function () {
     Route::post('/send', [\App\Http\Controllers\CommandController::class, 'send']);
     Route::get('/types', [\App\Http\Controllers\CommandController::class, 'types']);
 });

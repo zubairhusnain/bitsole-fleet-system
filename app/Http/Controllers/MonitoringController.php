@@ -261,7 +261,7 @@ class MonitoringController extends Controller
 
             $detectedForDevice = [];
 
-            // 1. Check Traccar-provided geofenceids
+            // 1. Check Tracking-provided geofenceids
             if (!empty($dev->position->geofenceids)) {
                 $gids = explode(',', $dev->position->geofenceids);
                 foreach ($gids as $gidStr) {
@@ -627,7 +627,7 @@ class MonitoringController extends Controller
      */
     public function getDeviceEvents(Request $request, $id)
     {
-        // Resolve device ID (Traccar ID)
+        // Resolve device ID (Tracking ID)
         $device = Devices::where('device_id', $id)->orWhere('id', $id)->firstOrFail();
 
         $query = \App\Models\TcEvent::where('deviceid', $device->device_id)

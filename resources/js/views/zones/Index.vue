@@ -270,7 +270,7 @@ async function confirmDelete(id, geofenceId) {
 }
 
 async function confirmBlock(id, geofenceId) {
-  if (!confirm('Block this zone? It will be hidden but not removed from Traccar.')) return;
+  if (!confirm('Block this zone? It will be hidden but not removed from Tracking Platform.')) return;
   error.value = '';
   message.value = '';
   try {

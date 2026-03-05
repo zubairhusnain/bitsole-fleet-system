@@ -1141,7 +1141,7 @@ class ReportService
 
         $baseUrl = is_string(Config::get('constants.Constants.host')) ? rtrim(Config::get('constants.Constants.host'), '/') : '';
         if (empty($baseUrl)) {
-            Log::error('ReportService: Traccar Host URL is not configured.');
+            Log::error('ReportService: Tracking Host URL is not configured.');
             return [];
         }
 
@@ -3164,7 +3164,7 @@ class ReportService
                     // (Assuming data gap means something else happened, or just lost signal)
                     // But strictly, if we only select idling points, any gap means we skipped moving/off points.
                     // So if $ts - $lastTs > update_interval (e.g. 60s), it might be a break?
-                    // Traccar default update is 10-60s.
+                    // Tracking default update is 10-60s.
                     // Let's say if gap > 300s (5 mins), we break.
                     $lastTs = strtotime($lastPos->fixtime);
                     if (($ts - $lastTs) > 300) {

@@ -585,7 +585,7 @@ class DriverController extends Controller
             return response()->json(['message' => 'Driver blocked'], 200);
         }
 
-        // HARD DELETE: delete driver on tracking server (Traccar), permanently remove local record,
+        // HARD DELETE: delete driver on tracking server (Tracking Platform), permanently remove local record,
         // and clean up any locally stored images referenced in attributes
 
         // Load existing local attributes to clean up images later

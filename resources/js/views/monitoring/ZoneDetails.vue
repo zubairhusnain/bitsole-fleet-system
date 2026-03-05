@@ -814,7 +814,7 @@ const parseWKTArea = (area) => {
             }
         }
 
-        // Traccar may use LINESTRING for routes
+        // Tracking Platform may use LINESTRING for routes
         if (wktUpper.startsWith('LINESTRING') || wktUpper.startsWith('ROUTE')) {
             const m = s.match(/(?:LINESTRING|ROUTE)\s*\(([\s\S]*?)\)/i);
             const body = m ? m[1] : '';

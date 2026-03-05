@@ -61,7 +61,7 @@ class ZoneController extends Controller
                 $zones->getCollection()->transform(function ($z) use ($remotes) {
                     $gf = $remotes->get((int) ($z->geofence_id ?? 0));
                     if ($gf) {
-                        // Traccar columns: name, description, area, attributes (JSON)
+                        // Tracking columns: name, description, area, attributes (JSON)
                         $z->setAttribute('name', $gf->name ?? null);
                         $z->setAttribute('description', $gf->description ?? null);
                         // Extract status/speed from attributes JSON if present
@@ -299,7 +299,7 @@ class ZoneController extends Controller
             return response()->json(['message' => 'Zone blocked'], 200);
         }
 
-        // HARD DELETE: delete geofence on tracking server (Traccar), permanently remove local record
+        // HARD DELETE: delete geofence on tracking server (Tracking Platform), permanently remove local record
         $zone = Zones::withTrashed()->where('geofence_id', $zoneParam)->first();
         if (!$zone) { $zone = Zones::withTrashed()->find($zoneParam); }
         if (!$zone) {

@@ -178,7 +178,7 @@ class AssignComputedAttributes extends Command
                     // Optionally update local cache if we want to be super strict in one run
                     $existing[$deviceId][] = $attrId;
                 } else {
-                    // 400 means Bad Request, usually "duplicate key" or "already exists" in Traccar permissions
+                    // 400 means Bad Request, usually "duplicate key" or "already exists" in Tracking permissions
                     if ($resp->responseCode == 400) {
                         $skippedCount++;
                     } else {

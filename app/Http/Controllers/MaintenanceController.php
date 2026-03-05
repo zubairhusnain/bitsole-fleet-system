@@ -57,13 +57,13 @@ class MaintenanceController extends Controller
 
         // Fetch assigned devices for each maintenance record
         // This might be N+1 query problem if not careful, but for now we iterate.
-        // Traccar API doesn't support "include=devices" in maintenance list easily.
+        // Tracking API doesn't support "include=devices" in maintenance list easily.
         foreach ($maintenance as &$item) {
             // Check attributes for device_ids (Source of Truth)
             if (isset($item['attributes']['device_ids']) && is_array($item['attributes']['device_ids'])) {
                 $item['deviceIds'] = $item['attributes']['device_ids'];
             } else {
-                // Fallback to fetching from API (Legacy / Traccar Permissions)
+                // Fallback to fetching from API (Legacy / Tracking Permissions)
                 $assignedDevices = $this->maintenanceService->getDevicesForMaintenance($request, $item['id']);
                 $item['deviceIds'] = $assignedDevices ? array_map(function($d) {
                     return (int) (is_array($d) ? $d['id'] : $d->id);
@@ -253,7 +253,7 @@ class MaintenanceController extends Controller
 
             foreach ($toRemove as $dId) {
                 $res = $this->maintenanceService->removeAssignment($request, $id, $dId);
-                // Log but ignore failures since Traccar API is buggy for DELETE
+                // Log but ignore failures since Tracking API is buggy for DELETE
             }
             foreach ($toAdd as $dId) {
                 $this->maintenanceService->assignToDevice($request, $id, $dId);

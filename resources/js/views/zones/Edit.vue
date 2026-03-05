@@ -430,7 +430,7 @@ function setupGoogleAutocomplete(input, onPlaceSelected, clearSuggestionsCb) {
   } catch {}
 }
 
-// Helper: parse WKT area string from Traccar into a shape
+// Helper: parse WKT area string from Tracking Platform into a shape
 function parseWKTArea(area) {
   try {
     const s = String(area || '').trim();

@@ -2147,7 +2147,7 @@ const comparisons = computed(() => ([
 function formatDistanceKm(d) {
     const n = Number(d);
     if (!Number.isFinite(n)) return '-';
-    // Traccar distances are in meters
+    // Tracking distances are in meters
     return `${(n / 1000).toFixed(2)} km`;
 }
 function formatDuration(d) {

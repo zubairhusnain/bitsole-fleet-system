@@ -258,7 +258,7 @@ class NotificationService
                     $attributes = (!empty($value['attributes'])) ? json_encode($value['attributes']): json_encode(new \stdClass());
                     $payloadData = '{"id": '.$value['id'].',"type": "'.$value['type'].'","always": true,"calendarId": 0,"attributes": '.$attributes.',"notificators": "'.$notificators.'"}';
 
-                    // For new creation (POST), remove ID from payload if it's 0 or just let Traccar handle it (usually ignore ID in POST)
+                    // For new creation (POST), remove ID from payload if it's 0 or just let Tracking API handle it (usually ignore ID in POST)
                     if ($type === 'POST') {
                          $payloadData = '{"type": "'.$value['type'].'","always": true,"calendarId": 0,"attributes": '.$attributes.',"notificators": "'.$notificators.'"}';
                     }

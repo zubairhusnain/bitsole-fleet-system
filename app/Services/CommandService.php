@@ -2,65 +2,67 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Http;
+use App\Helpers\Curl;
 use Illuminate\Support\Facades\Log;
-use App\Models\TcDevice;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Auth;
 
 class CommandService
 {
-    protected $baseUrl;
-    protected $username;
-    protected $password;
-
-    public function __construct()
-    {
-        // Use existing Traccar config or defaults
-        $this->baseUrl = config('traccar.base_url', 'http://localhost:8082');
-        $this->username = config('traccar.username', 'admin');
-        $this->password = config('traccar.password', 'admin');
-    }
+    use Curl;
 
     /**
-     * Send a command to a device via Traccar API
+     * Send a command to a device via Tracking API
      *
-     * @param int $deviceId The Traccar device ID (tc_devices.id)
+     * @param int $deviceId The device ID (tc_devices.id)
      * @param string $type Command type (engineStop, engineResume, custom, etc.)
      * @param array $attributes Additional attributes (e.g. { "data": "reset" } for custom commands)
      * @return array
      */
     public function sendCommand($deviceId, $type, $attributes = [])
     {
-        // Map friendly types to Traccar command types if needed
-        $traccarType = $type;
-        
+        // Follow ReportService pattern: use user session cookie
+        $user = Auth::user();
+        $sessionId = $user->traccarSession ?? session('cookie');
+
+        // Map friendly types to command types if needed
+        $commandType = $type;
+
         // Construct payload
-        $payload = [
+        $payload = json_encode([
             'deviceId' => (int)$deviceId,
-            'type' => $traccarType,
+            'type' => $commandType,
             'attributes' => (object)$attributes
-        ];
+        ]);
 
         try {
-            // Use basic auth as per standard Traccar API usage in this system context
-            $response = Http::withBasicAuth($this->username, $this->password)
-                ->withHeaders(['Content-Type' => 'application/json'])
-                ->post("{$this->baseUrl}/api/commands/send", $payload);
+            // Using Curl helper as requested
+            // static::curl($task, $method, $cookie, $data, $header)
+            // Task should start with /api/...
 
-            if ($response->successful()) {
+            $headers = [
+                'Content-Type: application/json',
+                'Accept: application/json'
+            ];
+
+            $response = static::curl('/api/commands/send', 'POST', $sessionId, $payload, $headers);
+
+            // Check response code (Curl helper returns object with responseCode, response, error)
+            if ($response->responseCode >= 200 && $response->responseCode < 300) {
                 return [
                     'success' => true,
-                    'data' => $response->json()
+                    'data' => json_decode($response->response, true)
                 ];
             }
 
-            Log::error("Traccar Command Failed: " . $response->body());
+            Log::error("Command Failed: " . ($response->response ?? 'No response body'));
             return [
                 'success' => false,
-                'message' => 'Command failed: ' . $response->status() . ' - ' . $response->body()
+                'message' => 'Command failed: ' . $response->responseCode . ' - ' . ($response->response ?? 'Unknown error')
             ];
 
         } catch (\Exception $e) {
-            Log::error("Traccar Command Exception: " . $e->getMessage());
+            Log::error("Command Exception: " . $e->getMessage());
             return [
                 'success' => false,
                 'message' => 'Connection error: ' . $e->getMessage()
@@ -73,8 +75,8 @@ class CommandService
      */
     public function getSavedCommands($deviceId)
     {
-        // This could be fetched from Traccar /api/commands?deviceId=X 
+        // This could be fetched from /api/commands?deviceId=X
         // or a local table if we implement saved templates
-        return []; 
+        return [];
     }
 }
