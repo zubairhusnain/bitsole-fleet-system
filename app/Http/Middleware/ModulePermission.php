@@ -23,6 +23,7 @@ class ModulePermission
             'monitoring.vehicles' => 'Monitoring – Vehicles',
             'monitoring.zones' => 'Monitoring – Zones',
             'reports' => 'Reports & Analytics',
+            'commands' => 'Remote Console',
             // Admin-only areas are not part of assignable modules
             // 'admin' => 'Admin',
             // 'fuel' => 'Fuel Management',
