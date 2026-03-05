@@ -23,6 +23,7 @@ return [
     'monitoring.vehicles' => 'Monitoring – Vehicles',
    // 'monitoring.zones' => 'Monitoring – Zones',
     'reports' => 'Reports & Analytics',
+    'commands' => 'Remote Console',
     // 'alerts' => 'Alerts & Notifications',
     // 'settings' => 'Settings',
 ];

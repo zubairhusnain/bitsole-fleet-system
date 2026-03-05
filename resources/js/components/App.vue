@@ -301,7 +301,7 @@
                             </ul>
                         </li>
 
-                        <li class="nav-item" v-if="isAuthed">
+                        <li class="nav-item"  v-if="!isAdminOrDistributor && hasPerm('commands','read')">
                             <RouterLink to="/commands" class="nav-link" :class="{ active: route.path.startsWith('/commands') }">
                                 <i class="nav-icon bi bi-terminal"></i>
                                 <p>Remote Console</p>
