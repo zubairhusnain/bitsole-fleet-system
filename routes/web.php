@@ -303,5 +303,5 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
 Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/commands')->group(function () {
     Route::post('/send', [\App\Http\Controllers\CommandController::class, 'send']);
     Route::get('/types', [\App\Http\Controllers\CommandController::class, 'types']);
-    Route::get('/web/device-options', [\App\Http\Controllers\ReportController::class, 'deviceOptions']);
+    Route::get('/device-options', [\App\Http\Controllers\ReportController::class, 'deviceOptions']);
 });

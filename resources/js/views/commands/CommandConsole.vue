@@ -103,7 +103,7 @@ onMounted(async () => {
 
 const loadDeviceOptions = async () => {
   try {
-    const res = await axios.get('/web/device-options');
+    const res = await axios.get('/web/commands/device-options');
     deviceOptions.value = res.data.options || res.data || [];
   } catch (e) {
     console.error('Failed to load devices', e);
