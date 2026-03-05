@@ -48,6 +48,7 @@ const ZonesAdd = () => import('../views/zones/AddZone.vue');
 const ZonesEdit = () => import('../views/zones/Edit.vue');
 const NotFound = () => import('../views/NotFound.vue');
 const TelemetryCodec8 = () => import('../views/telemetry/Codec8Tool.vue');
+const CommandConsole = () => import('../views/commands/Console.vue');
 
 const routes = [
   { path: '/', name: 'home', component: LiveTracking, meta: { requiresAuth: true, title: 'Realtime Tracking', roles: [0, 1] } },
@@ -101,6 +102,7 @@ const routes = [
   { path: '/reports/incident/new', name: 'reports-incident-new', component: ReportsIncidentNew, meta: { requiresAuth: true, title: 'Create New Incident', moduleKey: 'reports', action: 'create' } },
   { path: '/reports/vehicle-ranking', name: 'reports-vehicle-ranking', component: ReportsVehicleRanking, meta: { requiresAuth: true, title: 'Rankings', moduleKey: 'reports', action: 'read' } },
   { path: '/reports/fuel-efficiency', name: 'reports-fuel-efficiency', component: ReportsFuelEfficiency, meta: { requiresAuth: true, title: 'Fuel Efficiency', moduleKey: 'reports', action: 'read' } },
+  { path: '/commands', name: 'commands', component: CommandConsole, meta: { requiresAuth: true, title: 'Command Console', moduleKey: 'commands', action: 'create' } },
   { path: '/alerts', name: 'alerts', component: Alerts, meta: { requiresAuth: true, title: 'Alerts' } },
   { path: '/fuel', name: 'fuel', component: Fuel, meta: { requiresAuth: true, title: 'Fuel', moduleKey: 'fuel', action: 'read' } },
   { path: '/fuel/new', name: 'fuel-new', component: () => import('../views/fuel/AddFuel.vue'), meta: { requiresAuth: true, title: 'Add Fuel Entry', moduleKey: 'fuel', action: 'create' } },

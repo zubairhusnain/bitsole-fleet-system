@@ -285,6 +285,7 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/daily-breakdown-map', [\App\Http\Controllers\ReportController::class, 'dailyBreakdownMap']);
     Route::get('/vehicle-status', [\App\Http\Controllers\ReportController::class, 'vehicleStatus']);
     Route::get('/vehicle-status/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportVehicleStatusPdf']);
+
     Route::get('/device-options', [\App\Http\Controllers\ReportController::class, 'deviceOptions']);
     Route::get('/group-options', [\App\Http\Controllers\ReportController::class, 'groupOptions']);
     // Incident Analysis
@@ -293,4 +294,13 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/incidents/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportIncidentsPdf']);
     Route::get('/incidents/export-excel', [\App\Http\Controllers\ReportController::class, 'exportIncidentsExcel']);
     Route::get('/vehicle-ranking', [\App\Http\Controllers\ReportController::class, 'vehicleRanking']);
+
+    Route::get('/effective-fuel', [\App\Http\Controllers\ReportController::class, 'effectiveFuel']);
+    Route::get('/route-playback', [\App\Http\Controllers\ReportController::class, 'routePlayback']);
+});
+
+// Command Console
+Route::middleware(['auth'])->prefix('/web/commands')->group(function () {
+    Route::post('/send', [\App\Http\Controllers\CommandController::class, 'send']);
+    Route::get('/types', [\App\Http\Controllers\CommandController::class, 'types']);
 });

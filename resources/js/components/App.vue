@@ -302,6 +302,13 @@
                         </li>
 
                         <li class="nav-item" v-if="isAuthed">
+                            <RouterLink to="/commands" class="nav-link" :class="{ active: route.path.startsWith('/commands') }">
+                                <i class="nav-icon bi bi-terminal"></i>
+                                <p>Remote Console</p>
+                            </RouterLink>
+                        </li>
+
+                        <li class="nav-item" v-if="isAuthed">
                             <RouterLink to="/alerts" class="nav-link" :class="{ active: route.name === 'alerts' }">
                                 <i class="nav-icon bi bi-bell"></i>
                                 <p>Alerts</p>
