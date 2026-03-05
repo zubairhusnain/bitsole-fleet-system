@@ -850,21 +850,21 @@ const markerItems = computed(() => {
 
 function getLeafletIcon(m) {
     const activity = m.isMoving ? 'Moving' : (m.ignition ? 'Idle' : 'Stopped');
-    const isSelected = isSelected(m.id);
+    const selected = isSelected(m.id);
     let iconUrl = '/images/idle_car.png';
     if (activity === 'Moving') iconUrl = '/images/moving_car.png';
     if (activity === 'Stopped') iconUrl = '/images/stop_car.png';
 
     // Scale icon based on selection
-    const size = isSelected ? [48, 48] : [32, 32];
-    const anchor = isSelected ? [24, 24] : [16, 16];
+    const size = selected ? [48, 48] : [32, 32];
+    const anchor = selected ? [24, 24] : [16, 16];
 
     return L.icon({
         iconUrl: iconUrl,
         iconSize: size,
         iconAnchor: anchor,
         popupAnchor: [0, -anchor[1]],
-        className: isSelected ? 'marker-selected' : ''
+        className: selected ? 'marker-selected' : ''
     });
 }
 

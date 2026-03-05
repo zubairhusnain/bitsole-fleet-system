@@ -12,8 +12,10 @@
                 <!--begin::Start Navbar Links-->
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link toggle-btn" href="#" role="button" @click.stop.prevent="toggleSidebar($event)" @touchend.stop.prevent="toggleSidebar($event)" aria-label="Toggle sidebar">
-                            <i class="bi caret-toggle sidebar-toggle" :class="sidebarOpen ? 'bi-caret-right-fill' : 'bi-caret-left-fill'"></i>
+                        <a class="nav-link toggle-btn p-0" href="#" role="button" @click.stop.prevent="toggleSidebar($event)" @touchend.stop.prevent="toggleSidebar($event)" aria-label="Toggle sidebar">
+                            <div class="sidebar-toggle-circle">
+                                <i class="bi" :class="sidebarOpen ? 'bi-chevron-left' : 'bi-chevron-right'"></i>
+                            </div>
                         </a>
                     </li>
                 </ul>
@@ -885,6 +887,29 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.sidebar-toggle-circle {
+    width: 24px;
+    height: 24px;
+    background-color: #6366f1; /* Using a purple-blue shade similar to the image, or use var(--brand-primary) if preferred */
+    background-color: var(--brand-primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.2s ease;
+}
+.sidebar-toggle-circle:hover {
+    transform: scale(1.05);
+    background-color: var(--bs-link-hover-color);
+}
+.app-wrapper { min-height: 100vh; }
+.app-main { flex: 1; min-width: 0; transition: margin-left .3s; }
+.sidebar-open .app-main { margin-left: var(--app-sidebar-width); }
+.app-sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 1030; transition: transform .3s; }
+
 nav a.router-link-exact-active {
     font-weight: 600;
 }
