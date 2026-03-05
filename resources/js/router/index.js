@@ -48,7 +48,7 @@ const ZonesAdd = () => import('../views/zones/AddZone.vue');
 const ZonesEdit = () => import('../views/zones/Edit.vue');
 const NotFound = () => import('../views/NotFound.vue');
 const TelemetryCodec8 = () => import('../views/telemetry/Codec8Tool.vue');
-const CommandConsole = () => import('../views/commands/Console.vue');
+const CommandConsole = () => import('../views/commands/CommandConsole.vue');
 
 const routes = [
   { path: '/', name: 'home', component: LiveTracking, meta: { requiresAuth: true, title: 'Realtime Tracking', roles: [0, 1] } },
