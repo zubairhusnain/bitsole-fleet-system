@@ -291,6 +291,13 @@
                                         <p>Ranking</p>
                                     </RouterLink>
                                 </li>
+                                <li class="nav-item">
+                                    <RouterLink to="/reports/fuel-efficiency" class="nav-link"
+                                        :class="{ active: route.path.startsWith('/reports/fuel-efficiency') }">
+                                        <i class="nav-icon bi bi-fuel-pump"></i>
+                                        <p>Fuel Efficiency</p>
+                                    </RouterLink>
+                                </li>
                             </ul>
                         </li>
 

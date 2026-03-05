@@ -34,6 +34,11 @@ Route::get('/testing', function () {
     return view('welcome');
 });
 
+// Reports API Routes
+Route::middleware(['auth'])->prefix('/web/reports')->group(function () {
+    Route::get('/effective-fuel', [App\Http\Controllers\ReportController::class, 'effectiveFuel']);
+});
+
 // Simple example web routes
 Route::get('/ping', function () {
     return response('pong', 200);

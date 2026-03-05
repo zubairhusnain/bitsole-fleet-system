@@ -31,6 +31,100 @@ class ReportService
         return $this->fetchTravelHistoryDb($request);
     }
 
+    public function fetchEffectiveFuelDb($request)
+    {
+        ini_set('memory_limit', '1024M');
+        set_time_limit(600);
+
+        $from = \Carbon\Carbon::parse($request->from_date)->startOfDay()->format('Y-m-d H:i:s');
+        $to = \Carbon\Carbon::parse($request->to_date)->endOfDay()->format('Y-m-d H:i:s');
+
+        $vehicleIds = $request->vehicle_ids ?? [];
+        if (empty($vehicleIds)) {
+             $accessible = Devices::accessibleByUser($request->user())->pluck('device_id')->all();
+             $vehicleIds = $accessible;
+        } elseif (is_string($vehicleIds)) {
+             $vehicleIds = explode(',', $vehicleIds);
+        }
+
+        if (empty($vehicleIds)) return [];
+
+        $idsStr = implode(',', array_map('intval', $vehicleIds));
+
+        // 1. Fetch Total Distance per Vehicle in range
+        $distances = [];
+        try {
+            $distData = DB::connection('pgsql')->select("
+                SELECT
+                    deviceid,
+                    SUM(CAST(COALESCE(NULLIF(CAST(attributes AS json)->>'distance', ''), '0') AS FLOAT)) as total_dist
+                FROM tc_positions
+                WHERE deviceid IN ($idsStr)
+                  AND fixtime BETWEEN ? AND ?
+                GROUP BY deviceid
+            ", [$from, $to]);
+            foreach ($distData as $d) {
+                $distances[$d->deviceid] = $d->total_dist; // meters
+            }
+        } catch (\Throwable $e) {
+            Log::error('fetchEffectiveFuelDb distance query failed: ' . $e->getMessage());
+        }
+
+        // 2. Fetch Fuel Entries
+        $fuelData = [];
+        try {
+            $entries = DB::table('fuel_entries')
+                ->whereIn('device_id', $vehicleIds)
+                ->whereBetween('fill_date', [$from, $to])
+                ->select('device_id', DB::raw('SUM(quantity) as total_fuel'), DB::raw('SUM(cost) as total_cost'))
+                ->groupBy('device_id')
+                ->get();
+
+            foreach ($entries as $e) {
+                $fuelData[$e->device_id] = $e;
+            }
+        } catch (\Throwable $e) {
+             Log::error('fetchEffectiveFuelDb fuel query failed: ' . $e->getMessage());
+        }
+
+        // 3. Fetch Device Details
+        $tcDevices = \App\Models\TcDevice::whereIn('id', $vehicleIds)->get()->keyBy('id');
+
+        // 4. Build Report
+        $report = [];
+        foreach ($vehicleIds as $vid) {
+            $dev = $tcDevices->get($vid);
+            if (!$dev) continue;
+
+            $distM = $distances[$vid] ?? 0;
+            $distKm = $distM / 1000;
+
+            $fuel = $fuelData[$vid] ?? null;
+            $totalFuel = $fuel ? $fuel->total_fuel : 0;
+            $totalCost = $fuel ? $fuel->total_cost : 0;
+
+            // Efficiency: KM/L
+            $efficiency = $totalFuel > 0 ? ($distKm / $totalFuel) : 0;
+            // Consumption: L/100KM
+            $consumption = $distKm > 0 ? ($totalFuel / $distKm) * 100 : 0;
+
+            // Cost per KM
+            $costPerKm = $distKm > 0 ? ($totalCost / $distKm) : 0;
+
+            $report[] = [
+                'vehicleId' => $dev->name,
+                'totalDistance' => round($distKm, 2), // km
+                'totalFuel' => round($totalFuel, 2), // liters
+                'totalCost' => round($totalCost, 2), // currency
+                'efficiency' => round($efficiency, 2), // km/l
+                'consumption' => round($consumption, 2), // l/100km
+                'costPerKm' => round($costPerKm, 2),
+            ];
+        }
+
+        return $report;
+    }
+
     public function fetchTravelHistoryDb($request)
     {
         $deviceId = $request->device_id;

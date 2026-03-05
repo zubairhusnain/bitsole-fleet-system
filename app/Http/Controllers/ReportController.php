@@ -26,6 +26,12 @@ class ReportController extends Controller
         $this->reportService = $reportService;
     }
 
+    public function effectiveFuel(Request $request)
+    {
+        $rows = $this->reportService->fetchEffectiveFuelDb($request);
+        return response()->json(['rows' => $rows]);
+    }
+
     public function vehicleStatus(Request $request)
     {
         $query = $this->buildVehicleStatusQuery($request);
