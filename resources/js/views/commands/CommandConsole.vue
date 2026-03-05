@@ -40,29 +40,40 @@
                 </div>
               </div>
 
-              <!-- New Command Type -->
+              <!-- New Command Type (Grid) -->
               <div class="mb-3" v-if="commandMode === 'new'">
-                <label class="form-label small fw-semibold text-muted">Command Type</label>
-                <select class="form-select" v-model="selectedType" required @change="handleTypeChange">
-                  <option value="" disabled>-- Select Command --</option>
-                  <option v-for="type in commandTypes" :key="type.type" :value="type.type">
-                    {{ type.description || type.type }}
-                  </option>
-                </select>
-                <div v-if="selectedTypeDetails?.danger" class="form-text text-danger">
+                <label class="form-label small fw-semibold text-muted">Select Command Type</label>
+                <div class="row g-2">
+                  <div class="col-6 col-md-4" v-for="type in commandTypes" :key="type.type">
+                    <label class="card h-100 cursor-pointer border-0 shadow-sm" :class="{'ring-2 ring-primary bg-light-primary': selectedType === type.type, 'bg-light': selectedType !== type.type}">
+                      <div class="card-body p-3 text-center d-flex flex-column align-items-center justify-content-center">
+                        <input type="radio" class="d-none" :value="type.type" v-model="selectedType" @change="handleTypeChange">
+                        <i class="bi fs-4 mb-2" :class="getIconForType(type.type)"></i>
+                        <span class="small fw-semibold lh-sm">{{ type.description || type.type }}</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+                <div v-if="selectedTypeDetails?.danger" class="mt-2 text-danger small">
                   <i class="bi bi-exclamation-triangle me-1"></i> Warning: This command affects vehicle operation.
                 </div>
               </div>
 
-              <!-- Saved Command Selection -->
+              <!-- Saved Command Selection (Grid) -->
               <div class="mb-3" v-if="commandMode === 'saved'">
-                <label class="form-label small fw-semibold text-muted">Saved Command</label>
-                <select class="form-select" v-model="selectedSavedId" required>
-                  <option value="" disabled>-- Select Saved Command --</option>
-                  <option v-for="cmd in savedCommands" :key="cmd.id" :value="cmd.id">
-                    {{ cmd.description }} ({{ cmd.type }})
-                  </option>
-                </select>
+                <label class="form-label small fw-semibold text-muted">Select Saved Command</label>
+                <div class="row g-2">
+                  <div class="col-6 col-md-4" v-for="cmd in savedCommands" :key="cmd.id">
+                    <label class="card h-100 cursor-pointer border-0 shadow-sm" :class="{'ring-2 ring-primary bg-light-primary': selectedSavedId === cmd.id, 'bg-light': selectedSavedId !== cmd.id}">
+                      <div class="card-body p-3 text-center d-flex flex-column align-items-center justify-content-center">
+                        <input type="radio" class="d-none" :value="cmd.id" v-model="selectedSavedId">
+                        <i class="bi bi-hdd-stack fs-4 mb-2 text-secondary"></i>
+                        <span class="small fw-semibold lh-sm">{{ cmd.description }}</span>
+                        <span class="badge bg-secondary mt-1" style="font-size: 0.65rem;">{{ cmd.type }}</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
               </div>
 
               <!-- Dynamic Attributes -->
@@ -104,6 +115,11 @@
   </div>
 </template>
 
+<style scoped>
+.cursor-pointer { cursor: pointer; }
+.ring-2 { box-shadow: 0 0 0 2px var(--bs-primary); }
+.bg-light-primary { background-color: rgba(var(--bs-primary-rgb), 0.05) !important; }
+</style>
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
@@ -131,7 +147,7 @@ onMounted(async () => {
 
 const loadDeviceOptions = async () => {
   try {
-    const res = await axios.get('/web/device-options');
+    const res = await axios.get('/web/commands/device-options');
     deviceOptions.value = res.data.options || res.data || [];
   } catch (e) {
     console.error('Failed to load devices', e);
@@ -165,6 +181,15 @@ const onDeviceChange = async () => {
 const handleTypeChange = () => {
   customData.value = '';
   responseMessage.value = '';
+};
+
+const getIconForType = (type) => {
+  if (type.toLowerCase().includes('stop')) return 'bi-stop-circle text-danger';
+  if (type.toLowerCase().includes('resume')) return 'bi-play-circle text-success';
+  if (type.toLowerCase().includes('position')) return 'bi-geo-alt text-info';
+  if (type.toLowerCase().includes('reboot')) return 'bi-bootstrap-reboot text-warning';
+  if (type.toLowerCase().includes('custom')) return 'bi-code-slash text-dark';
+  return 'bi-terminal';
 };
 
 const sendCommand = async () => {
