@@ -167,23 +167,22 @@
             Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, filteredRows.length) }} of {{ filteredRows.length }} results
         </div>
         <div class="d-flex gap-1">
-            <button class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0"
+            <button class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0 page-link"
                     style="width: 32px; height: 32px;"
                     :disabled="currentPage === 1"
                     @click="changePage(currentPage - 1)">
               <i class="bi bi-chevron-left small"></i>
             </button>
 
-            <button v-for="p in totalPages" :key="p"
-                    class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0 fw-semibold"
-                    :class="p === currentPage ? 'bg-dark text-white border-dark' : 'bg-white text-dark'"
-                    style="width: 32px; height: 32px;"
-                    v-show="Math.abs(p - currentPage) < 3 || p === 1 || p === totalPages"
-                    @click="changePage(p)">
-              {{ p }}
-            </button>
+            <div v-for="p in totalPages" :key="p" v-show="Math.abs(p - currentPage) < 3 || p === 1 || p === totalPages" class="page-item" :class="{ active: p === currentPage }">
+              <button class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0 fw-semibold page-link"
+                      style="width: 32px; height: 32px;"
+                      @click="changePage(p)">
+                {{ p }}
+              </button>
+            </div>
 
-            <button class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0"
+            <button class="btn btn-sm border rounded-1 d-flex align-items-center justify-content-center p-0 page-link"
                     style="width: 32px; height: 32px;"
                     :disabled="currentPage === totalPages"
                     @click="changePage(currentPage + 1)">
@@ -337,10 +336,10 @@ onMounted(() => {
 </script>
 
 <style scoped>
-thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; vertical-align: middle; font-weight: 500; font-size: 13px; border-bottom: none; }
+thead.table-dark tr th { background-color: #886654 !important; color: #fff; vertical-align: middle; font-weight: 500; font-size: 13px; border-bottom: none; }
 tbody tr td { font-size: 13px; color: #333; }
 .badge { font-weight: 600; font-size: 12px; }
 .form-label { font-size: 0.85rem; }
-.pagination-app .page-item.active .page-link { background-color: var(--brand-primary); border-color: var(--brand-primary); color: white; }
-.pagination-app .page-link { color: #333; }
+.page-item.active .page-link { background-color: var(--brand-primary); border-color: var(--brand-primary); color: white; }
+.page-link { color: #333; }
 </style>

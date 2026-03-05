@@ -9,7 +9,7 @@
         .header-info { margin-bottom: 20px; font-size: 12px; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed; }
         th, td { border: 1px solid #ddd; padding: 4px; text-align: left; vertical-align: middle; word-wrap: break-word; }
-        th { background-color: #0b0f28; color: #ffffff; font-weight: bold; }
+        th { background-color: #886654; color: #ffffff; font-weight: bold; }
         tr:nth-child(even) { background-color: #f8f9fb; }
         .badge { padding: 2px 4px; border-radius: 4px; font-weight: bold; font-size: 9px; }
         .bg-success { color: #198754; background-color: #d1e7dd; }

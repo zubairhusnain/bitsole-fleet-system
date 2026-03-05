@@ -196,22 +196,26 @@
         <nav aria-label="Page navigation">
             <ul class="pagination pagination-sm mb-0 gap-1">
                 <li class="page-item" :class="{ disabled: currentPage === 1 }">
-                    <button class="page-link border-0 rounded"
-                        :class="currentPage === 1 ? 'bg-secondary-subtle text-muted' : 'bg-dark text-white'"
+                    <button class="page-link border rounded d-flex align-items-center justify-content-center p-0"
+                        style="width: 32px; height: 32px;"
+                        :disabled="currentPage === 1"
                         @click="changePage(currentPage - 1)">
-                        <i class="bi bi-chevron-left"></i>
+                        <i class="bi bi-chevron-left small"></i>
                     </button>
                 </li>
                 <li class="page-item" v-for="page in visiblePages" :key="page" :class="{ active: currentPage === page }">
-                    <button class="page-link border-0 rounded" :class="currentPage === page ? 'bg-dark text-white' : 'bg-white text-dark shadow-sm'" @click="changePage(page)">
+                    <button class="page-link border rounded d-flex align-items-center justify-content-center p-0 fw-semibold"
+                        style="width: 32px; height: 32px;"
+                        @click="changePage(page)">
                         {{ page }}
                     </button>
                 </li>
                 <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-                    <button class="page-link border-0 rounded"
-                        :class="currentPage === totalPages ? 'bg-secondary-subtle text-muted' : 'bg-dark text-white'"
+                    <button class="page-link border rounded d-flex align-items-center justify-content-center p-0"
+                        style="width: 32px; height: 32px;"
+                        :disabled="currentPage === totalPages"
                         @click="changePage(currentPage + 1)">
-                        <i class="bi bi-chevron-right"></i>
+                        <i class="bi bi-chevron-right small"></i>
                     </button>
                 </li>
             </ul>
@@ -490,4 +494,8 @@ const speedClass = (s) => {
 .cursor-pointer {
     cursor: pointer;
 }
+.pagination .page-link { color: #333; }
+.pagination .page-item.active .page-link { background-color: var(--brand-primary); border-color: var(--brand-primary); color: #fff; }
+.modal-backdrop { z-index: 1040; }
+.modal { z-index: 1050; }
 </style>

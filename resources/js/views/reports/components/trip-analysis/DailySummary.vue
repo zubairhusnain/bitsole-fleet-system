@@ -14,7 +14,7 @@ defineProps({
   },
   summary: {
     type: Object,
-    default: () => ({}) 
+    default: () => ({})
   },
   chartData: {
     type: Array,
@@ -30,6 +30,6 @@ defineProps({
 </script>
 
 <style scoped>
-thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; border-color: rgba(255,255,255,0.15); vertical-align: middle; }
+thead.table-dark tr th { background-color: #886654 !important; color: #fff; border-color: rgba(255,255,255,0.15); vertical-align: middle; }
 tbody tr td { font-size: 13px; vertical-align: middle; }
 </style>

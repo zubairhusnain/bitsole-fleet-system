@@ -835,29 +835,38 @@ const markerItems = computed(() => {
             const spRounded = speedKmh(speed);
             // Smoother isMoving check: If speed is > 2km/h, we consider it moving unless motion is explicitly false
             const isMoving = (motion !== false) && (typeof spRounded === 'number' && spRounded > 2);
-            const iconUrl = isSelected(id) ? '/images/markers/focus-marker.svg' : '/images/markers/device-pin.png';
-            return { id, lat: dlat, lon: dlon, popup: popupHtml(v), iconUrl, course: dCourse, isMoving, speed:spRounded };
+            // Revert to using vehicle state icons instead of generic pins
+            const { ignition } = getPosition(v);
+            const activity = isMoving ? 'Moving' : (ignition ? 'Idle' : 'Stopped');
+            let iconUrl = '/images/idle_car.png';
+            if (activity === 'Moving') iconUrl = '/images/moving_car.png';
+            if (activity === 'Stopped') iconUrl = '/images/stop_car.png';
+
+            return { id, lat: dlat, lon: dlon, popup: popupHtml(v), iconUrl, course: dCourse, isMoving, ignition: ignition === true, speed:spRounded };
         })
         .filter(m => typeof m.lat === 'number' && typeof m.lon === 'number')
         .sort((a, b) => String(a.id).localeCompare(String(b.id)));
 });
 
 function getLeafletIcon(m) {
-     if (isSelected(m.id)) {
-        console.log('selected devices ',m);
-         if (m.isMoving) {
-             return L.divIcon({
-                className: 'arrow-marker-icon',
-                html: `<img src="/images/markers/arrow.svg" style="transform: rotate(${m.course}deg); width: 36px; height: 36px; display: block;" alt="arrow" />`,
-                iconSize: [36, 36],
-                iconAnchor: [18, 18],
-                popupAnchor: [0, -18]
-            });
-         }
-         return focusIcon;
-     }
-     return carIcon;
- }
+    const activity = m.isMoving ? 'Moving' : (m.ignition ? 'Idle' : 'Stopped');
+    const isSelected = isSelected(m.id);
+    let iconUrl = '/images/idle_car.png';
+    if (activity === 'Moving') iconUrl = '/images/moving_car.png';
+    if (activity === 'Stopped') iconUrl = '/images/stop_car.png';
+
+    // Scale icon based on selection
+    const size = isSelected ? [48, 48] : [32, 32];
+    const anchor = isSelected ? [24, 24] : [16, 16];
+
+    return L.icon({
+        iconUrl: iconUrl,
+        iconSize: size,
+        iconAnchor: anchor,
+        popupAnchor: [0, -anchor[1]],
+        className: isSelected ? 'marker-selected' : ''
+    });
+}
 
 const selectedMarker = computed(() => {
     if (!selectedId.value) return null;
@@ -1443,6 +1452,13 @@ onBeforeUnmount(() => {
     position: relative;
     margin-left: calc(-1 * var(--bs-gutter-x, .75rem));
     margin-right: calc(-1 * var(--bs-gutter-x, .75rem));
+}
+
+/* Marker focus animation */
+:global(.marker-selected) {
+  filter: drop-shadow(0 0 10px rgba(0, 131, 193, 0.8));
+  z-index: 2000 !important;
+  transition: all 0.3s ease;
 }
 
 .map-wrap {

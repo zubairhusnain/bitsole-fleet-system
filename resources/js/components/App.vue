@@ -35,12 +35,15 @@
                             </span>
                         </button>
                     </li>
-                    <li class="nav-item d-flex align-items-center" v-if="isAuthed">
-                        <select v-model="timezone" @change="handleTimezoneChange" class="form-select form-select-sm timezone-select">
-                            <option v-for="opt in timezoneOptions" :key="opt.value" :value="opt.value">
-                                {{ opt.label }}
-                            </option>
-                        </select>
+                    <li class="nav-item d-none align-items-center" v-if="isAuthed">
+                        <div class="d-flex align-items-center bg-white border rounded px-2" style="width: 220px; height: 32px;">
+                            <i class="bi bi-clock text-muted me-2"></i>
+                            <select v-model="timezone" @change="handleTimezoneChange" class="form-select form-select-sm border-0 shadow-none p-0" style="font-size: 13px;">
+                                <option v-for="opt in timezoneOptions" :key="opt.value" :value="opt.value">
+                                    {{ opt.label }}
+                                </option>
+                            </select>
+                        </div>
                     </li>
                     <li class="nav-item" v-if="isAuthed">
                         <RouterLink to="/alerts" class="nav-link position-relative" style="padding-top: 0.5rem;">

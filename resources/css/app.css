@@ -58,9 +58,9 @@
 
 /* Global Table Styles */
 .table-dark th {
-  background-color: #0b0f28 !important;
+  background-color: #886654 !important;
   color: #fff;
-  border-color: #0b0f28;
+  border-color: #886654;
 }
 
 /* Base */
@@ -364,7 +364,7 @@ p  { font-size: 16px; line-height: 1.6; }
 .status-badge.is-unknown { color: #6b7280; background: rgba(107, 114, 128, 0.12); }
 
 /* Table header: dark slate bar */
-.thead-app-dark, .thead-app-dark th { background-color: #0b0f28; }
+.thead-app-dark, .thead-app-dark th { background-color: #886654; }
 .thead-app-dark th {
   color: #FFFFFF; font-weight: 600; letter-spacing: 0.1px;
   padding-top: 12px; padding-bottom: 12px;
@@ -446,7 +446,7 @@ p  { font-size: 16px; line-height: 1.6; }
   border-color: var(--bs-link-hover-color);
   color: #FFFFFF;
 }
- 
+
 /* Force any dark buttons to use brand primary */
 .btn-dark {
   background-color: var(--brand-primary) !important;

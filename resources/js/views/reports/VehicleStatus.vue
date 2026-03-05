@@ -477,7 +477,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; vertical-align: middle; font-weight: 500; font-size: 13px; border-bottom: none; }
+thead.table-dark tr th { background-color: #886654 !important; color: #fff; vertical-align: middle; font-weight: 500; font-size: 13px; border-bottom: none; }
 tbody tr td { font-size: 13px; color: #333; }
 .panel .card-body { padding-top: 1rem; padding-bottom: 1rem; }
 .card-header h6 { font-weight: 600; }

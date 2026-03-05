@@ -240,7 +240,7 @@ const getPercentageColor = (val) => {
 </script>
 
 <style scoped>
-thead.table-dark tr th { background-color: #0b0f28 !important; color: #fff; vertical-align: middle; font-weight: 500; font-size: 13px; border-bottom: none; }
+thead.table-dark tr th { background-color: #886654 !important; color: #fff; vertical-align: middle; font-weight: 500; font-size: 13px; border-bottom: none; }
 tbody tr td { font-size: 13px; color: #333; }
 .badge { font-weight: 600; font-size: 12px; }
 .form-label { font-size: 0.85rem; }
