@@ -5,7 +5,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 
-const props = defineProps({
+const props = defineProps({ 
   center: {
     type: Array,
     default: () => [0, 0],
@@ -155,21 +155,33 @@ function syncVehicleMarkers() {
     const isSelected = String(m.id) === String(props.selectedId);
 
     if (isSelected && m.isMoving) {
+      // Use arrow ONLY for focused moving vehicles
       icon = {
         path: 'M12 3L22 21L12 17L2 21L12 3Z',
         scale: 1.5,
-        fillColor: '#28a745',
+        fillColor: '#0083c1', // Brand color
         fillOpacity: 1,
         strokeColor: 'white',
         strokeWeight: 2,
         rotation: Number(m.course) || 0,
         anchor: new window.google.maps.Point(12, 12),
       };
-    } else if (iconUrl) {
+    } else {
+      // Teardrop Marker Path (Material Design Location On)
+      const path = "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z";
+      
+      // Default: Standard Blue (#2979ff). Focus: Brand Color (#0083c1).
+      const color = isSelected ? '#0083c1' : '#2979ff';
+      const scale = isSelected ? 2.5 : 1.8; // Google Maps scale factor
+
       icon = {
-        url: iconUrl,
-        scaledSize: new window.google.maps.Size(36, 48),
-        anchor: new window.google.maps.Point(18, 44),
+        path: path,
+        fillColor: color,
+        fillOpacity: 1,
+        strokeColor: 'white',
+        strokeWeight: 1,
+        scale: scale,
+        anchor: new window.google.maps.Point(12, 24), // Bottom tip of the 24x24 SVG
       };
     }
     const popupHtml = m.popup || null;

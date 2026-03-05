@@ -841,9 +841,9 @@ const markerItems = computed(() => {
             let iconUrl = '/images/idle_car.png';
             if (activity === 'Moving') iconUrl = '/images/moving_car.png';
             if (activity === 'Stopped') iconUrl = '/images/stop_car.png';
-
+  
             return { id, lat: dlat, lon: dlon, popup: popupHtml(v), iconUrl, course: dCourse, isMoving, ignition: ignition === true, speed:spRounded };
-        })
+        }) 
         .filter(m => typeof m.lat === 'number' && typeof m.lon === 'number')
         .sort((a, b) => String(a.id).localeCompare(String(b.id)));
 });
@@ -851,20 +851,45 @@ const markerItems = computed(() => {
 function getLeafletIcon(m) {
     const activity = m.isMoving ? 'Moving' : (m.ignition ? 'Idle' : 'Stopped');
     const selected = isSelected(m.id);
-    let iconUrl = '/images/idle_car.png';
-    if (activity === 'Moving') iconUrl = '/images/moving_car.png';
-    if (activity === 'Stopped') iconUrl = '/images/stop_car.png';
 
-    // Scale icon based on selection
-    const size = selected ? [48, 48] : [32, 32];
-    const anchor = selected ? [24, 24] : [16, 16];
+    // If focused and moving, use the arrow
+    if (selected && activity === 'Moving') {
+        const size = 48;
+        const anchor = size / 2;
+        return L.divIcon({
+            className: 'arrow-marker-icon marker-selected',
+            html: `<img src="/images/markers/arrow.svg" style="transform: rotate(${m.course}deg); width: ${size}px; height: ${size}px; display: block;" alt="arrow" />`,
+            iconSize: [size, size],
+            iconAnchor: [anchor, anchor],
+            popupAnchor: [0, -anchor]
+        });
+    }
 
-    return L.icon({
-        iconUrl: iconUrl,
-        iconSize: size,
-        iconAnchor: anchor,
-        popupAnchor: [0, -anchor[1]],
-        className: selected ? 'marker-selected' : ''
+    // SVG Path for the Teardrop Marker (Material Design Location On)
+    const path = "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z";
+    
+    // Colors
+    // Default: Standard Blue (matches image 1)
+    // Focus: Brand Color (matches logo) - #0083c1
+    const color = selected ? '#0083c1' : '#2979ff'; 
+    
+    const size = selected ? 64 : 48; // Size in px
+    const anchorX = size / 2;
+    const anchorY = size; // Bottom tip
+
+    // Create SVG string
+    const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+        <path d="${path}" fill="${color}" stroke="white" stroke-width="1" />
+    </svg>
+    `;
+
+    return L.divIcon({
+        className: selected ? 'marker-selected' : '',
+        html: svg,
+        iconSize: [size, size],
+        iconAnchor: [anchorX, anchorY],
+        popupAnchor: [0, -size]
     });
 }
 
