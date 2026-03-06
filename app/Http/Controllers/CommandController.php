@@ -78,18 +78,19 @@ class CommandController extends Controller
     public function types(Request $request)
     {
         $deviceId = $request->input('device_id');
-        if (!$deviceId) {
-            // Fallback to static list if no device provided
-            return response()->json([
-                ['type' => 'engineStop', 'description' => 'Stop Engine (Immobilize)', 'danger' => true],
-                ['type' => 'engineResume', 'description' => 'Resume Engine', 'danger' => false],
-                ['type' => 'positionSingle', 'description' => 'Get Single Position', 'danger' => false],
-                ['type' => 'custom', 'description' => 'Custom Command', 'danger' => true],
-                ['type' => 'rebootDevice', 'description' => 'Reboot Device', 'danger' => true],
-            ]);
-        }
+        // Fetch ALL supported command types from Traccar (pass null to ignore device filter)
+        // User requested to see all supported types, not just the limited set reported by protocol.
+        $types = $this->commandService->getCommandTypes(null);
 
-        $types = $this->commandService->getCommandTypes($deviceId);
+        // Ensure 'custom' is present if not returned by API (it's often hidden but supported)
+        $hasCustom = false;
+        foreach ($types as $t) {
+            $val = is_array($t) ? ($t['type'] ?? '') : $t;
+            if ($val === 'custom') { $hasCustom = true; break; }
+        }
+        if (!$hasCustom) {
+            $types[] = ['type' => 'custom'];
+        }
 
         // Format for frontend
         $formatted = array_map(function($t) {
@@ -102,6 +103,11 @@ class CommandController extends Controller
                 'danger' => in_array($type, ['engineStop', 'custom', 'rebootDevice'])
             ];
         }, $types);
+        
+        // Sort alphabetically by description for better UX
+        usort($formatted, function($a, $b) {
+            return strcmp($a['description'], $b['description']);
+        });
 
         return response()->json($formatted);
     }
