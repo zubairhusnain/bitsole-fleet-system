@@ -380,17 +380,23 @@
         <!--end::Footer-->
     </div>
 
-    <div v-if="showDemoToast" class="position-fixed top-0 end-0 p-3" style="z-index: 2050;">
-        <div class="toast show align-items-center text-bg-warning border-0" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body">
-                    <div class="fw-semibold mb-1">Demo Mode</div>
-                    <div class="small">{{ demoToastMessage }}</div>
+    <div v-if="showDemoModal" class="modal fade show" style="display: block;" tabindex="-1" aria-modal="true" role="dialog">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Demo Mode</h5>
+                    <button type="button" class="btn-close" aria-label="Close" @click="closeDemoModal"></button>
                 </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Close" @click="closeDemoToast"></button>
+                <div class="modal-body">
+                    <p class="mb-0">{{ demoModalMessage }}</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" @click="closeDemoModal">OK</button>
+                </div>
             </div>
         </div>
     </div>
+    <div v-if="showDemoModal" class="modal-backdrop fade show"></div>
 </template>
 
 <script setup>
@@ -419,10 +425,9 @@ const myDeviceIds = ref([]);
 let echoChannel = null;
 const processedAlertIds = new Set();
 
-const showDemoToast = ref(false);
-const demoToastMessage = ref('This is a demo project. You do not have permission to create/update/delete data. You can only read/view data.');
-let lastDemoToastAt = 0;
-let demoToastTimer = null;
+const showDemoModal = ref(false);
+const demoModalMessage = ref('This is a demo project. You do not have permission to create/update/delete data. You can only read/view data.');
+let lastDemoModalAt = 0;
 let swalSuppressPatched = false;
 
 function shouldSuppressSwal() {
@@ -453,29 +458,21 @@ function installSwalSuppressor() {
     };
 }
 
-function openDemoToast(message) {
+function openDemoModal(message) {
     const now = Date.now();
-    if (now - lastDemoToastAt < 500) return;
-    lastDemoToastAt = now;
-    demoToastMessage.value = message || demoToastMessage.value;
-    showDemoToast.value = true;
-    if (demoToastTimer) clearTimeout(demoToastTimer);
-    demoToastTimer = setTimeout(() => { showDemoToast.value = false; }, 4500);
+    if (now - lastDemoModalAt < 800) return;
+    lastDemoModalAt = now;
+    demoModalMessage.value = message || demoModalMessage.value;
+    showDemoModal.value = true;
 }
 
-function closeDemoToast() {
-    showDemoToast.value = false;
-    if (demoToastTimer) {
-        clearTimeout(demoToastTimer);
-        demoToastTimer = null;
-    }
+function closeDemoModal() {
+    showDemoModal.value = false;
 }
 
 function onDemoReadonly(e) {
-    openDemoToast(e?.detail?.message);
+    openDemoModal(e?.detail?.message);
 }
-
-// Toast removed
 
 
 
