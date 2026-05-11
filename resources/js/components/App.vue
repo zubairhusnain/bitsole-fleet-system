@@ -426,7 +426,7 @@ let echoChannel = null;
 const processedAlertIds = new Set();
 
 const showDemoModal = ref(false);
-const demoModalMessage = ref('This is a demo project. You do not have permission to create/update/delete data. You can only read/view data.');
+const demoModalMessage = ref('This is a demo account. You do not have permission to create/update/delete data. You can only read/view data.');
 let lastDemoModalAt = 0;
 let swalSuppressPatched = false;
 

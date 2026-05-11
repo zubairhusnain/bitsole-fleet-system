@@ -66,7 +66,7 @@ window.axios.interceptors.response.use(
     const config = error?.config || {};
     const isDemoReadOnly = status === 403 && (error?.response?.data?.demo_read_only === true || error?.response?.data?.code === 'DEMO_READ_ONLY');
     if (isDemoReadOnly) {
-      const msg = error?.response?.data?.message || 'This is a demo project. You can only read/view data.';
+      const msg = error?.response?.data?.message || 'This is a demo account. You can only read/view data.';
       emitDemoReadonly(msg);
     }
     if (status === 419 && !config.__retried) {
