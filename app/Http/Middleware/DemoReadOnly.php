@@ -10,7 +10,8 @@ class DemoReadOnly
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $enabled = filter_var(env('DEMO_READ_ONLY', false), FILTER_VALIDATE_BOOLEAN);
+        $raw = env('DEMO_READ_ONLY');
+        $enabled = $raw === null ? true : filter_var($raw, FILTER_VALIDATE_BOOLEAN);
         if (!$enabled) {
             return $next($request);
         }
