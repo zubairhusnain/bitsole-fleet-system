@@ -34,6 +34,9 @@ const isDemoWriteAllowedPath = (path) => {
 };
 
 const emitDemoReadonly = (message) => {
+  if (typeof window !== 'undefined') {
+    window.__demoReadonlyAt = Date.now();
+  }
   if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
     window.dispatchEvent(new CustomEvent('demo:readonly', { detail: { message } }));
   }

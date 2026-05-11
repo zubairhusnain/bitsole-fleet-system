@@ -380,23 +380,17 @@
         <!--end::Footer-->
     </div>
 
-    <div v-if="showDemoModal" class="modal fade show" style="display: block;" tabindex="-1" aria-modal="true" role="dialog">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Demo Mode</h5>
-                    <button type="button" class="btn-close" aria-label="Close" @click="closeDemoModal"></button>
+    <div v-if="showDemoToast" class="position-fixed top-0 end-0 p-3" style="z-index: 2050;">
+        <div class="toast show align-items-center text-bg-warning border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <div class="fw-semibold mb-1">Demo Mode</div>
+                    <div class="small">{{ demoToastMessage }}</div>
                 </div>
-                <div class="modal-body">
-                    <p class="mb-0">{{ demoModalMessage }}</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" @click="closeDemoModal">OK</button>
-                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Close" @click="closeDemoToast"></button>
             </div>
         </div>
     </div>
-    <div v-if="showDemoModal" class="modal-backdrop fade show"></div>
 </template>
 
 <script setup>
@@ -425,24 +419,60 @@ const myDeviceIds = ref([]);
 let echoChannel = null;
 const processedAlertIds = new Set();
 
-const showDemoModal = ref(false);
-const demoModalMessage = ref('This is a demo project. You do not have permission to create/update/delete data. You can only read/view data.');
-let lastDemoModalAt = 0;
+const showDemoToast = ref(false);
+const demoToastMessage = ref('This is a demo project. You do not have permission to create/update/delete data. You can only read/view data.');
+let lastDemoToastAt = 0;
+let demoToastTimer = null;
+let swalSuppressPatched = false;
 
-function openDemoModal(message) {
-    const now = Date.now();
-    if (now - lastDemoModalAt < 800) return;
-    lastDemoModalAt = now;
-    demoModalMessage.value = message || demoModalMessage.value;
-    showDemoModal.value = true;
+function shouldSuppressSwal() {
+    if (typeof window === 'undefined') return false;
+    const t = Number(window.__demoReadonlyAt || 0);
+    return t > 0 && (Date.now() - t) < 1400;
 }
 
-function closeDemoModal() {
-    showDemoModal.value = false;
+function installSwalSuppressor() {
+    if (swalSuppressPatched) return;
+    swalSuppressPatched = true;
+
+    const originalFire = Swal.fire.bind(Swal);
+    Swal.fire = (...args) => {
+        if (shouldSuppressSwal()) return Promise.resolve({ isDismissed: true });
+        return originalFire(...args);
+    };
+
+    const originalMixin = Swal.mixin.bind(Swal);
+    Swal.mixin = (...args) => {
+        const inst = originalMixin(...args);
+        const instFire = inst.fire.bind(inst);
+        inst.fire = (...fireArgs) => {
+            if (shouldSuppressSwal()) return Promise.resolve({ isDismissed: true });
+            return instFire(...fireArgs);
+        };
+        return inst;
+    };
+}
+
+function openDemoToast(message) {
+    const now = Date.now();
+    if (now - lastDemoToastAt < 500) return;
+    lastDemoToastAt = now;
+    demoToastMessage.value = message || demoToastMessage.value;
+    showDemoToast.value = true;
+    if (demoToastTimer) clearTimeout(demoToastTimer);
+    demoToastTimer = setTimeout(() => { showDemoToast.value = false; }, 4500);
+}
+
+function closeDemoToast() {
+    showDemoToast.value = false;
+    if (demoToastTimer) {
+        clearTimeout(demoToastTimer);
+        demoToastTimer = null;
+    }
 }
 
 function onDemoReadonly(e) {
-    openDemoModal(e?.detail?.message);
+    openDemoToast(e?.detail?.message);
 }
 
 // Toast removed
@@ -715,6 +745,7 @@ watch(isAuthed, (val) => {
 });
 
 onMounted(() => {
+    installSwalSuppressor();
     if (typeof window !== 'undefined') {
         window.addEventListener('demo:readonly', onDemoReadonly);
     }
