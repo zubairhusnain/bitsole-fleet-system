@@ -101,7 +101,7 @@ window.axios.interceptors.request.use(
 
     if (isDemoWriteAllowedPath(path)) return config;
 
-    emitDemoReadonly('This is a demo project. You do not have permission to create/update/delete data. You can only read/view data.');
+    emitDemoReadonly('This is a demo account. You do not have permission to create/update/delete data. You can only read/view data.');
     return Promise.reject({
       isDemoReadOnlyBlocked: true,
       config,
