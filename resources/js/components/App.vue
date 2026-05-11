@@ -379,6 +379,24 @@
         </footer>
         <!--end::Footer-->
     </div>
+
+    <div v-if="showDemoModal" class="modal fade show" style="display: block;" tabindex="-1" aria-modal="true" role="dialog">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Demo Mode</h5>
+                    <button type="button" class="btn-close" aria-label="Close" @click="closeDemoModal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">{{ demoModalMessage }}</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" @click="closeDemoModal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div v-if="showDemoModal" class="modal-backdrop fade show"></div>
 </template>
 
 <script setup>
@@ -406,6 +424,26 @@ const unreadCount = ref(0);
 const myDeviceIds = ref([]);
 let echoChannel = null;
 const processedAlertIds = new Set();
+
+const showDemoModal = ref(false);
+const demoModalMessage = ref('This is a demo project. You do not have permission to create/update/delete data. You can only read/view data.');
+let lastDemoModalAt = 0;
+
+function openDemoModal(message) {
+    const now = Date.now();
+    if (now - lastDemoModalAt < 800) return;
+    lastDemoModalAt = now;
+    demoModalMessage.value = message || demoModalMessage.value;
+    showDemoModal.value = true;
+}
+
+function closeDemoModal() {
+    showDemoModal.value = false;
+}
+
+function onDemoReadonly(e) {
+    openDemoModal(e?.detail?.message);
+}
 
 // Toast removed
 
@@ -677,6 +715,9 @@ watch(isAuthed, (val) => {
 });
 
 onMounted(() => {
+    if (typeof window !== 'undefined') {
+        window.addEventListener('demo:readonly', onDemoReadonly);
+    }
     if (isAuthed.value) {
         fetchMyDeviceIds().then(() => {
             fetchUnreadCount();
@@ -694,6 +735,9 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+    if (typeof window !== 'undefined') {
+        window.removeEventListener('demo:readonly', onDemoReadonly);
+    }
     if (echoChannel && authState.user) {
         window.echo.leave(`alerts.${authState.user.id}`);
     }

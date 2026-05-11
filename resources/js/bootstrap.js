@@ -40,6 +40,11 @@ window.axios.interceptors.response.use(
   async (error) => {
     const status = error?.response?.status;
     const config = error?.config || {};
+    const isDemoReadOnly = status === 403 && (error?.response?.data?.demo_read_only === true || error?.response?.data?.code === 'DEMO_READ_ONLY');
+    if (isDemoReadOnly && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      const msg = error?.response?.data?.message || 'This is a demo project. You can only read/view data.';
+      window.dispatchEvent(new CustomEvent('demo:readonly', { detail: { message: msg } }));
+    }
     if (status === 419 && !config.__retried) {
       try {
         const res = await window.axios.get(joinBackend('/web/csrf-token'));
