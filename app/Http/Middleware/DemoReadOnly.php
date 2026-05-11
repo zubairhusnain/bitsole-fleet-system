@@ -39,7 +39,7 @@ class DemoReadOnly
             }
         }
 
-        $message = 'This is a demo project. You do not have permission to create/update/delete data. You can only read/view data.';
+        $message = 'This is a demo account. You do not have permission to create/update/delete data. You can only read/view data.';
         $payload = [
             'message' => $message,
             'demo_read_only' => true,
