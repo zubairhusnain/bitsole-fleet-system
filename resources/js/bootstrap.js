@@ -6,6 +6,8 @@ window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 window.axios.defaults.withCredentials = true;
 window.axios.defaults.headers.common['Accept'] = 'application/json';
 
+const DEMO_READ_ONLY = typeof import.meta !== 'undefined' && String(import.meta.env?.VITE_DEMO_READ_ONLY || '').toLowerCase() === 'true';
+
 // Use Laravel's standard XSRF cookie/header pairing
 window.axios.defaults.xsrfCookieName = 'XSRF-TOKEN';
 window.axios.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
@@ -17,6 +19,25 @@ const joinBackend = (path) => (BACKEND_URL ? new URL(path, BACKEND_URL).toString
 if (BACKEND_URL) {
   window.axios.defaults.baseURL = BACKEND_URL;
 }
+
+const isDemoWriteAllowedPath = (path) => {
+  const p = String(path || '');
+  const allowedPrefixes = [
+    '/web/auth/login',
+    '/web/auth/register',
+    '/web/auth/logout',
+    '/web/auth/impersonate',
+    '/sanctum/csrf-cookie',
+    '/web/csrf-token',
+  ];
+  return allowedPrefixes.some((prefix) => p === prefix || p.startsWith(prefix + '/'));
+};
+
+const emitDemoReadonly = (message) => {
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('demo:readonly', { detail: { message } }));
+  }
+};
 
 // Seed CSRF header from meta tag or fallback endpoint
 const setCsrfHeader = (token) => {
@@ -41,9 +62,9 @@ window.axios.interceptors.response.use(
     const status = error?.response?.status;
     const config = error?.config || {};
     const isDemoReadOnly = status === 403 && (error?.response?.data?.demo_read_only === true || error?.response?.data?.code === 'DEMO_READ_ONLY');
-    if (isDemoReadOnly && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    if (isDemoReadOnly) {
       const msg = error?.response?.data?.message || 'This is a demo project. You can only read/view data.';
-      window.dispatchEvent(new CustomEvent('demo:readonly', { detail: { message: msg } }));
+      emitDemoReadonly(msg);
     }
     if (status === 419 && !config.__retried) {
       try {
@@ -57,6 +78,34 @@ window.axios.interceptors.response.use(
     }
     return Promise.reject(error);
   }
+);
+
+window.axios.interceptors.request.use(
+  (config) => {
+    if (!DEMO_READ_ONLY) return config;
+
+    const method = String(config?.method || 'get').toLowerCase();
+    if (!['post', 'put', 'patch', 'delete'].includes(method)) return config;
+
+    const urlRaw = String(config?.url || '');
+    const url = urlRaw.startsWith('http') ? urlRaw : joinBackend(urlRaw.startsWith('/') ? urlRaw : '/' + urlRaw);
+    let path = '';
+    try {
+      path = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost').pathname;
+    } catch (_) {
+      path = urlRaw.startsWith('/') ? urlRaw : '/' + urlRaw;
+    }
+
+    if (isDemoWriteAllowedPath(path)) return config;
+
+    emitDemoReadonly('This is a demo project. You do not have permission to create/update/delete data. You can only read/view data.');
+    return Promise.reject({
+      isDemoReadOnlyBlocked: true,
+      config,
+      message: 'Demo read-only mode blocked this request.',
+    });
+  },
+  (error) => Promise.reject(error)
 );
 
 import Echo from 'laravel-echo';
