@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 
+require __DIR__.'/mobile.php';
+
 Route::get('/status', function () {
     return response()->json([
         'app' => config('app.name'),
