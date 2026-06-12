@@ -29,7 +29,12 @@ Route::prefix('mobile')->group(function () {
         Route::post('/vehicles', [MobileVehicleController::class, 'store']);
         Route::get('/vehicles/{deviceId}', [MobileVehicleController::class, 'show']);
         Route::get('/vehicles/{deviceId}/detail', [MobileVehicleController::class, 'detail']);
+        Route::get('/vehicles/{deviceId}/trips', [MobileVehicleController::class, 'trips']);
+        Route::get('/vehicles/{deviceId}/driver', [MobileVehicleController::class, 'driver']);
+        Route::get('/vehicles/{deviceId}/performance', [MobileVehicleController::class, 'performance']);
+        Route::get('/vehicles/{deviceId}/rating', [MobileVehicleController::class, 'rating']);
         Route::get('/vehicles/{deviceId}/position', [MobileVehicleController::class, 'position']);
+        Route::get('/vehicles/{deviceId}/geofences', [MobileVehicleController::class, 'geofences']);
         Route::put('/vehicles/{deviceId}', [MobileVehicleController::class, 'update']);
         Route::delete('/vehicles/{deviceId}', [MobileVehicleController::class, 'destroy']);
         Route::post('/vehicles/{deviceId}/alert-status', [MobileVehicleController::class, 'updateAlertStatus']);

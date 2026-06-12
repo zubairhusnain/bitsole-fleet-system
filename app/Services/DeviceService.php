@@ -395,6 +395,9 @@ class DeviceService
      */
     public function getTrips(User $user, int $deviceId, array $options = [])
     {
+        $rawFrom = $options['from'] ?? null;
+        $rawTo = $options['to'] ?? null;
+
         $toIso = isset($options['to'])
             ? gmdate('Y-m-d H:i:s', is_numeric($options['to']) ? (int)$options['to'] : strtotime((string)$options['to']))
             : gmdate('Y-m-d H:i:s');
@@ -402,7 +405,133 @@ class DeviceService
             ? gmdate('Y-m-d H:i:s', is_numeric($options['from']) ? (int)$options['from'] : strtotime((string)$options['from']))
             : gmdate('Y-m-d H:i:s', strtotime('-1 day'));
 
-        return $this->fetchTripsDb($deviceId, $fromIso, $toIso, $options);
+        try {
+            $result = $this->fetchTripsDb($deviceId, $fromIso, $toIso, $options);
+        } catch (\Throwable $e) {
+            Log::warning('fetchTripsDb failed, falling back to Traccar trips report', [
+                'deviceId' => $deviceId,
+                'error' => $e->getMessage(),
+            ]);
+            $result = isset($options['paginate']) && $options['paginate']
+                ? $this->paginateTripsArray([], $options)
+                : [];
+        }
+
+        $dbTotal = $result instanceof \Illuminate\Pagination\LengthAwarePaginator
+            ? $result->total()
+            : (is_array($result) ? count($result) : 0);
+
+        if ($dbTotal > 0) {
+            return $result;
+        }
+
+        $traccarTrips = $this->fetchTripsFromTraccar($user, $deviceId, $rawFrom, $rawTo);
+        if (empty($traccarTrips)) {
+            return $result;
+        }
+
+        if (isset($options['paginate']) && $options['paginate']) {
+            return $this->paginateTripsArray($traccarTrips, $options);
+        }
+
+        return $traccarTrips;
+    }
+
+    /**
+     * Fetch trips from Traccar /api/reports/trips (canonical trip report).
+     */
+    private function fetchTripsFromTraccar(User $user, int $deviceId, ?string $from, ?string $to): array
+    {
+        $sessionId = $user->traccarSession ?? session('cookie');
+        if (!$sessionId) {
+            $sessionId = User::whereNotNull('traccarSession')->value('traccarSession');
+        }
+        if (!$sessionId) {
+            return [];
+        }
+
+        $fromIso = $this->toTraccarReportIso($from);
+        $toIso = $this->toTraccarReportIso($to);
+        $query = 'deviceId=' . $deviceId . '&from=' . $fromIso . '&to=' . $toIso;
+        $headers = ['Content-Type: application/json', 'Accept: application/json'];
+
+        try {
+            $resp = static::curl('/api/reports/trips?' . $query, 'GET', $sessionId, '', $headers, 120);
+            if (($resp->responseCode ?? 0) != 200) {
+                Log::warning('Traccar trips report failed', [
+                    'deviceId' => $deviceId,
+                    'code' => $resp->responseCode ?? null,
+                ]);
+                return [];
+            }
+
+            $decoded = json_decode($resp->response ?? '[]', true);
+            if (!is_array($decoded)) {
+                return [];
+            }
+
+            return collect($decoded)
+                ->map(fn ($t) => $this->normalizeTripRow(is_array($t) ? $t : []))
+                ->filter(fn ($t) => !empty($t['startTime']) || !empty($t['endTime']))
+                ->sortByDesc('startTime')
+                ->values()
+                ->all();
+        } catch (\Throwable $e) {
+            Log::warning('Traccar trips report error', ['deviceId' => $deviceId, 'error' => $e->getMessage()]);
+            return [];
+        }
+    }
+
+    private function toTraccarReportIso(?string $raw): string
+    {
+        if ($raw === null || $raw === '') {
+            return gmdate('Y-m-d\TH:i:s\Z');
+        }
+        $ts = strtotime($raw);
+        return gmdate('Y-m-d\TH:i:s\Z', $ts !== false ? $ts : time());
+    }
+
+    private function normalizeTripRow(array $t): array
+    {
+        return [
+            'deviceId' => $t['deviceId'] ?? $t['deviceid'] ?? null,
+            'deviceName' => $t['deviceName'] ?? $t['device_name'] ?? '',
+            'distance' => $t['distance'] ?? 0,
+            'averageSpeed' => $t['averageSpeed'] ?? $t['average_speed'] ?? 0,
+            'maxSpeed' => $t['maxSpeed'] ?? $t['max_speed'] ?? 0,
+            'spentFuel' => $t['spentFuel'] ?? $t['spent_fuel'] ?? 0,
+            'startOdometer' => $t['startOdometer'] ?? $t['start_odometer'] ?? null,
+            'endOdometer' => $t['endOdometer'] ?? $t['end_odometer'] ?? null,
+            'startTime' => $t['startTime'] ?? $t['start_time'] ?? null,
+            'endTime' => $t['endTime'] ?? $t['end_time'] ?? null,
+            'startPositionId' => $t['startPositionId'] ?? $t['start_position_id'] ?? null,
+            'endPositionId' => $t['endPositionId'] ?? $t['end_position_id'] ?? null,
+            'startLat' => $t['startLat'] ?? $t['start_lat'] ?? null,
+            'startLon' => $t['startLon'] ?? $t['start_lon'] ?? null,
+            'endLat' => $t['endLat'] ?? $t['end_lat'] ?? null,
+            'endLon' => $t['endLon'] ?? $t['end_lon'] ?? null,
+            'startAddress' => $t['startAddress'] ?? $t['start_address'] ?? null,
+            'endAddress' => $t['endAddress'] ?? $t['end_address'] ?? null,
+            'duration' => $t['duration'] ?? 0,
+            'driverUniqueId' => $t['driverUniqueId'] ?? $t['driver_unique_id'] ?? '',
+            'driverName' => $t['driverName'] ?? $t['driver_name'] ?? '',
+        ];
+    }
+
+    private function paginateTripsArray(array $trips, array $options): \Illuminate\Pagination\LengthAwarePaginator
+    {
+        $page = max(1, (int) ($options['page'] ?? 1));
+        $perPage = max(1, (int) ($options['perPage'] ?? 15));
+        $total = count($trips);
+        $items = array_slice($trips, ($page - 1) * $perPage, $perPage);
+
+        return new \Illuminate\Pagination\LengthAwarePaginator(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            ['path' => \Illuminate\Support\Facades\Request::url(), 'query' => \Illuminate\Support\Facades\Request::query()]
+        );
     }
 
     public function fetchTripsDb($deviceId, $from, $to, $options = [])

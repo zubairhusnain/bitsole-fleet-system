@@ -73,7 +73,8 @@ class VehicleController extends Controller
         // Eager load tcDevice and its current position; include soft-deleted (blocked) devices
         $query->withTrashed()->with(['tcDevice.position']);
 
-        $devices = $query->orderByDesc('id')->paginate(25);
+        $perPage = min(max((int) $request->input('per_page', 25), 1), 200);
+        $devices = $query->orderByDesc('id')->paginate($perPage);
 
         return response()->json($devices);
     }

@@ -36,9 +36,34 @@ class MobileVehicleController extends Controller
         return app(VehicleController::class)->detail($request, $deviceId);
     }
 
+    public function trips(Request $request, int $deviceId)
+    {
+        return app(VehicleController::class)->trips($request, $deviceId);
+    }
+
+    public function driver(Request $request, int $deviceId)
+    {
+        return app(VehicleController::class)->driver($request, $deviceId);
+    }
+
+    public function performance(Request $request, int $deviceId)
+    {
+        return app(VehicleController::class)->performance($request, $deviceId);
+    }
+
+    public function rating(Request $request, int $deviceId)
+    {
+        return app(VehicleController::class)->rating($request, $deviceId);
+    }
+
     public function position(Request $request, $deviceId)
     {
         return app(VehicleController::class)->positionCurrent($request, $deviceId);
+    }
+
+    public function geofences(Request $request, int $deviceId)
+    {
+        return app(VehicleController::class)->geofences($request, $deviceId);
     }
 
     public function store(Request $request)
