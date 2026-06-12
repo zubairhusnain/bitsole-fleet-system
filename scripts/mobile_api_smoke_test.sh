@@ -3,7 +3,7 @@
 #   MOBILE_TEST_EMAIL=user@example.com MOBILE_TEST_PASSWORD=secret ./scripts/mobile_api_smoke_test.sh
 set -euo pipefail
 
-BASE="${MOBILE_API_BASE:-https://portal.bit-sole.com/api/mobile}"
+BASE="${MOBILE_API_BASE:-https://portal.bit-sole.com/api}"
 PASS=0
 FAIL=0
 
@@ -31,7 +31,7 @@ echo
 check "Login validation (missing body)" 422 "$(http_code -X POST "$BASE/auth/login" -H 'Accept: application/json' -H 'Content-Type: application/json' -d '{}')"
 check "Register validation (missing body)" 422 "$(http_code -X POST "$BASE/auth/register" -H 'Accept: application/json' -H 'Content-Type: application/json' -d '{}')"
 check "Me without token" 401 "$(http_code "$BASE/auth/me" -H 'Accept: application/json')"
-check "Live positions without token" 401 "$(http_code "$BASE/live/positions" -H 'Accept: application/json')"
+check "Live positions without token" 401 "$(http_code "$BASE/live/positions/current" -H 'Accept: application/json')"
 
 if [[ -n "${MOBILE_TEST_EMAIL:-}" && -n "${MOBILE_TEST_PASSWORD:-}" ]]; then
   echo
@@ -52,7 +52,7 @@ if [[ -n "${MOBILE_TEST_EMAIL:-}" && -n "${MOBILE_TEST_PASSWORD:-}" ]]; then
     AUTH=(-H "Authorization: Bearer $TOKEN" -H 'Accept: application/json')
 
     check "GET /auth/me" 200 "$(http_code "$BASE/auth/me" "${AUTH[@]}")"
-    check "GET /live/positions" 200 "$(http_code "$BASE/live/positions" "${AUTH[@]}")"
+    check "GET /live/positions/current" 200 "$(http_code "$BASE/live/positions/current" "${AUTH[@]}")"
     check "GET /vehicles" 200 "$(http_code "$BASE/vehicles" "${AUTH[@]}")"
     check "GET /drivers" 200 "$(http_code "$BASE/drivers" "${AUTH[@]}")"
     check "GET /notifications/events" 200 "$(http_code "$BASE/notifications/events" "${AUTH[@]}")"

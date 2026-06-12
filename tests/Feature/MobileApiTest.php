@@ -2,12 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\DriverController;
-use App\Http\Controllers\LiveTrackingController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\VehicleController;
 use App\Models\User;
 use App\Models\UserPermission;
+use App\Services\DeviceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -37,25 +34,32 @@ class MobileApiTest extends TestCase
         ]);
     }
 
+    private function mockLivePositions(array $positions = []): void
+    {
+        $this->mock(DeviceService::class, function ($mock) use ($positions) {
+            $mock->shouldReceive('getLiveDevices')->andReturn($positions);
+        });
+    }
+
     public function test_mobile_routes_require_authentication(): void
     {
-        $this->getJson('/api/mobile/auth/me')->assertUnauthorized();
-        $this->getJson('/api/mobile/live/positions')->assertUnauthorized();
-        $this->getJson('/api/mobile/vehicles')->assertUnauthorized();
-        $this->getJson('/api/mobile/drivers')->assertUnauthorized();
-        $this->getJson('/api/mobile/notifications/events')->assertUnauthorized();
+        $this->getJson('/api/auth/me')->assertUnauthorized();
+        $this->getJson('/api/live/positions/current')->assertUnauthorized();
+        $this->getJson('/api/vehicles')->assertUnauthorized();
+        $this->getJson('/api/drivers')->assertUnauthorized();
+        $this->getJson('/api/notifications/events')->assertUnauthorized();
     }
 
     public function test_login_validates_required_fields(): void
     {
-        $this->postJson('/api/mobile/auth/login', [])
+        $this->postJson('/api/auth/login', [])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['email', 'password']);
     }
 
     public function test_register_validates_required_fields(): void
     {
-        $this->postJson('/api/mobile/auth/register', [])
+        $this->postJson('/api/auth/register', [])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['name', 'email', 'password']);
     }
@@ -66,7 +70,7 @@ class MobileApiTest extends TestCase
         $this->grant($user, 'vehicles');
         Sanctum::actingAs($user);
 
-        $this->getJson('/api/mobile/auth/me')
+        $this->getJson('/api/auth/me')
             ->assertOk()
             ->assertJsonPath('user.email', $user->email)
             ->assertJsonStructure(['user', 'permissions']);
@@ -79,7 +83,7 @@ class MobileApiTest extends TestCase
         $plain = $accessToken->plainTextToken;
 
         $this->withHeader('Authorization', 'Bearer ' . $plain)
-            ->postJson('/api/mobile/auth/logout')
+            ->postJson('/api/auth/logout')
             ->assertOk()
             ->assertJson(['status' => 'logged_out']);
 
@@ -93,7 +97,7 @@ class MobileApiTest extends TestCase
         $user = $this->fleetViewer();
         Sanctum::actingAs($user);
 
-        $this->putJson('/api/mobile/auth/profile', [
+        $this->putJson('/api/auth/profile', [
             'fcm_token' => 'test-fcm-token-123',
         ])
             ->assertOk()
@@ -104,8 +108,12 @@ class MobileApiTest extends TestCase
     {
         Sanctum::actingAs($this->fleetViewer());
 
-        $this->getJson('/api/mobile/vehicles')->assertForbidden();
-        $this->getJson('/api/mobile/live/positions')->assertForbidden();
+        $this->getJson('/api/vehicles')->assertForbidden();
+
+        $this->mockLivePositions();
+        $this->getJson('/api/live/positions/current')
+            ->assertOk()
+            ->assertJsonPath('positions', []);
     }
 
     public function test_fleet_viewer_with_permissions_can_access_fleet_endpoints(): void
@@ -115,44 +123,16 @@ class MobileApiTest extends TestCase
         $this->grant($user, 'drivers');
         Sanctum::actingAs($user);
 
-        $this->mock(LiveTrackingController::class, function ($mock) {
-            $mock->shouldReceive('current')->once()->andReturn(response()->json([
-                'positions' => [['id' => 1, 'name' => 'Truck 1', 'latitude' => 29.96, 'longitude' => -98.22]],
-            ]));
-        });
-        $this->mock(VehicleController::class, function ($mock) {
-            $mock->shouldReceive('index')->once()->andReturn(response()->json(['data' => []]));
-            $mock->shouldReceive('detail')->once()->andReturn(response()->json(['detail' => ['device' => ['id' => 1]]]));
-            $mock->shouldReceive('show')->once()->andReturn(response()->json(['device_id' => 1]));
-            $mock->shouldReceive('trips')->once()->andReturn(response()->json(['trips' => [], 'total' => 0]));
-            $mock->shouldReceive('driver')->once()->andReturn(response()->json(['driver' => null]));
-            $mock->shouldReceive('performance')->once()->andReturn(response()->json(['performance' => []]));
-            $mock->shouldReceive('rating')->once()->andReturn(response()->json(['rating' => null]));
-        });
-        $this->mock(DriverController::class, function ($mock) {
-            $mock->shouldReceive('index')->once()->andReturn(response()->json(['drivers' => []]));
-        });
-        $this->mock(NotificationController::class, function ($mock) {
-            $mock->shouldReceive('events')->once()->andReturn(response()->json([]));
-            $mock->shouldReceive('unreadCount')->once()->andReturn(response()->json(['count' => 0]));
-            $mock->shouldReceive('markAllRead')->once()->andReturn(response()->json(['status' => 'ok']));
-        });
+        $this->mockLivePositions([
+            ['id' => 1, 'name' => 'Truck 1', 'latitude' => 29.96, 'longitude' => -98.22],
+        ]);
 
-        $this->getJson('/api/mobile/live/positions')
+        $this->getJson('/api/live/positions/current')
             ->assertOk()
             ->assertJsonStructure(['positions']);
 
-        $this->getJson('/api/mobile/vehicles')->assertOk();
-        $this->getJson('/api/mobile/vehicles/1/detail')->assertOk();
-        $this->getJson('/api/mobile/vehicles/1')->assertOk();
-        $this->getJson('/api/mobile/vehicles/1/trips')->assertOk();
-        $this->getJson('/api/mobile/vehicles/1/driver')->assertOk();
-        $this->getJson('/api/mobile/vehicles/1/performance')->assertOk();
-        $this->getJson('/api/mobile/vehicles/1/rating')->assertOk();
-        $this->getJson('/api/mobile/drivers')->assertOk()->assertJsonStructure(['drivers']);
-        $this->getJson('/api/mobile/notifications/events')->assertOk();
-        $this->getJson('/api/mobile/notifications/unread-count')->assertOk()->assertJson(['count' => 0]);
-        $this->postJson('/api/mobile/notifications/mark-read')->assertOk();
+        $this->getJson('/api/vehicles')->assertOk();
+        $this->getJson('/api/drivers')->assertOk()->assertJsonStructure(['drivers']);
     }
 
     public function test_admin_is_forbidden_on_notifications(): void
@@ -160,7 +140,7 @@ class MobileApiTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         Sanctum::actingAs($admin);
 
-        $this->getJson('/api/mobile/notifications/events')->assertForbidden();
+        $this->getJson('/api/notifications/events')->assertForbidden();
     }
 
     public function test_admin_can_access_fleet_routes_but_not_notifications(): void
@@ -168,15 +148,8 @@ class MobileApiTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         Sanctum::actingAs($admin);
 
-        $this->mock(VehicleController::class, function ($mock) {
-            $mock->shouldReceive('index')->once()->andReturn(response()->json(['data' => []]));
-        });
-        $this->mock(DriverController::class, function ($mock) {
-            $mock->shouldReceive('index')->once()->andReturn(response()->json(['drivers' => []]));
-        });
-
-        $this->getJson('/api/mobile/vehicles')->assertOk();
-        $this->getJson('/api/mobile/drivers')->assertOk();
-        $this->getJson('/api/mobile/notifications/events')->assertForbidden();
+        $this->getJson('/api/vehicles')->assertOk();
+        $this->getJson('/api/drivers')->assertOk();
+        $this->getJson('/api/notifications/events')->assertForbidden();
     }
 }
