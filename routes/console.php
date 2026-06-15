@@ -5,9 +5,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+if (env('BACKUP_ENABLED', true)) {
 
 // Assign computed attributes hourly
 // Schedule::command('assign:computed-attributes')
@@ -29,10 +27,10 @@ Schedule::command('events:check-columns')
     ->runInBackground();
 
 // Database backup daily using custom command (can be disabled via env)
-if (env('BACKUP_ENABLED', true)) {
+
     Schedule::command('backup:cleanup-old')->daily()->at('01:00');
     Schedule::command('backup:database-only')->daily()->at('01:30');
-}
+
 
 // Backfill missing addresses in tc_positions
 // Runs continuously (restarts if stopped) to fix blank addresses
@@ -46,3 +44,4 @@ Schedule::command('traccar:stabilize-io9')
     ->everyMinute()
     ->withoutOverlapping()
     ->runInBackground();
+}
