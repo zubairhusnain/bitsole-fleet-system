@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schedule;
 
-if (env('BACKUP_ENABLED', true)) {
+if (filter_var(env('SCHEDULER_ENABLED', true), FILTER_VALIDATE_BOOLEAN)) {
 
 // Assign computed attributes hourly
 // Schedule::command('assign:computed-attributes')
