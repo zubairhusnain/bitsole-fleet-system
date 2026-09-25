@@ -9,6 +9,12 @@ use Illuminate\Support\Facades\Route;
 | Mobile auth (Sanctum bearer tokens) — mirrors /web/auth structure.
 |--------------------------------------------------------------------------
 */
+
+
+
+
+
+
 Route::prefix('auth')->group(function () {
     Route::post('/login', [MobileAuthController::class, 'login']);
     Route::post('/register', [MobileAuthController::class, 'register']);
