@@ -10,14 +10,18 @@ use App\Helpers\Helpers;
 use DateTimeZone;
 use DateTime;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use App\Models\User;
 use App\Services\GeofencesService;
+use App\Traits\GeocodingTrait;
+
 class DeviceService
 {
     use Curl;
+    use GeocodingTrait;
 
 
     // public function getAllDevices($request)
@@ -359,6 +363,31 @@ class DeviceService
         $drivers = json_decode($driverResp->response, true) ?? [];
         $payload['drivers'] = $drivers;
 
+        $payload['lastIgnitionOn'] = null;
+        $payload['lastIgnitionOff'] = null;
+        try {
+            $ignitionEvents = DB::connection('pgsql')
+                ->table('tc_events')
+                ->select('type', DB::raw('MAX(eventtime) as last_time'))
+                ->where('deviceid', $deviceId)
+                ->whereIn('type', ['ignitionOn', 'ignitionOff'])
+                ->groupBy('type')
+                ->get();
+
+            foreach ($ignitionEvents as $evt) {
+                if ($evt->type === 'ignitionOn') {
+                    $payload['lastIgnitionOn'] = $evt->last_time;
+                } elseif ($evt->type === 'ignitionOff') {
+                    $payload['lastIgnitionOff'] = $evt->last_time;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('getDeviceDetailWithTrips ignition times failed', [
+                'deviceId' => $deviceId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return $payload;
     }
 
@@ -470,12 +499,14 @@ class DeviceService
                 return [];
             }
 
-            return collect($decoded)
+            $trips = collect($decoded)
                 ->map(fn ($t) => $this->normalizeTripRow(is_array($t) ? $t : []))
                 ->filter(fn ($t) => !empty($t['startTime']) || !empty($t['endTime']))
                 ->sortByDesc('startTime')
                 ->values()
                 ->all();
+
+            return $this->enrichTripsWithAddresses($trips);
         } catch (\Throwable $e) {
             Log::warning('Traccar trips report error', ['deviceId' => $deviceId, 'error' => $e->getMessage()]);
             return [];
@@ -648,6 +679,7 @@ class DeviceService
 
                 $total = $trips->count();
                 $items = $trips->forPage($page, $perPage)->values()->all();
+                $items = $this->enrichTripsWithAddresses($items);
 
                 return new \Illuminate\Pagination\LengthAwarePaginator(
                     $items,
@@ -658,7 +690,7 @@ class DeviceService
                 );
             }
 
-            return $trips->all();
+            return $this->enrichTripsWithAddresses($trips->all());
 
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('fetchTripsDb Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
@@ -1158,4 +1190,56 @@ class DeviceService
         return $resp;
     }
 
+
+    public function getDeviceCommands(User $user, int $deviceId): array
+    {
+        $sessionId = $user->traccarSession ?? session('cookie');
+        $headers = ['Content-Type: application/json', 'Accept: application/json'];
+
+        $typesResp = static::curl('/api/commands/types?deviceId=' . $deviceId, 'GET', $sessionId, '', $headers);
+        $savedResp = static::curl('/api/commands/send?deviceId=' . $deviceId, 'GET', $sessionId, '', $headers);
+
+        $types = json_decode($typesResp->response ?? '[]', true);
+        $saved = json_decode($savedResp->response ?? '[]', true);
+
+        return [
+            'types' => $this->normalizeCommandTypes($types),
+            'saved' => is_array($saved) ? $saved : [],
+        ];
+    }
+
+    private function normalizeCommandTypes($types): array
+    {
+        if (! is_array($types)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($types as $item) {
+            if (is_string($item) && $item !== '') {
+                $out[] = $item;
+            } elseif (is_array($item) && ! empty($item['type'])) {
+                $out[] = (string) $item['type'];
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    public function sendDeviceCommand(User $user, int $deviceId, array $payload): \stdClass
+    {
+        $sessionId = $user->traccarSession ?? session('cookie');
+        $headers = ['Content-Type: application/json', 'Accept: application/json'];
+
+        $body = array_merge(['deviceId' => $deviceId], $payload);
+        $body = array_filter($body, static fn ($v) => $v !== null && $v !== '');
+
+        return static::curl(
+            '/api/commands/send',
+            'POST',
+            $sessionId,
+            json_encode($body),
+            $headers
+        );
+    }
 }

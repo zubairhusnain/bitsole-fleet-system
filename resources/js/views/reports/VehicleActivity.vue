@@ -65,7 +65,17 @@
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label small fw-semibold text-muted d-block">&nbsp;</label>
-            <button class="btn btn-primary w-100" @click="fetchReport">Submit</button>
+            <div class="d-flex flex-column gap-2">
+              <button class="btn btn-primary w-100" @click="fetchReport">Submit</button>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary flex-fill" :disabled="!canExport" @click="downloadCsv">
+                  <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                </button>
+                <button type="button" class="btn btn-outline-secondary flex-fill" :disabled="!canExport" @click="downloadPdf">
+                  <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -145,6 +155,9 @@
                     <span class="visually-hidden">Loading...</span>
                   </div>
                 </td>
+              </tr>
+              <tr v-else-if="!hasSearched">
+                <td colspan="13" class="text-center py-4 text-muted">Select filters and click <strong>Search</strong> to load the report.</td>
               </tr>
               <tr v-else-if="!reportData || !reportData.rows || reportData.rows.length === 0">
                 <td colspan="13" class="text-center py-4">No data available.</td>
@@ -231,11 +244,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
-import { formatDateTime, formatDate, formatTime } from '../../utils/datetime';
+import { formatDateTime, formatDate, formatTime, getActiveTimezone } from '../../utils/datetime';
+import { todayDateString } from '../../utils/reportDates';
+import { openReportExport } from '../../utils/reportExport';
+import { createCancellableRequest, isRequestAborted } from '../../utils/cancellableRequest';
 
 const router = useRouter();
 
@@ -244,11 +260,33 @@ const showInfo = ref(false);
 // State
 const devices = ref([]);
 const selectedDevice = ref(null);
-const fromDate = ref(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
-const toDate = ref(new Date().toISOString().slice(0, 10));
+const fromDate = ref(todayDateString());
+const toDate = ref(todayDateString());
 const loading = ref(false);
+const hasSearched = ref(false);
+const reportRequest = createCancellableRequest();
 const errorMessage = ref(null);
 const reportData = ref(null);
+
+const canExport = computed(() => Boolean(selectedDevice.value && fromDate.value && toDate.value));
+
+function exportParams() {
+  return {
+    from_date: fromDate.value,
+    to_date: toDate.value,
+    device_ids: [selectedDevice.value],
+    limit: 500,
+    tz: getActiveTimezone(),
+  };
+}
+function downloadCsv() {
+  if (!canExport.value) return;
+  openReportExport('/web/reports/vehicle-activity/export-csv', exportParams());
+}
+function downloadPdf() {
+  if (!canExport.value) return;
+  openReportExport('/web/reports/vehicle-activity/export-pdf', exportParams());
+}
 
 const headerInfo = computed(() => {
   if (!reportData.value || !reportData.value.header) return null;
@@ -320,41 +358,55 @@ async function loadDevices() {
     devices.value = res.data.options || [];
     if (devices.value.length > 0) {
       selectedDevice.value = devices.value[0].id;
-      // Auto-fetch report on load
-      fetchReport();
     }
   } catch (e) {
     console.error('Failed to load devices', e);
   }
 }
 
+function normalizeReportPayload(payload) {
+  return Array.isArray(payload)
+    ? { header: null, rows: [] }
+    : { header: payload?.header ?? null, rows: Array.isArray(payload?.rows) ? payload.rows : [] };
+}
+
 async function fetchReport() {
   if (!selectedDevice.value) return;
 
   loading.value = true;
+  hasSearched.value = true;
   errorMessage.value = null;
   reportData.value = null;
 
+  const signal = reportRequest.nextSignal();
   try {
     const res = await axios.get('/web/reports/vehicle-activity', {
       params: {
         from_date: fromDate.value,
         to_date: toDate.value,
         device_ids: [selectedDevice.value]
-      }
+      },
+      signal,
     });
-    reportData.value = res.data;
+    reportData.value = normalizeReportPayload(res.data);
   } catch (e) {
+    if (isRequestAborted(e)) return;
     console.error('Failed to fetch report', e);
     errorMessage.value = e.response?.data?.message || 'Failed to fetch report data';
   } finally {
-    loading.value = false;
+    if (!signal.aborted) {
+      loading.value = false;
+    }
   }
 }
 
 // Lifecycle
 onMounted(() => {
   loadDevices();
+});
+
+onBeforeUnmount(() => {
+  reportRequest.cancel();
 });
 </script>
 

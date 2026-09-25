@@ -120,9 +120,11 @@
 
 <script setup>
 import { ref } from 'vue';
+import { initTodayDatetimeRange } from '../../utils/reportDates';
 
-const startDate = ref('');
-const endDate = ref('');
+const { startDate: defaultStart, endDate: defaultEnd } = initTodayDatetimeRange();
+const startDate = ref(defaultStart);
+const endDate = ref(defaultEnd);
 const showInfo = ref(false);
 </script>
 

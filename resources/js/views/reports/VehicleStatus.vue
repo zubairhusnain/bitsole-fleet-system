@@ -110,6 +110,9 @@
               <tr v-if="loading">
                  <td colspan="18" class="text-center py-4">Loading...</td>
               </tr>
+              <tr v-else-if="!hasSearched">
+                 <td colspan="18" class="text-center py-4 text-muted">Select filters and click <strong>Search</strong> to load the report.</td>
+              </tr>
               <tr v-else-if="paginatedVehicles.length === 0">
                  <td colspan="18" class="text-center py-4">No vehicles found</td>
               </tr>
@@ -168,11 +171,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { formatTelemetry } from '../../utils/telemetry';
 import { formatDateTime } from '../../utils/datetime';
+import { createCancellableRequest, isRequestAborted } from '../../utils/cancellableRequest';
 const showInfo = ref(false);
 const vehicles = ref([]);
 const vehicleOptions = ref([]);
@@ -180,7 +184,9 @@ const groupOptions = ref([]);
 const selectedVehicleId = ref('');
 const selectedGroupId = ref('');
 const selectedFormat = ref('Website');
-const loading = ref(true);
+const loading = ref(false);
+const hasSearched = ref(false);
+const reportRequest = createCancellableRequest();
 const errorMessage = ref(null);
 const currentPage = ref(1);
 const itemsPerPage = 16;
@@ -410,7 +416,9 @@ const fetchVehicles = async () => {
     }
 
     loading.value = true;
+    hasSearched.value = true;
     currentPage.value = 1;
+    const signal = reportRequest.nextSignal();
     try {
         const params = { per_page: 500 };
         if (selectedVehicleId.value) {
@@ -420,15 +428,18 @@ const fetchVehicles = async () => {
             params.group_id = selectedGroupId.value;
         }
 
-        const { data } = await axios.get('/web/reports/vehicle-status', { params });
+        const { data } = await axios.get('/web/reports/vehicle-status', { params, signal });
         const list = Array.isArray(data) ? data : (data.data ?? []);
 
         vehicles.value = processVehicleData(list);
     } catch (err) {
+        if (isRequestAborted(err)) return;
         console.error("Failed to fetch vehicles", err);
         errorMessage.value = 'Failed to fetch vehicles. Please try again.';
     } finally {
-        loading.value = false;
+        if (!signal.aborted) {
+            loading.value = false;
+        }
     }
 };
 
@@ -472,7 +483,10 @@ const changePage = (page) => {
 onMounted(() => {
     fetchGroups();
     fetchOptions();
-    fetchVehicles();
+});
+
+onBeforeUnmount(() => {
+    reportRequest.cancel();
 });
 </script>
 

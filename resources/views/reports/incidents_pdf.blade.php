@@ -7,6 +7,7 @@
         body { font-family: sans-serif; font-size: 10px; margin: 0; padding: 0; }
         h2 { text-align: center; margin-bottom: 20px; }
         .header-info { margin-bottom: 20px; font-size: 12px; }
+        .meta { margin-bottom: 20px; font-size: 11px; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed; }
         th, td { border: 1px solid #ddd; padding: 4px; text-align: left; vertical-align: middle; word-wrap: break-word; }
         th { background-color: #886654; color: #ffffff; font-weight: bold; }
@@ -15,10 +16,7 @@
 </head>
 <body>
     <h2>Incident Analysis Report</h2>
-    <div class="header-info">
-        <strong>Date:</strong> {{ isset($date) ? date('d/m/Y', strtotime($date)) : date('d/m/Y') }}<br>
-        <strong>Total Rows:</strong> {{ is_array($rows) ? count($rows) : 0 }}
-    </div>
+    @include('reports.partials.pdf_meta', ['meta' => $meta ?? [], 'rows' => $rows ?? []])
     <table>
         <thead>
             <tr>

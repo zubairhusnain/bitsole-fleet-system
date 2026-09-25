@@ -153,6 +153,10 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/{deviceId}/rating', [\App\Http\Controllers\VehicleController::class, 'rating']);
     // Consolidated performance summary for dashboard (summary/events/maintenance)
     Route::get('/{deviceId}/performance', [\App\Http\Controllers\VehicleController::class, 'performance']);
+    // Per-device Traccar commands (separate from /web/commands console)
+    Route::get('/{deviceId}/commands', [\App\Http\Controllers\VehicleController::class, 'commands']);
+    Route::get('/{deviceId}/commands/history', [\App\Http\Controllers\VehicleController::class, 'commandHistory']);
+    Route::post('/{deviceId}/commands/send', [\App\Http\Controllers\VehicleController::class, 'sendCommand']);
     Route::put('/{deviceId}', [\App\Http\Controllers\VehicleController::class, 'update']);
     // Restore a soft-deleted (blocked) vehicle
     Route::patch('/{deviceId}/restore', [\App\Http\Controllers\VehicleController::class, 'restore']);
@@ -260,6 +264,8 @@ Route::middleware('auth')->get('/web/tracking/assign-computed-attributes', funct
 Route::middleware(['auth'])->prefix('/web/notifications')->group(function () {
     Route::get('/broadcast', [\App\Http\Controllers\NotificationController::class, 'broadcast']);
     Route::get('/events', [\App\Http\Controllers\NotificationController::class, 'events']);
+    Route::get('/device-options', [\App\Http\Controllers\NotificationController::class, 'deviceOptions']);
+    Route::get('/type-options', [\App\Http\Controllers\NotificationController::class, 'typeOptions']);
     Route::get('/unread-count', [\App\Http\Controllers\NotificationController::class, 'unreadCount']);
     Route::post('/mark-read', [\App\Http\Controllers\NotificationController::class, 'markAllRead']);
     Route::get('/my-device-ids', [\App\Http\Controllers\NotificationController::class, 'myDeviceIds']);
@@ -271,20 +277,35 @@ Route::middleware(['auth'])->prefix('/web/notifications')->group(function () {
 });
 
 // Reports
-Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefix('/web/reports')->group(function () {
+Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class, 'abort.client'])->prefix('/web/reports')->group(function () {
     Route::get('/trip-summary', [\App\Http\Controllers\ReportController::class, 'tripSummary']);
+    Route::get('/trip-summary/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportTripSummaryPdf']);
+    Route::get('/trip-summary/export-csv', [\App\Http\Controllers\ReportController::class, 'exportTripSummaryCsv']);
     Route::get('/daily-trips', [\App\Http\Controllers\ReportController::class, 'dailyTrips']);
     Route::get('/daily-summary', [\App\Http\Controllers\ReportController::class, 'dailySummary']);
+    Route::get('/daily-summary/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportDailySummaryPdf']);
+    Route::get('/daily-summary/export-csv', [\App\Http\Controllers\ReportController::class, 'exportDailySummaryCsv']);
     Route::get('/monthly-summary', [\App\Http\Controllers\ReportController::class, 'monthlySummary']);
+    Route::get('/monthly-summary/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportMonthlySummaryPdf']);
+    Route::get('/monthly-summary/export-csv', [\App\Http\Controllers\ReportController::class, 'exportMonthlySummaryCsv']);
     Route::get('/fuel-detailed', [\App\Http\Controllers\ReportController::class, 'fuelDetailed']);
     Route::get('/asset-activity', [\App\Http\Controllers\ReportController::class, 'assetActivity']);
+    Route::get('/asset-activity/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportAssetActivityPdf']);
+    Route::get('/asset-activity/export-csv', [\App\Http\Controllers\ReportController::class, 'exportAssetActivityCsv']);
     Route::get('/vehicle-activity', [\App\Http\Controllers\ReportController::class, 'vehicleActivity']);
+    Route::get('/vehicle-activity/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportVehicleActivityPdf']);
+    Route::get('/vehicle-activity/export-csv', [\App\Http\Controllers\ReportController::class, 'exportVehicleActivityCsv']);
     Route::get('/idling', [\App\Http\Controllers\ReportController::class, 'idling']);
+    Route::get('/idling/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportIdlingPdf']);
+    Route::get('/idling/export-csv', [\App\Http\Controllers\ReportController::class, 'exportIdlingCsv']);
     Route::get('/utilisation', [\App\Http\Controllers\ReportController::class, 'utilisation']);
     Route::get('/utilisation-db', [\App\Http\Controllers\ReportController::class, 'utilisationDb']);
+    Route::get('/utilisation-db/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportUtilisationPdf']);
+    Route::get('/utilisation-db/export-csv', [\App\Http\Controllers\ReportController::class, 'exportUtilisationCsv']);
     Route::get('/daily-breakdown-map', [\App\Http\Controllers\ReportController::class, 'dailyBreakdownMap']);
     Route::get('/vehicle-status', [\App\Http\Controllers\ReportController::class, 'vehicleStatus']);
     Route::get('/vehicle-status/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportVehicleStatusPdf']);
+    Route::get('/vehicle-status/export-csv', [\App\Http\Controllers\ReportController::class, 'exportVehicleStatusCsv']);
 
     Route::get('/device-options', [\App\Http\Controllers\ReportController::class, 'deviceOptions']);
     Route::get('/group-options', [\App\Http\Controllers\ReportController::class, 'groupOptions']);
@@ -294,9 +315,9 @@ Route::middleware(['auth', \App\Http\Middleware\ModulePermission::class])->prefi
     Route::get('/incidents/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportIncidentsPdf']);
     Route::get('/incidents/export-excel', [\App\Http\Controllers\ReportController::class, 'exportIncidentsExcel']);
     Route::get('/vehicle-ranking', [\App\Http\Controllers\ReportController::class, 'vehicleRanking']);
+    Route::get('/vehicle-ranking/export-pdf', [\App\Http\Controllers\ReportController::class, 'exportVehicleRankingPdf']);
+    Route::get('/vehicle-ranking/export-csv', [\App\Http\Controllers\ReportController::class, 'exportVehicleRankingCsv']);
 
-    Route::get('/effective-fuel', [\App\Http\Controllers\ReportController::class, 'effectiveFuel']);
-    Route::get('/route-playback', [\App\Http\Controllers\ReportController::class, 'routePlayback']);
 });
 
 // Command Console

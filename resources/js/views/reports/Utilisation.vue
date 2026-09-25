@@ -72,15 +72,32 @@
               <option value="Engine Hours">Engine Hours</option>
             </select>
           </div>
-          <div class="col-12 col-md-1">
-            <button class="btn btn-info text-white w-100 fw-semibold" style="background-color: #0ea5e9; border: none;" @click="fetchReport" :disabled="loading">
-              Submit
-            </button>
+          <div class="col-12 col-md-2">
+            <div class="d-flex flex-column gap-2">
+              <button class="btn btn-info text-white w-100 fw-semibold" style="background-color: #0ea5e9; border: none;" @click="fetchReport" :disabled="loading">
+                Submit
+              </button>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary flex-fill" :disabled="!canExport" @click="downloadCsv">
+                  <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                </button>
+                <button type="button" class="btn btn-outline-secondary flex-fill" :disabled="!canExport" @click="downloadPdf">
+                  <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
+    <div v-if="!hasSearched" class="card border rounded-3 shadow-0">
+      <div class="card-body text-center py-5 text-muted">
+        Select filters and click <strong>Search</strong> to load the report.
+      </div>
+    </div>
+
+    <template v-else>
     <div class="card border rounded-3 shadow-0 mb-3">
       <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
         <h6 class="mb-0 fw-bold">Utilisation Report Result</h6>
@@ -188,23 +205,48 @@
         </nav>
       </div>
     </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, inject } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed, inject } from 'vue';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
 import { formatDateTime } from '../../utils/datetime';
+import { todayDateString } from '../../utils/reportDates';
+import { openReportExport } from '../../utils/reportExport';
+import { createCancellableRequest, isRequestAborted } from '../../utils/cancellableRequest';
 
 const showInfo = ref(false);
 const deviceOptions = ref([]);
 const selectedDeviceId = ref('');
 const selectedType = ref('Movement');
-const fromDate = ref(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
-const toDate = ref(new Date().toISOString().slice(0, 10));
+const fromDate = ref(todayDateString());
+const toDate = ref(todayDateString());
 const loading = ref(false);
+const hasSearched = ref(false);
+const reportRequest = createCancellableRequest();
 const errorMessage = ref(null);
+
+const canExport = computed(() => Boolean(selectedDeviceId.value && fromDate.value && toDate.value));
+
+function exportParams() {
+  return {
+    from_date: fromDate.value,
+    to_date: toDate.value,
+    device_ids: [selectedDeviceId.value],
+    type: selectedType.value,
+  };
+}
+function downloadCsv() {
+  if (!canExport.value) return;
+  openReportExport('/web/reports/utilisation-db/export-csv', exportParams());
+}
+function downloadPdf() {
+  if (!canExport.value) return;
+  openReportExport('/web/reports/utilisation-db/export-pdf', exportParams());
+}
 
 const summary = ref({
   vehicleIdDisplay: '',
@@ -263,8 +305,10 @@ async function fetchReport() {
     return;
   }
   loading.value = true;
+  hasSearched.value = true;
   errorMessage.value = null;
   rows.value = [];
+  const signal = reportRequest.nextSignal();
   try {
     const params = {
       from_date: fromDate.value,
@@ -273,7 +317,7 @@ async function fetchReport() {
       type: selectedType.value,
     };
 
-    const response = await axios.get('/web/reports/utilisation-db', { params });
+    const response = await axios.get('/web/reports/utilisation-db', { params, signal });
     const data = response.data;
 
     rows.value = data.rows || [];
@@ -283,25 +327,25 @@ async function fetchReport() {
         durationDisplay: '',
         totalDays: 0
     };
-    console.log('summary data ',summary);
-
     page.value = 1;
 
   } catch (e) {
+    if (isRequestAborted(e)) return;
     console.error('Failed to fetch utilisation report', e);
     errorMessage.value = e.response?.data?.message || 'Failed to fetch report data.';
   } finally {
-    loading.value = false;
+    if (!signal.aborted) {
+      loading.value = false;
+    }
   }
 }
 
 onMounted(async () => {
   await loadDeviceOptions();
-  if (selectedDeviceId.value) {
-    setTimeout(() => {
-      fetchReport();
-    }, 500);
-  }
+});
+
+onBeforeUnmount(() => {
+  reportRequest.cancel();
 });
 </script>
 

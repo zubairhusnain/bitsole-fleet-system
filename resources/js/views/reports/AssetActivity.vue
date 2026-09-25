@@ -74,9 +74,19 @@
             </select>
           </div>
           <div class="col-12 col-md-3">
-            <button class="btn btn-app-dark w-100" @click="handleSearch" :disabled="loading">
-              Submit
-            </button>
+            <div class="d-flex flex-column gap-2">
+              <button class="btn btn-app-dark w-100" @click="handleSearch" :disabled="loading">
+                Submit
+              </button>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary flex-fill" :disabled="!canExport" @click="downloadCsv">
+                  <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                </button>
+                <button type="button" class="btn btn-outline-secondary flex-fill" :disabled="!canExport" @click="downloadPdf">
+                  <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -158,6 +168,9 @@
                   </div>
                 </td>
               </tr>
+              <tr v-else-if="!hasSearched">
+                <td colspan="13" class="text-center py-4 text-muted">Select filters and click <strong>Search</strong> to load the report.</td>
+              </tr>
               <template v-else-if="groupedRows.length">
                 <template v-for="(group, gIndex) in groupedRows" :key="gIndex">
                   <tr class="table-light">
@@ -233,20 +246,44 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
-import { formatDateTime, formatDate, formatTime } from '../../utils/datetime';
+import { formatDateTime, formatDate, formatTime, getActiveTimezone } from '../../utils/datetime';
+import { initTodayDatetimeRange } from '../../utils/reportDates';
+import { openReportExport } from '../../utils/reportExport';
+import { createCancellableRequest, isRequestAborted } from '../../utils/cancellableRequest';
 
 const showInfo = ref(false);
-const startDate = ref('');
-const endDate = ref('');
+const { startDate: defaultStart, endDate: defaultEnd } = initTodayDatetimeRange();
+const startDate = ref(defaultStart);
+const endDate = ref(defaultEnd);
 const vehicle = ref('');
 const vehicles = ref([]);
 const apiLimit = ref(100);
 const loading = ref(false);
+const canExport = computed(() => Boolean(startDate.value && endDate.value));
 const errorMessage = ref(null);
 const rows = ref([]);
+
+function exportParams() {
+  const params = {
+    from_date: startDate.value,
+    to_date: endDate.value,
+    limit: apiLimit.value,
+    tz: getActiveTimezone(),
+  };
+  if (vehicle.value) params.device_ids = [vehicle.value];
+  return params;
+}
+function downloadCsv() {
+  if (!canExport.value) return;
+  openReportExport('/web/reports/asset-activity/export-csv', exportParams());
+}
+function downloadPdf() {
+  if (!canExport.value) return;
+  openReportExport('/web/reports/asset-activity/export-pdf', exportParams());
+}
 const headerInfoRaw = ref(null);
 const headerInfo = computed(() => {
   if (!headerInfoRaw.value) return null;
@@ -271,6 +308,7 @@ const headerInfo = computed(() => {
   };
 });
 const hasSearched = ref(false);
+const reportRequest = createCancellableRequest();
 
 // Pagination
 const page = ref(1);
@@ -309,38 +347,24 @@ function prevPage() { if (page.value > 1) page.value--; }
 function nextPage() { if (page.value < totalPages.value) page.value++; }
 
 onMounted(async () => {
-  const now = new Date();
-  const start = new Date(now);
-  start.setDate(start.getDate() - 7);
-  start.setHours(0, 0, 0, 0);
-
-  const end = new Date(now);
-  end.setHours(23, 59, 59, 999);
-
-  startDate.value = toIsoLocal(start);
-  endDate.value = toIsoLocal(end);
-
   try {
     const { data } = await axios.get('/web/reports/device-options');
     vehicles.value = data.options || [];
   } catch (e) {
     console.error('Failed to load vehicles', e);
   }
-
-  handleSearch();
 });
 
 watch(vehicle, () => {
   page.value = 1;
-  handleSearch();
 });
 
-function toIsoLocal(d) {
-  const pad = (n) => n.toString().padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+onBeforeUnmount(() => {
+  reportRequest.cancel();
+});
 
 async function handleSearch() {
+  const signal = reportRequest.nextSignal();
   loading.value = true;
   hasSearched.value = true;
   errorMessage.value = null;
@@ -356,7 +380,8 @@ async function handleSearch() {
         to_date: endDate.value,
         device_ids: deviceIds,
         limit: apiLimit.value
-      }
+      },
+      signal,
     });
 
     if (data.rows) {
@@ -364,10 +389,13 @@ async function handleSearch() {
       headerInfoRaw.value = data.header || null;
     }
   } catch (e) {
+    if (isRequestAborted(e)) return;
     console.error('Error fetching asset activity', e);
     errorMessage.value = e.response?.data?.message || 'Failed to load report data.';
   } finally {
-    loading.value = false;
+    if (!signal.aborted) {
+      loading.value = false;
+    }
   }
 }
 </script>

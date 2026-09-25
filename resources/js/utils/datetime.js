@@ -45,53 +45,61 @@ export function getActiveTimezone() {
     return timeZone;
 }
 
-export function formatDateTime(date) {
-    if (!date) return '-';
-    try {
-        let d;
-        // Handle SQL timestamps (often UTC but missing Z)
-        // Matches "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD HH:MM:SS.sss"
-        // Also matches "YYYY-MM-DDTHH:MM:SS..." (ISO-like)
-        if (typeof date === 'string') {
-            // Check for basic date pattern
-            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/.test(date)) {
-                // If it explicitly has a timezone indicator (Z or +HH:MM or -HH:MM), rely on standard parsing
-                if (/[Z\+\-]\d{2}:?\d{2}$/.test(date) || date.endsWith('Z')) {
-                    d = new Date(date);
-                } else {
-                    // Assume UTC if no timezone info is present
-                    // Normalize space to T and append Z
-                    d = new Date(date.replace(' ', 'T') + 'Z');
-                }
-            } else {
+function parseDateInput(date) {
+    if (!date) return null;
+    let d;
+    if (typeof date === 'string') {
+        if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/.test(date)) {
+            if (/[Z\+\-]\d{2}:?\d{2}$/.test(date) || date.endsWith('Z')) {
                 d = new Date(date);
+            } else {
+                d = new Date(date.replace(' ', 'T') + 'Z');
             }
         } else {
             d = new Date(date);
         }
+    } else {
+        d = new Date(date);
+    }
 
-        if (isNaN(d.getTime())) {
-            const n = Number(date);
-            if (Number.isFinite(n)) d = new Date(n);
-        }
+    if (isNaN(d.getTime())) {
+        const n = Number(date);
+        if (Number.isFinite(n)) d = new Date(n);
+    }
 
-        if (isNaN(d.getTime())) {
-            return '-';
-        }
+    return isNaN(d.getTime()) ? null : d;
+}
+
+/** YYYY-MM-DD calendar date in the user's active timezone (for date-range filters). */
+export function calendarDateKeyInActiveTz(date) {
+    const d = parseDateInput(date);
+    if (!d) return '';
+    return d.toLocaleDateString('en-CA', { timeZone: getActiveTimezone() });
+}
+
+export function formatDateTime(date, options = {}) {
+    if (!date) return '-';
+    try {
+        const d = parseDateInput(date);
+        if (!d) return '-';
 
         const timeZone = getActiveTimezone();
+        const hour12 = options.hour12 ?? false;
 
-        // Format: DD/MM/YYYY HH:MM:SS
-        return d.toLocaleString('en-GB', {
+        let formatted = d.toLocaleString('en-GB', {
             timeZone,
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
             hour: '2-digit',
             minute: '2-digit',
-            second: '2-digit',
-            hour12: false
+            ...(hour12 ? {} : { second: '2-digit' }),
+            hour12,
         }).replace(',', '');
+        if (hour12) {
+            formatted = formatted.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase());
+        }
+        return formatted;
     } catch (e) {
         return '-';
     }

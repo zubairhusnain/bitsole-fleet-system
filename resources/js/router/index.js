@@ -103,7 +103,7 @@ const routes = [
   { path: '/reports/vehicle-ranking', name: 'reports-vehicle-ranking', component: ReportsVehicleRanking, meta: { requiresAuth: true, title: 'Rankings', moduleKey: 'reports', action: 'read' } },
   { path: '/reports/fuel-efficiency', name: 'reports-fuel-efficiency', component: ReportsFuelEfficiency, meta: { requiresAuth: true, title: 'Fuel Efficiency', moduleKey: 'reports', action: 'read' } },
   { path: '/commands', name: 'commands', component: CommandConsole, meta: { requiresAuth: true, title: 'Command Console', moduleKey: 'commands', action: 'create' } },
-  { path: '/alerts', name: 'alerts', component: Alerts, meta: { requiresAuth: true, title: 'Alerts' } },
+  { path: '/alerts', name: 'alerts', component: Alerts, meta: { requiresAuth: true, title: 'Alerts & Notifications' } },
   { path: '/fuel', name: 'fuel', component: Fuel, meta: { requiresAuth: true, title: 'Fuel', moduleKey: 'fuel', action: 'read' } },
   { path: '/fuel/new', name: 'fuel-new', component: () => import('../views/fuel/AddFuel.vue'), meta: { requiresAuth: true, title: 'Add Fuel Entry', moduleKey: 'fuel', action: 'create' } },
   { path: '/fuel/:id(\\d+)/edit', name: 'fuel-edit', component: () => import('../views/fuel/Edit.vue'), meta: { requiresAuth: true, title: 'Edit Fuel Entry', moduleKey: 'fuel', action: 'update' } },

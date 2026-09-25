@@ -61,8 +61,8 @@ class CleanDeviceComputedAttributes extends Command
             if (isset($attrs['odometerAttr']) && trim((string)$attrs['odometerAttr']) !== '') {
                 $keep[] = trim((string)$attrs['odometerAttr']);
             }
-            if (isset($attrs['fuelAttr']) && trim((string)$attrs['fuelAttr']) !== '') {
-                $keep[] = trim((string)$attrs['fuelAttr']);
+            if (isset($attrs['fuelAttr']) && trim((string) $attrs['fuelAttr']) !== '' && strtolower(trim((string) $attrs['fuelAttr'])) !== 'none') {
+                $keep[] = trim((string) $attrs['fuelAttr']);
             }
 
             $keepMap = [];

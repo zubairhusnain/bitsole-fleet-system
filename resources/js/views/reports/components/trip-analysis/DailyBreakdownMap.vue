@@ -116,7 +116,7 @@
           <div ref="mapEl" class="h-100 w-100 z-0"></div>
 
           <!-- Playback Controls Overlay -->
-          <div v-if="activeDay && activeDay.route && activeDay.route.length > 0"
+          <div v-if="activeDay && fullDayRoute.length > 0"
                class="position-absolute top-0 start-50 translate-middle-x mt-3 z-3 bg-white p-1 rounded-pill shadow-sm d-flex align-items-center gap-2 border">
 
             <button class="btn btn-sm btn-light rounded-pill px-3 fw-bold d-flex align-items-center" @click="restartPlayback" title="Restart">
@@ -159,6 +159,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { formatTime } from '../../../../utils/datetime';
+import { formatSpeed } from '../../../../utils/telemetry';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -194,6 +195,12 @@ const isPlaying = ref(false);
 const playbackSpeed = ref(200); // ms per step
 const playbackIndex = ref(0);
 const activeDay = ref(null);
+const activeRoute = ref([]);
+
+const fullDayRoute = computed(() => {
+    const r = activeDay.value && Array.isArray(activeDay.value.route) ? activeDay.value.route : [];
+    return r;
+});
 
 onMounted(() => {
   initMap();
@@ -220,6 +227,7 @@ watch(() => props.rowsDailyBreakdown, (newVal) => {
         loadDayOnMap(activeDay.value);
     } else {
         activeDay.value = null;
+        activeRoute.value = [];
         clearMapLayers();
     }
 }, { deep: true });
@@ -329,16 +337,88 @@ function clearMapLayers() {
     if (playbackMarker) map.removeLayer(playbackMarker);
     markers.forEach(m => map.removeLayer(m));
     markers = [];
+    playbackMarker = null;
 }
 
-function loadDayOnMap(day) {
-    clearMapLayers();
-    if (!map || !day.route || day.route.length === 0) return;
+function deviceSpeedAttrKey() {
+    const raw = activeDay.value?.deviceAttributes;
+    if (!raw) return null;
+    try {
+        const obj = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        return obj?.speedAttr_key ?? obj?.speedAttrKey ?? null;
+    } catch {
+        return null;
+    }
+}
 
-    // Draw route
-    const latlngs = day.route.map(pt => [pt[0], pt[1]]);
-    polyline = L.polyline(latlngs, { color: 'blue', weight: 4 }).addTo(map);
-    map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+function speedKnotsForIndex(idx) {
+    const route = activeRoute.value;
+    if (!Array.isArray(route) || !route.length) return null;
+    const pt = route[idx];
+    if (!pt) return null;
+
+    const direct = Array.isArray(pt) ? Number(pt[3]) : (pt && typeof pt === 'object' ? Number(pt.speed ?? pt.spd) : NaN);
+    if (Number.isFinite(direct) && direct >= 0) return direct;
+
+    const prev = idx > 0 ? route[idx - 1] : null;
+    const next = idx < route.length - 1 ? route[idx + 1] : null;
+    const a = prev || pt;
+    const b = prev ? pt : next;
+    if (!a || !b) return null;
+
+    const aLat = Number(a[0]), aLon = Number(a[1]);
+    const bLat = Number(b[0]), bLon = Number(b[1]);
+    const aT = Number(a[2]);
+    const bT = Number(b[2]);
+    if (!Number.isFinite(aLat) || !Number.isFinite(aLon) || !Number.isFinite(bLat) || !Number.isFinite(bLon)) return null;
+    if (!Number.isFinite(aT) || !Number.isFinite(bT)) return null;
+    const dt = Math.abs(bT - aT) / 1000;
+    if (!dt) return null;
+
+    const meters = L.latLng(aLat, aLon).distanceTo(L.latLng(bLat, bLon));
+    const kmh = (meters / dt) * 3.6;
+    if (!Number.isFinite(kmh) || kmh < 0 || kmh > 260) return null;
+    return kmh / 1.852;
+}
+
+function updatePlaybackTooltip() {
+    if (!playbackMarker) return;
+    const knots = speedKnotsForIndex(playbackIndex.value);
+    const speedKey = deviceSpeedAttrKey();
+    const pos = {
+        speed: knots,
+        attributes: (speedKey && knots != null) ? { [speedKey]: knots } : {}
+    };
+    const sp = formatSpeed(activeDay.value?.deviceAttributes || {}, pos);
+    const txt = sp?.display && sp.display !== '-' ? `Speed: ${sp.display}` : 'Speed: -';
+    if (!playbackMarker.getTooltip()) {
+        playbackMarker.bindTooltip(txt, {
+            permanent: true,
+            direction: 'top',
+            offset: [0, -12],
+            className: 'playback-speed-tooltip'
+        });
+    } else {
+        playbackMarker.setTooltipContent(txt);
+    }
+}
+
+function loadDayOnMap(day, { fit = true } = {}) {
+    clearMapLayers();
+    if (!map || !day || !Array.isArray(day.route) || day.route.length === 0) {
+        activeRoute.value = [];
+        return;
+    }
+
+    const routePts = day.route;
+    activeRoute.value = routePts;
+    if (routePts.length > 0) {
+        const latlngs = routePts.map(pt => [pt[0], pt[1]]);
+        polyline = L.polyline(latlngs, { color: 'blue', weight: 4 }).addTo(map);
+        if (fit) {
+            map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+        }
+    }
 
     // Add markers for timeline events
     if (day.timeline) {
@@ -366,12 +446,19 @@ function loadDayOnMap(day) {
 
     // Initialize playback marker at start
     playbackIndex.value = 0;
-    const startPt = day.route[0];
-    playbackMarker = L.marker([startPt[0], startPt[1]]).addTo(map);
+    const startPt = activeRoute.value[0];
+    if (startPt) {
+        playbackMarker = L.marker([startPt[0], startPt[1]]).addTo(map);
+        updatePlaybackTooltip();
+    } else if (fullDayRoute.value[0]) {
+        playbackMarker = L.marker([fullDayRoute.value[0][0], fullDayRoute.value[0][1]]).addTo(map);
+        updatePlaybackTooltip();
+    }
 }
 
 function seekToTime(day, timeSort) {
-    if (!day || !Array.isArray(day.route) || day.route.length === 0) return;
+    const route = activeDay.value === day ? activeRoute.value : (Array.isArray(day?.route) ? day.route : []);
+    if (!Array.isArray(route) || route.length === 0) return;
     if (!timeSort) {
         restartPlayback();
         return;
@@ -381,8 +468,8 @@ function seekToTime(day, timeSort) {
     let bestIndex = 0;
     let bestDiff = Infinity;
 
-    for (let i = 0; i < day.route.length; i++) {
-        const pt = day.route[i];
+    for (let i = 0; i < route.length; i++) {
+        const pt = route[i];
         const t = Array.isArray(pt) ? Number(pt[2]) : NaN;
         if (!Number.isFinite(t)) continue;
         const diff = Math.abs(t - targetMs);
@@ -407,8 +494,10 @@ function togglePlay() {
 }
 
 function startPlayback() {
-    if (!activeDay.value || !activeDay.value.route) return;
+    if (!activeDay.value || !activeRoute.value.length) return;
     isPlaying.value = true;
+    updatePlaybackTooltip();
+    playbackMarker?.openTooltip();
     animate();
 }
 
@@ -428,7 +517,7 @@ function restartPlayback() {
 
 function stepForward() {
     stopPlayback();
-    if (activeDay.value && activeDay.value.route && playbackIndex.value < activeDay.value.route.length - 1) {
+    if (activeRoute.value && playbackIndex.value < activeRoute.value.length - 1) {
         playbackIndex.value++;
         updatePlaybackMarker();
     }
@@ -451,8 +540,8 @@ function animate(time) {
     if (!isPlaying.value) return;
 
     if (time - lastFrameTime > playbackSpeed.value) {
-        if (activeDay.value && activeDay.value.route) {
-            if (playbackIndex.value < activeDay.value.route.length - 1) {
+        if (activeRoute.value && activeRoute.value.length) {
+            if (playbackIndex.value < activeRoute.value.length - 1) {
                 playbackIndex.value++;
                 updatePlaybackMarker();
             } else {
@@ -466,9 +555,13 @@ function animate(time) {
 }
 
 function updatePlaybackMarker() {
-    if (!playbackMarker || !activeDay.value || !activeDay.value.route) return;
-    const pt = activeDay.value.route[playbackIndex.value];
+    if (!playbackMarker || !activeRoute.value || !activeRoute.value.length) return;
+    const pt = activeRoute.value[playbackIndex.value];
     playbackMarker.setLatLng([pt[0], pt[1]]);
+    if (isPlaying.value) {
+        updatePlaybackTooltip();
+        playbackMarker.openTooltip();
+    }
 }
 
 function displayTime(item) {
@@ -502,5 +595,18 @@ function displayTime(item) {
   width: 2px;
   background-color: #e9ecef;
   z-index: 0;
+}
+:global(.playback-speed-tooltip) {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #333;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+:global(.playback-speed-tooltip::before) {
+  border-top-color: #dee2e6;
 }
 </style>

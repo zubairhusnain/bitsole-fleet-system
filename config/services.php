@@ -18,6 +18,11 @@ return [
         'api_key' => env('VITE_GOOGLE_MAPS_API_KEY'),
     ],
 
+    'nominatim' => [
+        'url' => env('NOMINATIM_URL', 'https://nominatim.openstreetmap.org/reverse'),
+        'email' => env('NOMINATIM_CONTACT_EMAIL', 'fleet@bitsole.local'),
+    ],
+
     'postmark' => [
         'token' => env('POSTMARK_TOKEN'),
     ],

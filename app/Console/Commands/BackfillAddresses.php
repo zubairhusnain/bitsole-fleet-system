@@ -17,7 +17,7 @@ class BackfillAddresses extends Command
      *
      * @var string
      */
-    protected $signature = 'traccar:backfill-addresses {--limit=100} {--device_id=} {--continuous}';
+    protected $signature = 'traccar:backfill-addresses {--limit=100} {--device_id=} {--from=} {--to=} {--continuous}';
 
     /**
      * The console command description.
@@ -45,6 +45,8 @@ class BackfillAddresses extends Command
     {
         $limit = (int) $this->option('limit');
         $deviceId = $this->option('device_id');
+        $from = $this->option('from');
+        $to = $this->option('to');
         $continuous = $this->option('continuous');
 
         do {
@@ -59,16 +61,24 @@ class BackfillAddresses extends Command
             // Order by ID descending to fix newest entries first
             $query = DB::connection('pgsql')->table('tc_positions')
                 ->select('id', 'latitude', 'longitude')
-                ->whereNull('address')
+                ->where(function ($q) {
+                    $q->whereNull('address')->orWhere('address', '');
+                })
                 ->where('latitude', '!=', 0)
                 ->where('longitude', '!=', 0)
-                ->whereExists(function ($q) use ($deviceId) {
+                ->whereExists(function ($q) use ($deviceId, $from, $to) {
                     $q->select(DB::raw(1))
-                      ->from('tc_events')
-                      ->whereColumn('tc_events.positionid', 'tc_positions.id')
-                      ->whereIn('tc_events.type', ['ignitionOn', 'ignitionOff']);
+                        ->from('tc_events')
+                        ->whereColumn('tc_events.positionid', 'tc_positions.id')
+                        ->whereIn('tc_events.type', ['ignitionOn', 'ignitionOff']);
                     if ($deviceId) {
                         $q->where('tc_events.deviceid', $deviceId);
+                    }
+                    if ($from) {
+                        $q->where('tc_events.eventtime', '>=', $from);
+                    }
+                    if ($to) {
+                        $q->where('tc_events.eventtime', '<=', $to);
                     }
                 });
 

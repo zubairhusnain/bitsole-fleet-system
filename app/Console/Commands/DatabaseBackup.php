@@ -57,58 +57,95 @@ class DatabaseBackup extends Command
         $zipFileName = "{$prefix}-{$timestamp}.zip";
         $zipFullPath = $disk->path($directory.'/'.$zipFileName);
 
-        $innerSqlName = Str::slug(config('app.name', 'app'), '-').'-database-backup.sql';
-        $tmpSqlPath = $disk->path($directory.'/.tmp-'.$timestamp.'.sql');
+        $innerSqlName = Str::slug(config('app.name', 'app'), '-').'-database-backup.sql.gz';
+        $tmpDumpPath = $disk->path($directory.'/.tmp-'.$timestamp.'.sql.gz');
+        $tmpPlainSqlPath = $disk->path($directory.'/.tmp-'.$timestamp.'.sql');
 
         $this->info("Creating database backup: {$zipFileName}");
 
-        $process = new Process([
-            $pgDump,
-            '--host='.$host,
-            '--port='.$port,
-            '--username='.$username,
+        $dumpToFileOk = false;
+        $dumpErr = '';
+
+        $dumpParts = [
+            escapeshellcmd($pgDump),
+            '--host='.escapeshellarg($host),
+            '--port='.escapeshellarg($port),
+            '--username='.escapeshellarg($username),
             '--format=plain',
             '--no-owner',
             '--no-privileges',
-            $database,
-        ]);
+            escapeshellarg($database),
+        ];
 
+        $dumpCmd = implode(' ', $dumpParts).' | gzip -9 > '.escapeshellarg($tmpDumpPath);
+        $process = new Process(['sh', '-lc', $dumpCmd]);
         $process->setEnv(array_merge($process->getEnv(), [
             'PGPASSWORD' => (string) $password,
         ]));
+        $process->setTimeout(900);
+        $process->setIdleTimeout(900);
+        $process->run();
 
-        $process->setTimeout(300);
-        $process->setIdleTimeout(300);
-
-        $process->run(function ($type, $buffer) use ($tmpSqlPath) {
-            file_put_contents($tmpSqlPath, $buffer, FILE_APPEND);
-        });
-
-        if (!$process->isSuccessful()) {
-            $this->error('Database backup failed: '.$process->getErrorOutput());
-            if (file_exists($tmpSqlPath)) {
-                @unlink($tmpSqlPath);
+        if ($process->isSuccessful() && file_exists($tmpDumpPath) && filesize($tmpDumpPath) > 0) {
+            $dumpToFileOk = true;
+        } else {
+            $dumpErr = trim($process->getErrorOutput() ?: $process->getOutput());
+            if (file_exists($tmpDumpPath)) {
+                @unlink($tmpDumpPath);
             }
-            if (file_exists($zipFullPath)) {
-                @unlink($zipFullPath);
+        }
+
+        if (!$dumpToFileOk) {
+            $innerSqlName = Str::slug(config('app.name', 'app'), '-').'-database-backup.sql';
+            $process = new Process([
+                $pgDump,
+                '--host='.$host,
+                '--port='.$port,
+                '--username='.$username,
+                '--format=plain',
+                '--no-owner',
+                '--no-privileges',
+                '--file='.$tmpPlainSqlPath,
+                $database,
+            ]);
+            $process->setEnv(array_merge($process->getEnv(), [
+                'PGPASSWORD' => (string) $password,
+            ]));
+            $process->setTimeout(900);
+            $process->setIdleTimeout(900);
+            $process->run();
+
+            if ($process->isSuccessful() && file_exists($tmpPlainSqlPath) && filesize($tmpPlainSqlPath) > 0) {
+                $tmpDumpPath = $tmpPlainSqlPath;
+                $dumpToFileOk = true;
+            } else {
+                $err = trim($process->getErrorOutput() ?: $process->getOutput());
+                $msg = $err ?: $dumpErr ?: 'Unknown error.';
+                $this->error('Database backup failed: '.$msg);
+                if (file_exists($tmpPlainSqlPath)) {
+                    @unlink($tmpPlainSqlPath);
+                }
+                if (file_exists($zipFullPath)) {
+                    @unlink($zipFullPath);
+                }
+                return 1;
             }
-            return 1;
         }
 
         $zip = new ZipArchive();
         if ($zip->open($zipFullPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             $this->error('Unable to create zip archive for database backup.');
-            if (file_exists($tmpSqlPath)) {
-                @unlink($tmpSqlPath);
+            if (file_exists($tmpDumpPath)) {
+                @unlink($tmpDumpPath);
             }
             return 1;
         }
 
-        $zip->addFile($tmpSqlPath, $innerSqlName);
+        $zip->addFile($tmpDumpPath, $innerSqlName);
         $zip->close();
 
-        if (file_exists($tmpSqlPath)) {
-            @unlink($tmpSqlPath);
+        if (file_exists($tmpDumpPath)) {
+            @unlink($tmpDumpPath);
         }
 
         $size = filesize($zipFullPath);

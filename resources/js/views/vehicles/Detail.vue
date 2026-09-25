@@ -72,6 +72,10 @@
                             <div>
                                 <div class="small text-muted">Ignition</div>
                                 <div class="fw-semibold">{{ ignitionLabel }}</div>
+                                <div v-if="ignitionTimeMeta" class="veh-widget-ignition-time">
+                                    <span class="veh-widget-time-label">{{ ignitionTimeMeta.label }}</span>
+                                    <span class="veh-widget-time-value">{{ ignitionTimeMeta.time }}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -270,7 +274,12 @@
                 </div>
                 <div class="card panel rounded-4 shadow-sm mt-3">
                     <div class="card-body">
-                        <h6 class="mb-3 panel-header">Tracking Information</h6>
+                        <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+                            <h6 class="mb-0 panel-header">Tracking Information</h6>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" @click="openCommandModal">
+                                <i class="bi bi-terminal me-1"></i> Send Command
+                            </button>
+                        </div>
                         <div class="row g-3">
 
                             <div class="col-6 col-md-3">
@@ -597,8 +606,11 @@
 
                         <!-- Tracking Information -->
                         <div class="card mt-3 rounded-3">
-                            <div class="card-header">
+                            <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
                                 <h6 class="mb-0">Tracking Information</h6>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @click="openCommandModal">
+                                    <i class="bi bi-terminal me-1"></i> Send Command
+                                </button>
                             </div>
                             <div class="card-body">
                             <dl class="row mb-0">
@@ -776,10 +788,183 @@
             <span class="visually-hidden">Loading…</span>
         </div>
     </div>
+
+    <!-- Send Command Modal -->
+    <div v-if="showCommandModal" class="driver-modal-overlay" @click.self="closeCommandModal">
+        <div class="driver-modal overflow-hidden command-modal" role="dialog" aria-modal="true">
+            <div class="modal-header border-bottom px-4 py-3">
+                <h5 class="fw-bold mb-0">{{ commandModalTab === 'history' ? 'Command History' : 'Send Device Command' }}</h5>
+                <button type="button" class="btn-close" @click="closeCommandModal" aria-label="Close"></button>
+            </div>
+            <ul class="nav nav-tabs command-modal-tabs px-4 pt-2 mb-0 border-bottom-0">
+                <li class="nav-item">
+                    <button
+                        type="button"
+                        class="nav-link"
+                        :class="{ active: commandModalTab === 'send' }"
+                        @click="switchCommandModalTab('send')"
+                    >
+                        Send Command
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button
+                        type="button"
+                        class="nav-link"
+                        :class="{ active: commandModalTab === 'history' }"
+                        @click="switchCommandModalTab('history')"
+                    >
+                        Command History
+                    </button>
+                </li>
+            </ul>
+            <div class="modal-body px-4 py-3">
+                <template v-if="commandModalTab === 'send'">
+                    <p class="text-muted small mb-3">
+                        Commands are sent to <strong>{{ deviceName || uniqueId || ('Device #' + deviceId) }}</strong> via Traccar.
+                        The device must be online (GPRS) or have SMS configured to receive the command.
+                    </p>
+                    <UiAlert :show="!!commandError" :message="commandError" variant="danger" dismissible @dismiss="commandError = ''" />
+                    <UiAlert :show="!!commandSuccess" :message="commandSuccess" variant="success" dismissible @dismiss="commandSuccess = ''" />
+                    <div v-if="commandLoading" class="text-center py-4">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                        <div class="small text-muted mt-2">Loading commands…</div>
+                    </div>
+                    <form v-else @submit.prevent="submitCommand">
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Command source</label>
+                            <div class="d-flex gap-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" id="cmdModeType" value="type" v-model="commandMode">
+                                    <label class="form-check-label small" for="cmdModeType">Command type</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" id="cmdModeSaved" value="saved" v-model="commandMode" :disabled="!savedCommands.length">
+                                    <label class="form-check-label small" for="cmdModeSaved">Saved command</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-if="commandMode === 'saved'" class="mb-3">
+                            <label class="form-label small fw-semibold">Saved command</label>
+                            <select v-model="commandForm.savedId" class="form-select" required>
+                                <option value="">-- Select --</option>
+                                <option v-for="cmd in savedCommands" :key="cmd.id" :value="cmd.id">
+                                    {{ cmd.description || cmd.type }} ({{ cmd.type }})
+                                </option>
+                            </select>
+                        </div>
+                        <template v-else>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Command type</label>
+                                <select v-model="commandForm.type" class="form-select" required>
+                                    <option value="">-- Select --</option>
+                                    <option v-for="tt in commandTypes" :key="tt" :value="tt">
+                                        {{ formatCommandTypeLabel(tt) }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div
+                                v-for="field in commandTypeFields"
+                                :key="field.key"
+                                class="mb-3"
+                            >
+                                <label class="form-label small fw-semibold" :for="`cmdAttr-${field.key}`">{{ field.label }}</label>
+                                <textarea
+                                    v-if="field.type === 'string'"
+                                    :id="`cmdAttr-${field.key}`"
+                                    v-model="commandForm.attributes[field.key]"
+                                    class="form-control"
+                                    rows="3"
+                                    :placeholder="field.placeholder || ''"
+                                    :required="field.required"
+                                ></textarea>
+                                <input
+                                    v-else-if="field.type === 'number'"
+                                    :id="`cmdAttr-${field.key}`"
+                                    v-model.number="commandForm.attributes[field.key]"
+                                    type="number"
+                                    class="form-control"
+                                    :placeholder="field.placeholder || ''"
+                                    :min="field.min"
+                                    :required="field.required"
+                                >
+                                <div v-else-if="field.type === 'boolean'" class="form-check">
+                                    <input
+                                        :id="`cmdAttr-${field.key}`"
+                                        v-model="commandForm.attributes[field.key]"
+                                        class="form-check-input"
+                                        type="checkbox"
+                                    >
+                                    <label class="form-check-label small" :for="`cmdAttr-${field.key}`">{{ field.label }}</label>
+                                </div>
+                                <div v-if="field.key === 'data'" class="form-text">Use only strings your device protocol supports.</div>
+                            </div>
+                        </template>
+                        <div class="mb-3 form-check">
+                            <input class="form-check-input" type="checkbox" id="cmdNoQueue" v-model="commandForm.noQueue">
+                            <label class="form-check-label small" for="cmdNoQueue">No queue</label>
+                            <div class="form-text">Send only when the device is online. If unchecked, the command is queued until the device reconnects.</div>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-outline-secondary" @click="closeCommandModal">Cancel</button>
+                            <button type="submit" class="btn btn-app-dark" :disabled="commandSending || !canSubmitCommand">
+                                <span v-if="commandSending">Sending…</span>
+                                <span v-else>Send Command</span>
+                            </button>
+                        </div>
+                    </form>
+                </template>
+
+                <template v-else>
+                    <div v-if="commandHistoryLoading" class="text-center py-4">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                        <div class="small text-muted mt-2">Loading command history…</div>
+                    </div>
+                    <template v-else>
+                        <div class="table-responsive command-history-table-wrap">
+                            <table class="table table-sm command-history-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Sending Time</th>
+                                        <th>Date/Time</th>
+                                        <th>Command</th>
+                                        <th>User</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-if="!commandHistory.length">
+                                        <td colspan="5" class="text-center text-muted py-4">No command history yet.</td>
+                                    </tr>
+                                    <tr v-for="row in commandHistory" :key="row.id">
+                                        <td class="text-nowrap">{{ row.sent_at ? formatDateTime(row.sent_at) : '—' }}</td>
+                                        <td class="text-nowrap">{{ formatDateTime(row.created_at) }}</td>
+                                        <td>{{ row.command }}</td>
+                                        <td>{{ row.user }}</td>
+                                        <td>
+                                            <span :class="['command-status-badge', `is-${row.status}`]">
+                                                <i :class="commandStatusIcon(row.status)" aria-hidden="true"></i>
+                                                {{ commandStatusLabel(row.status) }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div v-if="commandHistoryTotal > commandHistory.length" class="text-end mt-3">
+                            <button type="button" class="btn btn-link btn-sm p-0 command-view-all-link" @click="loadAllCommandHistory">
+                                View All
+                            </button>
+                        </div>
+                    </template>
+                </template>
+            </div>
+        </div>
+    </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, inject } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, inject, reactive } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { LMap, LTileLayer, LMarker, LPolyline, LPopup, LCircle, LPolygon } from '@vue-leaflet/vue-leaflet';
@@ -790,6 +975,14 @@ import { formatTelemetry, parseAttrs, formatSpeed } from '../../utils/telemetry'
 import { getCurrentUser } from '../../auth';
 import UiAlert from '../../components/UiAlert.vue';
 import GoogleMap from '../../components/GoogleMap.vue';
+import {
+    formatCommandTypeLabel,
+    getCommandTypeFields,
+    getDefaultCommandAttributes,
+    isCommandFormValid,
+    buildCommandSendPayload,
+    resolveCommandTypes,
+} from '../../utils/deviceCommands';
 
 // Ensure Leaflet default marker icons load correctly under Vite bundling
 try {
@@ -806,6 +999,136 @@ try {
 const route = useRoute();
 const router = useRouter();
 const deviceId = computed(() => parseInt(route.params.deviceId));
+
+
+// Traccar command modal
+const showCommandModal = ref(false);
+const commandModalTab = ref('send');
+const commandLoading = ref(false);
+const commandSending = ref(false);
+const commandError = ref('');
+const commandSuccess = ref('');
+const commandTypes = ref([]);
+const savedCommands = ref([]);
+const commandHistory = ref([]);
+const commandHistoryTotal = ref(0);
+const commandHistoryLimit = ref(10);
+const commandHistoryLoading = ref(false);
+const commandMode = ref('type');
+const commandForm = reactive({
+    type: '',
+    savedId: '',
+    attributes: {},
+    noQueue: false,
+});
+
+const commandTypeFields = computed(() =>
+    commandMode.value === 'type' ? getCommandTypeFields(commandForm.type) : []
+);
+const canSubmitCommand = computed(() => isCommandFormValid(commandMode.value, commandForm));
+
+watch(() => commandForm.type, (type) => {
+    commandForm.attributes = getDefaultCommandAttributes(type);
+});
+
+async function openCommandModal() {
+    showCommandModal.value = true;
+    commandModalTab.value = 'send';
+    commandHistoryLimit.value = 10;
+    commandHistory.value = [];
+    commandHistoryTotal.value = 0;
+    commandError.value = '';
+    commandSuccess.value = '';
+    commandLoading.value = true;
+    commandMode.value = 'type';
+    commandForm.type = '';
+    commandForm.savedId = '';
+    commandForm.attributes = {};
+    commandForm.noQueue = false;
+    try {
+        const { data } = await axios.get(`/web/vehicles/${deviceId.value}/commands`);
+        commandTypes.value = resolveCommandTypes(data?.types);
+        savedCommands.value = Array.isArray(data?.saved) ? data.saved : [];
+        if (commandTypes.value.length) {
+            commandForm.type = commandTypes.value.includes('custom') ? 'custom' : commandTypes.value[0];
+            commandForm.attributes = getDefaultCommandAttributes(commandForm.type);
+        } else {
+            commandError.value = 'No command types are available for this device.';
+        }
+        if (savedCommands.value.length && !commandTypes.value.length) {
+            commandMode.value = 'saved';
+        }
+    } catch (e) {
+        commandError.value = e?.response?.data?.message || 'Failed to load commands.';
+    } finally {
+        commandLoading.value = false;
+    }
+}
+
+function closeCommandModal() {
+    showCommandModal.value = false;
+    commandModalTab.value = 'send';
+}
+
+function switchCommandModalTab(tab) {
+    commandModalTab.value = tab;
+    if (tab === 'history') {
+        fetchCommandHistory();
+    }
+}
+
+async function fetchCommandHistory(limit = commandHistoryLimit.value) {
+    commandHistoryLoading.value = true;
+    try {
+        const { data } = await axios.get(`/web/vehicles/${deviceId.value}/commands/history`, {
+            params: { limit },
+        });
+        commandHistory.value = Array.isArray(data?.items) ? data.items : [];
+        commandHistoryTotal.value = Number(data?.total ?? commandHistory.value.length);
+        commandHistoryLimit.value = limit;
+    } catch (e) {
+        commandHistory.value = [];
+        commandHistoryTotal.value = 0;
+        commandError.value = e?.response?.data?.message || 'Failed to load command history.';
+    } finally {
+        commandHistoryLoading.value = false;
+    }
+}
+
+async function loadAllCommandHistory() {
+    await fetchCommandHistory(Math.min(commandHistoryTotal.value || 100, 100));
+}
+
+function commandStatusLabel(status) {
+    if (status === 'success') return 'Success';
+    if (status === 'failed') return 'Failed';
+    return 'Pending';
+}
+
+function commandStatusIcon(status) {
+    if (status === 'success') return 'bi bi-check-circle-fill';
+    if (status === 'failed') return 'bi bi-x-circle-fill';
+    return 'bi bi-clock-fill';
+}
+
+async function submitCommand() {
+    if (!canSubmitCommand.value) return;
+    commandSending.value = true;
+    commandError.value = '';
+    commandSuccess.value = '';
+    try {
+        const payload = buildCommandSendPayload(commandMode.value, commandForm);
+        const { data } = await axios.post(`/web/vehicles/${deviceId.value}/commands/send`, payload);
+        commandSuccess.value = data?.message || 'Command sent successfully.';
+        if (commandModalTab.value === 'history') {
+            await fetchCommandHistory(commandHistoryLimit.value);
+        }
+    } catch (e) {
+        commandError.value = e?.response?.data?.message || 'Failed to send command.';
+    } finally {
+        commandSending.value = false;
+    }
+}
 
 const device = ref(null);
 const positions = ref([]);
@@ -1120,6 +1443,28 @@ const ignitionLabel = computed(() => {
     if (ign === true) return 'On';
     if (ign === false) return 'Off';
     return '-';
+});
+const lastIgnitionOn = computed(() => detailPayload.value?.lastIgnitionOn ?? null);
+const lastIgnitionOff = computed(() => detailPayload.value?.lastIgnitionOff ?? null);
+const ignitionTimeMeta = computed(() => {
+    const ign = getIgnition();
+    if (ign === true && lastIgnitionOn.value) {
+        return { label: 'On time', time: formatDateTime(lastIgnitionOn.value, { hour12: true }) };
+    }
+    if (ign === false && lastIgnitionOff.value) {
+        return { label: 'Off time', time: formatDateTime(lastIgnitionOff.value, { hour12: true }) };
+    }
+    if (lastIgnitionOn.value || lastIgnitionOff.value) {
+        const onMs = lastIgnitionOn.value ? new Date(lastIgnitionOn.value).getTime() : 0;
+        const offMs = lastIgnitionOff.value ? new Date(lastIgnitionOff.value).getTime() : 0;
+        if (onMs >= offMs && lastIgnitionOn.value) {
+            return { label: 'On time', time: formatDateTime(lastIgnitionOn.value, { hour12: true }) };
+        }
+        if (lastIgnitionOff.value) {
+            return { label: 'Off time', time: formatDateTime(lastIgnitionOff.value, { hour12: true }) };
+        }
+    }
+    return null;
 });
 const ignitionIconClass = computed(() => {
     const ign = getIgnition();
@@ -2252,5 +2597,102 @@ function formatNumber(val, decimals = 1) {
 
 .card .fw-semibold {
     line-height: 1.1;
+}
+
+.driver-modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(2px); z-index: 1050; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 24px; }
+.driver-modal { background: #fff; border-radius: 16px; box-shadow: 0 10px 24px rgba(0,0,0,.15); width: 100%; max-width: 600px; font-family: var(--font-sans); }
+.command-modal { max-width: 720px; }
+.command-modal-tabs .nav-link {
+    cursor: pointer;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #6b7280;
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: -1px;
+    background: transparent;
+}
+.command-modal-tabs .nav-link.active {
+    color: #886654;
+    border-bottom-color: #886654;
+    background: transparent;
+}
+.command-history-table-wrap {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    overflow: hidden;
+}
+.command-history-table thead th {
+    background: #f9fafb;
+    color: #374151;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0.75rem 1rem;
+    white-space: nowrap;
+}
+.command-history-table tbody td {
+    font-size: 0.8125rem;
+    color: #111827;
+    padding: 0.875rem 1rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #f3f4f6;
+}
+.command-history-table tbody tr:last-child td {
+    border-bottom: none;
+}
+.command-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.command-status-badge.is-pending {
+    background: #fef3c7;
+    color: #b45309;
+}
+.command-status-badge.is-success {
+    background: #dcfce7;
+    color: #15803d;
+}
+.command-status-badge.is-failed {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+.command-view-all-link {
+    color: #886654;
+    text-decoration: none;
+    font-weight: 600;
+}
+.command-view-all-link:hover {
+    color: #6f5243;
+    text-decoration: underline;
+}
+
+.veh-widget-ignition-time {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 100%;
+    margin-top: 2px;
+}
+.veh-widget-time-label {
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: 700;
+    line-height: 1.15;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+.veh-widget-time-value {
+    font-size: 12px;
+    color: #886654;
+    font-weight: 700;
+    line-height: 1.25;
 }
 </style>

@@ -81,10 +81,20 @@
               </select>
             </div>
             <div class="col-12 col-md-3">
-              <button type="submit" class="btn btn-info text-white w-100" :disabled="loading">
-                <span v-if="loading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                Submit
-              </button>
+              <div class="d-flex flex-column gap-2">
+                <button type="submit" class="btn btn-info text-white w-100" :disabled="loading">
+                  <span v-if="loading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Submit
+                </button>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-outline-secondary flex-fill" :disabled="!canExport" @click="downloadCsv">
+                    <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary flex-fill" :disabled="!canExport" @click="downloadPdf">
+                    <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </form>
@@ -127,6 +137,9 @@
               <tr v-if="loading">
                 <td colspan="12" class="text-center py-4">Loading data...</td>
               </tr>
+              <tr v-else-if="!hasSearched">
+                <td colspan="12" class="text-center py-4 text-muted">Select filters and click <strong>Search</strong> to load the report.</td>
+              </tr>
               <tr v-else-if="rows.length === 0">
                 <td colspan="12" class="text-center py-4">No data found</td>
               </tr>
@@ -161,14 +174,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
+import { createCancellableRequest, isRequestAborted } from '../../utils/cancellableRequest';
+import { todayDateString } from '../../utils/reportDates';
+import { openReportExport } from '../../utils/reportExport';
 
 const showInfo = ref(false);
 
 const rows = ref([]);
 const loading = ref(false);
+const hasSearched = ref(false);
+const reportRequest = createCancellableRequest();
 const errorMessage = ref(null);
 const fromDate = ref('');
 const toDate = ref('');
@@ -176,16 +194,31 @@ const rankingType = ref('points');
 const filterVehicleId = ref('');
 const deviceOptions = ref([]);
 
-// Set default dates (one week)
+const canExport = computed(() => Boolean(fromDate.value && toDate.value));
+
+function exportParams() {
+  const params = {
+    from_date: fromDate.value,
+    to_date: toDate.value,
+    type: rankingType.value,
+  };
+  if (filterVehicleId.value) params.vehicle_ids = [filterVehicleId.value];
+  return params;
+}
+const downloadCsv = () => {
+  if (!canExport.value) return;
+  openReportExport('/web/reports/vehicle-ranking/export-csv', exportParams());
+};
+const downloadPdf = () => {
+  if (!canExport.value) return;
+  openReportExport('/web/reports/vehicle-ranking/export-pdf', exportParams());
+};
+
 onMounted(async () => {
-  const now = new Date();
-  const oneWeekAgo = new Date();
-  oneWeekAgo.setDate(now.getDate() - 7);
+  const today = todayDateString();
+  fromDate.value = today;
+  toDate.value = today;
 
-  fromDate.value = oneWeekAgo.toISOString().split('T')[0];
-  toDate.value = now.toISOString().split('T')[0];
-
-  // Initialize tooltips
   nextTick(() => {
     if (window.bootstrap && window.bootstrap.Tooltip) {
       const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
@@ -196,8 +229,10 @@ onMounted(async () => {
   });
 
   await loadDeviceOptions();
+});
 
-  fetchRanking();
+onBeforeUnmount(() => {
+  reportRequest.cancel();
 });
 
 const loadDeviceOptions = async () => {
@@ -211,7 +246,9 @@ const loadDeviceOptions = async () => {
 
 const fetchRanking = async () => {
   loading.value = true;
+  hasSearched.value = true;
   errorMessage.value = null;
+  const signal = reportRequest.nextSignal();
   try {
     const params = {
         from_date: fromDate.value,
@@ -221,14 +258,17 @@ const fetchRanking = async () => {
     if (filterVehicleId.value) {
         params.vehicle_ids = [filterVehicleId.value];
     }
-    const response = await axios.get('/web/reports/vehicle-ranking', { params });
+    const response = await axios.get('/web/reports/vehicle-ranking', { params, signal });
     rows.value = response.data;
   } catch (error) {
+    if (isRequestAborted(error)) return;
     console.error('Error fetching ranking:', error);
     errorMessage.value = 'Failed to load vehicle ranking data. Please try again.';
     rows.value = [];
   } finally {
-    loading.value = false;
+    if (!signal.aborted) {
+      loading.value = false;
+    }
   }
 };
 

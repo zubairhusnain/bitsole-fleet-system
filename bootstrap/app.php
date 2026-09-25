@@ -16,8 +16,17 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\DemoReadOnly::class,
             \App\Http\Middleware\LogSystemActivity::class,
+            \App\Http\Middleware\SanitizeUserFacingMessages::class,
+        ]);
+        $middleware->alias([
+            'abort.client' => \App\Http\Middleware\AbortIfClientDisconnected::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->dontReport([
+            \App\Exceptions\ClientDisconnectedException::class,
+        ]);
+        $exceptions->render(function (\App\Exceptions\ClientDisconnectedException $e) {
+            return response('', 499);
+        });
     })->create();

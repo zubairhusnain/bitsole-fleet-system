@@ -107,9 +107,14 @@
             <li class="page-item" :class="{ disabled: logs.current_page === 1 }">
               <button class="page-link" @click="fetchLogs(logs.current_page - 1)">‹</button>
             </li>
-            <li class="page-item" v-for="n in logs.last_page" :key="n" :class="{ active: logs.current_page === n }">
-              <button class="page-link" @click="fetchLogs(n)">{{ n }}</button>
-            </li>
+            <template v-for="(page, idx) in visiblePages" :key="`page-${idx}-${page}`">
+              <li v-if="page === '...'" class="page-item disabled">
+                <span class="page-link border-0 bg-transparent text-muted">…</span>
+              </li>
+              <li v-else class="page-item" :class="{ active: logs.current_page === page }">
+                <button class="page-link" @click="fetchLogs(page)">{{ page }}</button>
+              </li>
+            </template>
             <li class="page-item" :class="{ disabled: logs.current_page === logs.last_page }">
               <button class="page-link" @click="fetchLogs(logs.current_page + 1)">›</button>
             </li>
@@ -167,7 +172,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import UiAlert from '../../components/UiAlert.vue';
 import JsonTreeView from '../../components/JsonTreeView.vue';
@@ -188,6 +193,33 @@ const filterData = ref({
 });
 const selectedLog = ref(null);
 const showDetailsModal = ref(false);
+
+const visiblePages = computed(() => {
+  const total = logs.value.last_page || 1;
+  const current = logs.value.current_page || 1;
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  const pages = [1];
+  const windowStart = Math.max(2, current - 1);
+  const windowEnd = Math.min(total - 1, current + 1);
+
+  if (windowStart > 2) {
+    pages.push('...');
+  }
+
+  for (let i = windowStart; i <= windowEnd; i++) {
+    pages.push(i);
+  }
+
+  if (windowEnd < total - 1) {
+    pages.push('...');
+  }
+
+  pages.push(total);
+  return pages;
+});
 
 const fetchFilterData = async () => {
   try {

@@ -204,7 +204,32 @@ const markerRefs = new Map();
 const router = useRouter();
 const route = useRoute();
 
+let popupClickHandler = null;
+
+function navigateToVehicleDetail(deviceId) {
+    const id = parseInt(String(deviceId), 10);
+    if (!Number.isFinite(id) || id <= 0) return;
+    router.push({ name: 'vehicles-detail', params: { deviceId: String(id) } });
+}
+
 onMounted(() => {
+    popupClickHandler = (e) => {
+        const viewBtn = e.target?.closest?.('[data-vehicle-detail]');
+        if (viewBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            navigateToVehicleDetail(viewBtn.getAttribute('data-vehicle-detail'));
+            return;
+        }
+        const copyBtn = e.target?.closest?.('[data-copy-map-link]');
+        if (copyBtn && typeof window.copyMapLink === 'function') {
+            e.preventDefault();
+            e.stopPropagation();
+            window.copyMapLink(copyBtn.getAttribute('data-copy-map-link'), copyBtn);
+        }
+    };
+    document.addEventListener('click', popupClickHandler, true);
+
     window.copyMapLink = (url, btn) => {
             if (!url) return;
 
@@ -298,17 +323,9 @@ onMounted(() => {
         }
     };
 
-    window.viewVehicleDetails = (url, btn) => {
-        if (!url) return;
-        // Prevent multiple clicks
-        if (btn) {
-            if (btn._clicked) return;
-            btn._clicked = true;
-            btn.style.opacity = '0.5';
-            btn.style.pointerEvents = 'none';
-        }
-        // Use router to navigate to avoid full page reload and multiple redirects
-        router.push(url);
+    window.viewVehicleDetails = (url) => {
+        const match = String(url || '').match(/\/vehicles\/(\d+)/);
+        if (match) navigateToVehicleDetail(match[1]);
     };
 });
 
@@ -722,7 +739,13 @@ function applyRealtimePositions(list) {
                 setDisplayPos(id, prevPos.lat, prevPos.lon, prevPos.course);
             }
         }
-        animateMarkerTo(id, toLat, toLon, toCourse);
+        const ignRaw = p.ignition ?? p.attributes?.ignition ?? null;
+        const moving = isVehicleMoving(parseIgnition(ignRaw), p.speed);
+        if (moving) {
+            animateMarkerTo(id, toLat, toLon, toCourse);
+        } else {
+            setDisplayPos(id, toLat, toLon, Number.isFinite(toCourse) ? toCourse : 0);
+        }
     });
 }
 
@@ -766,13 +789,7 @@ function getPosition(v) {
     };
     const lat = toNumber(latRaw);
     const lon = toNumber(lonRaw);
-    const ignRaw = pos.attributes?.ignition ?? pos.ignition ?? null;
-    let ignition = null;
-    if (ignRaw !== null && ignRaw !== undefined) {
-        const s = String(ignRaw).toLowerCase();
-        ignition = s === 'on' || s === 'true' || s === '1' || ignRaw === true || ignRaw === 1 ? true
-            : (s === 'off' || s === 'false' || s === '0' || ignRaw === false || ignRaw === 0 ? false : null);
-    }
+    const ignition = parseIgnition(pos.attributes?.ignition ?? pos.ignition ?? null);
 
     // Custom speed attribute logic
     const tc = v.tc_device || v.tcDevice || {};
@@ -826,18 +843,15 @@ const filtered = computed(() => {
 const markerItems = computed(() => {
     return filtered.value
         .map(v => {
-            const { lat, lon, speed, course, motion } = getPosition(v);
+            const { lat, lon, speed, course, ignition } = getPosition(v);
             const id = deviceKey(v);
             const disp = displayPositions[id];
             const dlat = typeof disp?.lat === 'number' ? disp.lat : lat;
             const dlon = typeof disp?.lon === 'number' ? disp.lon : lon;
             const dCourse = typeof disp?.course === 'number' ? disp.course : (course || 0);
             const spRounded = speedKmh(speed);
-            // Smoother isMoving check: If speed is > 2km/h, we consider it moving unless motion is explicitly false
-            const isMoving = (motion !== false) && (typeof spRounded === 'number' && spRounded > 2);
-            // Revert to using vehicle state icons instead of generic pins
-            const { ignition } = getPosition(v);
-            const activity = isMoving ? 'Moving' : (ignition ? 'Idle' : 'Stopped');
+            const isMoving = isVehicleMoving(ignition, speed);
+            const activity = isMoving ? 'Moving' : (ignition === true ? 'Idle' : 'Stopped');
             let iconUrl = '/images/idle_car.png';
             if (activity === 'Moving') iconUrl = '/images/moving_car.png';
             if (activity === 'Stopped') iconUrl = '/images/stop_car.png';
@@ -1038,11 +1052,12 @@ function getVehicleMeta(v) {
 function getActivity(v) {
     const { ignition, speed } = getPosition(v);
     const speedVal = speedKmh(speed) || 0;
-    const isIgnOn = ignition === true;
 
-    if (!isIgnOn) return { label: 'Stopped', class: 'text-danger' };
+    if (ignition === false) return { label: 'Stopped', class: 'text-danger' };
+    if (isVehicleMoving(ignition, speed)) return { label: 'Moving', class: 'text-success' };
+    if (ignition === true) return { label: 'Idle', class: 'text-warning' };
     if (speedVal > 0) return { label: 'Moving', class: 'text-success' };
-    return { label: 'Idle', class: 'text-warning' };
+    return { label: 'Stopped', class: 'text-danger' };
 }
 
 function getIcon(v) {
@@ -1157,6 +1172,20 @@ function speedKmh(speed) {
     return Math.round(n * 1.852);
 }
 
+function parseIgnition(ignRaw) {
+    if (ignRaw === null || ignRaw === undefined) return null;
+    const s = String(ignRaw).toLowerCase();
+    if (s === 'on' || s === 'true' || s === '1' || ignRaw === true || ignRaw === 1) return true;
+    if (s === 'off' || s === 'false' || s === '0' || ignRaw === false || ignRaw === 0) return false;
+    return null;
+}
+
+/** Moving only when ignition is on and speed > 0 (km/h). */
+function isVehicleMoving(ignition, speed) {
+    const kmh = speedKmh(speed);
+    return ignition === true && typeof kmh === 'number' && kmh > 0;
+}
+
 const carIcon = L.icon({
     iconUrl: '/images/markers/device-pin.png',
     iconSize: [36, 48],
@@ -1190,7 +1219,7 @@ function popupHtml(v) {
         <div style="display:inline-flex; align-items:center; gap:4px;">
           <a href="${mapUrl}" target="_blank" class="text-primary text-decoration-underline">Live Tracking</a>
           <div style="position:relative; display:inline-block; line-height:1;">
-            <button type="button" onclick="window.copyMapLink('${mapUrl}', this)" title="Copy Link" style="border:none; background:none; padding:0 2px; color:#6c757d; cursor:pointer;">
+            <button type="button" data-copy-map-link="${mapUrl}" title="Copy Link" style="border:none; background:none; padding:0 2px; color:#6c757d; cursor:pointer;">
               <i class="bi bi-copy" style="font-size:12px;"></i>
             </button>
             <span class="copy-feedback" style="display:none; position:absolute; left:50%; top:-24px; transform:translateX(-50%); background:#212529; color:#fff; padding:2px 6px; border-radius:4px; font-size:10px; z-index:100; white-space:nowrap;">Copied!</span>
@@ -1208,8 +1237,8 @@ function popupHtml(v) {
     const isOnline = statusIs(v, 'online');
     const fuel = fuelDisplay(v);
     const odo = odometerDisplay(v);
-    const id = trackingId(v);
-    const detailUrl = typeof id === 'number' || typeof id === 'string' ? `/vehicles/${id}` : null;
+    const detailDeviceId = trackingId(v);
+    const detailIdStr = detailDeviceId != null ? String(detailDeviceId) : '';
     return `
     <div class="popup-card" style="box-sizing:border-box; font-size:13px; line-height:1.4; word-break:break-word;">
       <div class="popup-title-row" style="margin:0 0 8px 0;">
@@ -1226,7 +1255,7 @@ function popupHtml(v) {
       <div class="popup-row" style="display:flex;gap:6px;"><span>Odometer:</span> <strong>${odo ?? '—'}</strong></div>
       <div class="popup-row" style="display:flex;gap:6px;"><span>Fuel:</span> <strong>${fuel ?? '—'}</strong></div>
       <div class="popup-row" style="display:flex;gap:6px; align-items:center;"><span>Location:</span> <span>${locText}</span></div>
-      ${detailUrl ? `<div class="popup-row" style="margin-top:10px; text-align:center;"><button type="button" onclick="window.viewVehicleDetails('${detailUrl}', this)" class="btn btn-link p-0 text-primary text-decoration-underline" style="font-size:13px; border:none; background:none;">View Details</button></div>` : ''}
+      ${detailIdStr ? `<div class="popup-row" style="margin-top:10px; text-align:center;"><button type="button" data-vehicle-detail="${detailIdStr}" class="btn btn-link p-0 text-primary text-decoration-underline" style="font-size:13px; border:none; background:none; cursor:pointer;">View Details</button></div>` : ''}
     </div>
   `;
 }
@@ -1319,12 +1348,12 @@ function focusVehicle(v) {
     const disp = displayPositions[id];
     const rawPos = getPosition(v);
     if (typeof rawPos.lat === 'number' && typeof rawPos.lon === 'number') {
-        const spKmh = speedKmh(rawPos.speed);
         let targetLat = rawPos.lat;
         let targetLon = rawPos.lon;
         let targetCourse = rawPos.course;
 
-        if (typeof spKmh === 'number' && spKmh > 2 && typeof targetCourse === 'number') {
+        if (isVehicleMoving(rawPos.ignition, rawPos.speed) && typeof targetCourse === 'number') {
+            const spKmh = speedKmh(rawPos.speed);
             const secondsAhead = 5;
             const distMeters = (spKmh / 3.6) * secondsAhead;
             const projected = projectPosition(rawPos.lat, rawPos.lon, targetCourse, distMeters);
@@ -1334,7 +1363,11 @@ function focusVehicle(v) {
             }
         }
 
-        animateMarkerTo(id, targetLat, targetLon, targetCourse, SELECTED_ANIM_MS);
+        if (isVehicleMoving(rawPos.ignition, rawPos.speed)) {
+            animateMarkerTo(id, targetLat, targetLon, targetCourse, SELECTED_ANIM_MS);
+        } else {
+            setDisplayPos(id, targetLat, targetLon, Number.isFinite(targetCourse) ? targetCourse : 0);
+        }
         if (typeof pollPositionsOnce === 'function') {
             pollPositionsOnce();
         }
@@ -1465,6 +1498,10 @@ onBeforeUnmount(() => {
         }
         window.removeEventListener('resize', updatePanelVisibilityForViewport);
     } catch {}
+    if (popupClickHandler) {
+        document.removeEventListener('click', popupClickHandler, true);
+        popupClickHandler = null;
+    }
     try {
         animations.forEach(a => { if (a?.raf) cancelAnimationFrame(a.raf); });
         animations.clear();

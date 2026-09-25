@@ -2,15 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\TelemetryFormat;
 use App\Models\Devices;
+use App\Models\TcDevice;
+use App\Models\TcEvent;
+use App\Models\TcGeofence;
 use App\Models\User;
 use App\Models\Zones;
-use App\Models\TcGeofence;
-use App\Models\TcDevice;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 use App\Services\DeviceService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class MonitoringController extends Controller
 {
@@ -29,6 +31,7 @@ class MonitoringController extends Controller
                 return [];
             }
         }
+
         return [];
     }
 
@@ -37,10 +40,209 @@ class MonitoringController extends Controller
      */
     private function formatDate($dateStr)
     {
-        if (!$dateStr) {
+        if (! $dateStr) {
             return 'N/A';
         }
+
         return date('d/m/Y-H:i', strtotime($dateStr));
+    }
+
+    /**
+     * Match frontend table: attrs.ignition || false
+     */
+    private function positionIgnitionOn(?array $attrs): bool
+    {
+        if (empty($attrs)) {
+            return false;
+        }
+        $ign = $attrs['ignition'] ?? false;
+
+        return $ign === true || $ign === 1 || $ign === '1' || (is_string($ign) && strtolower($ign) === 'true');
+    }
+
+    /**
+     * Motion flag from latest position (same as DeviceService / live tracking).
+     */
+    private function positionMotionActive(?array $attrs, $speed): bool
+    {
+        if (! empty($attrs) && isset($attrs['motion'])) {
+            $motion = $attrs['motion'];
+            if ($motion === true || $motion === 1 || $motion === '1' || (is_string($motion) && strtolower($motion) === 'true')) {
+                return true;
+            }
+        }
+
+        return is_numeric($speed) && (float) $speed > 0;
+    }
+
+    /**
+     * Vehicle movement stats aligned with monitoring table ignition badges.
+     *
+     * @param  \Illuminate\Support\Collection<int, Devices>  $devices
+     */
+    /**
+     * Movement stats from position rows only (no full Devices model hydration).
+     */
+    private function computeVehicleMonitoringStatsFromDb(array $allDeviceIds): array
+    {
+        $total = count($allDeviceIds);
+        if ($total === 0) {
+            return [
+                'total' => 0,
+                'ignitionOn' => 0,
+                'ignitionOff' => 0,
+                'moving' => 0,
+                'stopped' => 0,
+                'idle' => 0,
+            ];
+        }
+
+        $rows = DB::connection('pgsql')
+            ->table('tc_devices as d')
+            ->leftJoin('tc_positions as p', 'p.id', '=', 'd.positionid')
+            ->whereIn('d.id', $allDeviceIds)
+            ->get(['d.id', 'p.attributes', 'p.speed']);
+
+        $ignitionOn = 0;
+        $ignitionOff = 0;
+        $moving = 0;
+        $stopped = 0;
+        $idle = 0;
+
+        foreach ($rows as $row) {
+            $attrs = $this->parseAttributes($row->attributes);
+            $ignOn = $this->positionIgnitionOn($attrs);
+
+            if ($ignOn) {
+                $ignitionOn++;
+            } else {
+                $ignitionOff++;
+            }
+
+            if (! $ignOn) {
+                $stopped++;
+
+                continue;
+            }
+
+            if ($this->positionMotionActive($attrs, $row->speed ?? 0)) {
+                $moving++;
+            } else {
+                $idle++;
+            }
+        }
+
+        $missingCount = $total - $rows->count();
+        if ($missingCount > 0) {
+            $ignitionOff += $missingCount;
+            $stopped += $missingCount;
+        }
+
+        return [
+            'total' => $total,
+            'ignitionOn' => $ignitionOn,
+            'ignitionOff' => $ignitionOff,
+            'moving' => $moving,
+            'stopped' => $stopped,
+            'idle' => $idle,
+        ];
+    }
+
+    /**
+     * Same rules as TcEvent::scopeWithEnabledNotifications (used for monitoring counts).
+     */
+    private function enabledNotificationEventSql(): string
+    {
+        return "(
+            e.type IN ('frequentIgnition', 'driverChanged')
+            OR (
+                e.type <> 'maintenance'
+                AND (
+                    CAST(d.attributes AS json)->>'alert_status' IS NULL
+                    OR CAST(d.attributes AS json)->>'alert_status' != 'disabled'
+                )
+                AND EXISTS (
+                    SELECT 1 FROM tc_device_notification dn
+                    INNER JOIN tc_notifications n ON n.id = dn.notificationid AND n.type = e.type
+                    WHERE dn.deviceid = e.deviceid
+                )
+            )
+            OR (
+                e.type = 'maintenance'
+                AND (
+                    CAST(d.attributes AS json)->>'maintenance_status' IS NULL
+                    OR CAST(d.attributes AS json)->>'maintenance_status' != 'disabled'
+                )
+                AND EXISTS (
+                    SELECT 1 FROM tc_device_notification dn
+                    INNER JOIN tc_notifications n ON n.id = dn.notificationid AND n.type = e.type
+                    WHERE dn.deviceid = e.deviceid
+                )
+            )
+        )";
+    }
+
+    /**
+     * Unread event counts with enabled-notification rules (matches legacy Eloquent scope).
+     *
+     * @return array{alerts: array<int, int>, maintenance: array<int, int>, frequentIgnition: array<int, int>}
+     */
+    private function aggregateUnreadEventCountsByDevice(array $deviceIds): array
+    {
+        $alerts = [];
+        $maintenance = [];
+        $frequentIgnition = [];
+
+        if (empty($deviceIds)) {
+            return compact('alerts', 'maintenance', 'frequentIgnition');
+        }
+
+        sort($deviceIds);
+        $cacheKey = 'monitoring_event_counts:' . md5(implode(',', $deviceIds));
+        $filter = $this->enabledNotificationEventSql();
+
+        return Cache::remember($cacheKey, 30, function () use ($deviceIds, $filter) {
+            $alerts = [];
+            $maintenance = [];
+            $frequentIgnition = [];
+
+            $placeholders = implode(',', array_fill(0, count($deviceIds), '?'));
+            $rows = DB::connection('pgsql')->select(
+                "SELECT e.deviceid, e.type, COUNT(*) AS cnt
+                 FROM tc_events e
+                 INNER JOIN tc_devices d ON d.id = e.deviceid
+                 WHERE e.is_read = 0
+                   AND e.deviceid IN ({$placeholders})
+                   AND {$filter}
+                 GROUP BY e.deviceid, e.type",
+                $deviceIds
+            );
+
+            foreach ($rows as $row) {
+                $dId = (int) $row->deviceid;
+                $cnt = (int) $row->cnt;
+
+                if ($row->type === 'maintenance') {
+                    $maintenance[$dId] = ($maintenance[$dId] ?? 0) + $cnt;
+                } elseif ($row->type === 'frequentIgnition') {
+                    $frequentIgnition[$dId] = ($frequentIgnition[$dId] ?? 0) + $cnt;
+                    $alerts[$dId] = ($alerts[$dId] ?? 0) + $cnt;
+                } else {
+                    $alerts[$dId] = ($alerts[$dId] ?? 0) + $cnt;
+                }
+            }
+
+            return compact('alerts', 'maintenance', 'frequentIgnition');
+        });
+    }
+
+    private function parseTcDeviceAttributes(?\App\Models\TcDevice $tcDevice): array
+    {
+        if (! $tcDevice) {
+            return [];
+        }
+
+        return $this->parseAttributes($tcDevice->getRawOriginal('attributes'));
     }
 
     /**
@@ -52,7 +254,7 @@ class MonitoringController extends Controller
         // Accept either a remote geofence ID or a local Zones.id and resolve to geofence_id
         $gid = (int) $id;
         $zone = Zones::where('geofence_id', $gid)->first();
-        if (!$zone) {
+        if (! $zone) {
             $zone = Zones::find($gid);
             if ($zone && (int) $zone->geofence_id > 0) {
                 $gid = (int) $zone->geofence_id;
@@ -64,7 +266,7 @@ class MonitoringController extends Controller
         // But strictly we should check if this $gid is in allowed list.
 
         $gf = TcGeofence::find($gid);
-        if (!$gf) {
+        if (! $gf) {
             return response()->json(['error' => 'Zone not found'], 404);
         }
 
@@ -98,12 +300,12 @@ class MonitoringController extends Controller
         }
 
         // If not found in local Zones but exists in TcGeofence and user is admin?
-        if (!$localZone && $role === User::ROLE_ADMIN) {
+        if (! $localZone && $role === User::ROLE_ADMIN) {
             $canAccess = true;
         }
 
-        if (!$canAccess) {
-             return response()->json(['error' => 'Unauthorized'], 403);
+        if (! $canAccess) {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         // Fetch vehicles
@@ -121,7 +323,7 @@ class MonitoringController extends Controller
 
         $vehicles = collect($linkedDeviceIds)->map(function ($did) use ($deviceRows) {
             $row = $deviceRows->get((int) $did);
-            if (!$row) {
+            if (! $row) {
                 return null;
             }
 
@@ -155,7 +357,7 @@ class MonitoringController extends Controller
                 'address' => $pos ? $pos->address : '',
                 'type' => $attrs['type'] ?? 'Unknown',
                 'model' => $row->model ?? 'Unknown',
-                'odometer' => isset($posAttrs['odometer']) ? round($posAttrs['odometer'] / 1000, 1) : 0,
+                'odometer' => TelemetryFormat::formatOdometerForDevice($row, [], $posAttrs) ?? '—',
             ];
         })->filter()->values()->all();
 
@@ -165,7 +367,7 @@ class MonitoringController extends Controller
         // Return geofence payload in the same format as getGeofenceById,
         // alongside monitoring-specific fields (vehicles, count, percent)
         $geofence = $this->geofencesService->getGeofenceById($request, $gid);
-        if (!$geofence) {
+        if (! $geofence) {
             return response()->json(['error' => 'Zone not found'], 404);
         }
 
@@ -222,10 +424,11 @@ class MonitoringController extends Controller
         $assignedCounts = [];
         foreach ($links as $ln) {
             $gid = (int) $ln->geofenceid;
-            if (!isset($assignedCounts[$gid])) $assignedCounts[$gid] = 0;
+            if (! isset($assignedCounts[$gid])) {
+                $assignedCounts[$gid] = 0;
+            }
             $assignedCounts[$gid]++;
         }
-
 
         // Real-time "Inside" Counts based on device position
         $insideCounts = [];
@@ -239,7 +442,7 @@ class MonitoringController extends Controller
         $zoneRows = TcGeofence::query()->whereIn('id', $allowedIds->all())->get()->keyBy('id');
         $zonePolygons = [];
         foreach ($zoneRows as $z) {
-            if (!empty($z->area) && str_starts_with($z->area, 'POLYGON')) {
+            if (! empty($z->area) && str_starts_with($z->area, 'POLYGON')) {
                 // Parse WKT: POLYGON((lon lat, lon lat, ...))
                 if (preg_match('/\(\((.*?)\)\)/', $z->area, $matches)) {
                     $pointsStr = explode(',', $matches[1]);
@@ -248,7 +451,7 @@ class MonitoringController extends Controller
                         $coords = preg_split('/\s+/', trim($pStr));
                         if (count($coords) >= 2) {
                             // WKT is usually LON LAT
-                            $polygon[] = ['lat' => (float)$coords[1], 'lon' => (float)$coords[0]];
+                            $polygon[] = ['lat' => (float) $coords[1], 'lon' => (float) $coords[0]];
                         }
                     }
                     $zonePolygons[$z->id] = $polygon;
@@ -257,12 +460,14 @@ class MonitoringController extends Controller
         }
 
         foreach ($devicesWithPos as $dev) {
-            if (!$dev->position) continue;
+            if (! $dev->position) {
+                continue;
+            }
 
             $detectedForDevice = [];
 
-            // 1. Check Tracking-provided geofenceids
-            if (!empty($dev->position->geofenceids)) {
+            // 1. Check Traccar-provided geofenceids
+            if (! empty($dev->position->geofenceids)) {
                 $gids = explode(',', $dev->position->geofenceids);
                 foreach ($gids as $gidStr) {
                     $gid = (int) trim($gidStr);
@@ -276,7 +481,9 @@ class MonitoringController extends Controller
             // This handles cases where Traccar hasn't computed the geofence entry yet
             if ($dev->position->latitude && $dev->position->longitude) {
                 foreach ($zonePolygons as $zid => $poly) {
-                    if (isset($detectedForDevice[$zid])) continue;
+                    if (isset($detectedForDevice[$zid])) {
+                        continue;
+                    }
 
                     if ($this->isPointInPolygon($dev->position->latitude, $dev->position->longitude, $poly)) {
                         $detectedForDevice[$zid] = true;
@@ -287,7 +494,9 @@ class MonitoringController extends Controller
             // Update counts based on combined results
             $inAllowed = false;
             foreach ($detectedForDevice as $gid => $_) {
-                if (!isset($insideCounts[$gid])) $insideCounts[$gid] = 0;
+                if (! isset($insideCounts[$gid])) {
+                    $insideCounts[$gid] = 0;
+                }
                 $insideCounts[$gid]++;
                 $inAllowed = true;
             }
@@ -303,7 +512,9 @@ class MonitoringController extends Controller
 
         $zones = $allowedIds->map(function ($gid) use ($zoneRows, $assignedCounts, $insideCounts, $totalDevices, $localZones) {
             $gf = $zoneRows->get((int) $gid);
-            if (!$gf) return null;
+            if (! $gf) {
+                return null;
+            }
 
             $localZone = $localZones->get((int) $gid);
             $assigned = $assignedCounts[(int) $gid] ?? 0;
@@ -312,7 +523,7 @@ class MonitoringController extends Controller
 
             return [
                 'id' => (int) $gid,
-                'name' => $gf->name ?? ('Zone ' . $gid),
+                'name' => $gf->name ?? ('Zone '.$gid),
                 'description' => $gf->description ?? null,
                 'created_at' => $localZone ? $localZone->created_at : null,
                 'updated_at' => $localZone ? $localZone->updated_at : null,
@@ -325,239 +536,134 @@ class MonitoringController extends Controller
             ];
         })->filter()->values()->all();
 
-
         return response()->json([
             'zones' => $zones,
             'total_devices' => $totalDevices,
-            'vehicles_in_zone' => $vehiclesInAnyZone
+            'vehicles_in_zone' => $vehiclesInAnyZone,
         ]);
     }
 
     /**
      * List vehicles for monitoring with detailed attributes.
      */
+    private function applyMonitoringVehicleSearch($query, string $search): void
+    {
+        if ($search === '') {
+            return;
+        }
+
+        $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $search) . '%';
+        $query->where(function ($q) use ($like) {
+            $q->whereHas('tcDevice', function ($tq) use ($like) {
+                $tq->where('name', 'ilike', $like)
+                    ->orWhere('uniqueid', 'ilike', $like)
+                    ->orWhereRaw('attributes::text ILIKE ?', [$like])
+                    ->orWhereRaw("(CAST(attributes AS json)->>'driverUniqueId') ILIKE ?", [$like]);
+            })->orWhereHas('manager', function ($mq) use ($like) {
+                $mq->where('name', 'ilike', $like);
+            });
+        });
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
 
-        // Apply role-based access control
         if ($request->boolean('mine')) {
-            $query = Devices::accessibleByUser($user);
-            $query->whereHas('users', function($q) use ($user) {
+            $baseQuery = Devices::accessibleByUser($user);
+            $baseQuery->whereHas('users', function ($q) use ($user) {
                 $q->where('users.id', $user->id);
             });
         } else {
-            $query = Devices::accessibleByUser($user);
+            $baseQuery = Devices::accessibleByUser($user);
         }
 
-        // Eager load tcDevice and its current position
-        // We include soft-deleted devices if they are still relevant for monitoring history,
-        // but typically monitoring focuses on active devices.
-        // As per request, we remove deleted vehicles from monitoring list.
-        // Also changing owner to manager instead of distributor.
-        $query->with(['tcDevice.position', 'manager']);
+        $search = trim((string) $request->input('search', ''));
+        $perPage = min(100, max(10, (int) $request->input('per_page', 10)));
 
-        // Pagination or fetch all
-        $perPage = $request->input('per_page', 25);
+        // Stats always reflect the full accessible fleet (matches legacy client-side search UX).
+        $allDeviceIds = (clone $baseQuery)->pluck('device_id')->map(fn ($id) => (int) $id)->all();
 
-        // If per_page is -1 or very large, we might want to return all, but paginate is safer.
-        // The frontend requests per_page=500 in fetchVehicles.
-        $devices = $query->orderByDesc('id')->paginate($perPage);
+        $eventCounts = $this->aggregateUnreadEventCountsByDevice($allDeviceIds);
+        $alertCounts = $eventCounts['alerts'];
+        $maintenanceCounts = $eventCounts['maintenance'];
+        $frequentIgnitionCounts = $eventCounts['frequentIgnition'];
 
-        // Fetch last ignition events for these devices
-        $deviceIds = $devices->pluck('device_id')->unique()->values()->all();
+        $listQuery = clone $baseQuery;
+        $this->applyMonitoringVehicleSearch($listQuery, $search);
 
-        if (!empty($deviceIds)) {
-            $ignitionEvents = DB::connection('pgsql')
-                ->table('tc_events')
-                ->select('deviceid', 'type', DB::raw('MAX(eventtime) as last_time'))
-                ->whereIn('deviceid', $deviceIds)
-                ->whereIn('type', ['ignitionOn', 'ignitionOff'])
-                ->groupBy('deviceid', 'type')
-                ->get();
+        $listQuery->with([
+            'tcDevice:id,name,uniqueid,model,positionid,attributes,status,lastupdate',
+            'tcDevice.position:id,deviceid,latitude,longitude,speed,servertime,fixtime,address,attributes',
+            'manager:id,name',
+        ]);
 
-            $ignitionTimes = [];
-            foreach ($ignitionEvents as $evt) {
-                $ignitionTimes[$evt->deviceid][$evt->type] = $evt->last_time;
+        $devices = $listQuery->orderByDesc('id')->paginate($perPage);
+
+        if ($request->boolean('with_ignition_times')) {
+            $pageDeviceIds = $devices->getCollection()
+                ->pluck('device_id')
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->values()
+                ->all();
+
+            if (! empty($pageDeviceIds)) {
+                sort($pageDeviceIds);
+                $ignitionCacheKey = 'monitoring_ignition_times:' . md5(implode(',', $pageDeviceIds));
+                $ignitionTimes = Cache::remember($ignitionCacheKey, 30, function () use ($pageDeviceIds) {
+                    $rows = DB::connection('pgsql')
+                        ->table('tc_events')
+                        ->select('deviceid', 'type', DB::raw('MAX(eventtime) as last_time'))
+                        ->whereIn('deviceid', $pageDeviceIds)
+                        ->whereIn('type', ['ignitionOn', 'ignitionOff'])
+                        ->groupBy('deviceid', 'type')
+                        ->get();
+
+                    $times = [];
+                    foreach ($rows as $evt) {
+                        $times[$evt->deviceid][$evt->type] = $evt->last_time;
+                    }
+
+                    return $times;
+                });
+
+                $devices->getCollection()->transform(function ($device) use ($ignitionTimes) {
+                    $device->last_ignition_on = $ignitionTimes[$device->device_id]['ignitionOn'] ?? null;
+                    $device->last_ignition_off = $ignitionTimes[$device->device_id]['ignitionOff'] ?? null;
+
+                    return $device;
+                });
             }
-
-            // Helper for date formatting
-            $formatDate = function ($dateStr) {
-                if (!$dateStr) return null;
-                return date('d/m/Y-H:i', strtotime($dateStr));
-            };
-
-            // Enrich the devices collection
-            $devices->getCollection()->transform(function ($device) use ($ignitionTimes, $formatDate) {
-                $ignOnTime = $ignitionTimes[$device->device_id]['ignitionOn'] ?? null;
-                $ignOffTime = $ignitionTimes[$device->device_id]['ignitionOff'] ?? null;
-
-                $device->last_ignition_on = $ignOnTime ? $ignOnTime : null;
-                $device->last_ignition_off = $ignOffTime ? $ignOffTime : null;
-
-                return $device;
-            });
         }
 
-        // Enrich with alerts and maintenance counts
-        $deviceIds = $devices->pluck('device_id')->toArray();
+        $devices->getCollection()->transform(function ($device) use ($alertCounts, $maintenanceCounts, $frequentIgnitionCounts) {
+            $dId = (int) $device->device_id;
+            $device->alert_count = $alertCounts[$dId] ?? 0;
+            $device->frequent_ignition_count = $frequentIgnitionCounts[$dId] ?? 0;
+            $mCount = $maintenanceCounts[$dId] ?? 0;
+            $device->maintenance_count = $mCount;
 
-        if (!empty($deviceIds)) {
-            // Retrieve unread events using Eloquent relationships
-            $events = \App\Models\TcEvent::with(['notifications'])
-                ->whereIn('tc_events.deviceid', $deviceIds)
-                ->where('is_read', 0)
-                ->withEnabledNotifications()
-                ->get();
+            $attrs = $this->parseTcDeviceAttributes($device->tcDevice);
+            $device->vehicle_no = $attrs['vehicleNo'] ?? ($attrs['vehicle_id'] ?? ($attrs['vehicleId'] ?? ($attrs['vehicleID'] ?? null)));
 
-            // Group by device and count types
-            $alertCounts = [];
-            $maintenanceCounts = [];
-            $frequentIgnitionCounts = [];
+            $device->maintenance_display = $mCount > 0 ? $mCount.' Due' : 'N/A';
 
-            foreach ($events as $event) {
-                $dId = $event->deviceid;
+            return $device;
+        });
 
-                if ($event->type === 'frequentIgnition') {
-                    if (!isset($frequentIgnitionCounts[$dId])) $frequentIgnitionCounts[$dId] = 0;
-                    $frequentIgnitionCounts[$dId]++;
-                }
-
-                if ($event->type === 'maintenance') {
-                    if (!isset($maintenanceCounts[$dId])) $maintenanceCounts[$dId] = 0;
-                    $maintenanceCounts[$dId]++;
-                } else {
-                    if (!isset($alertCounts[$dId])) $alertCounts[$dId] = 0;
-                    $alertCounts[$dId]++;
-                }
-            }
-
-            $devices->getCollection()->transform(function ($device) use ($alertCounts, $maintenanceCounts, $frequentIgnitionCounts) {
-                $dId = $device->device_id;
-                $device->alert_count = $alertCounts[$dId] ?? 0;
-                $device->frequent_ignition_count = $frequentIgnitionCounts[$dId] ?? 0;
-                $mCount = $maintenanceCounts[$dId] ?? 0;
-                $device->maintenance_count = $mCount;
-
-                // Add vehicle_no for detail modal
-                $attrs = $device->tcDevice && $device->tcDevice->attributes
-                    ? (is_array($device->tcDevice->attributes) ? $device->tcDevice->attributes : json_decode($device->tcDevice->attributes, true))
-                    : [];
-                $device->vehicle_no = $attrs['vehicleNo'] ?? ($attrs['vehicle_id'] ?? ($attrs['vehicleId'] ?? ($attrs['vehicleID'] ?? null)));
-
-                // Format maintenance string for display
-                if ($mCount > 0) {
-                     $device->maintenance_display = $mCount . ' Due';
-                } else {
-                     $device->maintenance_display = 'N/A';
-                }
-
-                return $device;
-            });
-        }
-
-        // Calculate Global Stats
-        $allDeviceIds = $query->pluck('device_id')->toArray();
-        $totalVehicles = count($allDeviceIds);
-
-        $ignitionOn = 0;
-        $ignitionOff = 0;
-        $maintenanceVehicles = 0;
-        $alertVehicles = 0;
-        $movingVehicles = 0;
-        $stoppedVehicles = 0;
-        $idleVehicles = 0;
-
-        if ($totalVehicles > 0) {
-            // Ignition Stats (from tc_positions via TcDevice)
-            // Assuming 'attributes' column in tc_positions has {"ignition": true/false}
-            // We use whereIn on TcDevice (pgsql)
-            $ignitionOn = \App\Models\TcDevice::whereIn('id', $allDeviceIds)
-                ->whereHas('position', function ($q) {
-                    // Postgres JSON operator ->> requires casting text column to json
-                    $q->whereRaw("CAST(attributes AS json)->>'ignition' = 'true'")
-                      ->orWhereRaw("CAST(attributes AS json)->>'ignition' = '1'");
-                })
-                ->count();
-
-            $ignitionOff = $totalVehicles - $ignitionOn;
-
-            $movingVehicles = \App\Models\TcDevice::whereIn('id', $allDeviceIds)
-                ->whereHas('position', function ($q) {
-                    $q->whereRaw("CAST(attributes AS json)->>'motion' = '1'")
-                      ->orWhere('speed', '>', 0);
-                })
-                ->count();
-
-            $idleVehicles = \App\Models\TcDevice::whereIn('id', $allDeviceIds)
-                ->whereHas('position', function ($q) {
-                    $q->where(function ($w1) {
-                        $w1->whereRaw("CAST(attributes AS json)->>'motion' = '0'")
-                           ->where(function ($wIgn) {
-                               $wIgn->whereRaw("CAST(attributes AS json)->>'ignition' = 'true'")
-                                    ->orWhereRaw("CAST(attributes AS json)->>'ignition' = '1'");
-                           });
-                    })->orWhere(function ($w2) {
-                        $w2->where('speed', '=', 0)
-                           ->where(function ($wIgn) {
-                               $wIgn->whereRaw("CAST(attributes AS json)->>'ignition' = 'true'")
-                                    ->orWhereRaw("CAST(attributes AS json)->>'ignition' = '1'");
-                           });
-                    });
-                })
-                ->count();
-
-            $stoppedVehicles = \App\Models\TcDevice::whereIn('id', $allDeviceIds)
-                ->whereHas('position', function ($q) {
-                    $q->where(function ($w1) {
-                        $w1->whereRaw("CAST(attributes AS json)->>'motion' = '0'")
-                           ->where(function ($wIgn) {
-                               $wIgn->whereRaw("CAST(attributes AS json)->>'ignition' = 'false'")
-                                    ->orWhereRaw("CAST(attributes AS json)->>'ignition' = '0'")
-                                    ->orWhereRaw("CAST(attributes AS json)->>'ignition' IS NULL");
-                           });
-                    })->orWhere(function ($w2) {
-                        $w2->where('speed', '=', 0)
-                           ->where(function ($wIgn) {
-                               $wIgn->whereRaw("CAST(attributes AS json)->>'ignition' = 'false'")
-                                    ->orWhereRaw("CAST(attributes AS json)->>'ignition' = '0'")
-                                    ->orWhereRaw("CAST(attributes AS json)->>'ignition' IS NULL");
-                           });
-                    });
-                })
-                ->count();
-
-            // Maintenance & Alerts Stats (from tc_events)
-            // We reuse the logic for filtering relevant notifications
-            $globalEventsQuery = \App\Models\TcEvent::query()
-                ->whereIn('tc_events.deviceid', $allDeviceIds)
-                ->where('is_read', 0)
-                ->withEnabledNotifications();
-
-            // Count distinct devices with maintenance
-            $maintenanceVehicles = (clone $globalEventsQuery)
-                ->where('tc_events.type', 'maintenance')
-                ->distinct('tc_events.deviceid')
-                ->count('tc_events.deviceid');
-
-            // Count distinct devices with alerts (type != maintenance)
-            $alertVehicles = (clone $globalEventsQuery)
-                ->where('tc_events.type', '!=', 'maintenance')
-                ->distinct('tc_events.deviceid')
-                ->count('tc_events.deviceid');
-        }
+        $movementStats = $this->computeVehicleMonitoringStatsFromDb($allDeviceIds);
+        $maintenanceVehicles = count($maintenanceCounts);
+        $alertVehicles = count(array_unique(array_merge(
+            array_keys($alertCounts),
+            array_keys($frequentIgnitionCounts)
+        )));
 
         $response = $devices->toArray();
-        $response['stats'] = [
-            'total' => $totalVehicles,
-            'ignitionOn' => $ignitionOn,
-            'ignitionOff' => $ignitionOff,
-            'moving' => $movingVehicles,
-            'stopped' => $stoppedVehicles,
-            'idle' => $idleVehicles,
+        $response['stats'] = array_merge($movementStats, [
             'maintenance' => $maintenanceVehicles,
             'alerts' => $alertVehicles,
-        ];
+        ]);
 
         return response()->json($response);
     }
@@ -627,7 +733,7 @@ class MonitoringController extends Controller
      */
     public function getDeviceEvents(Request $request, $id)
     {
-        // Resolve device ID (Tracking ID)
+        // Resolve device ID (Traccar ID)
         $device = Devices::where('device_id', $id)->orWhere('id', $id)->firstOrFail();
 
         $query = \App\Models\TcEvent::where('deviceid', $device->device_id)
@@ -663,7 +769,7 @@ class MonitoringController extends Controller
         // Update attributes with remarks
         $attributes = $event->attributes ?? [];
         // Ensure attributes is an array (it should be cast, but safety check)
-        if (!is_array($attributes)) {
+        if (! is_array($attributes)) {
             $attributes = json_decode($attributes, true) ?? [];
         }
 
@@ -690,13 +796,13 @@ class MonitoringController extends Controller
 
         $device = Devices::with(['tcDevice'])->where('device_id', $id)->orWhere('id', $id)->firstOrFail();
         $tc = $device->tcDevice;
-        if (!$tc) {
+        if (! $tc) {
             return response()->json(['message' => 'Tracker device not found'], 404);
         }
 
         $svc = app(DeviceService::class);
         $raw = $svc->getDeviceRaw($request->user(), (int) $device->device_id);
-        if (!$raw) {
+        if (! $raw) {
             return response()->json(['message' => 'Tracking server device not found'], 404);
         }
         $rawAttrs = [];
@@ -730,7 +836,7 @@ class MonitoringController extends Controller
         $updateReq = new Request($payload);
         $updateReq->setUserResolver(fn () => $request->user());
         $resp = $svc->deviceUpdate($updateReq);
-        if (!isset($resp->responseCode) || $resp->responseCode < 200 || $resp->responseCode >= 300) {
+        if (! isset($resp->responseCode) || $resp->responseCode < 200 || $resp->responseCode >= 300) {
             return response()->json(['message' => 'Failed to update device on tracking server', 'code' => $resp->responseCode ?? 0, 'error' => $resp->error ?? null], 502);
         }
 
@@ -753,9 +859,9 @@ class MonitoringController extends Controller
     /**
      * Check if a point is inside a polygon using Ray Casting algorithm.
      *
-     * @param float $lat
-     * @param float $lon
-     * @param array $polygon Array of ['lat' => float, 'lon' => float]
+     * @param  float  $lat
+     * @param  float  $lon
+     * @param  array  $polygon  Array of ['lat' => float, 'lon' => float]
      * @return bool
      */
     private function isPointInPolygon($lat, $lon, $polygon)
@@ -771,9 +877,10 @@ class MonitoringController extends Controller
             $intersect = (($xi > $lat) != ($xj > $lat))
                 && ($lon < ($yj - $yi) * ($lat - $xi) / ($xj - $xi) + $yi);
             if ($intersect) {
-                $inside = !$inside;
+                $inside = ! $inside;
             }
         }
+
         return $inside;
     }
 }

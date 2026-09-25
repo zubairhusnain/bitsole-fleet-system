@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { sanitizeUserFacingMessage } from './utils/userFacingMessage';
 window.axios = axios;
 
 // Core defaults
@@ -60,13 +61,33 @@ if (meta && meta.content) {
 
 // Auto-refresh CSRF header on 419 (Page Expired) and retry once
 window.axios.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const data = response?.data;
+    if (data && typeof data === 'object') {
+      if (typeof data.message === 'string') {
+        data.message = sanitizeUserFacingMessage(data.message);
+      }
+      if (typeof data.error === 'string') {
+        data.error = sanitizeUserFacingMessage(data.error);
+      }
+    }
+    return response;
+  },
   async (error) => {
     const status = error?.response?.status;
     const config = error?.config || {};
-    const isDemoReadOnly = status === 403 && (error?.response?.data?.demo_read_only === true || error?.response?.data?.code === 'DEMO_READ_ONLY');
+    const data = error?.response?.data;
+    if (data && typeof data === 'object') {
+      if (typeof data.message === 'string') {
+        data.message = sanitizeUserFacingMessage(data.message);
+      }
+      if (typeof data.error === 'string') {
+        data.error = sanitizeUserFacingMessage(data.error);
+      }
+    }
+    const isDemoReadOnly = status === 403 && (data?.demo_read_only === true || data?.code === 'DEMO_READ_ONLY');
     if (isDemoReadOnly) {
-      const msg = error?.response?.data?.message || 'This is a demo account. You can only read/view data.';
+      const msg = data?.message || 'This is a demo account. You can only read/view data.';
       emitDemoReadonly(msg);
     }
     if (status === 419 && !config.__retried) {

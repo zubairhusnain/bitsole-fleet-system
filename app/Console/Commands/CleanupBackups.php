@@ -47,7 +47,7 @@ class CleanupBackups extends Command
 
         foreach ($files as $file) {
             $extension = pathinfo($file, PATHINFO_EXTENSION);
-            if (in_array($extension, ['sql', 'zip'], true)) {
+            if (in_array($extension, ['sql', 'zip', 'gz'], true)) {
                 $lastModified = $disk->lastModified($file);
 
                 if ($lastModified < $threshold) {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Devices;
 use App\Models\User;
+use App\Services\DeviceCommandEventService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -15,9 +16,14 @@ use Illuminate\Support\Facades\DB;
 
 class VehicleController extends Controller
 {
+    private function isFuelAttrNone(?string $fuelAttr): bool
+    {
+        return strtolower(trim((string) $fuelAttr)) === 'none';
+    }
+
     private function updateModelDefaults($attributes)
     {
-        if (empty($attributes['trackerModel']) || empty($attributes['fuelAttr'])) {
+        if (empty($attributes['trackerModel']) || empty($attributes['fuelAttr']) || $this->isFuelAttrNone($attributes['fuelAttr'])) {
             return;
         }
         $modelName = $attributes['trackerModel'];
@@ -291,7 +297,7 @@ class VehicleController extends Controller
                 $deleteNamesForAttrs[] = $v;
             }
         }
-        if (!empty($attributes['fuelAttr'])) {
+        if (! empty($attributes['fuelAttr']) && ! $this->isFuelAttrNone($attributes['fuelAttr'])) {
             $v = trim((string)$attributes['fuelAttr']);
             if ($v !== '') {
                 if (!in_array($v, $namesForAttrs, true)) {
@@ -492,8 +498,8 @@ class VehicleController extends Controller
             if ($n === null || $n === '') {
                 continue;
             }
-            $nStr = trim((string)$n);
-            if ($nStr === '') {
+            $nStr = trim((string) $n);
+            if ($nStr === '' || $this->isFuelAttrNone($nStr)) {
                 continue;
             }
             if (!in_array($nStr, $deleteNamesForAttrs, true)) {
@@ -507,7 +513,7 @@ class VehicleController extends Controller
                 $namesForAttrs[] = $v;
             }
         }
-        if (!empty($attributes['fuelAttr'])) {
+        if (! empty($attributes['fuelAttr']) && ! $this->isFuelAttrNone($attributes['fuelAttr'])) {
             $v = trim((string)$attributes['fuelAttr']);
             if ($v !== '' && !in_array($v, $namesForAttrs, true)) {
                 $namesForAttrs[] = $v;
@@ -1583,5 +1589,91 @@ class VehicleController extends Controller
         }
 
         return response()->json(['message' => 'Vehicle activated'], 200);
+    }
+
+    public function commands(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        Devices::accessibleByUser($request->user())->where('device_id', $deviceId)->firstOrFail();
+
+        $data = app(\App\Services\DeviceService::class)->getDeviceCommands($request->user(), $deviceId);
+
+        return response()->json($data);
+    }
+
+    public function commandHistory(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        Devices::accessibleByUser($request->user())->where('device_id', $deviceId)->firstOrFail();
+
+        $limit = max(1, min((int) $request->query('limit', 10), 100));
+        $history = app(DeviceCommandEventService::class)->historyForDevice($deviceId, $limit);
+
+        return response()->json($history);
+    }
+
+    public function sendCommand(Request $request, int $deviceId): \Illuminate\Http\JsonResponse
+    {
+        Devices::accessibleByUser($request->user())->where('device_id', $deviceId)->firstOrFail();
+
+        $validated = $request->validate([
+            'id' => 'nullable|integer',
+            'type' => 'nullable|string|max:128',
+            'attributes' => 'nullable|array',
+            'no_queue' => 'nullable|boolean',
+        ]);
+
+        if (empty($validated['id']) && empty($validated['type'])) {
+            return response()->json(['message' => 'Select a command type or saved command.'], 422);
+        }
+
+        $payload = array_filter([
+            'id' => $validated['id'] ?? null,
+            'type' => $validated['type'] ?? null,
+        ], static fn ($v) => $v !== null && $v !== '');
+
+        $attributes = $validated['attributes'] ?? [];
+        if (! empty($validated['no_queue'])) {
+            $attributes['noQueue'] = true;
+        }
+        if (! empty($attributes)) {
+            $payload['attributes'] = $attributes;
+        }
+
+        $resp = app(\App\Services\DeviceService::class)->sendDeviceCommand($request->user(), $deviceId, $payload);
+
+        if (! isset($resp->responseCode) || $resp->responseCode < 200 || $resp->responseCode >= 300) {
+            return response()->json([
+                'message' => $this->traccarCommandErrorMessage($resp),
+                'code' => $resp->responseCode ?? 0,
+            ], 502);
+        }
+
+        $code = (int) ($resp->responseCode ?? 0);
+        $message = $code === 202
+            ? 'Command queued. It will be delivered when the device is online.'
+            : 'Command sent to the device.';
+
+        return response()->json([
+            'message' => $message,
+            'queued' => $code === 202,
+            'result' => json_decode($resp->response ?? 'null'),
+        ]);
+    }
+
+    private function traccarCommandErrorMessage(\stdClass $resp): string
+    {
+        $body = trim((string) ($resp->response ?? ''));
+        if ($body !== '') {
+            $decoded = json_decode($body, true);
+            if (is_array($decoded)) {
+                return (string) ($decoded['message'] ?? $decoded['error'] ?? 'Traccar rejected the command.');
+            }
+            if (stripos($body, 'Failed to send command') !== false) {
+                return 'Device is offline or this command type is not supported. Uncheck "No queue" to queue it, or try Custom command.';
+            }
+
+            return \Illuminate\Support\Str::limit(trim(strip_tags($body)), 300);
+        }
+
+        return $resp->error ?: 'Failed to send command to Traccar.';
     }
 }

@@ -98,7 +98,20 @@
               </tr>
             </thead>
             <tbody>
-                  <tr v-for="row in pagedRows" :key="row.deviceId + '_' + row.vehicleId">
+              <tr v-if="loading">
+                <td colspan="9" class="text-center py-4">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </td>
+              </tr>
+              <tr v-else-if="!hasSearched">
+                <td colspan="9" class="text-center py-4 text-muted">Select filters and click <strong>Search</strong> to load the report.</td>
+              </tr>
+              <tr v-else-if="pagedRows.length === 0">
+                <td colspan="9" class="text-center py-4 text-muted">No incidents found.</td>
+              </tr>
+                  <tr v-else v-for="row in pagedRows" :key="row.deviceId + '_' + row.vehicleId">
                 <td class="ps-3">{{ row.vehicleId }}</td>
                 <td>{{ row.typeModel }}</td>
                     <td>{{ formatDateTime(row.incidentStart) }}</td>
@@ -131,20 +144,24 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { hasPermission } from '../../auth';
 import { formatDateTime } from '../../utils/datetime';
+import { todayDateString } from '../../utils/reportDates';
+import { createCancellableRequest, isRequestAborted } from '../../utils/cancellableRequest';
 
 const hasPerm = (m, a) => hasPermission(m, a);
 const showInfo = ref(false);
-const fromDate = ref(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
-const toDate = ref(new Date().toISOString().slice(0, 10));
+const fromDate = ref(todayDateString());
+const toDate = ref(todayDateString());
 const filterVehicleId = ref('');
 const deviceOptions = ref([]);
 const alert = ref({ message: '', type: '' });
 const loading = ref(false);
+const hasSearched = ref(false);
+const reportRequest = createCancellableRequest();
 const rows = ref([]);
 const page = ref(1);
 const pageSize = ref(10);
@@ -169,18 +186,23 @@ async function loadDeviceOptions() {
 
 async function fetchIncidents() {
   loading.value = true;
+  hasSearched.value = true;
   rows.value = [];
+  const signal = reportRequest.nextSignal();
   try {
     const params = { from_date: fromDate.value, to_date: toDate.value, vehicle_id: filterVehicleId.value };
-    const res = await axios.get('/web/reports/incidents', { params });
+    const res = await axios.get('/web/reports/incidents', { params, signal });
     rows.value = res.data.rows || [];
     page.value = 1;
     alert.value = { message: '', type: '' };
   } catch (e) {
+    if (isRequestAborted(e)) return;
     console.error('Failed to fetch incidents', e);
     alert.value = { message: 'Failed to fetch incidents.', type: 'danger' };
   } finally {
-    loading.value = false;
+    if (!signal.aborted) {
+      loading.value = false;
+    }
   }
 }
 
@@ -205,7 +227,10 @@ function exportExcel(row) {
 
 onMounted(async () => {
   await loadDeviceOptions();
-  fetchIncidents();
+});
+
+onBeforeUnmount(() => {
+  reportRequest.cancel();
 });
 </script>
 

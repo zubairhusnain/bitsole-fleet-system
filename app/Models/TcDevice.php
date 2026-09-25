@@ -87,7 +87,7 @@ class TcDevice extends Model
 
                 // Merge Fuel Key
                 $fuelAttr = $attributes['fuelAttr'] ?? null;
-                if ($fuelAttr && !empty($vmAttrs['fuel']) && is_array($vmAttrs['fuel'])) {
+                if ($fuelAttr && strtolower(trim((string) $fuelAttr)) !== 'none' && ! empty($vmAttrs['fuel']) && is_array($vmAttrs['fuel'])) {
                     foreach ($vmAttrs['fuel'] as $item) {
                         if (($item['name'] ?? '') === $fuelAttr) {
                             $attributes['fuelAttr_key'] = $item['key'] ?? null;

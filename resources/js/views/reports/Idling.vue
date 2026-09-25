@@ -81,10 +81,20 @@
             </select>
           </div>
           <div class="col-12 col-md-3">
-            <button class="btn btn-app-dark w-100" @click="fetchReport" :disabled="loading">
-                <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
-                Submit
-            </button>
+            <div class="d-flex flex-column gap-2">
+              <button class="btn btn-app-dark w-100" @click="fetchReport" :disabled="loading">
+                  <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
+                  Submit
+              </button>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary flex-fill" :disabled="!canExport" @click="downloadCsv">
+                  <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                </button>
+                <button type="button" class="btn btn-outline-secondary flex-fill" :disabled="!canExport" @click="downloadPdf">
+                  <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -136,6 +146,9 @@
                     <span class="visually-hidden">Loading...</span>
                   </div>
                 </td>
+              </tr>
+              <tr v-else-if="!hasSearched">
+                <td colspan="7" class="text-center py-4 text-muted">Select filters and click <strong>Search</strong> to load the report.</td>
               </tr>
               <tr v-else-if="filteredRows.length === 0">
                 <td colspan="7" class="text-center py-4">No idling events found.</td>
@@ -195,19 +208,44 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import UiAlert from '../../components/UiAlert.vue';
 import axios from 'axios';
 import { formatDate, formatTime, getActiveTimezone } from '../../utils/datetime';
+import { todayDateString } from '../../utils/reportDates';
+import { openReportExport } from '../../utils/reportExport';
+import { createCancellableRequest, isRequestAborted } from '../../utils/cancellableRequest';
 const showInfo = ref(false);
 const devices = ref([]);
 const selectedDevice = ref('');
-const fromDate = ref(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
-const toDate = ref(new Date().toISOString().slice(0, 10));
+const fromDate = ref(todayDateString());
+const toDate = ref(todayDateString());
 const timeFilter = ref('>120'); // Default > 2 mins
 const loading = ref(false);
+const hasSearched = ref(false);
+const reportRequest = createCancellableRequest();
 const errorMessage = ref(null);
 const reportData = ref([]);
+
+const canExport = computed(() => Boolean(fromDate.value && toDate.value));
+
+function exportParams() {
+  const params = {
+    from_date: fromDate.value,
+    to_date: toDate.value,
+    tz: getActiveTimezone(),
+  };
+  if (selectedDevice.value) params.device_ids = [selectedDevice.value];
+  return params;
+}
+function downloadCsv() {
+  if (!canExport.value) return;
+  openReportExport('/web/reports/idling/export-csv', exportParams());
+}
+function downloadPdf() {
+  if (!canExport.value) return;
+  openReportExport('/web/reports/idling/export-pdf', exportParams());
+}
 
 // Pagination
 const currentPage = ref(1);
@@ -287,8 +325,6 @@ async function loadDevices() {
         devices.value = res.data.options || [];
         if (devices.value.length > 0) {
             selectedDevice.value = devices.value[0].id;
-            // Auto-fetch report on load
-            fetchReport();
         }
     } catch (e) {
         console.error('Failed to load devices', e);
@@ -298,40 +334,54 @@ async function loadDevices() {
 async function fetchReport() {
     if (!selectedDevice.value) return;
 
+    hasSearched.value = true;
     loading.value = true;
     errorMessage.value = null;
     reportData.value = [];
     currentPage.value = 1;
 
+    const signal = reportRequest.nextSignal();
     try {
         const res = await axios.get('/web/reports/idling', {
             params: {
                 from_date: fromDate.value,
                 to_date: toDate.value,
                 device_ids: [selectedDevice.value]
-            }
+            },
+            signal,
         });
         const raw = Array.isArray(res.data) ? res.data : [];
         reportData.value = raw.map((r) => {
             const startMs = typeof r.startEpoch === 'number' ? r.startEpoch * 1000 : null;
             const endMs = typeof r.endEpoch === 'number' ? r.endEpoch * 1000 : null;
+            const tripStartMs = typeof r.tripStartEpoch === 'number' ? r.tripStartEpoch * 1000 : null;
+            const tripEndMs = typeof r.tripEndEpoch === 'number' ? r.tripEndEpoch * 1000 : null;
             return {
                 ...r,
                 date: startMs ? formatDate(startMs) : r.date,
                 startTime: startMs ? formatTime(startMs) : r.startTime,
-                endTime: endMs ? formatTime(endMs) : r.endTime
+                endTime: endMs ? formatTime(endMs) : r.endTime,
+                tripStartTime: tripStartMs ? formatTime(tripStartMs) : r.tripStartTime,
+                tripEndTime: tripEndMs ? formatTime(tripEndMs) : r.tripEndTime
             };
         });
     } catch (e) {
+        if (isRequestAborted(e)) return;
         console.error('Failed to fetch idling report', e);
         errorMessage.value = e.response?.data?.message || 'Failed to fetch report data';
     } finally {
-        loading.value = false;
+        if (!signal.aborted) {
+            loading.value = false;
+        }
     }
 }
 
 onMounted(() => {
     loadDevices();
+});
+
+onBeforeUnmount(() => {
+    reportRequest.cancel();
 });
 </script>
 

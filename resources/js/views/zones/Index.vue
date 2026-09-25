@@ -70,7 +70,7 @@
             </div>
           </div>
           <div class="col-sm-12 col-md-3 col-lg-2 d-flex align-items-end">
-            <button class="btn btn-primary w-auto" @click="fetchZones">Submit</button>
+            <button class="btn btn-app-dark w-auto" @click="() => fetchZones({ resetPage: true })">Search</button>
           </div>
         </div>
       </div>
@@ -169,9 +169,7 @@ function formatNumber(n) {
 
 // Table data and pagination
 const page = ref(1);
-const pageSize = ref(16);
-const totalCount = ref(0);
-const totalPages = ref(1);
+const pageSize = ref(10);
 const rows = ref([]);
 const loading = ref(false);
 const message = ref('');
@@ -196,14 +194,17 @@ const filteredRows = computed(() => {
   }
   return list;
 });
+const totalCount = computed(() => filteredRows.value.length);
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
 const pagedRows = computed(() => filteredRows.value.slice(startIndex.value, startIndex.value + pageSize.value));
 
 function goPage(n) {
+  if (n < 1 || n > totalPages.value) return;
   page.value = n;
-  fetchZones();
 }
-function prevPage() { if (page.value > 1) { page.value -= 1; fetchZones(); } }
-function nextPage() { if (page.value < totalPages.value) { page.value += 1; fetchZones(); } }
+
+function prevPage() { goPage(page.value - 1); }
+function nextPage() { goPage(page.value + 1); }
 
 function statusClass(s) {
   return s === 'Active' ? 'is-on' : 'is-off';
@@ -225,28 +226,22 @@ function mapRow(z) {
   };
 }
 
-async function fetchZones() {
+async function fetchZones({ resetPage = false } = {}) {
+  if (resetPage) page.value = 1;
   loading.value = true;
   error.value = '';
   try {
-    // Backend uses page size 25; we page client-side at 16 to fit UI.
-    const params = {};
-    params.page = page.value;
+    const params = { page: 1, per_page: 500 };
     if (showBlocked.value) params.withDeleted = 1;
     const { data } = await axios.get('/web/zones', { params });
     const list = Array.isArray(data?.data) ? data.data : [];
     rows.value = list.map(mapRow);
-    // Apply client-side filters to align with UI when backend name filter is unavailable
-    const filtered = filteredRows.value;
-    totalCount.value = filtered.length;
-    const serverTotalPages = Number(data?.last_page || 1);
-    // Mirror UI pagination count to show enough pages
-    totalPages.value = Math.max(1, Math.ceil(totalCount.value / pageSize.value));
-    // Summary cards
-    summaryCards.value[0].value = totalCount.value;
-    const activeCount = filtered.filter(r => r.status === 'Active').length;
+    if (page.value > totalPages.value) page.value = totalPages.value;
+    const allRows = rows.value;
+    summaryCards.value[0].value = allRows.length;
+    const activeCount = allRows.filter(r => r.status === 'Active').length;
     summaryCards.value[1].value = activeCount;
-    summaryCards.value[2].value = totalCount.value - activeCount;
+    summaryCards.value[2].value = allRows.length - activeCount;
   } catch (e) {
     error.value = e?.response?.data?.message || 'Failed to load zones';
   } finally {

@@ -117,11 +117,17 @@
         <div class="card-body">
             <div class="fw-semibold mb-2">Search Option</div>
             <div class="row g-2 align-items-end">
-                <div class="col-md-5">
+                <div class="col-md-4">
                     <label class="form-label small">Vehicle</label>
                     <input type="text" class="form-control" placeholder="Search Vehicle ID" v-model="searchQuery">
                 </div>
-                <div class="col-md-5">
+                <div class="col-md-2">
+                    <label class="form-label small">Per Page</label>
+                    <select class="form-select" v-model.number="selectedPerPage" @change="onPerPageChange">
+                        <option v-for="n in perPageOptions" :key="n" :value="n">{{ n }}</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
                     <label class="form-label small">Auto Refresh (sec / min)</label>
                     <div class="d-flex gap-0 bg-light rounded overflow-hidden">
                         <button
@@ -137,7 +143,7 @@
                     </div>
                 </div>
                 <div class="col-md-2">
-                    <button class="btn btn-primary w-100 text-white" @click="applySearch">Submit</button>
+                    <button class="btn btn-app-dark w-100" @click="applySearch">Search</button>
                 </div>
             </div>
         </div>
@@ -216,7 +222,7 @@
         <!-- Pagination -->
         <div class="card-footer d-flex align-items-center py-2">
             <div class="text-muted small me-auto">
-                Showing {{ paginationStart }} to {{ paginationEnd }} of {{ filteredVehicles.length }} results
+                Showing {{ paginationStart }} to {{ paginationEnd }} of {{ totalResults }} results
             </div>
             <nav aria-label="Page navigation" class="ms-auto">
                 <ul class="pagination pagination-sm mb-0 pagination-app">
@@ -257,8 +263,9 @@
                          class="list-group-item list-group-item-action d-flex justify-content-between align-items-center cursor-pointer"
                          @click="selectAlert(alert)">
                          <div>
-                             <div class="fw-bold">{{ alert.type }}</div>
+                             <div class="fw-bold">{{ formatAlertMessage(alert) }}</div>
                              <div class="small text-muted">{{ formatDate(alert.eventtime) }}</div>
+                             <span class="badge bg-light text-dark mt-1">{{ formatAlertTitle(alert.type) }}</span>
                          </div>
                          <i class="bi bi-chevron-right text-muted"></i>
                      </li>
@@ -276,9 +283,14 @@
                      <div class="fw-medium">{{ formatDate(selectedAlert.eventtime) }}</div>
                  </div>
 
+                 <div class="mb-3">
+                     <label class="small text-muted d-block">Alert Message</label>
+                     <div class="fw-medium">{{ formatAlertMessage(selectedAlert) }}</div>
+                 </div>
+
                  <div class="mb-4">
                      <label class="small text-muted d-block">Alert Type</label>
-                     <div class="fw-medium text-danger">{{ selectedAlert.type }}</div>
+                     <div class="fw-medium text-danger">{{ formatAlertTitle(selectedAlert.type) }}</div>
                  </div>
 
                  <h6 class="fw-bold mb-3">Alert Acknowledgement</h6>
@@ -448,7 +460,10 @@ import { useRouter } from 'vue-router';
 import { hasPermission } from '../../auth';
 import UiAlert from '../../components/UiAlert.vue';
 import { formatDateTime } from '../../utils/datetime';
-import { formatSpeed } from '../../utils/telemetry';
+import { formatNotificationTitle, formatAlertMessage } from '../../utils/notificationTitles';
+import { formatSpeed, formatTelemetry } from '../../utils/telemetry';
+
+const formatAlertTitle = formatNotificationTitle;
 
 const router = useRouter();
 
@@ -458,7 +473,8 @@ const loading = ref(true);
 const error = ref('');
 const searchQuery = ref('');
 const refreshOptions = ['30s', '1m', '2m', '3m', '4m', '5m', '10m', 'Off'];
-const selectedRefresh = ref(7); // Default Off
+const DEFAULT_REFRESH_INDEX = 5; // 5m
+const selectedRefresh = ref(DEFAULT_REFRESH_INDEX);
 const refreshInterval = ref(null);
 const selectedVehicle = ref(null);
 const showDetailsModal = ref(false);
@@ -478,9 +494,12 @@ const selectedMaintenanceStatus = ref('');
 const alertStatusTargetId = ref(null);
 const submittingStatus = ref(false);
 
-// Pagination
+// Pagination (server-side)
+const perPageOptions = [10, 25, 50, 75, 100];
+const selectedPerPage = ref(10);
 const currentPage = ref(1);
-const itemsPerPage = 16;
+const totalResults = ref(0);
+const lastPage = ref(1);
 
 const stats = ref({
     total: 0,
@@ -493,27 +512,10 @@ const stats = ref({
     alerts: 0
 });
 
-// Filtering & Pagination
-const filteredVehicles = computed(() => {
-    let res = vehicles.value;
-    if (searchQuery.value) {
-        const q = searchQuery.value.toLowerCase();
-        res = res.filter(v =>
-            v.name.toLowerCase().includes(q) ||
-            v.uniqueid.toLowerCase().includes(q) ||
-            (v.driver_name && v.driver_name.toLowerCase().includes(q))
-        );
-    }
-    return res;
-});
-
-const totalPages = computed(() => Math.ceil(filteredVehicles.value.length / itemsPerPage));
-
-const paginatedVehicles = computed(() => {
-    const start = (currentPage.value - 1) * itemsPerPage;
-    const end = start + itemsPerPage;
-    return filteredVehicles.value.slice(start, end);
-});
+// Server returns one page at a time; stats cards still cover the full fleet.
+const filteredVehicles = computed(() => vehicles.value);
+const paginatedVehicles = computed(() => filteredVehicles.value);
+const totalPages = computed(() => Math.max(1, lastPage.value));
 
 const visiblePages = computed(() => {
     const pages = [];
@@ -534,10 +536,18 @@ const visiblePages = computed(() => {
     return pages;
 });
 
-const paginationStart = computed(() => (currentPage.value - 1) * itemsPerPage + 1);
-const paginationEnd = computed(() => Math.min(currentPage.value * itemsPerPage, filteredVehicles.value.length));
+const paginationStart = computed(() => totalResults.value === 0 ? 0 : (currentPage.value - 1) * selectedPerPage.value + 1);
+const paginationEnd = computed(() => Math.min(currentPage.value * selectedPerPage.value, totalResults.value));
 
-// Methods
+// Methods — same odometer pattern as Live Tracking
+function odometerDisplay(deviceAttrs, vehicleAttrs, posAttrs, model) {
+    const mergedAttrs = { ...deviceAttrs, ...vehicleAttrs, ...posAttrs };
+    const configuredOdometerAttr = vehicleAttrs.odometerAttr || vehicleAttrs.odometer_attribute
+        || deviceAttrs.odometerAttr || deviceAttrs.odometer_attribute || null;
+    const tel = formatTelemetry(mergedAttrs, { protocol: null, model, preferNamedOdometer: true, odometerAttr: configuredOdometerAttr });
+    return tel?.odometer?.display ?? null;
+}
+
 const parseAttrs = (a) => {
     if (!a) return {};
     if (typeof a === 'object') return a;
@@ -562,21 +572,34 @@ const formatDate = (dateStr) => {
     return formatDateTime(dateStr);
 };
 
-const fetchVehicles = async () => {
+const fetchVehicles = async (page = currentPage.value) => {
+    loading.value = true;
     try {
         error.value = '';
-        const { data } = await axios.get('/web/monitoring/vehicles', { params: { per_page: 50 } });
+        const { data } = await axios.get('/web/monitoring/vehicles', {
+            params: {
+                per_page: selectedPerPage.value,
+                page,
+                with_ignition_times: 0,
+                search: searchQuery.value.trim() || undefined,
+            },
+        });
         const list = Array.isArray(data) ? data : (data.data ?? []);
 
         if (data.stats) {
             stats.value = data.stats;
         }
 
+        totalResults.value = data.total ?? list.length;
+        lastPage.value = data.last_page ?? 1;
+        currentPage.value = data.current_page ?? page;
+
         vehicles.value = list.map(v => {
             const tc = v.tc_device || v.tcDevice || {};
             const pos = tc.position || {};
             const attrs = parseAttrs(pos.attributes);
             const deviceAttrs = parseAttrs(tc.attributes);
+            const vehicleAttrs = parseAttrs(v.attributes);
 
             // Extract vehicle_id from attributes, prioritizing vehicleNo
             const vehicleId = deviceAttrs.vehicleNo || deviceAttrs.vehicle_id || deviceAttrs.vehicleId || deviceAttrs.vehicleID || null;
@@ -594,7 +617,7 @@ const fetchVehicles = async () => {
                 driver_name: v.driver_name || tc.driverUniqueId || 'N/A',
                 last_update: formatDate(pos.servertime || pos.fixtime),
                 fuel: attrs.fuel || 0,
-                odometer: attrs.odometer || 0,
+                odometer: odometerDisplay(deviceAttrs, vehicleAttrs, attrs, tc.model || v.model),
                 ignition: attrs.ignition || false,
                 group: v.group || 'Default Group',
                 model: tc.model || v.model || 'Unknown',
@@ -619,7 +642,12 @@ const fetchVehicles = async () => {
 };
 
 const applySearch = () => {
+    fetchVehicles(1);
+};
+
+const onPerPageChange = () => {
     currentPage.value = 1;
+    fetchVehicles(1);
 };
 
 const setupAutoRefresh = (val) => {
@@ -650,7 +678,7 @@ watch(selectedRefresh, (val) => {
 
 const changePage = (page) => {
     if (page >= 1 && page <= totalPages.value) {
-        currentPage.value = page;
+        fetchVehicles(page);
     }
 };
 
@@ -668,6 +696,7 @@ const showDetails = async (vehicle) => {
         const pos = tc.position || {};
         const attrs = parseAttrs(pos.attributes);
         const deviceAttrs = parseAttrs(tc.attributes);
+        const vehicleAttrs = parseAttrs(data.attributes);
         const allAttrs = { ...deviceAttrs, ...attrs };
 
         // Speed Logic
@@ -730,7 +759,7 @@ const showDetails = async (vehicle) => {
             driver_name: data.driver_name || tc.driverUniqueId || 'N/A',
             last_update: formatDate(pos.servertime || pos.fixtime),
             fuel: attrs.fuel || 0,
-            odometer: attrs.odometer || 0,
+            odometer: odometerDisplay(deviceAttrs, vehicleAttrs, attrs, tc.model || data.model),
             ignition: attrs.ignition || false,
             group: data.group || 'Default Group',
             model: tc.model || data.model || 'Unknown',
@@ -870,13 +899,12 @@ onMounted(() => {
                 setupAutoRefresh(idx);
             }
         } else {
-             // Default 30s (Index 0)
-            selectedRefresh.value = 0;
-            setupAutoRefresh(0);
+            selectedRefresh.value = DEFAULT_REFRESH_INDEX;
+            setupAutoRefresh(DEFAULT_REFRESH_INDEX);
         }
     } catch {
-        selectedRefresh.value = 0;
-        setupAutoRefresh(0);
+        selectedRefresh.value = DEFAULT_REFRESH_INDEX;
+        setupAutoRefresh(DEFAULT_REFRESH_INDEX);
     }
 });
 

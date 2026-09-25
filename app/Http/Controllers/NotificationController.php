@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Events\DeleteAlertEvent;
 use App\Models\Devices;
 use App\Models\User;
+use App\Support\AlertTypes;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use App\Events\AlertsUpdated;
 
@@ -19,53 +21,155 @@ class NotificationController extends Controller
         }
         return response()->json(['ok' => true]);
     }
-
+ 
     public function events(Request $request)
     {
         $user = $request->user();
 
-        if ($user && ($user->isAdmin() || $user->isDistributor())) {
-            return response()->json([]);
+        $deviceIds = Devices::accessibleByUser($user)
+            ->pluck('device_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($deviceIds)) {
+            $perPage = max(1, min(500, (int) $request->input('per_page', 25)));
+
+            return response()->json([
+                'data' => [],
+                'current_page' => 1,
+                'last_page' => 1,
+                'per_page' => $perPage,
+                'total' => 0,
+                'from' => null,
+                'to' => null,
+            ]);
         }
 
-        // Scope devices for this user
-        $query = Devices::accessibleByUser($user);
-        $deviceIds = $query->pluck('device_id')->toArray();
-
-        // Retrieve events using Eloquent with relations and scope
-        $events = \App\Models\TcEvent::with(['device', 'notifications.devices'])
+        $eventsQuery = \App\Models\TcEvent::query()
+            ->select([
+                'tc_events.id',
+                'tc_events.type',
+                'tc_events.eventtime',
+                'tc_events.deviceid',
+                'tc_events.positionid',
+                'tc_events.attributes',
+                'tc_events.is_read',
+            ])
+            ->with(['device:id,name', 'position:id,latitude,longitude,address'])
             ->whereIn('deviceid', $deviceIds)
-            ->withEnabledNotifications()
-            ->distinct('id')
-            ->orderBy('id', 'desc')
-            ->limit(100)
-            ->get();
+            ->withEnabledNotifications();
 
-        // Transform to match expected JSON structure
-        $mappedEvents = $events->map(function ($event) {
-            // Find the notification definition that is assigned to this device
-            // Since we used withEnabledNotifications (strict), there should be one.
-            $notification = $event->notifications->first(function ($n) use ($event) {
-                return $n->devices->contains('id', $event->deviceid);
+        $deviceId = (int) $request->input('device_id', 0);
+        if ($deviceId > 0 && in_array($deviceId, $deviceIds, true)) {
+            $eventsQuery->where('deviceid', $deviceId);
+        }
+
+        $types = $this->resolveEventTypeFilters($request);
+        if ($types !== []) {
+            $eventsQuery->where(function ($q) use ($types) {
+                foreach ($types as $type) {
+                    $q->orWhere(function ($inner) use ($type) {
+                        $inner->where('type', $type);
+                        if ($type !== 'alarm') {
+                            $inner->orWhere(function ($alarm) use ($type) {
+                                $alarm->where('type', 'alarm')
+                                    ->whereRaw("CAST(attributes AS json)->>'alarm' = ?", [$type]);
+                            });
+                        }
+                    });
+                }
             });
+        }
+ 
+        $dateFrom = trim((string) $request->input('date_from', ''));
+        $dateTo = trim((string) $request->input('date_to', ''));
+        if ($dateFrom !== '' || $dateTo !== '') {
+            try {
+                $from = $dateFrom !== '' ? $this->parseEventFilterDate($dateFrom, true) : null;
+                $to = $dateTo !== '' ? $this->parseEventFilterDate($dateTo, false) : null;
+                if ($from && $to) {
+                    $eventsQuery->whereBetween('eventtime', [$from, $to]);
+                } elseif ($from) {
+                    $eventsQuery->where('eventtime', '>=', $from);
+                } elseif ($to) {
+                    $eventsQuery->where('eventtime', '<=', $to);
+                }
+            } catch (\Throwable $e) {
+            }
+        }
 
-            return array_merge($event->toArray(), [
-                'device_name' => $event->device->name ?? null,
-                'notification_type' => $event->type,
-                'notification_attributes' => $notification ? $notification->attributes : null,
-            ]);
-        });
+        $perPage = (int) $request->input('per_page', (int) $request->input('limit', 25));
+        if ($perPage < 1) {
+            $perPage = 1;
+        }
+        if ($perPage > 500) {
+            $perPage = 500;
+        }
 
-        return response()->json($mappedEvents);
+        $page = max(1, (int) $request->input('page', 1));
+
+        $paginator = $eventsQuery
+            ->orderByDesc('tc_events.id')
+            ->paginate($perPage, ['*'], 'page', $page);
+
+        $paginator->through(fn ($event) => [
+            'id' => $event->id,
+            'type' => $event->type,
+            'eventtime' => $event->eventtime,
+            'deviceid' => $event->deviceid,
+            'positionid' => $event->positionid,
+            'attributes' => $event->attributes,
+            'is_read' => $event->is_read,
+            'device_name' => $event->device->name ?? null,
+            'notification_type' => $event->type,
+            'notification_attributes' => null,
+            'latitude' => $event->position->latitude ?? null,
+            'longitude' => $event->position->longitude ?? null,
+            'address' => $event->position->address ?? null,
+        ]);
+
+        return response()->json($paginator);
+    }
+
+    public function deviceOptions(Request $request)
+    {
+        $user = $request->user();
+
+        $devices = Devices::accessibleByUser($user)
+            ->with(['tcDevice'])
+            ->get()
+            ->map(function ($d) {
+                $tc = $d->tcDevice;
+                $name = data_get($tc, 'name', data_get($d, 'name', null));
+                return [
+                    'id' => (int) $d->device_id,
+                    'name' => $name ?: ('Vehicle #' . (int) $d->device_id),
+                ];
+            })
+            ->sortBy(function ($d) {
+                return mb_strtolower((string) ($d['name'] ?? ''));
+            })
+            ->values();
+
+        return response()->json($devices);
+    }
+
+    public function typeOptions(Request $request)
+    {
+        $user = $request->user();
+        $deviceIds = Devices::accessibleByUser($user)->pluck('device_id')->toArray();
+
+        return response()->json([
+            'types' => AlertTypes::forUserDevices($deviceIds, $user?->id),
+            'labels' => AlertTypes::labels(),
+        ]);
     }
 
     public function unreadCount(Request $request)
     {
         $user = $request->user();
-
-        if ($user && ($user->isAdmin() || $user->isDistributor())) {
-            return response()->json(['count' => 0]);
-        }
 
         // Scope devices for this user
         $query = Devices::accessibleByUser($user);
@@ -82,10 +186,6 @@ class NotificationController extends Controller
     public function markAllRead(Request $request)
     {
         $user = $request->user();
-
-        if ($user && ($user->isAdmin() || $user->isDistributor())) {
-            return response()->json(['success' => true]);
-        }
 
         // Scope devices for this user
         $query = Devices::accessibleByUser($user);
@@ -104,10 +204,6 @@ class NotificationController extends Controller
     {
         $user = $request->user();
 
-        if ($user && ($user->isAdmin() || $user->isDistributor())) {
-            return response()->json([]);
-        }
-
         $query = Devices::accessibleByUser($user);
         $deviceIds = $query->pluck('device_id')->toArray();
 
@@ -117,10 +213,6 @@ class NotificationController extends Controller
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
-
-        if ($user && ($user->isAdmin() || $user->isDistributor())) {
-            return response()->json(['message' => 'Notification deleted']);
-        }
 
         // Check if event exists using Eloquent
         $event = \App\Models\TcEvent::find($id);
@@ -188,5 +280,40 @@ class NotificationController extends Controller
         }
         $resp = $this->permissionService->assignNotification($request, $deviceId, $notificationId);
         return response()->json(['response' => $resp]);
+    }
+
+    private function parseEventFilterDate(string $value, bool $isStart): Carbon
+    {
+        $tz = config('app.timezone', 'UTC');
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            $parsed = Carbon::parse($value, $tz);
+
+            return ($isStart ? $parsed->copy()->startOfDay() : $parsed->copy()->endOfDay())->utc();
+        }
+
+        return Carbon::parse($value, $tz)->utc();
+    }
+
+    /** @return list<string> */
+    private function resolveEventTypeFilters(Request $request): array
+    {
+        $raw = $request->input('types', $request->input('type'));
+
+        if ($raw === null || $raw === '') {
+            return [];
+        }
+
+        $values = is_array($raw) ? $raw : explode(',', (string) $raw);
+
+        $types = [];
+        foreach ($values as $value) {
+            $type = trim((string) $value);
+            if ($type !== '') {
+                $types[] = $type;
+            }
+        }
+
+        return array_values(array_unique($types));
     }
 }

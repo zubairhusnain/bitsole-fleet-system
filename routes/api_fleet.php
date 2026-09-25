@@ -93,6 +93,9 @@ Route::middleware($sanctumFleet)->prefix('vehicles')->group(function () {
     Route::get('/{deviceId}/driver', [VehicleController::class, 'driver']);
     Route::get('/{deviceId}/rating', [VehicleController::class, 'rating']);
     Route::get('/{deviceId}/performance', [VehicleController::class, 'performance']);
+    Route::get('/{deviceId}/commands', [VehicleController::class, 'commands']);
+    Route::get('/{deviceId}/commands/history', [VehicleController::class, 'commandHistory']);
+    Route::post('/{deviceId}/commands/send', [VehicleController::class, 'sendCommand']);
     Route::put('/{deviceId}', [VehicleController::class, 'update']);
     Route::patch('/{deviceId}/restore', [VehicleController::class, 'restore']);
     Route::delete('/{deviceId}', [VehicleController::class, 'destroy']);
@@ -178,6 +181,8 @@ Route::middleware($sanctumAuth)->get('/tracking/assign-computed-attributes', fun
 Route::middleware([$sanctumAuth, ApiFleetNotificationAccess::class])->prefix('notifications')->group(function () {
     Route::get('/broadcast', [NotificationController::class, 'broadcast']);
     Route::get('/events', [NotificationController::class, 'events']);
+    Route::get('/device-options', [NotificationController::class, 'deviceOptions']);
+    Route::get('/type-options', [NotificationController::class, 'typeOptions']);
     Route::get('/unread-count', [NotificationController::class, 'unreadCount']);
     Route::post('/mark-read', [NotificationController::class, 'markAllRead']);
     Route::get('/my-device-ids', [NotificationController::class, 'myDeviceIds']);
@@ -190,18 +195,33 @@ Route::middleware([$sanctumAuth, ApiFleetNotificationAccess::class])->prefix('no
 
 Route::middleware($sanctumFleet)->prefix('reports')->group(function () {
     Route::get('/trip-summary', [ReportController::class, 'tripSummary']);
+    Route::get('/trip-summary/export-pdf', [ReportController::class, 'exportTripSummaryPdf']);
+    Route::get('/trip-summary/export-csv', [ReportController::class, 'exportTripSummaryCsv']);
     Route::get('/daily-trips', [ReportController::class, 'dailyTrips']);
     Route::get('/daily-summary', [ReportController::class, 'dailySummary']);
+    Route::get('/daily-summary/export-pdf', [ReportController::class, 'exportDailySummaryPdf']);
+    Route::get('/daily-summary/export-csv', [ReportController::class, 'exportDailySummaryCsv']);
     Route::get('/monthly-summary', [ReportController::class, 'monthlySummary']);
+    Route::get('/monthly-summary/export-pdf', [ReportController::class, 'exportMonthlySummaryPdf']);
+    Route::get('/monthly-summary/export-csv', [ReportController::class, 'exportMonthlySummaryCsv']);
     Route::get('/fuel-detailed', [ReportController::class, 'fuelDetailed']);
     Route::get('/asset-activity', [ReportController::class, 'assetActivity']);
+    Route::get('/asset-activity/export-pdf', [ReportController::class, 'exportAssetActivityPdf']);
+    Route::get('/asset-activity/export-csv', [ReportController::class, 'exportAssetActivityCsv']);
     Route::get('/vehicle-activity', [ReportController::class, 'vehicleActivity']);
+    Route::get('/vehicle-activity/export-pdf', [ReportController::class, 'exportVehicleActivityPdf']);
+    Route::get('/vehicle-activity/export-csv', [ReportController::class, 'exportVehicleActivityCsv']);
     Route::get('/idling', [ReportController::class, 'idling']);
+    Route::get('/idling/export-pdf', [ReportController::class, 'exportIdlingPdf']);
+    Route::get('/idling/export-csv', [ReportController::class, 'exportIdlingCsv']);
     Route::get('/utilisation', [ReportController::class, 'utilisation']);
     Route::get('/utilisation-db', [ReportController::class, 'utilisationDb']);
+    Route::get('/utilisation-db/export-pdf', [ReportController::class, 'exportUtilisationPdf']);
+    Route::get('/utilisation-db/export-csv', [ReportController::class, 'exportUtilisationCsv']);
     Route::get('/daily-breakdown-map', [ReportController::class, 'dailyBreakdownMap']);
     Route::get('/vehicle-status', [ReportController::class, 'vehicleStatus']);
     Route::get('/vehicle-status/export-pdf', [ReportController::class, 'exportVehicleStatusPdf']);
+    Route::get('/vehicle-status/export-csv', [ReportController::class, 'exportVehicleStatusCsv']);
     Route::get('/device-options', [ReportController::class, 'deviceOptions']);
     Route::get('/group-options', [ReportController::class, 'groupOptions']);
     Route::get('/incidents', [ReportController::class, 'incidents']);
@@ -209,8 +229,8 @@ Route::middleware($sanctumFleet)->prefix('reports')->group(function () {
     Route::get('/incidents/export-pdf', [ReportController::class, 'exportIncidentsPdf']);
     Route::get('/incidents/export-excel', [ReportController::class, 'exportIncidentsExcel']);
     Route::get('/vehicle-ranking', [ReportController::class, 'vehicleRanking']);
-    Route::get('/effective-fuel', [ReportController::class, 'effectiveFuel']);
-    Route::get('/route-playback', [ReportController::class, 'routePlayback']);
+    Route::get('/vehicle-ranking/export-pdf', [ReportController::class, 'exportVehicleRankingPdf']);
+    Route::get('/vehicle-ranking/export-csv', [ReportController::class, 'exportVehicleRankingCsv']);
 });
 
 Route::middleware($sanctumFleet)->prefix('commands')->group(function () {

@@ -52,7 +52,8 @@ class ZoneController extends Controller
         // Name-based search removed; local table no longer stores name
 
         // Include creator user relation so UI can show creator username
-        $zones = $query->with('user')->orderByDesc('id')->paginate(25);
+        $perPage = max(1, min((int) $request->query('per_page', 25), 500));
+        $zones = $query->with('user')->orderByDesc('id')->paginate($perPage);
         // Enrich with Traccar geofence name/description/status/speed following driver pattern
         try {
             $ids = collect($zones->items())->map(fn($z) => (int) ($z->geofence_id ?? 0))->filter(fn($id) => $id > 0)->unique()->values();

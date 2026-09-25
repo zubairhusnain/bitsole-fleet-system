@@ -27,7 +27,10 @@
                         <i class="bi bi-car-front fs-3 text-primary"></i>
                     </div>
                     <div class="text-muted small">No. of Vehicles</div>
-                    <h4 class="fw-bold mb-0">{{ stats.total }} Vehicles</h4>
+                    <div class="monitoring-stat-value">
+                        <span class="monitoring-stat-count">{{ stats.total }}</span>
+                        <span class="monitoring-stat-unit">Vehicles</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -38,7 +41,10 @@
                         <i class="bi bi-power fs-3 text-success"></i>
                     </div>
                     <div class="text-muted small">Ignition On</div>
-                    <h4 class="fw-bold mb-0">{{ stats.ignitionOn }} Vehicles</h4>
+                    <div class="monitoring-stat-value">
+                        <span class="monitoring-stat-count">{{ stats.ignitionOn }}</span>
+                        <span class="monitoring-stat-unit">Vehicles</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -49,7 +55,10 @@
                         <i class="bi bi-power fs-3 text-danger"></i>
                     </div>
                     <div class="text-muted small">Ignition Off</div>
-                    <h4 class="fw-bold mb-0">{{ stats.ignitionOff }} Vehicles</h4>
+                    <div class="monitoring-stat-value">
+                        <span class="monitoring-stat-count">{{ stats.ignitionOff }}</span>
+                        <span class="monitoring-stat-unit">Vehicles</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -60,7 +69,10 @@
                         <i class="bi bi-speedometer fs-3 text-info"></i>
                     </div>
                     <div class="text-muted small">Moving</div>
-                    <h4 class="fw-bold mb-0">{{ stats.moving }} Vehicles</h4>
+                    <div class="monitoring-stat-value">
+                        <span class="monitoring-stat-count">{{ stats.moving }}</span>
+                        <span class="monitoring-stat-unit">Vehicles</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -71,7 +83,10 @@
                         <i class="bi bi-stop-circle fs-3 text-danger"></i>
                     </div>
                     <div class="text-muted small">Stop</div>
-                    <h4 class="fw-bold mb-0">{{ stats.stopped }} Vehicles</h4>
+                    <div class="monitoring-stat-value">
+                        <span class="monitoring-stat-count">{{ stats.stopped }}</span>
+                        <span class="monitoring-stat-unit">Vehicles</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -82,7 +97,10 @@
                         <i class="bi bi-pause-circle fs-3 text-warning"></i>
                     </div>
                     <div class="text-muted small">Idle</div>
-                    <h4 class="fw-bold mb-0">{{ stats.idle }} Vehicles</h4>
+                    <div class="monitoring-stat-value">
+                        <span class="monitoring-stat-count">{{ stats.idle }}</span>
+                        <span class="monitoring-stat-unit">Vehicles</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -93,7 +111,10 @@
                         <i class="bi bi-tools fs-3 text-info"></i>
                     </div>
                     <div class="text-muted small">Maintenance</div>
-                    <h4 class="fw-bold mb-0">{{ stats.maintenance }} Vehicles</h4>
+                    <div class="monitoring-stat-value">
+                        <span class="monitoring-stat-count">{{ stats.maintenance }}</span>
+                        <span class="monitoring-stat-unit">Vehicles</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -104,7 +125,10 @@
                         <i class="bi bi-exclamation-triangle fs-3 text-danger"></i>
                     </div>
                     <div class="text-muted small">Alerts</div>
-                    <h4 class="fw-bold mb-0">{{ stats.alerts }} Vehicles</h4>
+                    <div class="monitoring-stat-value">
+                        <span class="monitoring-stat-count">{{ stats.alerts }}</span>
+                        <span class="monitoring-stat-unit">Vehicles</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -115,11 +139,17 @@
         <div class="card-body">
             <div class="fw-semibold mb-2">Search Option</div>
             <div class="row g-2 align-items-end">
-                <div class="col-md-5">
+                <div class="col-md-4">
                     <label class="form-label small">Vehicle</label>
                     <input type="text" class="form-control" placeholder="Search Vehicle ID" v-model="searchQuery">
                 </div>
-                <div class="col-md-5">
+                <div class="col-md-2">
+                    <label class="form-label small">Per Page</label>
+                    <select class="form-select" v-model.number="selectedPerPage" @change="onPerPageChange">
+                        <option v-for="n in perPageOptions" :key="n" :value="n">{{ n }}</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
                     <label class="form-label small">Auto Refresh Sec/Min</label>
                     <div class="d-flex gap-0 bg-light rounded overflow-hidden">
                         <button
@@ -135,7 +165,7 @@
                     </div>
                 </div>
                 <div class="col-md-2">
-                    <button class="btn btn-primary w-100 text-white" @click="applySearch">Submit</button>
+                    <button class="btn btn-app-dark w-100" @click="applySearch">Search</button>
                 </div>
             </div>
         </div>
@@ -189,9 +219,9 @@
     </div>
 
     <!-- Pagination -->
-    <div class="d-flex justify-content-between align-items-center mb-4" v-if="!loading && filteredVehicles.length > 0">
+    <div class="d-flex justify-content-between align-items-center mb-4" v-if="!loading && totalResults > 0">
         <div class="text-muted small">
-            Showing {{ paginationStart }} to {{ paginationEnd }} of {{ filteredVehicles.length }} results
+            Showing {{ paginationStart }} to {{ paginationEnd }} of {{ totalResults }} results
         </div>
         <nav aria-label="Page navigation">
             <ul class="pagination pagination-sm mb-0 gap-1">
@@ -246,8 +276,11 @@ import { formatTelemetry, formatSpeed } from '../../utils/telemetry';
 const vehicles = ref([]);
 const loading = ref(true);
 const searchQuery = ref('');
+const perPageOptions = [10, 25, 50, 75, 100];
+const selectedPerPage = ref(10);
 const currentPage = ref(1);
-const itemsPerPage = 12; // Adjusted for grid layout (3x4)
+const totalResults = ref(0);
+const lastPage = ref(1);
 const showDetailsModal = ref(false);
 const selectedVehicle = ref(null);
 
@@ -265,22 +298,34 @@ const stats = ref({
 
 // Auto Refresh
 const refreshOptions = ['30s', '1m', '2m', '3m', '4m', '5m', '10m', 'Off'];
-const selectedRefresh = ref(0); // default 30s
+const DEFAULT_REFRESH_INDEX = 5; // 5m
+const selectedRefresh = ref(DEFAULT_REFRESH_INDEX);
 let refreshInterval = null;
 
 // Methods
-const fetchVehicles = async () => {
+const fetchVehicles = async (page = currentPage.value) => {
+    loading.value = true;
     try {
-        const { data } = await axios.get('/web/monitoring/vehicles', { params: { per_page: 50 } });
+        const { data } = await axios.get('/web/monitoring/vehicles', {
+            params: {
+                per_page: selectedPerPage.value,
+                page,
+                with_ignition_times: 1,
+                search: searchQuery.value.trim() || undefined,
+            },
+        });
         const list = Array.isArray(data) ? data : (data.data ?? []);
 
         if (data.stats) {
             stats.value = data.stats;
         }
 
+        totalResults.value = data.total ?? list.length;
+        lastPage.value = data.last_page ?? 1;
+        currentPage.value = data.current_page ?? page;
+
         vehicles.value = list.map(v => {
             const tc = v.tc_device || v.tcDevice || {};
-            console.log('device data list ',tc);
             const pos = tc.position || {};
             const attrs = parseAttrs(pos.attributes);
             const deviceAttrs = parseAttrs(tc.attributes);
@@ -321,32 +366,18 @@ const fetchVehicles = async () => {
             };
         });
         await verifyImages();
-        loading.value = false;
     } catch (e) {
         console.error('Failed to fetch vehicles', e);
+    } finally {
         loading.value = false;
     }
 };
 
-// Filter & Pagination
-const filteredVehicles = computed(() => {
-    if (!searchQuery.value) return vehicles.value;
-    const query = searchQuery.value.toLowerCase();
-    return vehicles.value.filter(v =>
-        (v.name && v.name.toLowerCase().includes(query)) ||
-        (v.vehicle_no && v.vehicle_no.toLowerCase().includes(query)) ||
-        (v.uniqueid && v.uniqueid.toLowerCase().includes(query))
-    );
-});
-
-const totalPages = computed(() => Math.ceil(filteredVehicles.value.length / itemsPerPage));
-const paginationStart = computed(() => (currentPage.value - 1) * itemsPerPage + 1);
-const paginationEnd = computed(() => Math.min(currentPage.value * itemsPerPage, filteredVehicles.value.length));
-
-const paginatedVehicles = computed(() => {
-    const start = (currentPage.value - 1) * itemsPerPage;
-    return filteredVehicles.value.slice(start, start + itemsPerPage);
-});
+const filteredVehicles = computed(() => vehicles.value);
+const totalPages = computed(() => Math.max(1, lastPage.value));
+const paginationStart = computed(() => totalResults.value === 0 ? 0 : (currentPage.value - 1) * selectedPerPage.value + 1);
+const paginationEnd = computed(() => Math.min(currentPage.value * selectedPerPage.value, totalResults.value));
+const paginatedVehicles = computed(() => filteredVehicles.value);
 
 const visiblePages = computed(() => {
     const pages = [];
@@ -366,12 +397,17 @@ const visiblePages = computed(() => {
 
 const changePage = (page) => {
     if (page >= 1 && page <= totalPages.value) {
-        currentPage.value = page;
+        fetchVehicles(page);
     }
 };
 
 const applySearch = () => {
+    fetchVehicles(1);
+};
+
+const onPerPageChange = () => {
     currentPage.value = 1;
+    fetchVehicles(1);
 };
 
 // Auto Refresh Logic
@@ -494,6 +530,29 @@ const speedClass = (s) => {
 .cursor-pointer {
     cursor: pointer;
 }
+
+.monitoring-stat-value {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  line-height: 1.2;
+  margin-top: 0.125rem;
+}
+
+.monitoring-stat-count {
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.monitoring-stat-unit {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
 .pagination .page-link { color: #333; }
 .pagination .page-item.active .page-link { background-color: var(--brand-primary); border-color: var(--brand-primary); color: #fff; }
 .modal-backdrop { z-index: 1040; }

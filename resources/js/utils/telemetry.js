@@ -2,10 +2,61 @@ export function parseAttrs(raw) {
   try { return typeof raw === 'string' ? JSON.parse(raw) : (raw || {}); } catch { return {}; }
 }
 
+/** Fuel gauge / alert thresholds (%). Below critical = red; below warning = yellow. */
+export const FUEL_LEVEL_THRESHOLDS = { critical: 10, warning: 25 };
+
+export function fuelLevelVariant(percent) {
+  if (percent == null || !Number.isFinite(Number(percent))) return null;
+  const p = Number(percent);
+  if (p < FUEL_LEVEL_THRESHOLDS.critical) return 'danger';
+  if (p < FUEL_LEVEL_THRESHOLDS.warning) return 'warning';
+  return 'success';
+}
+
+export function fuelLevelColor(percent, variant = null) {
+  const v = variant ?? fuelLevelVariant(percent);
+  if (v === 'danger') return '#e03131';
+  if (v === 'warning') return '#f59f00';
+  if (v === 'success') return '#2f9e44';
+  return '#adb5bd';
+}
+
 const num = (v) => {
   const n = typeof v === 'string' ? parseFloat(v) : v;
   return Number.isFinite(n) ? n : null;
 };
+
+/** Traccar device.totalDistance / position totalDistance — always metres. */
+export function parseTraccarDistanceKm(raw) {
+  const n = num(raw);
+  if (n == null) return null;
+  return n / 1000;
+}
+
+/**
+ * Engine runtime counters from Traccar device.hours (ms) or position IO keys.
+ * @param {string|null} key - attribute name when falling back to position attrs
+ */
+export function parseEngineHoursValue(key, raw) {
+  const n = num(raw);
+  if (n == null) return null;
+  const k = String(key || '').toLowerCase();
+
+  // Traccar device.hours and position "hours" are milliseconds
+  if (k === 'hours' || k === '') {
+    return n / 3_600_000;
+  }
+
+  if (['enginehours', 'totalhours', 'workinghours', 'runhours', 'operatinghours'].includes(k)) {
+    if (n >= 1_000_000) return n / 3_600_000;
+    if (n >= 10_000) return n / 3_600;
+    return n;
+  }
+
+  if (n >= 1_000_000) return n / 3_600_000;
+  if (n >= 10_000) return n / 3_600;
+  return n;
+}
 
 const fmtKm = (k) => {
   const n = Math.round(k * 10) / 10;
@@ -74,75 +125,162 @@ export function formatOdometer(raw, ctx = {}) {
   return null;
 }
 
+const isFuelReverseFlag = (v) => v === true || v === 'true' || v === 1 || v === '1';
+
+const isAnalogFuelAttr = (attrs, ctx) => String(attrs.fuelAttr ?? ctx?.fuelAttr ?? '').toLowerCase().includes('analog');
+
+/** True when vehicle form explicitly disables fuel telemetry (electric / no fuel sensor). */
+export function isFuelAttrNone(fuelAttr) {
+  return String(fuelAttr ?? '').trim().toLowerCase() === 'none';
+}
+
+/** IO keys that report fuel level as 0–100 % (not mV / litres). */
+const isPercentFuelIoKey = (key) => {
+  const s = String(key || '').toLowerCase();
+  return ['io89', '89', 'io48', '48'].includes(s) || s.includes('percent');
+};
+
+/**
+ * Resolve EMPTY/FULL mV for (EMPTY − AI1) / (EMPTY − FULL).
+ * Reverse swaps fuelMin/fuelMax first, then: if max > min → EMPTY=max, FULL=min; else EMPTY=min, FULL=max.
+ */
+export function resolveAnalogEmptyFull(fuelMin, fuelMax, isReverse) {
+  if (fuelMin == null || fuelMax == null || fuelMin === fuelMax) return null;
+  let minV = fuelMin;
+  let maxV = fuelMax;
+  if (isReverse) {
+    minV = fuelMax;
+    maxV = fuelMin;
+  }
+  if (maxV > minV) {
+    return { empty: maxV, full: minV };
+  }
+  return { empty: minV, full: maxV };
+}
+
+/**
+ * Client formula (one ratio, then apply capacity):
+ *   ratio = (EMPTY − AI1) / (EMPTY − FULL)
+ *   LITRES = CAPACITY × ratio
+ *   PERCENT = ratio × 100
+ * AI1 is clamped to [FULL, EMPTY] mV so readings below FULL = full tank, above EMPTY = empty.
+ */
+export function analogFuelFromMv(ai1, capacity, fuelMin, fuelMax, isReverse) {
+  const cal = resolveAnalogEmptyFull(fuelMin, fuelMax, isReverse);
+  if (cal == null || ai1 == null || capacity == null || capacity <= 0) return null;
+
+  const EMPTY = cal.empty;
+  const FULL = cal.full;
+  const range = EMPTY - FULL;
+  if (range === 0) return null;
+
+  const lo = Math.min(EMPTY, FULL);
+  const hi = Math.max(EMPTY, FULL);
+  const AI1 = Math.max(lo, Math.min(hi, ai1));
+
+  let ratio = (EMPTY - AI1) / range;
+  ratio = Math.max(0, Math.min(1, ratio));
+
+  const liters = parseFloat((capacity * ratio).toFixed(1));
+  const percent = Math.round(ratio * 100);
+
+  return { liters, percent, empty: EMPTY, full: FULL, ai1: AI1, ratio };
+}
+
+/** @deprecated Use analogFuelFromMv — kept for callers that only need percent. */
+export function analogFuelPercent(adj, emptyCal, fullCal, isReverse) {
+  const cap = 100;
+  const r = analogFuelFromMv(adj, cap, emptyCal, fullCal, isReverse);
+  return r ? r.percent : null;
+}
+
 export function formatFuel(rawAttrs, ctx = {}) {
   const attrs = parseAttrs(rawAttrs);
+  const configuredFuelAttr = attrs.fuelAttr ?? ctx?.fuelAttr ?? null;
+  if (isFuelAttrNone(configuredFuelAttr)) {
+    const cap = num(ctx?.capacity ?? ctx?.fuelTankCapacity);
+    return {
+      key: null, liters: null, percent: null, raw: null, capacity: cap,
+      display: '-', source: 'none', variant: null, isPercent: false,
+    };
+  }
   const getV = (k) => num(get(attrs, k));
   const cap = num(ctx?.capacity ?? ctx?.fuelTankCapacity);
+  const emptyCal = getV('fuelanalogempty') ?? getV('fuelAnalogEmpty') ?? getV('fuel_empty') ?? getV('analog_empty') ?? getV('analogEmpty') ?? getV('fuelMin') ?? getV('fuel_min');
+  const fullCal = getV('fuelanalogfull') ?? getV('fuelAnalogFull') ?? getV('fuel_full') ?? getV('analog_full') ?? getV('analogFull') ?? getV('fuelMax') ?? getV('fuel_max');
+  const aScale = getV('fuelanalogscale') ?? getV('fuelAnalogScale') ?? getV('analog_scale') ?? getV('analogScale') ?? 1;
+  const aOff = getV('fuelanalogoffset') ?? getV('fuelAnalogOffset') ?? getV('analog_offset') ?? getV('analogOffset') ?? 0;
+  const fuelReverse = isFuelReverseFlag(attrs.fuelReverse ?? ctx?.fuelReverse);
+  const hasAnalogCal = (emptyCal != null && fullCal != null && emptyCal !== fullCal) || aScale !== 1 || aOff !== 0;
+
+  const analogCompute = (rawVal, rawKey) => {
+    const rawNum = num(rawVal);
+    if (rawNum == null) return null;
+    const adj = rawNum * aScale + aOff;
+    let pRes = null;
+    let lRes = null;
+    const fuel = cap && cap > 0 ? analogFuelFromMv(adj, cap, emptyCal, fullCal, fuelReverse) : null;
+    if (fuel) {
+      pRes = { k: rawKey, v: fuel.percent };
+      lRes = { k: rawKey, v: fuel.liters };
+    }
+    return { raw: rawNum, rawKey, pRes, lRes };
+  };
+
+  const isIoKey = (k) => {
+    const s = String(k || '').trim().toLowerCase();
+    return /^io\d+$/.test(s) || /^\d+$/.test(s);
+  };
 
   // Result helper
   const mkFuel = (key, l, p, raw = null, src = null) => {
-    const d = l != null ? `${l} L${p != null ? ` (${p}%)` : ''}` : (p != null ? `${p}%` : null);
+    const d = (cap && cap > 0)
+      ? (p != null ? `${p}%` : (l != null ? `${l} L` : null))
+      : (l != null ? `${l} L` : (p != null ? `${p}%` : null));
     return {
       key, liters: l, percent: p, raw, capacity: cap, display: d, source: src,
-      variant: p == null ? null : (p >= 60 ? 'success' : p >= 30 ? 'warning' : 'danger'),
+      variant: fuelLevelVariant(p),
       isPercent: p != null && l == null
     };
   };
 
-  const calcAnalogFuel = (key) => {
-    const raw = getV(key);
-    if (raw === null || raw <= 0) return null;
-
-    let min = getV('fuelanalogempty') ?? getV('fuel_empty') ?? getV('analog_empty') ?? getV('fuelMin') ?? getV('fuel_min');
-    let max = getV('fuelanalogfull') ?? getV('fuel_full') ?? getV('analog_full') ?? getV('fuelMax') ?? getV('fuel_max');
-    const scale = getV('fuelanalogscale') ?? getV('analog_scale') ?? 1;
-    const off = getV('fuelanalogoffset') ?? getV('analog_offset') ?? 0;
-
-    const revRaw = get(attrs, 'fuelReverse') ?? ctx?.fuelReverse;
-    const rev = revRaw === true || revRaw === 1 || String(revRaw).toLowerCase() === 'true';
-    if (rev) {
-      const tmp = min;
-      min = max;
-      max = tmp;
-    }
-
-    if (min == null || max == null || min === max) return null;
-
-    const adj = raw * scale + off;
-    let p;
-    if (max > min) {
-      p = ((adj - min) / (max - min)) * 100;
-    } else {
-      p = ((min - adj) / (min - max)) * 100;
-    }
-    p = Math.max(0, Math.min(100, Math.round(p)));
-    let l = null;
-    if (cap && cap > 0) {
-      l = Math.round((cap * p / 100) * 10) / 10;
-    }
-    return { raw, p, l };
-  };
-
   // 1. Preferred/Resolved
   const pref = attrs.fuelAttr_key || ctx?.fuelAttr_key;
-  const fuelAttr = attrs.fuelAttr || ctx?.fuelAttr;
 
-  if (pref && fuelAttr) {
-    if (pref === 'io9' || pref === 'io6') {
-      const res = calcAnalogFuel(pref);
-      if (res) return mkFuel(pref, res.l, res.p, res.raw, pref);
-      return mkFuel(pref, 0, 0, null, 'zero');
-    }
-    const val = getV(pref);
+  if (pref) {
+    let val = getV(pref);
     if (val !== null && val !== -1) {
-      let v = val;
-      const isCan = String(pref).toLowerCase().includes('can') || ['io84', '84'].includes(String(pref).toLowerCase());
-      const multiplier = isCan ? 0.1 : 1.0;
-      v = v * multiplier;
+      const fuelAttrName = String(attrs.fuelAttr ?? ctx?.fuelAttr ?? '').toLowerCase();
+      const needsAnalogCal = isIoKey(pref) && isAnalogFuelAttr(attrs, ctx) && emptyCal != null && fullCal != null;
+      if (needsAnalogCal) {
+        const a = analogCompute(val, pref);
+        if (a && (a.pRes || a.lRes)) return mkFuel(a.lRes?.k || a.pRes?.k || a.rawKey, a.lRes?.v, a.pRes?.v, a.raw);
+        return mkFuel(pref, 0, 0, val, 'unconfigured');
+      }
+      // CAN / percent IO keys (io89, io48, io84) — not millivolt analog
+      const prefLower = String(pref).toLowerCase();
+      const isCanScaled = (prefLower.includes('can') || ['io84', '84'].includes(prefLower))
+        && !fuelAttrName.includes('percent');
+      const multiplier = isCanScaled ? 0.1 : 1.0;
+      val = val * multiplier;
 
       let l = null, p = null;
-      if (cap && v >= 0 && v <= 100) { p = Math.round(v); l = Math.round((cap * p / 100) * 10) / 10; }
-      else { l = Math.round(v * 10) / 10; }
+      if (isIoKey(pref)) {
+        if (cap && val >= 0) {
+          if (isPercentFuelIoKey(pref) && val <= 100) {
+            p = Math.round(val);
+            l = Math.round((cap * val / 100) * 10) / 10;
+          } else {
+            l = Math.round(val * 10) / 10;
+            p = Math.max(0, Math.min(100, Math.round((l / cap) * 100)));
+          }
+        }
+      } else if (cap && val >= 0 && val <= 100) {
+        p = Math.round(val);
+        l = Math.round((cap * p / 100) * 10) / 10;
+      } else {
+        l = Math.round(val * 10) / 10;
+      }
       return mkFuel(pref, l, p);
     }
     // Explicitly configured but missing/invalid -> Return empty/zero (Skip defaults)
@@ -161,6 +299,7 @@ export function formatFuel(rawAttrs, ctx = {}) {
   const lKeys = ['canFuel', 'can_fuel', 'can_fuel_level', 'fuelLiter', 'fuelLiters', 'fuel', 'io84', '84'];
   let lRes = null;
   let wasMinusOne = false;
+  let raw = null, rawKey = null;
   for (const k of lKeys) {
     const v = getV(k);
     if (v !== null) {
@@ -172,15 +311,13 @@ export function formatFuel(rawAttrs, ctx = {}) {
     }
   }
 
-  // 4. Analog (For analog-only devices or as fallback)
-  let raw = null, rawKey = null;
+  // 4. Remaining IO / analog fallback (only mV calibration for configured analog fuel)
   if (!pRes && !lRes) {
-    const rKeys = ['io9', 'io6', 'io67', 'io68', 'io69', 'io240', 'io241', 'io242', 'io243', 'fuelRaw', 'analog1', 'analog2', 'analog3'];
+    const rKeys = ['io67', 'io68', 'io69', 'io240', 'io241', 'io242', 'io243', 'fuelRaw', 'analog1', 'analog2', 'analog3', 'adc1', 'adc2', 'adc3', 'adc'];
     let sum = 0, count = 0;
 
     for (const k of rKeys) {
       const v = getV(k);
-      // Only include values that look like raw analog readings (usually > 0)
       if (v !== null && v > 0) {
         sum += v;
         count++;
@@ -194,35 +331,17 @@ export function formatFuel(rawAttrs, ctx = {}) {
     }
 
     if (raw !== null) {
-      let min = getV('fuelanalogempty') ?? getV('fuel_empty') ?? getV('analog_empty') ?? getV('fuelMin') ?? getV('fuel_min');
-      let max = getV('fuelanalogfull') ?? getV('fuel_full') ?? getV('analog_full') ?? getV('fuelMax') ?? getV('fuel_max');
-      const scale = getV('fuelanalogscale') ?? getV('analog_scale') ?? 1;
-      const off = getV('fuelanalogoffset') ?? getV('analog_offset') ?? 0;
-
-      const revRaw = get(attrs, 'fuelReverse') ?? ctx?.fuelReverse;
-      const rev = revRaw === true || revRaw === 1 || String(revRaw).toLowerCase() === 'true';
-      if (rev) {
-        const tmp = min;
-        min = max;
-        max = tmp;
-      }
-
-      const adj = raw * scale + off;
-
-      if (min != null && max != null && min !== max) {
-        let p;
-        if (max > min) {
-          // Sensor increases with fuel: standard interpolation
-          p = ((adj - min) / (max - min)) * 100;
-        } else {
-          // Sensor decreases with fuel: EMPTY > FULL (client formula)
-          // Percentage full = (EMPTY - value) / (EMPTY - FULL) * 100
-          p = ((min - adj) / (min - max)) * 100;
+      const useAnalogCal = isAnalogFuelAttr(attrs, ctx) && emptyCal != null && fullCal != null;
+      if (useAnalogCal) {
+        const a = analogCompute(raw, rawKey);
+        if (a) {
+          pRes = a.pRes;
+          lRes = a.lRes;
         }
-        p = Math.round(p);
-        pRes = { k: rawKey, v: Math.max(0, Math.min(100, p)) };
-      } else {
-        lRes = { k: rawKey, v: Math.round(adj * 10) / 10 };
+      } else if (isPercentFuelIoKey(rawKey) && cap && cap > 0 && raw <= 100) {
+        pRes = { k: rawKey, v: Math.round(raw) };
+      } else if (raw > 0) {
+        lRes = { k: rawKey, v: Math.round(raw * 10) / 10 };
       }
     }
   }
@@ -275,16 +394,7 @@ export function formatSpeed(deviceAttributes, position) {
     const v = pAttrs[speedAttrKey];
     val = (v !== undefined && v !== null) ? v : 0;
   } else {
-    const speedAttr = attrs.speedAttr;
-    if (speedAttr) {
-      const key = Object.keys(pAttrs).find(k => k.toLowerCase() === speedAttr.toLowerCase());
-      if (key) val = pAttrs[key];
-    }
-
-    // Fallback to GPS Speed (only if no strict key configured)
-    if (val === null || val === undefined) {
       val = defaultSpeed;
-    }
   }
 
   // 2. Format Value
@@ -298,7 +408,7 @@ export function formatSpeed(deviceAttributes, position) {
   if (!Number.isFinite(n)) return { value: val, display: String(val), unit: '' };
 
   // Conversion (Knots to km/h) - Standard logic for this project
-  const kmh = n * 1.852;
+  const kmh = n;
   return {
     value: n,
     display: `${kmh.toFixed(1)} km/h`,

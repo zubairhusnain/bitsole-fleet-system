@@ -26,31 +26,26 @@
     <table>
         <thead>
             <tr>
-                <th style="width: 6%;">Vehicle ID</th>
-                <th style="width: 6%;">Owner</th>
-                <th style="width: 6%;">Type/Model</th>
-                <th style="width: 6%;">Device Model</th>
-                <th style="width: 8%;">IMEI</th>
-                <th style="width: 6%;">ICCID</th>
-                <th style="width: 6%;">Odometer</th>
-                <th style="width: 4%;">Power</th>
-                <th style="width: 6%;">Last Report</th>
-                <th style="width: 5%;">Lat</th>
-                <th style="width: 5%;">Lon</th>
-                <th style="width: 8%;">Location</th>
-                <th style="width: 5%;">Speed</th>
-                <th style="width: 4%;">GPS</th>
-                <th style="width: 4%;">Ignition</th>
-                <th style="width: 6%;">Last On</th>
-                <th style="width: 6%;">Last Off</th>
-                <th style="width: 6%;">Activation</th>
+                <th style="width: 9%;">Vehicle ID</th>
+                <th style="width: 9%;">Type/Model</th>
+                <th style="width: 9%;">Device Model</th>
+                <th style="width: 9%;">IMEI</th>
+                <th style="width: 7%;">Odometer</th>
+                <th style="width: 5%;">Power</th>
+                <th style="width: 9%;">Last Report</th>
+                <th style="width: 13%;">Location</th>
+                <th style="width: 6%;">Speed</th>
+                <th style="width: 5%;">GPS Signal</th>
+                <th style="width: 5%;">Ignition</th>
+                <th style="width: 9%;">Last Ignition On</th>
+                <th style="width: 9%;">Last Ignition Off</th>
+                <th style="width: 6%;">Activation Date</th>
             </tr>
         </thead>
         <tbody>
             @foreach($rows as $row)
             <tr>
                 <td>{{ $row['vehicle_id'] }}</td>
-                <td>{{ $row['owner'] }}</td>
                 <td>{{ $row['type_model'] }}</td>
                 <td>{{ $row['device_model'] }}</td>
                 <td>{{ $row['imei'] }}</td>
@@ -61,8 +56,6 @@
                     </span>
                 </td>
                 <td>{{ $row['last_report'] }}</td>
-                <td>{{ $row['latitude'] }}</td>
-                <td>{{ $row['longitude'] }}</td>
                 <td>{{ $row['location'] }}</td>
                 <td>{{ $row['speed'] }}</td>
                 <td>{{ $row['gps_signal'] }}</td>

@@ -2,10 +2,11 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schedule;
 
-if (filter_var(env('SCHEDULER_ENABLED', true), FILTER_VALIDATE_BOOLEAN)) {
+Artisan::command('inspire', function () {
+    $this->comment(Inspiring::quote());
+})->purpose('Display an inspiring quote');
 
 // Assign computed attributes hourly
 // Schedule::command('assign:computed-attributes')
@@ -13,35 +14,61 @@ if (filter_var(env('SCHEDULER_ENABLED', true), FILTER_VALIDATE_BOOLEAN)) {
 //     ->withoutOverlapping()
 //     ->runInBackground();
 
-// Poll alerts service - runs continuously
-// In production, ensure the scheduler is running (cron)
-Schedule::command('alerts:poll')
-    ->everyMinute()
-    ->withoutOverlapping()
-    ->runInBackground();
+// Background jobs — enable on ONE domain only (e.g. production). Set SCHEDULER_ENABLED=false
+// on dev/staging clones that share the same database to avoid duplicate workers.
+// Includes: alerts:poll, low-fuel alerts, address backfill, fuel refill, ignition stabilize,
+// io9 stabilize, event columns, backups, geofence queue.
+if (filter_var(env('SCHEDULER_ENABLED', true), FILTER_VALIDATE_BOOLEAN)) {
+    Schedule::command('alerts:poll')
+        ->everyMinute()
+        ->withoutOverlapping()
+        ->runInBackground();
 
-// Check for missing columns in tc_events table every 5 minutes
-Schedule::command('events:check-columns')
-    ->everyFiveMinutes()
-    ->withoutOverlapping()
-    ->runInBackground();
-
-// Database backup daily using custom command (can be disabled via env)
+    Schedule::command('events:check-columns')
+        ->everyFiveMinutes()
+        ->withoutOverlapping()
+        ->runInBackground();
 
     Schedule::command('backup:cleanup-old')->daily()->at('01:00');
     Schedule::command('backup:database-only')->daily()->at('01:30');
 
+    Schedule::command('traccar:backfill-addresses --continuous')
+        ->everyMinute()
+        ->withoutOverlapping()
+        ->runInBackground();
 
-// Backfill missing addresses in tc_positions
-// Runs continuously (restarts if stopped) to fix blank addresses
-Schedule::command('traccar:backfill-addresses --continuous')
-    ->everyMinute()
-    ->withoutOverlapping()
-    ->runInBackground();
+    Schedule::command('traccar:backfill-event-positions --continuous')
+        ->everyMinute()
+        ->withoutOverlapping()
+        ->runInBackground();
 
-// Stabilize io9 for latest positions using last non-zero ignition-on reading
-Schedule::command('traccar:stabilize-io9')
-    ->everyMinute()
-    ->withoutOverlapping()
-    ->runInBackground();
+    // BITSole legacy io9 stabilizer — keep until ignition-attribute path is validated in prod
+    Schedule::command('traccar:stabilize-io9')
+        ->everyMinute()
+        ->withoutOverlapping()
+        ->runInBackground();
+
+    Schedule::command('traccar:stabilize-ignition-attributes')
+        ->everyMinute()
+        ->withoutOverlapping()
+        ->runInBackground();
+
+    Schedule::command('positions:observe-fuel-refill')
+        ->everyMinute()
+        ->withoutOverlapping()
+        ->runInBackground();
+
+    Schedule::command('positions:observe-geofence-alerts --interval=5')
+        ->everyMinute()
+        ->withoutOverlapping()
+        ->runInBackground();
+
+    Schedule::command('queue:work database --queue=geofence --sleep=1 --tries=3 --timeout=120')
+        ->everyMinute()
+        ->withoutOverlapping()
+        ->runInBackground();
+
+    Schedule::command('alerts:check-low-fuel')
+        ->everyFiveMinutes()
+        ->withoutOverlapping();
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\UtcDatetime;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -15,7 +16,7 @@ class TcEvent extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'eventtime' => 'datetime',
+        'eventtime' => UtcDatetime::class,
         'attributes' => 'array',
         'is_read' => 'boolean',
     ];
@@ -23,6 +24,11 @@ class TcEvent extends Model
     public function device(): BelongsTo
     {
         return $this->belongsTo(TcDevice::class, 'deviceid', 'id');
+    }
+
+    public function position(): BelongsTo
+    {
+        return $this->belongsTo(TcPosition::class, 'positionid', 'id');
     }
 
     public function notifications()
@@ -38,7 +44,7 @@ class TcEvent extends Model
     public function scopeWithEnabledNotifications($query)
     {
         return $query->where(function ($top) {
-            $top->where(function ($main) {
+            $top->where(function ($main) { 
                 $main->whereHas('notifications', function ($q) {
                     $q->whereHas('devices', function ($dq) {
                         $dq->whereColumn('tc_devices.id', 'tc_events.deviceid');
@@ -57,7 +63,9 @@ class TcEvent extends Model
                     });
                 });
             })->orWhere('tc_events.type', 'frequentIgnition')
-              ->orWhere('tc_events.type', 'driverChanged');
+              ->orWhere('tc_events.type', 'driverChanged')
+              ->orWhere('tc_events.type', 'lowFuelWarning')
+              ->orWhere('tc_events.type', 'lowFuelCritical');
         });
     }
 }

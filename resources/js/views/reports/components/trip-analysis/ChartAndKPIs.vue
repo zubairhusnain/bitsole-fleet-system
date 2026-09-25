@@ -7,7 +7,7 @@
           <!-- Legend -->
           <div class="d-flex align-items-center justify-content-center gap-3 mb-4">
              <div class="d-flex align-items-center gap-1"><span style="width:12px;height:12px;background:#e83e8c;display:inline-block;border-radius:2px;"></span> <span class="small fw-semibold text-muted">Trip Duration</span></div>
-             <div class="d-flex align-items-center gap-1"><span style="width:12px;height:12px;background:#0b0f28;display:inline-block;border-radius:2px;"></span> <span class="small fw-semibold text-muted">Idle Duration</span></div>
+             <div class="d-flex align-items-center gap-1"><span style="width:12px;height:12px;background:#886654;display:inline-block;border-radius:2px;"></span> <span class="small fw-semibold text-muted">Idle Duration</span></div>
              <div class="d-flex align-items-center gap-1"><span style="width:12px;height:12px;background:#339af0;display:inline-block;border-radius:2px;"></span> <span class="small fw-semibold text-muted">Distance</span></div>
           </div>
 
@@ -36,7 +36,7 @@
                               opacity="0.8"
                               rx="0.5"
                         >
-                            <title>Distance: {{ formatDistance(d.distance) }}</title>
+                            <title>Distance: {{ formatDistanceChart(d.distance) }}</title>
                         </rect>
                     </g>
 
@@ -44,14 +44,14 @@
                     <polyline :points="tripLinePoints" fill="none" stroke="#e83e8c" stroke-width="0.8" />
                     <circle v-for="(d, i) in chartData" :key="'trip-dot-'+i"
                             :cx="getX(i)" :cy="getYDuration(d.tripDuration)" r="1.5" fill="#e83e8c" stroke="#fff" stroke-width="0.5">
-                        <title>Trip: {{ formatDuration(d.tripDuration) }}</title>
+                        <title>Trip: {{ formatHoursLabel(d.tripDuration) }}</title>
                     </circle>
 
                     <!-- Idle Duration Line -->
-                    <polyline :points="idleLinePoints" fill="none" stroke="#0b0f28" stroke-width="0.8" />
+                    <polyline :points="idleLinePoints" fill="none" stroke="#886654" stroke-width="0.8" />
                     <circle v-for="(d, i) in chartData" :key="'idle-dot-'+i"
-                            :cx="getX(i)" :cy="getYDuration(d.idleDuration)" r="1.5" fill="#0b0f28" stroke="#fff" stroke-width="0.5">
-                        <title>Idle: {{ formatDuration(d.idleDuration) }}</title>
+                            :cx="getX(i)" :cy="getYDuration(d.idleDuration)" r="1.5" fill="#886654" stroke="#fff" stroke-width="0.5">
+                        <title>Idle: {{ formatHoursLabel(d.idleDuration) }}</title>
                     </circle>
 
                     <!-- X-Axis Labels -->
@@ -69,11 +69,11 @@
                     <text x="2" y="30" font-size="2.5" text-anchor="middle" transform="rotate(-90, 2, 30)" fill="#6c757d">(Kilo-meters)</text>
 
                     <!-- Right Y-Axis Labels (Duration) -->
-                    <text x="92" y="10" font-size="2.5" text-anchor="start" fill="#6c757d">{{ Math.round(maxDuration/60000) }}</text>
-                    <text x="92" y="30" font-size="2.5" text-anchor="start" fill="#6c757d">{{ Math.round((maxDuration/2)/60000) }}</text>
+                    <text x="92" y="10" font-size="2.5" text-anchor="start" fill="#6c757d">{{ formatHours(maxDuration) }}</text>
+                    <text x="92" y="30" font-size="2.5" text-anchor="start" fill="#6c757d">{{ formatHours(maxDuration / 2) }}</text>
                     <text x="92" y="50" font-size="2.5" text-anchor="start" fill="#6c757d">0</text>
                     <!-- Label -->
-                    <text x="98" y="30" font-size="2.5" text-anchor="middle" transform="rotate(90, 98, 30)" fill="#6c757d">(Minutes)</text>
+                    <text x="98" y="30" font-size="2.5" text-anchor="middle" transform="rotate(90, 98, 30)" fill="#6c757d">(Hours)</text>
                 </svg>
              </div>
           </div>
@@ -94,7 +94,7 @@
                 <!-- Progress Bar -->
                 <div class="progress mb-4" style="height: 6px;">
                   <div class="progress-bar" :style="{width: tripPct + '%', backgroundColor: '#e83e8c'}"></div>
-                  <div class="progress-bar" :style="{width: idlePct + '%', backgroundColor: '#0b0f28'}"></div>
+                  <div class="progress-bar" :style="{width: idlePct + '%', backgroundColor: '#886654'}"></div>
                 </div>
 
                 <!-- Stacked Info Blocks -->
@@ -108,7 +108,7 @@
                     </div>
                     <div class="p-3 border rounded bg-white shadow-sm">
                         <div class="d-flex align-items-center gap-2 mb-1">
-                            <span style="width:8px;height:8px;background:#0b0f28;border-radius:50%;display:inline-block;"></span>
+                            <span style="width:8px;height:8px;background:#886654;border-radius:50%;display:inline-block;"></span>
                             <span class="small fw-bold text-muted">Idle Duration</span>
                         </div>
                         <div class="h5 fw-bold mb-0">{{ formatDuration(summary?.totalIdle) }}</div>
@@ -186,7 +186,16 @@ const toNumber = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-// Helper to format duration
+const formatHours = (ms) => {
+  const safeMs = toNumber(ms);
+  if (!safeMs) return '0';
+  return (safeMs / 3600000).toFixed(2);
+};
+
+const formatHoursLabel = (ms) => {
+  return `${formatHours(ms)} Hours`;
+};
+
 const formatDuration = (ms) => {
   const safeMs = toNumber(ms);
   if (!safeMs) return '0s';
@@ -204,6 +213,12 @@ const formatDistance = (m) => {
   const safeM = toNumber(m);
   if (!safeM) return '0 KM';
   return (safeM / 1000).toFixed(2) + ' KM';
+};
+
+const formatDistanceChart = (km) => {
+  const safe = toNumber(km);
+  if (!safe) return '0 KM';
+  return safe.toFixed(2) + ' KM';
 };
 
 // Total Time for Progress Bar
@@ -226,7 +241,7 @@ const chartData = computed(() => {
         return props.precomputedChartData
           .map((d) => ({
             ...d,
-            distance: toNumber(d.distance),
+            distance: toNumber(d.distance) / 1000,
             tripDuration: toNumber(d.tripDuration),
             idleDuration: toNumber(d.idleDuration),
           }))
@@ -252,7 +267,9 @@ const chartData = computed(() => {
         dataMap[d].idleDuration += toNumber(s.duration_ms);
     });
 
-    return Object.values(dataMap).sort((a, b) => a.date.localeCompare(b.date));
+    return Object.values(dataMap)
+      .map((d) => ({ ...d, distance: toNumber(d.distance) / 1000 }))
+      .sort((a, b) => a.date.localeCompare(b.date));
 });
 
 // Chart Scaling
@@ -264,7 +281,7 @@ const maxDistance = computed(() => {
 
 const maxDuration = computed(() => {
     if (!chartData.value.length) return 3600000;
-    const max = Math.max(...chartData.value.map(d => Math.max(d.tripDuration, d.idleDuration)));
+    const max = Math.max(...chartData.value.map(d => toNumber(d.tripDuration) + toNumber(d.idleDuration)));
     return max > 0 ? max * 1.1 : 3600000;
 });
 

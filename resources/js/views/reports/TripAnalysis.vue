@@ -87,8 +87,18 @@
               <option>Monthly Summary List</option>
             </select>
           </div>
-          <div class="col-12 col-md-1 text-md-end">
-            <button class="btn btn-primary w-100" @click="handleSearch">Search</button>
+          <div class="col-12 col-md-2 text-md-end">
+            <div class="d-flex flex-column gap-2">
+              <button class="btn btn-primary w-100" @click="handleSearch">Search</button>
+              <div v-if="isExportableView" class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary flex-fill" :disabled="!canExport" @click="downloadCsvActive">
+                  <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                </button>
+                <button type="button" class="btn btn-outline-secondary flex-fill" :disabled="!canExport" @click="downloadPdfActive">
+                  <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -98,6 +108,12 @@
     <div v-if="loading" class="d-flex align-items-center justify-content-center py-5">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+
+    <div v-else-if="!hasSearched" class="card border rounded-3 shadow-0">
+      <div class="card-body text-center py-5 text-muted">
+        Select filters and click <strong>Search</strong> to load the report.
       </div>
     </div>
 
@@ -129,7 +145,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue';
+import { createCancellableRequest, isRequestAborted } from '../../utils/cancellableRequest';
+import { initTodayDatetimeRange, todayStartDatetimeLocal, todayEndDatetimeLocal } from '../../utils/reportDates';
 import UiAlert from '../../components/UiAlert.vue';
 import DailyBreakdown from './components/trip-analysis/DailyBreakdown.vue';
 import DailyBreakdownMap from './components/trip-analysis/DailyBreakdownMap.vue';
@@ -139,15 +157,19 @@ import MonthlySummary from './components/trip-analysis/MonthlySummary.vue';
 import MonthlySummaryList from './components/trip-analysis/MonthlySummaryList.vue';
 import TripSummary from './components/trip-analysis/TripSummary.vue';
 import ReportSummary from './components/trip-analysis/ReportSummary.vue';
+import { openReportExport } from '../../utils/reportExport';
 
 const showInfo = ref(false);
-const startDate = ref('');
-const endDate = ref('');
+const { startDate: defaultStart, endDate: defaultEnd } = initTodayDatetimeRange();
+const startDate = ref(defaultStart);
+const endDate = ref(defaultEnd);
 const vehicle = ref('');
 const vehicles = ref([]);
 const viewType = ref('Trip Summary');
 const loading = ref(false);
+const hasSearched = ref(false);
 const errorMessage = ref(null);
+const reportRequest = createCancellableRequest();
 
 const rowsTripSummary = ref([]);
 const rowsDailyTrips = ref([]);
@@ -171,6 +193,49 @@ const selectedVehicleInfo = computed(() => {
 const isVehicleRequired = computed(() => {
     return ['Daily Breakdown', 'Daily Breakdown (with map)'].includes(viewType.value);
 });
+
+const isExportableView = computed(() => {
+  return ['Trip Summary', 'Daily Summary List', 'Monthly Summary List'].includes(viewType.value);
+});
+
+const canExport = computed(() => {
+  if (!isExportableView.value || !startDate.value || !endDate.value) return false;
+  if (isVehicleRequired.value && !vehicle.value) return false;
+  return true;
+});
+
+function exportParams() {
+  const params = {
+    from_date: startDate.value,
+    to_date: endDate.value,
+  };
+  if (vehicle.value) params.device_ids = [vehicle.value];
+  return params;
+}
+
+function downloadCsvActive() {
+  if (!canExport.value) return;
+  const params = exportParams();
+  if (viewType.value === 'Trip Summary') {
+    openReportExport('/web/reports/trip-summary/export-csv', params);
+  } else if (viewType.value === 'Daily Summary List') {
+    openReportExport('/web/reports/daily-summary/export-csv', params);
+  } else if (viewType.value === 'Monthly Summary List') {
+    openReportExport('/web/reports/monthly-summary/export-csv', params);
+  }
+}
+
+function downloadPdfActive() {
+  if (!canExport.value) return;
+  const params = exportParams();
+  if (viewType.value === 'Trip Summary') {
+    openReportExport('/web/reports/trip-summary/export-pdf', params);
+  } else if (viewType.value === 'Daily Summary List') {
+    openReportExport('/web/reports/daily-summary/export-pdf', params);
+  } else if (viewType.value === 'Monthly Summary List') {
+    openReportExport('/web/reports/monthly-summary/export-pdf', params);
+  }
+}
 
 const dateRange = computed(() => ({
   start: startDate.value,
@@ -202,28 +267,10 @@ const fetchVehicles = async () => {
 };
 
 const handleSearch = async () => {
-  let from = startDate.value;
-  let to = endDate.value;
-
-  // Default to today if empty
-  if (!from) {
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
-      // Adjust to local timezone ISO string for input
-      const offset = now.getTimezoneOffset() * 60000;
-      const localISOTime = (new Date(now - offset)).toISOString().slice(0, 16);
-      startDate.value = localISOTime;
-      from = localISOTime;
-  }
-
-  if (!to) {
-      const now = new Date();
-      now.setHours(23, 59, 59, 999);
-      const offset = now.getTimezoneOffset() * 60000;
-      const localISOTime = (new Date(now - offset)).toISOString().slice(0, 16);
-      endDate.value = localISOTime;
-      to = localISOTime;
-  }
+  let from = startDate.value || todayStartDatetimeLocal();
+  let to = endDate.value || todayEndDatetimeLocal();
+  if (!startDate.value) startDate.value = from;
+  if (!endDate.value) endDate.value = to;
 
   // Validate Device Selection
   if (!vehicle.value && isVehicleRequired.value) {
@@ -240,40 +287,44 @@ const handleSearch = async () => {
     params.device_ids = [vehicle.value];
   }
 
+  const signal = reportRequest.nextSignal();
+  hasSearched.value = true;
   loading.value = true;
   errorMessage.value = null;
   try {
+    const requestConfig = { params, signal };
     if (viewType.value === 'Trip Summary') {
-      const response = await window.axios.get('/web/reports/trip-summary', { params });
+      const response = await window.axios.get('/web/reports/trip-summary', requestConfig);
       rowsTripSummary.value = response.data;
     } else if (viewType.value === 'Daily Breakdown') {
-      const response = await window.axios.get('/web/reports/daily-trips', { params });
+      const response = await window.axios.get('/web/reports/daily-trips', requestConfig);
       rowsDailyTrips.value = response.data.rows;
       rowsDailyStops.value = response.data.stops || [];
       dailySummaryData.value = response.data.summary;
     } else if (viewType.value === 'Daily Breakdown (with map)') {
-      const response = await window.axios.get('/web/reports/daily-breakdown-map', { params });
+      const response = await window.axios.get('/web/reports/daily-breakdown-map', requestConfig);
       rowsDailyBreakdown.value = response.data;
     } else if (viewType.value === 'Daily Summary') {
       const p = { ...params, group_by: 'date' };
-      const response = await window.axios.get('/web/reports/daily-summary', { params: p });
+      const response = await window.axios.get('/web/reports/daily-summary', { params: p, signal });
       rowsDailySummary.value = response.data.rows || [];
       dailySummaryTotals.value = response.data.summary || {};
       dailySummaryChart.value = response.data.chart || [];
     } else if (viewType.value === 'Daily Summary List') {
-      const response = await window.axios.get('/web/reports/daily-summary', { params });
+      const response = await window.axios.get('/web/reports/daily-summary', requestConfig);
       rowsDailyVehicleList.value = response.data.rows || [];
     } else if (viewType.value === 'Monthly Summary') {
       const p = { ...params, group_by: 'month' };
-      const response = await window.axios.get('/web/reports/monthly-summary', { params: p });
+      const response = await window.axios.get('/web/reports/monthly-summary', { params: p, signal });
       rowsMonthlySummary.value = response.data.rows || [];
       monthlySummaryTotals.value = response.data.summary || {};
       monthlySummaryChart.value = response.data.chart || [];
     } else if (viewType.value === 'Monthly Summary List') {
-      const response = await window.axios.get('/web/reports/monthly-summary', { params });
+      const response = await window.axios.get('/web/reports/monthly-summary', requestConfig);
       rowsMonthlyVehicleList.value = response.data.rows || [];
     }
   } catch (error) {
+    if (isRequestAborted(error)) return;
     console.error('Error fetching report data:', error);
     errorMessage.value = error.response?.data?.message || 'Error fetching report data.';
     // Clear the current view's data on error
@@ -285,7 +336,9 @@ const handleSearch = async () => {
     else if (viewType.value === 'Monthly Summary') rowsMonthlySummary.value = [];
     else if (viewType.value === 'Monthly Summary List') rowsMonthlyVehicleList.value = [];
   } finally {
-    loading.value = false;
+    if (!signal.aborted) {
+      loading.value = false;
+    }
   }
 };
 
@@ -296,32 +349,17 @@ const handleViewDetails = (row) => {
 };
 
 watch(viewType, () => {
-    if (!vehicle.value && vehicles.value.length > 0) {
+    if (!vehicle.value && vehicles.value.length > 0 && isVehicleRequired.value) {
         vehicle.value = vehicles.value[0].device_id;
     }
-    handleSearch();
 });
 
 onMounted(() => {
   fetchVehicles();
+});
 
-  // Set default duration to last 7 days (Start of day to End of day)
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
-
-  const start = new Date();
-  start.setDate(end.getDate() - 6);
-  start.setHours(0, 0, 0, 0);
-
-  const toIsoLocal = (date) => {
-      const offset = date.getTimezoneOffset() * 60000;
-      return (new Date(date - offset)).toISOString().slice(0, 16);
-  };
-
-  startDate.value = toIsoLocal(start);
-  endDate.value = toIsoLocal(end);
-
-  handleSearch();
+onBeforeUnmount(() => {
+  reportRequest.cancel();
 });
 </script>
 
