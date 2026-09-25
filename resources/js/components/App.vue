@@ -37,8 +37,8 @@
                             </span>
                         </button>
                     </li>
-                    <li class="nav-item d-none align-items-center" v-if="isAuthed">
-                        <div class="d-flex align-items-center bg-white border rounded px-2" style="width: 220px; height: 32px;">
+                    <li class="nav-item d-flex align-items-center me-2" v-if="isAuthed">
+                        <div class="d-flex align-items-center bg-white border rounded px-2 timezone-select-wrap" style="width: 220px; height: 32px;">
                             <i class="bi bi-clock text-muted me-2"></i>
                             <select v-model="timezone" @change="handleTimezoneChange" class="form-select form-select-sm border-0 shadow-none p-0" style="font-size: 13px;">
                                 <option v-for="opt in timezoneOptions" :key="opt.value" :value="opt.value">
